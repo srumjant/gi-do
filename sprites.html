@@ -58,7 +58,7 @@ const DODO_JUMP=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,
 const DODO_P={1:'#ff69b4',3:'#ffffff',4:'#ffcc99',5:'#e8c845',6:'#cc6699',7:'#dd5555',8:'#ffaa88',9:'#ff9999'};
 
 // --- CAPE & ITEMS ---
-const CAPE_S=[[0,0,1,1,0,0],[0,1,1,1,1,0],[1,1,1,1,1,1],[1,1,1,1,1,1],[1,2,1,1,2,1],[1,2,2,2,2,1],[0,1,2,2,1,0],[0,0,1,1,0,0]];
+const CAPE_S=[[0,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1],[1,1,2,1,1,2,1,1],[0,1,1,2,2,1,1,0],[0,0,1,1,1,1,0,0]];
 const CAPE_P={1:'#dd2200',2:'#ff4422'};
 const SUPER_S=[[0,0,0,1,1,0,0,0],[0,0,1,2,2,1,0,0],[0,1,2,2,2,2,1,0],[1,2,2,3,3,2,2,1],[1,2,2,3,3,2,2,1],[0,1,2,2,2,2,1,0],[0,0,1,2,2,1,0,0],[0,0,0,1,1,0,0,0]];
 const SUPER_P={1:'#ff4400',2:'#ffaa00',3:'#ffff88'};
@@ -68,6 +68,38 @@ const ARROW_S=[[0,0,2,1,1,1],[0,0,2,1,1,1]];
 const ARROW_P={1:'#aa6633',2:'#cccccc'};
 const HEART_S=[[0,1,1,0,1,1,0],[1,1,1,1,1,1,1],[1,1,1,1,1,1,1],[0,1,1,1,1,1,0],[0,0,1,1,1,0,0],[0,0,0,1,0,0,0]];
 const HEART_P={1:'#ff3355'};
+
+// --- ENEMIES ---
+const DOLL_S=[[0,0,7,7,7,7,0,0],[0,7,7,7,7,7,7,0],[0,7,1,7,7,1,7,0],[0,7,7,3,3,7,7,0],[0,0,7,7,7,7,0,0],[0,0,2,2,2,2,0,0],[0,0,2,2,2,2,0,0],[0,0,2,2,2,2,0,0],[0,0,4,0,0,4,0,0]];
+const DOLL_P={1:'#ff0000',2:'#9040c0',3:'#ff3366',4:'#ffcc99',7:'#ffdd66'};
+const CAR_S=[[0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,1,1,1,1,1,1,0,0,0],[0,0,1,3,3,1,1,3,3,1,0,0],[0,1,1,1,1,1,1,1,1,1,1,0],[0,1,7,1,1,1,1,1,1,7,1,0],[0,0,2,2,0,0,0,0,2,2,0,0]];
+const CAR_P={1:'#3388ff',2:'#333333',3:'#aaddff',7:'#ffff00'};
+const DINO_S=[[0,0,0,0,0,1,1,1],[0,0,0,0,1,1,3,1],[0,0,0,0,1,1,1,1],[0,1,0,1,1,1,0,0],[0,1,1,1,1,1,0,0],[0,1,1,1,1,0,0,0],[0,1,1,1,1,1,0,0],[0,1,0,0,1,0,0,0],[0,2,0,0,2,0,0,0]];
+const DINO_P={1:'#44bb44',2:'#336633',3:'#ff3333'};
+const GHOST_S=[[0,0,1,1,1,1,0,0],[0,1,1,1,1,1,1,0],[0,1,2,1,1,2,1,0],[0,1,3,1,1,3,1,0],[0,1,1,1,1,1,1,0],[0,1,1,4,4,1,1,0],[0,1,1,1,1,1,1,0],[1,0,1,1,1,1,0,1],[0,0,1,0,0,1,0,0]];
+const GHOST_P={1:'#ddeeff',2:'#2222aa',3:'#4444cc',4:'#aabbdd'};
+const BAT_S=[[1,0,0,0,0,0,1],[1,1,0,0,0,1,1],[1,1,1,2,1,1,1],[0,1,2,3,2,1,0],[0,0,2,2,2,0,0],[0,0,0,1,0,0,0]];
+const BAT_P={1:'#553377',2:'#442266',3:'#ff3333'};
+const CANNON_S=[[0,0,2,2,2,2,0,0],[0,2,2,1,1,2,2,0],[2,2,1,1,1,1,2,2],[2,1,1,1,1,1,1,2],[2,1,1,1,1,1,1,2],[2,2,1,1,1,1,2,2],[0,2,2,2,2,2,2,0],[0,0,3,3,3,3,0,0]];
+const CANNON_P={1:'#555555',2:'#888888',3:'#444444'};
+const BOUNCER_S=[[0,0,1,1,1,0,0],[0,1,1,1,1,1,0],[0,1,2,1,2,1,0],[0,1,1,3,1,1,0],[0,1,1,1,1,1,0],[0,0,1,1,1,0,0],[0,4,4,4,4,4,0],[4,4,4,4,4,4,4]];
+const BOUNCER_P={1:'#ff8800',2:'#ffffff',3:'#ff4444',4:'#cc6600'};
+const PENGUIN_S=[[0,0,0,1,1,0,0,0],[0,0,1,1,1,1,0,0],[0,1,1,2,2,1,1,0],[0,1,1,3,3,1,1,0],[0,1,1,5,5,1,1,0],[0,6,6,6,6,6,6,0],[0,1,4,4,4,4,1,0],[1,1,4,4,4,4,1,1],[1,0,4,4,4,4,0,1],[0,0,1,1,1,1,0,0],[0,0,7,7,7,7,0,0]];
+const PENGUIN_P={1:'#1a1a2e',2:'#ffffff',3:'#111111',4:'#e8e8ff',5:'#ffaa00',6:'#ee3333',7:'#ff8800'};
+const ICEBAT_S=[[1,0,0,0,0,0,1],[1,1,0,0,0,1,1],[1,1,1,2,1,1,1],[0,1,2,3,2,1,0],[0,0,2,4,2,0,0],[0,0,0,1,0,0,0]];
+const ICEBAT_P={1:'#224466',2:'#334488',3:'#ff3355',4:'#55ffff'};
+const CHICKEN_S=[[0,0,0,1,0,0,0,0],[0,0,1,1,1,0,0,0],[0,2,1,1,1,0,0,0],[0,0,1,1,1,1,0,0],[0,0,0,1,1,0,0,0],[0,0,0,3,3,0,0,0],[0,0,3,0,0,3,0,0]];
+const CHICKEN_P={1:'#ffffff',2:'#ff4400',3:'#ffaa00'};
+const TRASHBOT_S=[[0,0,1,1,1,1,0,0],[0,1,2,2,2,2,1,0],[0,1,2,3,2,3,2,0],[0,1,2,2,4,2,2,0],[0,0,1,2,2,2,0,0],[0,0,1,1,1,1,0,0],[0,5,5,0,0,5,5,0]];
+const TRASHBOT_P={1:'#887766',2:'#aa9977',3:'#ff3333',4:'#ffaa00',5:'#555555'};
+const DRONE_S=[[0,0,6,6,6,6,6,6,0,0],[0,0,0,6,0,0,6,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,1,1,2,1,1,2,1,1,0],[0,1,1,1,1,1,1,1,1,0],[0,0,0,3,0,0,3,0,0,0]];
+const DRONE_P={1:'#888899',2:'#ff0000',3:'#555566',6:'#aaaacc'};
+const PISTONBOT_S=[[0,0,1,1,1,1,0,0],[0,1,1,2,2,1,1,0],[0,1,2,3,3,2,1,0],[0,1,1,1,1,1,1,0],[0,1,1,4,4,1,1,0],[0,1,1,1,1,1,1,0],[0,0,1,1,1,1,0,0],[0,0,5,0,0,5,0,0]];
+const PISTONBOT_P={1:'#555566',2:'#666677',3:'#ff4400',4:'#ffcc00',5:'#333344'};
+
+// --- CAT COMPANION ---
+const CAT_S=[[0,1,0,0,0,0,0,1,0,0],[0,1,1,0,0,0,1,1,0,0],[0,1,2,1,1,1,2,1,0,0],[0,0,1,1,1,1,1,0,0,0],[0,0,1,3,1,3,1,0,0,0],[0,0,1,1,4,1,1,0,0,0],[5,0,1,1,1,1,1,0,5,0],[0,5,1,1,1,1,1,5,0,0],[0,0,1,1,1,1,1,0,0,0],[0,0,1,0,0,0,1,0,0,0],[0,0,1,0,0,0,1,0,0,0],[0,0,0,0,0,0,0,1,1,0],[0,0,0,0,0,0,0,0,1,0]];
+const CAT_P={1:'#444455',2:'#556666',3:'#aaffaa',4:'#ff69b4',5:'#555566'};
 
 // ==========================================
 //  RENDERING
@@ -198,24 +230,24 @@ function buildUI() {
 
   // --- COMBINED: Gigi + Cape ---
   row = addSection('Combined: Gigi + Cape');
-  // Cape behind, offset to the left
-  let cb = createCombinedBox('Gigi Stand + Cape (facing right)',
-    [CAPE_S, GIGI_STAND], [CAPE_P, GIGI_P], [[-2, 4], [0, 0]]);
+  // Cape behind at shoulder level, flowing left (character faces right)
+  let cb = createCombinedBox('Gigi Stand + Cape',
+    [CAPE_S, GIGI_STAND], [CAPE_P, GIGI_P], [[0, 6], [4, 0]]);
   row.appendChild(cb.box); allBoxes.push(cb);
-  cb = createCombinedBox('Gigi Run + Cape (facing right)',
-    [CAPE_S, GIGI_RUN], [CAPE_P, GIGI_P], [[-2, 4], [0, 0]]);
+  cb = createCombinedBox('Gigi Run + Cape',
+    [CAPE_S, GIGI_RUN], [CAPE_P, GIGI_P], [[0, 6], [4, 0]]);
   row.appendChild(cb.box); allBoxes.push(cb);
-  cb = createCombinedBox('Gigi Jump + Cape (facing right)',
-    [CAPE_S, GIGI_JUMP], [CAPE_P, GIGI_P], [[-2, 4], [0, 0]]);
+  cb = createCombinedBox('Gigi Jump + Cape',
+    [CAPE_S, GIGI_JUMP], [CAPE_P, GIGI_P], [[0, 6], [4, 0]]);
   row.appendChild(cb.box); allBoxes.push(cb);
 
   // --- COMBINED: Dodo + Cape ---
   row = addSection('Combined: Dodo + Cape');
   cb = createCombinedBox('Dodo Stand + Cape',
-    [CAPE_S, DODO_STAND], [CAPE_P, DODO_P], [[-2, 4], [0, 0]]);
+    [CAPE_S, DODO_STAND], [CAPE_P, DODO_P], [[0, 5], [4, 0]]);
   row.appendChild(cb.box); allBoxes.push(cb);
   cb = createCombinedBox('Dodo Run + Cape',
-    [CAPE_S, DODO_RUN], [CAPE_P, DODO_P], [[-2, 4], [0, 0]]);
+    [CAPE_S, DODO_RUN], [CAPE_P, DODO_P], [[0, 5], [4, 0]]);
   row.appendChild(cb.box); allBoxes.push(cb);
 
   // --- ITEMS ---
@@ -224,6 +256,30 @@ function buildUI() {
     const b = createSpriteBox(l, d, p);
     row.appendChild(b.box); allBoxes.push(b);
   });
+
+  // --- CAT ---
+  row = addSection('Cat Companion');
+  const catBox = createSpriteBox('Cat', CAT_S, CAT_P);
+  row.appendChild(catBox.box); allBoxes.push(catBox);
+
+  // --- CH1 ENEMIES ---
+  row = addSection('Chapter 1 Enemies');
+  [['Doll', DOLL_S, DOLL_P], ['Car', CAR_S, CAR_P], ['Dino', DINO_S, DINO_P], ['Ghost', GHOST_S, GHOST_P], ['Bat', BAT_S, BAT_P], ['Cannon', CANNON_S, CANNON_P], ['Bouncer', BOUNCER_S, BOUNCER_P], ['Penguin', PENGUIN_S, PENGUIN_P], ['Ice Bat', ICEBAT_S, ICEBAT_P]].forEach(([l, d, p]) => {
+    const b = createSpriteBox(l, d, p);
+    row.appendChild(b.box); allBoxes.push(b);
+  });
+
+  // --- CH2 ENEMIES ---
+  row = addSection('Chapter 2 Enemies');
+  [['Trash Bot', TRASHBOT_S, TRASHBOT_P], ['Drone', DRONE_S, DRONE_P], ['Piston Bot', PISTONBOT_S, PISTONBOT_P]].forEach(([l, d, p]) => {
+    const b = createSpriteBox(l, d, p);
+    row.appendChild(b.box); allBoxes.push(b);
+  });
+
+  // --- CHICKEN ---
+  row = addSection('Chicken (Power-up Transform)');
+  const chickenBox = createSpriteBox('Chicken', CHICKEN_S, CHICKEN_P);
+  row.appendChild(chickenBox.box); allBoxes.push(chickenBox);
 }
 
 function setScale(s) {
