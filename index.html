@@ -928,6 +928,7 @@ if(p.fartTimer>0){enemies.forEach(e=>{if(!e.alive)return;const edx=e.x+e.w/2-(p.
     const h1=Math.floor(pL2/TILE),h2=Math.floor(pR2/TILE),hy=Math.floor(hY/TILE);
     [h1,h2].forEach(hx=>{const qb=questionBlocks.find(q=>q.x===hx&&q.y===hy&&!q.hit);if(qb){qb.hit=true;map[qb.y][qb.x]=2;stars.push({x:qb.x*TILE,y:qb.y*TILE-TILE,vy:-2,collected:false});spawnParticles(qb.x*TILE+8,qb.y*TILE,'#ffdd00',5);sfxBlock();}});
     [h1,h2].forEach(hx=>{const rb=rainbowBlocks.find(q=>q.x===hx&&q.y===hy&&!q.hit);if(rb){rb.hit=true;map[rb.y][rb.x]=2;giveRandomSillyPowerup();spawnParticles(rb.x*TILE+8,rb.y*TILE,'#ff69b4',8);sfxBlock();}});
+    [h1,h2].forEach(hx=>{if(map[hy]&&map[hy][hx]===4)breakCrate(hx,hy);});
   }}
   if(p.onGround){crateComboTimer--;if(crateComboTimer<=0)crateCombo=0;}
   if(p.x<0)p.x=0;
@@ -1328,6 +1329,26 @@ smashTexts.forEach(st=>{
   if(player.fartTimer>0){ctx.fillStyle='#88cc44';ctx.font='bold 10px monospace';ctx.fillText('FART '+Math.ceil(player.fartTimer/60)+'s',BASE_W-80,hudY);hudY+=14;}
   if(player.bigHeadTimer>0){ctx.fillStyle='#ff69b4';ctx.font='bold 10px monospace';ctx.fillText('BIG HEAD '+Math.ceil(player.bigHeadTimer/60)+'s',BASE_W-80,hudY);hudY+=14;}
   if(player.chickenRayCharges>0){ctx.fillStyle='#ffffff';ctx.font='bold 10px monospace';ctx.fillText('CHICKEN x'+player.chickenRayCharges,BASE_W-80,hudY);hudY+=14;}
+  // Power-up viewport border
+  if(player.fartTimer>0||player.bigHeadTimer>0||player.chickenRayCharges>0){
+    ctx.save();
+    const bw=4,af=animFrame;
+    const pColor=player.fartTimer>0?'#88cc44':player.bigHeadTimer>0?'#ff69b4':'#ffffff';
+    const pAlpha=0.3+Math.sin(af*0.1)*0.15;
+    ctx.globalAlpha=pAlpha;
+    // Animated dashes along all four edges
+    ctx.strokeStyle=pColor;ctx.lineWidth=bw;ctx.setLineDash([8,6]);ctx.lineDashOffset=-af*2;
+    ctx.strokeRect(bw/2,bw/2,BASE_W-bw,BASE_H-bw);
+    // Corner glow
+    ctx.setLineDash([]);
+    const glow=6+Math.sin(af*0.15)*3;
+    [[0,0],[BASE_W,0],[0,BASE_H],[BASE_W,BASE_H]].forEach(([cx,cy])=>{
+      const g=ctx.createRadialGradient(cx,cy,0,cx,cy,glow*3);
+      g.addColorStop(0,pColor);g.addColorStop(1,'transparent');
+      ctx.fillStyle=g;ctx.fillRect(cx-glow*3,cy-glow*3,glow*6,glow*6);
+    });
+    ctx.restore();
+  }
   // Boss HUD
   if(boss&&boss.alive){
     const bHW=120,bHH=10,bHX=BASE_W/2-bHW/2,bHY=BASE_H-22;
