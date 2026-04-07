@@ -663,7 +663,62 @@ const LEVELS = [
     enemyDefs:[{type:'doll',x:10},{type:'bat',x:14},{type:'dino',x:18},{type:'cannon',x:26},{type:'car',x:30},{type:'ghost',x:37},{type:'doll',x:42},{type:'bouncer',x:47},{type:'dino',x:50},{type:'car',x:58},{type:'bat',x:63},{type:'doll',x:68},{type:'cannon',x:73},{type:'dino',x:76},{type:'ghost',x:82},{type:'car',x:88},{type:'bouncer',x:93},{type:'dino',x:96},{type:'cannon',x:103},{type:'doll',x:106},{type:'bat',x:110},{type:'dino',x:114},{type:'ghost',x:120},{type:'car',x:124},{type:'bouncer',x:130},{type:'cannon',x:134},{type:'doll',x:136},{type:'bat',x:143},{type:'dino',x:148}],
     bowPositions:[15,50,90,130], superPositions:[30,70,110,142], catPosition:60,
     clouds:[[8,3],[25,5],[45,2],[65,4],[85,3],[105,5],[125,2],[145,4]]
-  }
+  },
+  // --- Level 7: Junkyard ---
+  {
+    name:"Junkyard", bg:'#cc8844', groundColor:'#8B6914', brickColor:'#6B4E0A', groundTop:'#aa7733',
+    width:130, height:25, playerStart:[2,20], rescuePos:[125,20],
+    generate(dc){
+      const m=makeGround(this.width,this.height);
+      addPlats(m,[[8,19,4],[14,17,3],[20,15,5],[28,20,4],[34,18,3],[40,14,4],[46,20,5],[52,16,4],[58,19,3],[64,14,5],[70,17,4],[76,20,3],[82,15,4],[88,18,5],[94,20,3],[100,16,4],[106,19,3],[112,14,4],[118,17,5]]);
+      addQBlocks(m,[[16,14],[36,11],[54,13],[66,11],[84,12],[102,13],[114,11]]);
+      addGaps(m,[[24,3],[43,2],[62,3],[80,2],[98,3],[116,2]],this.height,dc.gapWidth);
+      addCrates(m,[[10,19],[10,20],[22,14],[38,17],[52,15],[70,16],[88,17],[100,15],[112,13]]);
+      addConveyors(m,[[46,23,'r'],[47,23,'r'],[48,23,'r'],[49,23,'r'],[76,23,'l'],[77,23,'l'],[78,23,'l']]);
+      addRainbowBlock(m,[[40,11]]);
+      return m;
+    },
+    enemyDefs:[{type:'trash_bot',x:10},{type:'trash_bot',x:18},{type:'drone',x:25},{type:'doll',x:32},{type:'trash_bot',x:38},{type:'drone',x:45},{type:'car',x:50},{type:'trash_bot',x:56},{type:'drone',x:62},{type:'trash_bot',x:70},{type:'car',x:76},{type:'drone',x:82},{type:'trash_bot',x:90},{type:'doll',x:96},{type:'drone',x:102},{type:'trash_bot',x:108},{type:'drone',x:115},{type:'trash_bot',x:120}],
+    bowPositions:[20,60,100], superPositions:[30,75,110], catPosition:55,
+    clouds:[[5,3],[25,5],[50,2],[75,4],[100,3],[120,5]]
+  },
+  // --- Level 8: Neon City ---
+  {
+    name:"Neon City", bg:'#1a1a3e', groundColor:'#333355', brickColor:'#4444aa', groundTop:'#5555cc',
+    width:140, height:25, playerStart:[2,20], rescuePos:[135,20],
+    generate(dc){
+      const m=makeGround(this.width,this.height);
+      addPlats(m,[[6,18,3],[12,15,4],[18,20,5],[26,17,3],[32,13,4],[38,19,3],[44,16,5],[52,20,4],[58,14,3],[64,17,4],[70,20,3],[76,15,5],[82,18,4],[88,13,3],[94,20,5],[100,16,4],[106,19,3],[112,14,4],[118,17,3],[124,20,5],[130,15,4]]);
+      addQBlocks(m,[[14,12],[34,10],[60,11],[78,12],[90,10],[102,13],[120,11]]);
+      addGaps(m,[[10,3],[22,3],[36,2],[50,3],[68,3],[86,2],[104,3],[122,2]],this.height,dc.gapWidth);
+      addCrates(m,[[8,17],[18,19],[32,12],[44,15],[58,13],[76,14],[82,17],[100,15],[112,13],[124,19]]);
+      addConveyors(m,[[52,23,'r'],[53,23,'r'],[54,23,'r'],[94,23,'l'],[95,23,'l'],[96,23,'l'],[97,23,'l']]);
+      addRainbowBlock(m,[[44,13]]);
+      return m;
+    },
+    enemyDefs:[{type:'drone',x:8},{type:'trash_bot',x:14},{type:'drone',x:22},{type:'bouncer',x:28},{type:'trash_bot',x:34},{type:'drone',x:40},{type:'trash_bot',x:48},{type:'drone',x:54},{type:'bouncer',x:60},{type:'trash_bot',x:66},{type:'drone',x:72},{type:'bouncer',x:78},{type:'trash_bot',x:84},{type:'drone',x:90},{type:'trash_bot',x:96},{type:'drone',x:102},{type:'bouncer',x:108},{type:'trash_bot',x:114},{type:'drone',x:120},{type:'trash_bot',x:126},{type:'drone',x:132}],
+    bowPositions:[15,55,95,125], superPositions:[25,65,105], catPosition:80,
+    clouds:[]
+  },
+  // --- Level 9: Factory ---
+  {
+    name:"Factory", bg:'#555566', groundColor:'#777788', brickColor:'#666677', groundTop:'#888899',
+    width:150, height:25, playerStart:[2,20], rescuePos:[145,20],
+    generate(dc){
+      const m=makeGround(this.width,this.height);
+      addPlats(m,[[8,19,4],[14,16,3],[20,20,5],[28,14,4],[34,18,3],[40,15,5],[48,20,4],[54,13,3],[60,17,4],[66,20,5],[72,14,4],[78,18,3],[84,15,5],[90,20,4],[96,13,4],[102,17,3],[108,20,5],[114,14,4],[120,18,3],[126,15,5],[132,20,4],[138,16,3]]);
+      addQBlocks(m,[[16,13],[30,11],[42,12],[56,10],[74,11],[86,12],[98,10],[116,11],[128,12]]);
+      addGaps(m,[[12,2],[25,3],[45,2],[64,3],[82,2],[100,3],[118,2],[136,2]],this.height,dc.gapWidth);
+      addCrates(m,[[10,19],[20,19],[28,13],[40,14],[54,12],[72,13],[84,14],[96,12],[114,13],[126,14],[132,19]]);
+      addConveyors(m,[[48,23,'r'],[49,23,'r'],[50,23,'r'],[90,23,'l'],[91,23,'l'],[92,23,'l']]);
+      addSteamVents(m,[[20,23],[66,23],[108,23]]);
+      addRainbowBlock(m,[[40,12]]);
+      return m;
+    },
+    enemyDefs:[{type:'piston_bot',x:10},{type:'trash_bot',x:16},{type:'drone',x:22},{type:'piston_bot',x:30},{type:'trash_bot',x:36},{type:'drone',x:42},{type:'piston_bot',x:50},{type:'trash_bot',x:56},{type:'drone',x:62},{type:'trash_bot',x:68},{type:'piston_bot',x:74},{type:'drone',x:80},{type:'trash_bot',x:86},{type:'piston_bot',x:94},{type:'drone',x:100},{type:'trash_bot',x:106},{type:'piston_bot',x:112},{type:'drone',x:118},{type:'trash_bot',x:124},{type:'piston_bot',x:130},{type:'drone',x:136},{type:'trash_bot',x:140}],
+    bowPositions:[18,58,98,130], superPositions:[35,75,115], catPosition:60,
+    clouds:[]
+  },
 ];
 
 // ==========================================
