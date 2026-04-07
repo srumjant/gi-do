@@ -889,35 +889,50 @@ const LEVELS = [
   },
   // --- Level 11: Pirate Ship ---
   {
-    name:"Pirate Ship", bg:'#2266aa', groundColor:'#8B6914', brickColor:'#6B4E0A', groundTop:'#aa8833',
+    name:"Pirate Ship", bg:'#1a3355', groundColor:'#8B6914', brickColor:'#6B4E0A', groundTop:'#aa8833',
     width:140, height:25, playerStart:[2,20], rescuePos:[135,20],
     generate(dc){
       const m=makeGround(this.width,this.height);
-      addPlats(m,[[8,18,4],[14,16,3],[20,20,5],[28,14,4],[34,19,3],[40,17,5],[48,20,4],[54,15,3],[60,18,4],[66,20,3],[72,16,5],[78,19,4],[84,14,3],[90,20,5],[96,17,4],[102,15,3],[108,20,4],[114,18,3],[120,16,4],[126,20,5]]);
-      addQBlocks(m,[[16,13],[30,11],[52,12],[74,13],[86,11],[104,12],[122,13]]);
-      addGaps(m,[[24,3],[44,2],[64,3],[82,2],[100,3],[118,2]],this.height,dc.gapWidth);
-      addCrates(m,[[10,17],[20,19],[28,13],[40,16],[54,14],[72,15],[84,13],[96,16],[108,19],[120,15]]);
-      addConveyors(m,[[48,23,'r'],[49,23,'r'],[50,23,'r'],[90,23,'l'],[91,23,'l'],[92,23,'l']]);
-      addRainbowBlock(m,[[40,14]]);
+      // Ship deck platforms (wider, more horizontal for ship feel)
+      addPlats(m,[[4,20,12],[18,19,8],[28,18,6],[36,20,10],[48,17,5],[55,19,8],[65,20,6],[73,18,5],[80,16,4],[86,20,8],[96,19,6],[104,17,5],[112,20,8],[122,18,6],[130,20,8]]);
+      // Mast platforms (tall vertical jumps)
+      addPlats(m,[[12,14,3],[50,12,3],[88,13,3],[118,11,3]]);
+      addQBlocks(m,[[13,11],[51,9],[89,10],[119,8],[30,15],[70,15],[106,14]]);
+      addGaps(m,[[16,2],[34,2],[63,2],[84,2],[110,2]],this.height,dc.gapWidth);
+      addCrates(m,[[6,19],[8,19],[22,18],[40,19],[56,18],[74,17],[92,19],[100,18],[114,19],[126,17]]);
+      addConveyors(m,[[36,23,'r'],[37,23,'r'],[38,23,'r'],[39,23,'r'],[96,23,'l'],[97,23,'l'],[98,23,'l']]);
+      addRainbowBlock(m,[[50,9]]);
       return m;
     },
-    enemyDefs:[{type:'monkey',x:10},{type:'parrot',x:16},{type:'monkey',x:22},{type:'parrot',x:28},{type:'monkey',x:36},{type:'parrot',x:42},{type:'monkey',x:50},{type:'parrot',x:56},{type:'monkey',x:64},{type:'parrot',x:70},{type:'monkey',x:78},{type:'parrot',x:84},{type:'monkey',x:92},{type:'parrot',x:98},{type:'monkey',x:106},{type:'parrot',x:112},{type:'monkey',x:120},{type:'parrot',x:128}],
-    bowPositions:[18,58,98,125], superPositions:[30,75,110], catPosition:55,
-    clouds:[[10,3],[35,5],[60,2],[85,4],[110,3]]
+    enemyDefs:[{type:'monkey',x:10},{type:'parrot',x:18},{type:'monkey',x:26},{type:'parrot',x:34},{type:'monkey',x:42},{type:'parrot',x:50},{type:'monkey',x:58},{type:'parrot',x:66},{type:'monkey',x:74},{type:'parrot',x:82},{type:'monkey',x:90},{type:'parrot',x:98},{type:'monkey',x:106},{type:'parrot',x:114},{type:'monkey',x:122},{type:'parrot',x:130}],
+    bowPositions:[20,60,100,128], superPositions:[35,75,115], catPosition:55,
+    clouds:[[5,2],[25,4],[45,2],[65,3],[85,2],[105,4],[125,2]]
   },
   // --- Level 12: Pirate Castle (Boss) ---
   {
-    name:"Pirate Castle", bg:'#333344', groundColor:'#555566', brickColor:'#666677', groundTop:'#777788',
+    name:"Pirate Castle", bg:'#221133', groundColor:'#554455', brickColor:'#776677', groundTop:'#887788',
     width:160, height:25, playerStart:[2,20], rescuePos:[155,14],
     generate(dc){
       const m=makeGround(this.width,this.height);
-      addPlats(m,[[8,20,4],[14,17,3],[20,15,5],[28,20,4],[34,14,4],[40,19,3],[46,16,5],[52,20,4],[58,13,4],[64,18,3],[70,15,5],[78,20,4],[84,14,4],[90,18,3],[96,16,5],[102,20,4],[108,13,4],[114,17,3],[120,15,5],[126,20,4],[132,18,3],[138,16,4],[144,14,4],[150,14,8]]);
-      addQBlocks(m,[[22,12],[36,11],[48,13],[60,10],[72,12],[86,11],[98,13],[110,10],[122,12],[140,9]]);
-      addGaps(m,[[12,2],[25,3],[42,2],[56,3],[76,2],[94,3],[116,2],[134,2]],this.height,dc.gapWidth);
-      addCrates(m,[[10,19],[20,14],[34,13],[46,15],[52,19],[64,17],[78,19],[84,13],[96,15],[108,12],[120,14],[132,17],[138,15]]);
-      addConveyors(m,[[28,23,'r'],[29,23,'r'],[30,23,'r'],[102,23,'l'],[103,23,'l'],[104,23,'l']]);
-      addSteamVents(m,[[52,23],[126,23]]);
-      addRainbowBlock(m,[[58,10]]);
+      // Castle entrance - drawbridge area
+      addPlats(m,[[4,20,8],[14,18,4],[20,16,3]]);
+      // First tower - vertical climb
+      addPlats(m,[[25,20,6],[28,16,3],[26,12,4]]);
+      // Castle hallway
+      addPlats(m,[[34,20,10],[46,18,6],[54,20,8]]);
+      // Second tower
+      addPlats(m,[[64,20,4],[66,16,3],[64,12,4]]);
+      // Upper battlements
+      addPlats(m,[[70,14,8],[80,12,4],[86,14,6]]);
+      // Long hallway to throne
+      addPlats(m,[[94,20,8],[104,18,6],[112,20,8],[122,16,5],[128,20,6]]);
+      // Throne room - wide platform
+      addPlats(m,[[136,20,4],[142,18,3],[146,14,4],[150,14,10]]);
+      addQBlocks(m,[[16,15],[29,9],[36,17],[48,15],[66,9],[72,11],[82,9],[96,17],[106,15],[124,13],[148,11]]);
+      addGaps(m,[[22,2],[32,2],[62,2],[92,2],[120,2],[134,2]],this.height,dc.gapWidth);
+      addCrates(m,[[6,19],[14,17],[38,19],[40,19],[56,19],[58,19],[70,13],[86,13],[96,19],[98,19],[114,19],[130,19]]);
+      addSteamVents(m,[[54,23],[112,23]]);
+      addRainbowBlock(m,[[72,8]]);
       return m;
     },
     enemyDefs:[{type:'monkey',x:10},{type:'parrot',x:14},{type:'monkey',x:20},{type:'parrot',x:26},{type:'monkey',x:32},{type:'parrot',x:38},{type:'monkey',x:44},{type:'parrot',x:50},{type:'monkey',x:56},{type:'parrot',x:62},{type:'monkey',x:68},{type:'parrot',x:74},{type:'monkey',x:80},{type:'parrot',x:86},{type:'monkey',x:92},{type:'parrot',x:98},{type:'monkey',x:104},{type:'parrot',x:110},{type:'monkey',x:116},{type:'parrot',x:122},{type:'monkey',x:128},{type:'parrot',x:134},{type:'monkey',x:140},{type:'parrot',x:146}],
@@ -2223,47 +2238,47 @@ function drawDebug(){
 
   // Level cards
   const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6','level_7','level_8','level_9','level_10','level_11','level_12'];
-  const cardW=56,cardH=110,gap=6;
-  const totalW=LEVELS.length*(cardW+gap)-gap;
+  const cols=6,cardW=90,cardH=70,gap=8;
+  const totalW=cols*(cardW+gap)-gap;
   const startX=(BASE_W-totalW)/2;
 
   LEVELS.forEach((lvl,i)=>{
-    const x=startX+i*(cardW+gap), y=90;
+    const col=i%cols, row=Math.floor(i/cols);
+    const x=startX+col*(cardW+gap), y=80+row*(cardH+gap+16);
     const sel=(i===debugLevelIndex);
+    const ch=i>=10?3:i>=6?2:1;
     // Card background
     ctx.fillStyle=sel?'#113322':'#111122';
     ctx.fillRect(x,y,cardW,cardH);
     ctx.strokeStyle=sel?'#00ff66':'#334455';ctx.lineWidth=sel?2:1;
     ctx.strokeRect(x,y,cardW,cardH);
-    // Level number
-    ctx.fillStyle=sel?'#00ff66':'#667788';ctx.font='bold 12px monospace';ctx.textAlign='center';
-    ctx.fillText((i+1)+'',x+cardW/2,y+16);
-    // Level name
-    ctx.fillStyle=sel?'#aaffcc':'#6688aa';ctx.font='8px monospace';
-    ctx.fillText(T(lvlNames[i]),x+cardW/2,y+30);
+    // Level number + name
+    ctx.fillStyle=sel?'#00ff66':'#667788';ctx.font='bold 11px monospace';ctx.textAlign='center';
+    ctx.fillText((i+1)+'. '+T(lvlNames[i]),x+cardW/2,y+14);
     // Mini color preview
-    ctx.fillStyle=lvl.bg;ctx.fillRect(x+5,y+38,cardW-10,20);
-    ctx.fillStyle=lvl.groundColor;ctx.fillRect(x+5,y+50,cardW-10,8);
+    ctx.fillStyle=lvl.bg;ctx.fillRect(x+4,y+20,cardW-8,16);
+    ctx.fillStyle=lvl.groundColor;ctx.fillRect(x+4,y+30,cardW-8,6);
     // Boss indicator
-    if(i===LEVELS.length-1){
-      ctx.fillStyle='#ff4444';ctx.font='bold 7px monospace';
-      ctx.fillText('BOSS',x+cardW/2,y+72);
+    if(i===5||i===9||i===LEVELS.length-1){
+      ctx.fillStyle='#ff4444';ctx.font='bold 8px monospace';
+      ctx.fillText('BOSS',x+cardW/2,y+48);
     }
     // Chapter indicator
-    ctx.fillStyle=i>=6?'#ff6644':'#4488cc';ctx.font='bold 7px monospace';
-    ctx.fillText(i>=6?'CH2':'CH1',x+cardW/2,y+84);
+    const chColors=['#4488cc','#ff6644','#ffaa00'];
+    ctx.fillStyle=chColors[ch-1];ctx.font='bold 8px monospace';
+    ctx.fillText('CH'+ch,x+cardW/2,y+60);
     // Enemy count
     ctx.fillStyle='#556677';ctx.font='7px monospace';
-    ctx.fillText(lvl.enemyDefs.length+' foes',x+cardW/2,y+95);
+    ctx.fillText(lvl.enemyDefs.length+' foes',x+cardW/2,y+68);
     // Selected arrow
     if(sel){
-      ctx.fillStyle='#00ff66';ctx.font='bold 16px monospace';
-      ctx.fillText('\u25b2',x+cardW/2,y+cardH+16);
+      ctx.fillStyle='#00ff66';ctx.font='bold 14px monospace';
+      ctx.fillText('\u25b2',x+cardW/2,y+cardH+12);
     }
   });
 
   // Difficulty selector
-  const dy=235;
+  const dy=80+Math.ceil(LEVELS.length/cols)*(cardH+gap+16)+10;
   ctx.fillStyle='#00cc55';ctx.font='bold 13px monospace';ctx.textAlign='center';
   ctx.fillText('Difficulty: '+TDiff(DIFF_KEYS[diffIndex])+' (\u2191\u2193)',BASE_W/2,dy);
   ctx.fillStyle='#556677';ctx.font='10px monospace';
