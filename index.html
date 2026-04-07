@@ -908,10 +908,14 @@ const LEVELS = [
     bowPositions:[20,60,100,128], superPositions:[35,75,115], catPosition:55,
     clouds:[[5,2],[25,4],[45,2],[65,3],[85,2],[105,4],[125,2]],
     bgDeco:[
-      [12,10,'mast'],[50,8,'mast'],[88,9,'mast'],[118,7,'mast'],
-      [5,22,'wave'],[20,22,'wave'],[35,22,'wave'],[50,22,'wave'],[65,22,'wave'],[80,22,'wave'],[95,22,'wave'],[110,22,'wave'],[125,22,'wave'],
-      [8,16,'rope'],[30,14,'rope'],[60,15,'rope'],[90,13,'rope'],[120,11,'rope'],
-      [15,19,'skull'],[45,18,'skull'],[75,17,'skull'],[105,18,'skull'],[135,19,'skull']
+      // Masts on mast platforms (x,y matches platform positions)
+      [13,14,'mast'],[51,12,'mast'],[89,13,'mast'],[119,11,'mast'],
+      // Ropes hanging from mast platforms down to deck
+      [11,14,'rope'],[15,14,'rope'],[49,12,'rope'],[53,12,'rope'],[87,13,'rope'],[91,13,'rope'],[117,11,'rope'],[121,11,'rope'],
+      // Waves visible in the gaps (water below deck)
+      [16,22,'wave'],[34,22,'wave'],[63,22,'wave'],[84,22,'wave'],[110,22,'wave'],
+      // Skulls on deck platforms (on solid ground)
+      [7,19,'skull'],[24,17,'skull'],[42,19,'skull'],[58,18,'skull'],[94,19,'skull'],[115,19,'skull'],[132,19,'skull']
     ]
   },
   // --- Level 12: Pirate Castle (Boss) ---
@@ -945,28 +949,30 @@ const LEVELS = [
     bowPositions:[15,50,90,130], superPositions:[30,70,110,140], catPosition:60,
     clouds:[],
     bgDeco:[
-      // Entrance torches
-      [2,17,'torch'],[10,17,'torch'],
-      // First tower - windows and chains
-      [24,14,'window'],[30,14,'window'],[26,9,'chain'],[28,9,'chain'],
-      // Hallway banners
-      [36,15,'banner','#cc2222'],[42,15,'banner','#cc2222'],[50,15,'banner','#222288'],
-      // Hallway torches
-      [38,17,'torch'],[46,17,'torch'],[56,17,'torch'],
-      // Second tower
-      [62,14,'window'],[68,14,'window'],[64,9,'chain'],[66,9,'chain'],
-      // Battlements - banners and torches
-      [72,10,'banner','#222288'],[76,10,'banner','#cc2222'],[80,8,'torch'],[84,10,'banner','#222288'],
-      // Throne hallway - grand decorations
-      [96,15,'torch'],[102,15,'torch'],[108,15,'torch'],[114,15,'torch'],
-      [98,14,'banner','#ffdd00'],[106,14,'banner','#ffdd00'],[112,14,'banner','#cc2222'],
-      [100,13,'window'],[110,13,'window'],
-      // Throne room - heavy decoration
-      [124,12,'torch'],[128,12,'torch'],[132,12,'torch'],
-      [136,10,'banner','#ffdd00'],[140,10,'banner','#cc2222'],[144,10,'banner','#ffdd00'],
-      [138,9,'window'],[142,9,'window'],[146,9,'window'],
-      [148,8,'skull'],[152,8,'skull'],[156,8,'skull'],
-      [150,11,'chain'],[154,11,'chain']
+      // Entrance (plats: [4,20,8],[14,18,4],[20,16,3]) — torches beside door
+      [4,18,'torch'],[11,18,'torch'],[14,16,'torch'],[20,14,'torch'],
+      // Tower 1 (plats: [25,20,6],[28,16,3],[26,12,4]) — windows in tower wall, chains from top
+      [25,10,'window'],[29,10,'window'],[27,12,'chain'],[30,12,'chain'],
+      [26,14,'banner','#cc2222'],
+      // Hallway 1 (plats: [34,20,10],[46,18,6],[54,20,8]) — torches on walls, banners high
+      [35,18,'torch'],[41,18,'torch'],[48,16,'torch'],[55,18,'torch'],
+      [37,16,'banner','#cc2222'],[43,16,'banner','#222288'],[52,16,'banner','#cc2222'],
+      // Tower 2 (plats: [64,20,4],[66,16,3],[64,12,4]) — windows + chains
+      [64,10,'window'],[67,10,'window'],[65,12,'chain'],[67,12,'chain'],
+      [66,14,'banner','#222288'],
+      // Battlements (plats: [70,14,8],[80,12,4],[86,14,6]) — torches on battlement level
+      [70,12,'torch'],[77,12,'torch'],[82,10,'torch'],[86,12,'torch'],
+      [73,10,'banner','#cc2222'],[79,8,'banner','#222288'],[89,10,'banner','#cc2222'],
+      // Hallway 2 (plats: [94,20,8],[104,18,6],[112,20,8],[122,16,5],[128,20,6])
+      [94,18,'torch'],[100,18,'torch'],[106,16,'torch'],[112,18,'torch'],[118,18,'torch'],
+      [96,16,'banner','#ffdd00'],[103,16,'banner','#cc2222'],[109,14,'banner','#ffdd00'],
+      [98,15,'window'],[114,15,'window'],
+      // Throne room (plats: [136,20,4],[142,18,3],[146,14,4],[150,14,10])
+      [136,18,'torch'],[142,16,'torch'],[148,12,'torch'],[154,12,'torch'],
+      [138,12,'banner','#ffdd00'],[144,12,'banner','#ffdd00'],[150,10,'banner','#cc2222'],[156,10,'banner','#ffdd00'],
+      [140,10,'window'],[146,10,'window'],[152,10,'window'],
+      [149,12,'skull'],[155,12,'skull'],[158,12,'skull'],
+      [151,14,'chain'],[157,14,'chain']
     ]
   }
 ];
