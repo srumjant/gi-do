@@ -1571,10 +1571,10 @@ smashTexts.forEach(st=>{
   let hx=BASE_W-40;if(cat&&cat.hitsLeft>0){drawSprite(CAT_S,hx,30,CAT_P,1.5,false);ctx.fillStyle='#fff';ctx.font='bold 8px monospace';ctx.fillText('x'+cat.hitsLeft,hx+2,48);hx-=22;}
   if(p.hasCape){drawSprite(SUPER_S,hx,32,SUPER_P,1.5,false);hx-=22;}
   if(p.hasBow){drawSprite(BOW_S,hx,32,BOW_P,1.5,false);ctx.fillStyle='#fff';ctx.font='bold 10px monospace';ctx.fillText('x'+p.bowCharges,hx+2,50);}
-  let hudY=30;
-  if(player.fartTimer>0){ctx.font='14px serif';ctx.fillText('💨',BASE_W-80,hudY);ctx.fillStyle='#88cc44';ctx.font='bold 10px monospace';ctx.fillText(Math.ceil(player.fartTimer/60)+'s',BASE_W-60,hudY);hudY+=16;}
-  if(player.bigHeadTimer>0){ctx.font='14px serif';ctx.fillText('🤪',BASE_W-80,hudY);ctx.fillStyle='#ff69b4';ctx.font='bold 10px monospace';ctx.fillText(Math.ceil(player.bigHeadTimer/60)+'s',BASE_W-60,hudY);hudY+=16;}
-  if(player.chickenRayCharges>0){ctx.font='14px serif';ctx.fillText('🐔',BASE_W-80,hudY);ctx.fillStyle='#ffffff';ctx.font='bold 10px monospace';ctx.fillText('x'+player.chickenRayCharges,BASE_W-60,hudY);hudY+=16;}
+  let hudY=32;
+  if(player.fartTimer>0){ctx.font='14px serif';ctx.fillText('💨',8,hudY);ctx.fillStyle='#88cc44';ctx.font='bold 10px monospace';ctx.fillText(Math.ceil(player.fartTimer/60)+'s',26,hudY);hudY+=16;}
+  if(player.bigHeadTimer>0){ctx.font='14px serif';ctx.fillText('🤪',8,hudY);ctx.fillStyle='#ff69b4';ctx.font='bold 10px monospace';ctx.fillText(Math.ceil(player.bigHeadTimer/60)+'s',26,hudY);hudY+=16;}
+  if(player.chickenRayCharges>0){ctx.font='14px serif';ctx.fillText('🐔',8,hudY);ctx.fillStyle='#ffffff';ctx.font='bold 10px monospace';ctx.fillText('x'+player.chickenRayCharges,26,hudY);hudY+=16;}
   // Power-up viewport border
   if(player.fartTimer>0||player.bigHeadTimer>0||player.chickenRayCharges>0){
     ctx.save();
