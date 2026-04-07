@@ -39,9 +39,24 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; border: 3px s
   .ctrl-btn.big { width: 62px; height: 62px; }
   #dpad { grid-template-columns: 50px 38px 50px; grid-template-rows: 38px 50px; }
 }
+#rotate-overlay {
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  background: #222; color: #fff; font-family: monospace;
+  flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+}
+#rotate-overlay .rotate-icon { font-size: 64px; animation: rotate-hint 2s ease-in-out infinite; }
+#rotate-overlay .rotate-text { font-size: 20px; text-align: center; padding: 0 20px; }
+@keyframes rotate-hint { 0%,100%{ transform: rotate(0deg); } 50%{ transform: rotate(90deg); } }
+@media (pointer: coarse) and (orientation: portrait) {
+  #rotate-overlay { display: flex; }
+}
 </style>
 </head>
 <body>
+<div id="rotate-overlay">
+  <div class="rotate-icon">📱</div>
+  <div class="rotate-text">Rotate your device to landscape mode</div>
+</div>
 <canvas id="game"></canvas>
 <button id="fullscreen-btn" title="Fullscreen">⛶</button>
 <div id="mobile-controls">
@@ -690,6 +705,16 @@ if(fsBtn){
 if('ontouchstart' in window&&fsBtn){
   fsBtn.style.background='rgba(255,200,0,0.4)';fsBtn.style.borderColor='rgba(255,200,0,0.7)';
   fsBtn.style.width='48px';fsBtn.style.height='48px';fsBtn.style.fontSize='22px';
+}
+// Auto-enter fullscreen+landscape on first touch on mobile
+if('ontouchstart' in window){
+  function autoFullscreenLandscape(){
+    const el=document.documentElement;
+    const req=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen;
+    if(req&&!isFullscreen())req.call(el).catch(()=>{});
+    document.removeEventListener('touchstart',autoFullscreenLandscape);
+  }
+  document.addEventListener('touchstart',autoFullscreenLandscape,{once:true});
 }
 
 function findGroundY(tx){const l=LEVELS[currentLevel];for(let ty=0;ty<l.height;ty++)if(tx>=0&&tx<l.width&&isSolid(map[ty][tx]))return ty*TILE;return(l.height-2)*TILE;}
