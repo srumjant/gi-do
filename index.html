@@ -833,6 +833,7 @@ let boss=null, bossDefeated=false;
 let map=[], camera={x:0,y:0}, player={}, enemies=[], pendingEnemies=[];
 let stars=[], particles=[], questionBlocks=[], arrows=[], enemyProjectiles=[];
 let crateCombo=0, crateComboTimer=0, smashTexts=[], crateShake=0;
+let powerupPopup=null;
 let rainbowBlocks=[];
 let bowPickups=[], superPickups=[], catPickup=null, cat=null, animFrame=0;
 
@@ -934,13 +935,19 @@ function breakCrate(tx,ty){
     if(crateCombo>=5){player.invincible=Math.max(player.invincible,8);}
   }
 }
+const POWERUP_INFO={
+  fart:{name:'FART JUMP',desc:'Super bouncy!',color:'#88cc44',icon:'💨'},
+  bighead:{name:'BIG HEAD',desc:'Mega stomp!',color:'#ff69b4',icon:'🤪'},
+  chicken:{name:'CHICKEN RAY',desc:'Bawk bawk!',color:'#ffdd00',icon:'🐔'}
+};
 function giveRandomSillyPowerup(){
   const types=['fart','bighead','chicken'];
   const type=types[Math.floor(Math.random()*types.length)];
   if(type==='fart'){player.fartTimer=900;}
   else if(type==='bighead'){player.bigHeadTimer=1200;}
   else{player.chickenRayCharges=8;player.hasBow=true;}
-  sfxPickup();
+  powerupPopup={type:type,timer:120,maxTimer:120};
+  sfxPickup();sfxWin();
 }
 function clearJP(){Object.keys(justPressed).forEach(k=>justPressed[k]=false);}
 
@@ -1016,6 +1023,7 @@ function spawnEnemy(def){
 // ==========================================
 function update(){
   animFrame++;
+  if(powerupPopup){powerupPopup.timer--;if(powerupPopup.timer<=0)powerupPopup=null;return;}
   // Language toggle
   if(justPressed['KeyL']){lang=lang==='et'?'en':'et';justPressed['KeyL']=false;}
   // Debug level selector — hold B for 3 seconds
@@ -2082,7 +2090,62 @@ function drawWin(){
   ctx.fillStyle='#fff';ctx.font='12px monospace';ctx.fillText(T('press_play_again'),BASE_W/2,330);ctx.textAlign='left';
 }
 
-function gameLoop(){update();draw();requestAnimationFrame(gameLoop);}
+function drawPowerupPopup(){
+  if(!powerupPopup)return;
+  const pp=powerupPopup,info=POWERUP_INFO[pp.type];
+  const progress=1-pp.timer/pp.maxTimer;
+  // Entrance/exit easing
+  const enter=Math.min(1,progress*5);
+  const exit=Math.min(1,(pp.timer/pp.maxTimer)*5);
+  const alpha=Math.min(enter,exit);
+  // Darken background
+  ctx.save();
+  ctx.globalAlpha=alpha*0.5;
+  ctx.fillStyle='#000';ctx.fillRect(0,0,BASE_W,BASE_H);
+  ctx.globalAlpha=alpha;
+  // Expanding ring burst
+  const ringR=progress*180;
+  ctx.strokeStyle=info.color;ctx.lineWidth=3;ctx.globalAlpha=alpha*(1-progress)*0.6;
+  ctx.beginPath();ctx.arc(BASE_W/2,BASE_H/2,ringR,0,Math.PI*2);ctx.stroke();
+  if(ringR>30){ctx.beginPath();ctx.arc(BASE_W/2,BASE_H/2,ringR*0.6,0,Math.PI*2);ctx.stroke();}
+  // Central box with bounce
+  ctx.globalAlpha=alpha;
+  const bounce=enter<1?Math.sin(enter*Math.PI*0.5):1;
+  const boxW=240*bounce,boxH=100*bounce;
+  const bx=BASE_W/2-boxW/2,by=BASE_H/2-boxH/2;
+  // Box background
+  ctx.fillStyle='rgba(0,0,0,0.85)';
+  ctx.fillRect(bx,by,boxW,boxH);
+  ctx.strokeStyle=info.color;ctx.lineWidth=3;
+  ctx.strokeRect(bx,by,boxW,boxH);
+  // Shimmering border
+  const shimmer=Math.sin(animFrame*0.2)*0.3+0.7;
+  ctx.strokeStyle=info.color;ctx.globalAlpha=alpha*shimmer;ctx.lineWidth=1;
+  ctx.strokeRect(bx+3,by+3,boxW-6,boxH-6);
+  ctx.globalAlpha=alpha;
+  if(bounce>0.8){
+    // Icon
+    ctx.font='36px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(info.icon,BASE_W/2,BASE_H/2-20);
+    // Name
+    ctx.fillStyle=info.color;ctx.font='bold 20px monospace';
+    ctx.fillText(info.name,BASE_W/2,BASE_H/2+15);
+    // Description
+    ctx.fillStyle='#ffffff';ctx.font='12px monospace';
+    ctx.fillText(info.desc,BASE_W/2,BASE_H/2+35);
+  }
+  ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  // Sparkle particles around box
+  for(let i=0;i<4;i++){
+    const angle=animFrame*0.05+i*Math.PI/2;
+    const sx=BASE_W/2+Math.cos(angle)*(boxW/2+10);
+    const sy=BASE_H/2+Math.sin(angle)*(boxH/2+10);
+    ctx.fillStyle=info.color;ctx.globalAlpha=alpha*shimmer;
+    ctx.fillRect(sx-2,sy-2,4,4);
+  }
+  ctx.restore();
+}
+function gameLoop(){update();draw();drawPowerupPopup();requestAnimationFrame(gameLoop);}
 gameLoop();
 </script>
 </body>
