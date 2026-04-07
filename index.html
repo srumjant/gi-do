@@ -271,6 +271,8 @@ const TRANSLATIONS = {
   level_8:            {et:'Neoonlinn',                 en:'Neon City',              it:'Citta al Neon'},
   level_9:            {et:'Tehas',                     en:'Factory',                it:'Fabbrica'},
   level_10:           {et:'Robotilinnus',               en:'Robot Fortress',        it:'Fortezza Robot'},
+  level_11:           {et:'Piraadilev',                 en:'Pirate Ship',           it:'Nave Pirata'},
+  level_12:           {et:'Piraatide loss',             en:'Pirate Castle',         it:'Castello dei Pirati'},
 };
 function T(key){return TRANSLATIONS[key]?TRANSLATIONS[key][lang]||TRANSLATIONS[key]['en']:key;}
 function TDiff(key){
@@ -609,6 +611,11 @@ const ROBO_ROAR=[
 [0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0],
 [0,0,0,0,0,8,8,8,0,0,8,8,8,0,0,0,0,0]];
 const ROBO_P={1:'#888899',2:'#ff0000',3:'#333344',4:'#ffcc00',5:'#ccaa00',6:'#666677',7:'#aabbcc',8:'#555566'};
+const PIRATE_IDLE=[[0,0,0,0,7,7,7,7,7,0,0,0,0,0,0,0,0,0],[0,0,0,7,4,4,4,4,4,7,0,0,0,0,0,0,0,0],[0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],[0,0,1,1,3,1,1,6,1,1,1,0,0,0,0,0,0,0],[0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0],[0,0,0,1,1,2,2,2,1,1,0,0,0,0,0,0,0,0],[0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0],[0,0,0,1,1,5,5,5,1,1,0,0,0,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,1,0,0,0,0,0,0,0,0],[0,0,0,1,5,5,4,5,5,1,0,0,0,0,0,0,0,0],[0,0,0,0,1,5,5,5,1,0,0,0,0,0,0,0,0,0],[0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,8,8,0,8,8,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]];
+const PIRATE_WALK=[[0,0,0,0,7,7,7,7,7,0,0,0,0,0,0,0,0,0],[0,0,0,7,4,4,4,4,4,7,0,0,0,0,0,0,0,0],[0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],[0,0,1,1,3,1,1,6,1,1,1,0,0,0,0,0,0,0],[0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0],[0,0,0,1,1,2,2,2,1,1,0,0,0,0,0,0,0,0],[0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0],[0,0,0,1,1,5,5,5,1,1,0,0,0,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,1,0,0,0,0,0,0,0,0],[0,0,0,1,5,5,4,5,5,1,0,0,0,0,0,0,0,0],[0,0,0,0,1,5,5,5,1,0,0,0,0,0,0,0,0,0],[0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0],[0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0],[0,0,0,0,8,8,0,0,8,8,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]];
+const PIRATE_CHARGE=[[0,0,0,0,7,7,7,7,7,0,0,0,0,0,0,0,0,0],[0,0,0,7,4,4,4,4,4,7,0,0,0,0,0,0,0,0],[0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],[0,0,1,1,3,1,1,6,1,1,1,0,0,0,0,0,0,0],[0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0],[0,0,0,1,1,2,2,2,1,1,0,9,9,9,0,0,0,0],[0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0],[0,0,0,1,1,5,5,5,1,1,0,0,0,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,1,0,0,0,0,0,0,0,0],[0,0,0,1,5,5,4,5,5,1,0,0,0,0,0,0,0,0],[0,0,0,0,1,5,5,5,1,0,0,0,0,0,0,0,0,0],[0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0],[0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0],[0,0,0,8,8,0,0,8,8,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]];
+const PIRATE_ROAR=[[0,0,0,0,7,7,7,7,7,0,0,0,0,0,0,0,0,0],[0,0,0,7,4,4,4,4,4,7,0,0,0,0,0,0,0,0],[0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],[0,0,1,1,3,1,1,6,1,1,1,0,0,0,0,0,0,0],[0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0],[0,0,0,1,2,2,2,2,2,1,0,0,0,0,0,0,0,0],[0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0],[0,9,0,1,1,5,5,5,1,1,0,9,0,0,0,0,0,0],[0,0,0,1,5,5,5,5,5,1,0,0,0,0,0,0,0,0],[0,0,0,1,5,5,4,5,5,1,0,0,0,0,0,0,0,0],[0,0,0,0,1,5,5,5,1,0,0,0,0,0,0,0,0,0],[0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,8,8,0,8,8,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]];
+const PIRATE_P={1:'#8B6914',2:'#ffaa88',3:'#ffffff',4:'#ffdd00',5:'#cc3333',6:'#333333',7:'#aa8833',8:'#665522',9:'#cccccc'};
 // Rotating kidnappers for cutscenes (one per level transition)
 const KIDNAPPERS=[
   {s:DINO_S,p:DINO_P,color:'#44bb44'},
@@ -869,6 +876,43 @@ const LEVELS = [
     enemyDefs:[{type:'trash_bot',x:10},{type:'drone',x:14},{type:'piston_bot',x:20},{type:'trash_bot',x:26},{type:'drone',x:32},{type:'piston_bot',x:38},{type:'trash_bot',x:44},{type:'drone',x:50},{type:'piston_bot',x:56},{type:'trash_bot',x:62},{type:'drone',x:68},{type:'trash_bot',x:74},{type:'piston_bot',x:80},{type:'drone',x:86},{type:'trash_bot',x:92},{type:'piston_bot',x:98},{type:'drone',x:104},{type:'trash_bot',x:110},{type:'piston_bot',x:116},{type:'drone',x:122},{type:'trash_bot',x:128},{type:'piston_bot',x:134},{type:'drone',x:140},{type:'trash_bot',x:146}],
     bowPositions:[15,50,90,130], superPositions:[30,70,110,140], catPosition:60,
     clouds:[]
+  },
+  // --- Level 11: Pirate Ship ---
+  {
+    name:"Pirate Ship", bg:'#2266aa', groundColor:'#8B6914', brickColor:'#6B4E0A', groundTop:'#aa8833',
+    width:140, height:25, playerStart:[2,20], rescuePos:[135,20],
+    generate(dc){
+      const m=makeGround(this.width,this.height);
+      addPlats(m,[[8,18,4],[14,16,3],[20,20,5],[28,14,4],[34,19,3],[40,17,5],[48,20,4],[54,15,3],[60,18,4],[66,20,3],[72,16,5],[78,19,4],[84,14,3],[90,20,5],[96,17,4],[102,15,3],[108,20,4],[114,18,3],[120,16,4],[126,20,5]]);
+      addQBlocks(m,[[16,13],[30,11],[52,12],[74,13],[86,11],[104,12],[122,13]]);
+      addGaps(m,[[24,3],[44,2],[64,3],[82,2],[100,3],[118,2]],this.height,dc.gapWidth);
+      addCrates(m,[[10,17],[20,19],[28,13],[40,16],[54,14],[72,15],[84,13],[96,16],[108,19],[120,15]]);
+      addConveyors(m,[[48,23,'r'],[49,23,'r'],[50,23,'r'],[90,23,'l'],[91,23,'l'],[92,23,'l']]);
+      addRainbowBlock(m,[[40,14]]);
+      return m;
+    },
+    enemyDefs:[{type:'monkey',x:10},{type:'parrot',x:16},{type:'monkey',x:22},{type:'parrot',x:28},{type:'monkey',x:36},{type:'parrot',x:42},{type:'monkey',x:50},{type:'parrot',x:56},{type:'monkey',x:64},{type:'parrot',x:70},{type:'monkey',x:78},{type:'parrot',x:84},{type:'monkey',x:92},{type:'parrot',x:98},{type:'monkey',x:106},{type:'parrot',x:112},{type:'monkey',x:120},{type:'parrot',x:128}],
+    bowPositions:[18,58,98,125], superPositions:[30,75,110], catPosition:55,
+    clouds:[[10,3],[35,5],[60,2],[85,4],[110,3]]
+  },
+  // --- Level 12: Pirate Castle (Boss) ---
+  {
+    name:"Pirate Castle", bg:'#333344', groundColor:'#555566', brickColor:'#666677', groundTop:'#777788',
+    width:160, height:25, playerStart:[2,20], rescuePos:[155,14],
+    generate(dc){
+      const m=makeGround(this.width,this.height);
+      addPlats(m,[[8,20,4],[14,17,3],[20,15,5],[28,20,4],[34,14,4],[40,19,3],[46,16,5],[52,20,4],[58,13,4],[64,18,3],[70,15,5],[78,20,4],[84,14,4],[90,18,3],[96,16,5],[102,20,4],[108,13,4],[114,17,3],[120,15,5],[126,20,4],[132,18,3],[138,16,4],[144,14,4],[150,14,8]]);
+      addQBlocks(m,[[22,12],[36,11],[48,13],[60,10],[72,12],[86,11],[98,13],[110,10],[122,12],[140,9]]);
+      addGaps(m,[[12,2],[25,3],[42,2],[56,3],[76,2],[94,3],[116,2],[134,2]],this.height,dc.gapWidth);
+      addCrates(m,[[10,19],[20,14],[34,13],[46,15],[52,19],[64,17],[78,19],[84,13],[96,15],[108,12],[120,14],[132,17],[138,15]]);
+      addConveyors(m,[[28,23,'r'],[29,23,'r'],[30,23,'r'],[102,23,'l'],[103,23,'l'],[104,23,'l']]);
+      addSteamVents(m,[[52,23],[126,23]]);
+      addRainbowBlock(m,[[58,10]]);
+      return m;
+    },
+    enemyDefs:[{type:'monkey',x:10},{type:'parrot',x:14},{type:'monkey',x:20},{type:'parrot',x:26},{type:'monkey',x:32},{type:'parrot',x:38},{type:'monkey',x:44},{type:'parrot',x:50},{type:'monkey',x:56},{type:'parrot',x:62},{type:'monkey',x:68},{type:'parrot',x:74},{type:'monkey',x:80},{type:'parrot',x:86},{type:'monkey',x:92},{type:'parrot',x:98},{type:'monkey',x:104},{type:'parrot',x:110},{type:'monkey',x:116},{type:'parrot',x:122},{type:'monkey',x:128},{type:'parrot',x:134},{type:'monkey',x:140},{type:'parrot',x:146}],
+    bowPositions:[15,50,90,130], superPositions:[30,70,110,140], catPosition:60,
+    clouds:[]
   }
 ];
 
@@ -1037,7 +1081,7 @@ function initLevel(idx){
   for(let y=0;y<lvl.height;y++) for(let x=0;x<lvl.width;x++) if(map[y][x]===5) rainbowBlocks.push({x,y,hit:false});
   particles=[]; crateCombo=0;crateComboTimer=0;smashTexts=[];crateShake=0; camera={x:0,y:0}; gameState='playing';
   // Boss on final level
-  const isBossLevel=(idx===5||idx===LEVELS.length-1);
+  const isBossLevel=(idx===5||idx===9||idx===LEVELS.length-1);
   bossDefeated=false;
   if(isBossLevel){
     const bossScale=4;
@@ -1051,9 +1095,11 @@ function initLevel(idx){
       chargeTimer:0,charging:false,chargeVx:0,
       hurtTimer:0,phase:0,facing:-1,frame:0,frameTimer:0,
       roarTimer:0,roarCooldown:0,
-      sprIdle:idx>=6?ROBO_IDLE:BOSS_IDLE,sprWalk:idx>=6?ROBO_WALK:BOSS_WALK,
-      sprCharge:idx>=6?ROBO_CHARGE:BOSS_CHARGE,sprRoar:idx>=6?ROBO_ROAR:BOSS_ROAR,
-      sprPalette:idx>=6?ROBO_P:BOSS_P};
+      sprIdle:idx>=10?PIRATE_IDLE:idx>=6?ROBO_IDLE:BOSS_IDLE,
+      sprWalk:idx>=10?PIRATE_WALK:idx>=6?ROBO_WALK:BOSS_WALK,
+      sprCharge:idx>=10?PIRATE_CHARGE:idx>=6?ROBO_CHARGE:BOSS_CHARGE,
+      sprRoar:idx>=10?PIRATE_ROAR:idx>=6?ROBO_ROAR:BOSS_ROAR,
+      sprPalette:idx>=10?PIRATE_P:idx>=6?ROBO_P:BOSS_P};
   }else{boss=null;}
   startBGM(idx);
 }
@@ -1584,7 +1630,7 @@ smashTexts.forEach(st=>{
   if(lives===Infinity){drawSprite(HEART_S,8,8,HEART_P,2,false);ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.fillText('∞',28,22);}
   else{for(let i=0;i<lives;i++)drawSprite(HEART_S,8+i*18,8,HEART_P,2,false);}
   ctx.fillStyle='#fff';ctx.font='bold 14px monospace';ctx.fillText(T('score')+score,BASE_W-140,22);
-  const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6','level_7','level_8','level_9','level_10'];
+  const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6','level_7','level_8','level_9','level_10','level_11','level_12'];
   ctx.fillStyle='#ffffffaa';ctx.font='10px monospace';ctx.fillText(T(lvlNames[currentLevel])+' ['+TDiff(selectedDifficulty)+']',BASE_W/2-60,16);
   let hx=BASE_W-40;if(cat&&cat.hitsLeft>0){drawSprite(CAT_S,hx,30,CAT_P,1.5,false);ctx.fillStyle='#fff';ctx.font='bold 8px monospace';ctx.fillText('x'+cat.hitsLeft,hx+2,48);hx-=22;}
   if(p.hasCape){drawSprite(SUPER_S,hx,32,SUPER_P,1.5,false);hx-=22;}
@@ -1810,12 +1856,13 @@ function drawBetween(){
   const heroStand=ps.stand, heroRun=ps.run, heroPal=ps.palette;
   const sibStand=rs.sprite, sibPal=rs.palette;
   const sibJump=selectedChar==='gigi'?DODO_JUMP:GIGI_JUMP;
-  const isBossLevel=(currentLevel===5||currentLevel===LEVELS.length-1);
-  const isCh2=currentLevel>=6;
-  const bossIdleSpr=isCh2?ROBO_IDLE:BOSS_IDLE;
-  const bossWalkSpr=isCh2?ROBO_WALK:BOSS_WALK;
-  const bossRoarSpr=isCh2?ROBO_ROAR:BOSS_ROAR;
-  const bossPal=isCh2?ROBO_P:BOSS_P;
+  const isBossLevel=(currentLevel===5||currentLevel===9||currentLevel===LEVELS.length-1);
+  const isCh2=currentLevel>=6&&currentLevel<10;
+  const isCh3=currentLevel>=10;
+  const bossIdleSpr=isCh3?PIRATE_IDLE:isCh2?ROBO_IDLE:BOSS_IDLE;
+  const bossWalkSpr=isCh3?PIRATE_WALK:isCh2?ROBO_WALK:BOSS_WALK;
+  const bossRoarSpr=isCh3?PIRATE_ROAR:isCh2?ROBO_ROAR:BOSS_ROAR;
+  const bossPal=isCh3?PIRATE_P:isCh2?ROBO_P:BOSS_P;
 
   // === CHAPTER 2 INTRO (after defeating Toy Castle boss) ===
   if(currentLevel===6){
@@ -2054,7 +2101,7 @@ function drawBetween(){
       ctx.strokeText(sibName+T('sib_stolen_again'),0,0);
       ctx.fillText(sibName+T('sib_stolen_again'),0,0);
       ctx.fillStyle='#ffdd00';ctx.font='bold 16px monospace';
-      const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6','level_7','level_8','level_9','level_10'];
+      const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6','level_7','level_8','level_9','level_10','level_11','level_12'];
       const nextName=T(lvlNames[currentLevel]);
       ctx.strokeText(T('keep_going')+' \u2192 '+nextName,0,35);
       ctx.fillText(T('keep_going')+' \u2192 '+nextName,0,35);
@@ -2082,7 +2129,7 @@ function drawDebug(){
   ctx.fillText('Hold B to open \u2022 ESC to close',BASE_W/2,58);
 
   // Level cards
-  const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6','level_7','level_8','level_9','level_10'];
+  const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6','level_7','level_8','level_9','level_10','level_11','level_12'];
   const cardW=56,cardH=110,gap=6;
   const totalW=LEVELS.length*(cardW+gap)-gap;
   const startX=(BASE_W-totalW)/2;
