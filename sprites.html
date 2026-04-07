@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gigi & Dodo - Sprite Viewer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: #fff; font-family: monospace; padding: 20px; }
+h1 { text-align: center; margin-bottom: 20px; color: #ffdd00; }
+h2 { margin: 20px 0 10px; color: #88ccff; border-bottom: 1px solid #333; padding-bottom: 5px; }
+.sprite-row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 10px; }
+.sprite-box { background: #222; border: 2px solid #444; border-radius: 8px; padding: 10px; text-align: center; }
+.sprite-box:hover { border-color: #ffdd00; }
+.sprite-box canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; margin: 0 auto 8px; }
+.sprite-box .label { font-size: 11px; color: #aaa; }
+.combined { background: #2a2a3e; border-color: #666; }
+.controls { text-align: center; margin: 10px 0; }
+.controls button { background: #444; color: #fff; border: 1px solid #666; padding: 6px 16px; margin: 0 4px; border-radius: 4px; cursor: pointer; font-family: monospace; }
+.controls button:hover { background: #666; }
+.controls button.active { background: #ffdd00; color: #000; }
+</style>
+</head>
+<body>
+<h1>Gigi & Dodo - Sprite Viewer</h1>
+<div class="controls">
+  Scale: <button onclick="setScale(4)">4x</button>
+  <button onclick="setScale(6)" class="active">6x</button>
+  <button onclick="setScale(8)">8x</button>
+  <button onclick="setScale(10)">10x</button>
+  <button onclick="setScale(12)">12x</button>
+</div>
+<div id="content"></div>
+
+<script>
+let SCALE = 6;
+
+// ==========================================
+//  SPRITE DATA (from game)
+// ==========================================
+
+// --- GIGI (Classic) ---
+const GIGI_STAND=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,0,2,2,0,2,2,0,0],[0,0,0,6,6,0,6,6,0,0]];
+const GIGI_RUN=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
+const GIGI_JUMP=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,1,0,1,1,1,1,0,1,0],[0,0,1,1,1,1,1,1,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,0,0,0,0,2,0,0],[0,6,0,0,0,0,0,0,6,0]];
+const GIGI_P={1:'#e03030',2:'#3050d0',3:'#ffffff',4:'#ffcc99',5:'#e8c845',6:'#aa6633',7:'#dd5555',8:'#ffaa88'};
+
+// --- GIGI (Monster Truck skin) ---
+const GIGI_TRUCK_STAND=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,9,9,9,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,0,2,2,0,2,2,0,0],[0,0,0,6,6,0,6,6,0,0]];
+const GIGI_TRUCK_RUN=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,9,9,9,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
+const GIGI_TRUCK_JUMP=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,1,0,1,1,1,1,0,1,0],[0,0,1,1,9,9,9,1,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,0,0,0,0,2,0,0],[0,6,0,0,0,0,0,0,6,0]];
+const GIGI_TRUCK_P={1:'#2266cc',2:'#223355',3:'#ffffff',4:'#ffcc99',5:'#e8c845',6:'#554433',7:'#dd5555',8:'#ffaa88',9:'#44aaff'};
+
+// --- DODO ---
+const DODO_STAND=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,0,6,0,0,6,0,0,0]];
+const DODO_RUN=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,0,6,0,0,0,0,6,0,0],[0,0,0,0,0,0,0,0,0,0]];
+const DODO_JUMP=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,1,0,1,1,1,0,1,0,0],[0,0,1,1,1,1,1,0,0,0],[0,6,0,0,0,0,0,6,0,0],[0,0,0,0,0,0,0,0,0,0]];
+const DODO_P={1:'#ff69b4',3:'#ffffff',4:'#ffcc99',5:'#e8c845',6:'#cc6699',7:'#dd5555',8:'#ffaa88',9:'#ff9999'};
+
+// --- CAPE & ITEMS ---
+const CAPE_S=[[0,0,1,1,0,0],[0,1,1,1,1,0],[1,1,1,1,1,1],[1,1,1,1,1,1],[1,2,1,1,2,1],[1,2,2,2,2,1],[0,1,2,2,1,0],[0,0,1,1,0,0]];
+const CAPE_P={1:'#dd2200',2:'#ff4422'};
+const SUPER_S=[[0,0,0,1,1,0,0,0],[0,0,1,2,2,1,0,0],[0,1,2,2,2,2,1,0],[1,2,2,3,3,2,2,1],[1,2,2,3,3,2,2,1],[0,1,2,2,2,2,1,0],[0,0,1,2,2,1,0,0],[0,0,0,1,1,0,0,0]];
+const SUPER_P={1:'#ff4400',2:'#ffaa00',3:'#ffff88'};
+const BOW_S=[[0,0,0,1,1,0,0,0],[0,0,1,0,0,2,0,0],[0,1,0,0,0,0,2,0],[1,0,0,0,0,0,2,0],[1,0,0,0,0,0,2,0],[0,1,0,0,0,0,2,0],[0,0,1,0,0,2,0,0],[0,0,0,1,1,0,0,0]];
+const BOW_P={1:'#aa6633',2:'#cccccc'};
+const ARROW_S=[[0,0,2,1,1,1],[0,0,2,1,1,1]];
+const ARROW_P={1:'#aa6633',2:'#cccccc'};
+const HEART_S=[[0,1,1,0,1,1,0],[1,1,1,1,1,1,1],[1,1,1,1,1,1,1],[0,1,1,1,1,1,0],[0,0,1,1,1,0,0],[0,0,0,1,0,0,0]];
+const HEART_P={1:'#ff3355'};
+
+// ==========================================
+//  RENDERING
+// ==========================================
+function renderSprite(canvas, data, palette, scale) {
+  const rows = data.length, cols = data[0].length;
+  canvas.width = cols * scale;
+  canvas.height = rows * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Checkerboard background
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      ctx.fillStyle = (r + c) % 2 === 0 ? '#2a2a3e' : '#252538';
+      ctx.fillRect(c * scale, r * scale, scale, scale);
+    }
+  }
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const v = data[r][c];
+      if (!v) continue;
+      ctx.fillStyle = palette[v] || '#ff00ff';
+      ctx.fillRect(c * scale, r * scale, scale, scale);
+    }
+  }
+}
+
+function renderCombined(canvas, sprites, palettes, offsets, scale) {
+  // Find bounding box
+  let maxW = 0, maxH = 0;
+  sprites.forEach((spr, i) => {
+    const [ox, oy] = offsets[i];
+    maxW = Math.max(maxW, ox + spr[0].length);
+    maxH = Math.max(maxH, oy + spr.length);
+  });
+  canvas.width = maxW * scale;
+  canvas.height = maxH * scale;
+  const ctx = canvas.getContext('2d');
+  // Checkerboard
+  for (let r = 0; r < maxH; r++) {
+    for (let c = 0; c < maxW; c++) {
+      ctx.fillStyle = (r + c) % 2 === 0 ? '#2a2a3e' : '#252538';
+      ctx.fillRect(c * scale, r * scale, scale, scale);
+    }
+  }
+  sprites.forEach((spr, i) => {
+    const pal = palettes[i];
+    const [ox, oy] = offsets[i];
+    for (let r = 0; r < spr.length; r++) {
+      for (let c = 0; c < spr[r].length; c++) {
+        const v = spr[r][c];
+        if (!v) continue;
+        ctx.fillStyle = pal[v] || '#ff00ff';
+        ctx.fillRect((ox + c) * scale, (oy + r) * scale, scale, scale);
+      }
+    }
+  });
+}
+
+function createSpriteBox(label, data, palette, extraClass) {
+  const box = document.createElement('div');
+  box.className = 'sprite-box' + (extraClass ? ' ' + extraClass : '');
+  const canvas = document.createElement('canvas');
+  renderSprite(canvas, data, palette, SCALE);
+  box.appendChild(canvas);
+  const lbl = document.createElement('div');
+  lbl.className = 'label';
+  lbl.textContent = label;
+  box.appendChild(lbl);
+  return { box, canvas, data, palette };
+}
+
+function createCombinedBox(label, sprites, palettes, offsets) {
+  const box = document.createElement('div');
+  box.className = 'sprite-box combined';
+  const canvas = document.createElement('canvas');
+  renderCombined(canvas, sprites, palettes, offsets, SCALE);
+  box.appendChild(canvas);
+  const lbl = document.createElement('div');
+  lbl.className = 'label';
+  lbl.textContent = label;
+  box.appendChild(lbl);
+  return { box, canvas, sprites, palettes, offsets };
+}
+
+let allBoxes = [];
+
+function buildUI() {
+  const content = document.getElementById('content');
+  content.innerHTML = '';
+  allBoxes = [];
+
+  function addSection(title) {
+    const h = document.createElement('h2');
+    h.textContent = title;
+    content.appendChild(h);
+    const row = document.createElement('div');
+    row.className = 'sprite-row';
+    content.appendChild(row);
+    return row;
+  }
+
+  // --- GIGI CLASSIC ---
+  let row = addSection('Gigi (Classic)');
+  [['Stand', GIGI_STAND], ['Run', GIGI_RUN], ['Jump', GIGI_JUMP]].forEach(([l, d]) => {
+    const b = createSpriteBox(l, d, GIGI_P);
+    row.appendChild(b.box); allBoxes.push(b);
+  });
+
+  // --- GIGI TRUCK ---
+  row = addSection('Gigi (Monster Truck)');
+  [['Stand', GIGI_TRUCK_STAND], ['Run', GIGI_TRUCK_RUN], ['Jump', GIGI_TRUCK_JUMP]].forEach(([l, d]) => {
+    const b = createSpriteBox(l, d, GIGI_TRUCK_P);
+    row.appendChild(b.box); allBoxes.push(b);
+  });
+
+  // --- DODO ---
+  row = addSection('Dodo');
+  [['Stand', DODO_STAND], ['Run', DODO_RUN], ['Jump', DODO_JUMP]].forEach(([l, d]) => {
+    const b = createSpriteBox(l, d, DODO_P);
+    row.appendChild(b.box); allBoxes.push(b);
+  });
+
+  // --- CAPE ---
+  row = addSection('Cape');
+  const capeBox = createSpriteBox('Cape', CAPE_S, CAPE_P);
+  row.appendChild(capeBox.box); allBoxes.push(capeBox);
+
+  // --- COMBINED: Gigi + Cape ---
+  row = addSection('Combined: Gigi + Cape');
+  // Cape behind, offset to the left
+  let cb = createCombinedBox('Gigi Stand + Cape (facing right)',
+    [CAPE_S, GIGI_STAND], [CAPE_P, GIGI_P], [[-2, 4], [0, 0]]);
+  row.appendChild(cb.box); allBoxes.push(cb);
+  cb = createCombinedBox('Gigi Run + Cape (facing right)',
+    [CAPE_S, GIGI_RUN], [CAPE_P, GIGI_P], [[-2, 4], [0, 0]]);
+  row.appendChild(cb.box); allBoxes.push(cb);
+  cb = createCombinedBox('Gigi Jump + Cape (facing right)',
+    [CAPE_S, GIGI_JUMP], [CAPE_P, GIGI_P], [[-2, 4], [0, 0]]);
+  row.appendChild(cb.box); allBoxes.push(cb);
+
+  // --- COMBINED: Dodo + Cape ---
+  row = addSection('Combined: Dodo + Cape');
+  cb = createCombinedBox('Dodo Stand + Cape',
+    [CAPE_S, DODO_STAND], [CAPE_P, DODO_P], [[-2, 4], [0, 0]]);
+  row.appendChild(cb.box); allBoxes.push(cb);
+  cb = createCombinedBox('Dodo Run + Cape',
+    [CAPE_S, DODO_RUN], [CAPE_P, DODO_P], [[-2, 4], [0, 0]]);
+  row.appendChild(cb.box); allBoxes.push(cb);
+
+  // --- ITEMS ---
+  row = addSection('Items');
+  [['Super (Cape Pickup)', SUPER_S, SUPER_P], ['Bow', BOW_S, BOW_P], ['Arrow', ARROW_S, ARROW_P], ['Heart', HEART_S, HEART_P]].forEach(([l, d, p]) => {
+    const b = createSpriteBox(l, d, p);
+    row.appendChild(b.box); allBoxes.push(b);
+  });
+}
+
+function setScale(s) {
+  SCALE = s;
+  document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  // Re-render all
+  allBoxes.forEach(b => {
+    if (b.sprites) {
+      renderCombined(b.canvas, b.sprites, b.palettes, b.offsets, SCALE);
+    } else {
+      renderSprite(b.canvas, b.data, b.palette, SCALE);
+    }
+  });
+}
+
+buildUI();
+</script>
+</body>
+</html>
