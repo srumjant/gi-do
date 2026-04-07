@@ -482,6 +482,79 @@ const BOSS_ROAR=[
 [0,0,0,0,8,8,8,0,0,8,8,8,0,0,0,0,0,0],
 [0,0,0,0,0,8,0,0,0,0,8,0,0,0,0,0,0,0]];
 const BOSS_P={1:'#8B5E3C',2:'#ffcc99',3:'#ff3333',4:'#6B3F1F',5:'#6B4226',6:'#111111',7:'#ffffff',8:'#ccaa00',9:'#7B4E2C',10:'#7B4E2C'};
+const ROBO_IDLE=[
+[0,0,0,0,0,0,5,5,5,5,5,5,0,0,0,0,0,0],
+[0,0,0,0,0,5,1,1,1,1,1,1,5,0,0,0,0,0],
+[0,0,0,0,5,1,1,1,1,1,1,1,1,5,0,0,0,0],
+[0,0,0,0,1,1,3,3,1,1,3,3,1,1,0,0,0,0],
+[0,0,0,0,1,1,3,2,1,1,3,2,1,1,0,0,0,0],
+[0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+[0,0,0,0,0,1,1,4,4,4,4,1,1,0,0,0,0,0],
+[0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+[0,0,6,6,0,1,1,1,1,1,1,1,1,0,6,6,0,0],
+[0,0,6,0,1,1,1,7,7,7,7,1,1,1,0,6,0,0],
+[0,0,0,0,1,1,1,7,1,1,7,1,1,1,0,0,0,0],
+[0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0],
+[0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0],
+[0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+[0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0],
+[0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0],
+[0,0,0,0,0,8,8,8,0,0,8,8,8,0,0,0,0,0]];
+const ROBO_WALK=[
+[0,0,0,0,0,0,5,5,5,5,5,5,0,0,0,0,0,0],
+[0,0,0,0,0,5,1,1,1,1,1,1,5,0,0,0,0,0],
+[0,0,0,0,5,1,1,1,1,1,1,1,1,5,0,0,0,0],
+[0,0,0,0,1,1,3,3,1,1,3,3,1,1,0,0,0,0],
+[0,0,0,0,1,1,3,2,1,1,3,2,1,1,0,0,0,0],
+[0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+[0,0,0,0,0,1,1,4,4,4,4,1,1,0,0,0,0,0],
+[0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+[0,0,6,6,0,1,1,1,1,1,1,1,1,0,6,6,0,0],
+[0,0,6,0,1,1,1,7,7,7,7,1,1,1,0,6,0,0],
+[0,0,0,0,1,1,1,7,1,1,7,1,1,1,0,0,0,0],
+[0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0],
+[0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0],
+[0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+[0,0,0,0,0,1,1,0,0,0,0,1,1,0,0,0,0,0],
+[0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0],
+[0,0,0,0,0,8,8,8,0,0,0,8,8,8,0,0,0,0]];
+const ROBO_CHARGE=[
+[0,0,0,0,0,0,5,5,5,5,5,5,0,0,0,0,0,0],
+[0,0,0,0,0,5,1,1,1,1,1,1,5,0,0,0,0,0],
+[0,0,0,0,5,1,1,1,1,1,1,1,1,5,0,0,0,0],
+[0,0,0,0,1,1,2,2,1,1,2,2,1,1,0,0,0,0],
+[0,0,0,0,1,1,2,2,1,1,2,2,1,1,0,0,0,0],
+[0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+[0,0,0,0,0,1,1,4,4,4,4,1,1,0,0,0,0,0],
+[0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+[0,6,6,6,0,1,1,1,1,1,1,1,1,0,6,6,6,0],
+[0,6,0,0,1,1,1,7,7,7,7,1,1,1,0,0,6,0],
+[0,0,0,0,1,1,1,7,1,1,7,1,1,1,0,0,0,0],
+[0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0],
+[0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0],
+[0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+[0,0,0,0,0,1,1,0,0,0,0,1,1,0,0,0,0,0],
+[0,0,0,0,8,8,0,0,0,0,0,0,8,8,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]];
+const ROBO_ROAR=[
+[0,0,0,0,0,0,5,5,5,5,5,5,0,0,0,0,0,0],
+[0,0,0,0,0,5,1,1,1,1,1,1,5,0,0,0,0,0],
+[0,0,0,0,5,1,1,1,1,1,1,1,1,5,0,0,0,0],
+[0,0,0,0,1,1,2,2,1,1,2,2,1,1,0,0,0,0],
+[0,0,0,0,1,1,2,2,1,1,2,2,1,1,0,0,0,0],
+[0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+[0,0,0,0,0,1,4,4,4,4,4,4,1,0,0,0,0,0],
+[0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+[0,6,6,6,0,1,1,1,1,1,1,1,1,0,6,6,6,0],
+[6,6,0,0,1,1,1,7,7,7,7,1,1,1,0,0,6,6],
+[0,0,0,0,1,1,1,7,1,1,7,1,1,1,0,0,0,0],
+[0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0],
+[0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0],
+[0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+[0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0],
+[0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0],
+[0,0,0,0,0,8,8,8,0,0,8,8,8,0,0,0,0,0]];
+const ROBO_P={1:'#888899',2:'#ff0000',3:'#333344',4:'#ffcc00',5:'#ccaa00',6:'#666677',7:'#aabbcc',8:'#555566'};
 // Rotating kidnappers for cutscenes (one per level transition)
 const KIDNAPPERS=[
   {s:DINO_S,p:DINO_P,color:'#44bb44'},
@@ -719,6 +792,25 @@ const LEVELS = [
     bowPositions:[18,58,98,130], superPositions:[35,75,115], catPosition:60,
     clouds:[]
   },
+  // --- Level 10: Robot Fortress (Boss) ---
+  {
+    name:"Robot Fortress", bg:'#2a1a1a', groundColor:'#554444', brickColor:'#443333', groundTop:'#665555',
+    width:160, height:25, playerStart:[2,20], rescuePos:[155,14],
+    generate(dc){
+      const m=makeGround(this.width,this.height);
+      addPlats(m,[[8,20,4],[14,17,3],[20,15,5],[28,20,4],[34,14,4],[40,19,3],[46,16,5],[52,20,4],[58,13,4],[64,18,3],[70,15,5],[78,20,4],[84,14,4],[90,18,3],[96,16,5],[102,20,4],[108,13,4],[114,17,3],[120,15,5],[126,20,4],[132,18,3],[138,16,4],[144,14,4],[150,14,8]]);
+      addQBlocks(m,[[22,12],[36,11],[48,13],[60,10],[72,12],[86,11],[98,13],[110,10],[122,12],[140,9]]);
+      addGaps(m,[[12,2],[25,3],[42,2],[56,3],[76,2],[94,3],[116,2],[134,2]],this.height,dc.gapWidth);
+      addCrates(m,[[10,19],[20,14],[34,13],[46,15],[52,19],[64,17],[78,19],[84,13],[96,15],[108,12],[120,14],[132,17],[138,15]]);
+      addConveyors(m,[[28,23,'r'],[29,23,'r'],[30,23,'r'],[102,23,'l'],[103,23,'l'],[104,23,'l']]);
+      addSteamVents(m,[[52,23],[126,23]]);
+      addRainbowBlock(m,[[58,10]]);
+      return m;
+    },
+    enemyDefs:[{type:'trash_bot',x:10},{type:'drone',x:14},{type:'piston_bot',x:20},{type:'trash_bot',x:26},{type:'drone',x:32},{type:'piston_bot',x:38},{type:'trash_bot',x:44},{type:'drone',x:50},{type:'piston_bot',x:56},{type:'trash_bot',x:62},{type:'drone',x:68},{type:'trash_bot',x:74},{type:'piston_bot',x:80},{type:'drone',x:86},{type:'trash_bot',x:92},{type:'piston_bot',x:98},{type:'drone',x:104},{type:'trash_bot',x:110},{type:'piston_bot',x:116},{type:'drone',x:122},{type:'trash_bot',x:128},{type:'piston_bot',x:134},{type:'drone',x:140},{type:'trash_bot',x:146}],
+    bowPositions:[15,50,90,130], superPositions:[30,70,110,140], catPosition:60,
+    clouds:[]
+  }
 ];
 
 // ==========================================
@@ -874,19 +966,23 @@ function initLevel(idx){
   for(let y=0;y<lvl.height;y++) for(let x=0;x<lvl.width;x++) if(map[y][x]===5) rainbowBlocks.push({x,y,hit:false});
   particles=[]; crateCombo=0;crateComboTimer=0;smashTexts=[];crateShake=0; camera={x:0,y:0}; gameState='playing';
   // Boss on final level
-  const isFinal=(idx===LEVELS.length-1);
+  const isBossLevel=(idx===5||idx===LEVELS.length-1);
   bossDefeated=false;
-  if(isFinal){
+  if(isBossLevel){
     const bossScale=4;
+    const idleSpr=idx>=6?ROBO_IDLE:BOSS_IDLE;
     const bTX=lvl.rescuePos[0]-6;
     const bGY=findGroundY(bTX);
-    const bH=spriteH(BOSS_IDLE,bossScale),bW=spriteW(BOSS_IDLE,bossScale);
+    const bH=spriteH(idleSpr,bossScale),bW=spriteW(idleSpr,bossScale);
     const hp=dc.enemySpeed<=0.4?5:dc.enemySpeed<=0.7?7:dc.enemySpeed<=1.0?10:14;
     boss={x:bTX*TILE,y:bGY-bH,vx:0,w:bW,h:bH,hp,maxHp:hp,alive:true,
       shootTimer:0,shootInterval:dc.enemyShootInterval*1.2,
       chargeTimer:0,charging:false,chargeVx:0,
       hurtTimer:0,phase:0,facing:-1,frame:0,frameTimer:0,
-      roarTimer:0,roarCooldown:0};
+      roarTimer:0,roarCooldown:0,
+      sprIdle:idx>=6?ROBO_IDLE:BOSS_IDLE,sprWalk:idx>=6?ROBO_WALK:BOSS_WALK,
+      sprCharge:idx>=6?ROBO_CHARGE:BOSS_CHARGE,sprRoar:idx>=6?ROBO_ROAR:BOSS_ROAR,
+      sprPalette:idx>=6?ROBO_P:BOSS_P};
   }else{boss=null;}
   startBGM(idx);
 }
@@ -1287,8 +1383,8 @@ else if(tile===8){
 
   // Rescue NPC — in cage on boss level, free otherwise
   const rsSpr=getRescueSprites(),rTX=lvl.rescuePos[0],rGY=findGroundY(rTX),rDH=spriteH(rsSpr.sprite,2),rX=rTX*TILE,rY=rGY-rDH;
-  const isFinalLvl=(currentLevel===LEVELS.length-1);
-  if(boss&&boss.alive&&isFinalLvl){
+  const isBossLvl=(currentLevel===5||currentLevel===LEVELS.length-1);
+  if(boss&&boss.alive&&isBossLvl){
     // Sibling trapped in cage
     const cageW=40,cageH=50;
     const cageX=rX-8,cageY=rY-8;
@@ -1326,26 +1422,26 @@ else if(tile===8){
       const bfl=boss.facing>0;
       if(boss.hurtTimer>0&&boss.hurtTimer%4<2)ctx.globalAlpha=0.5;
       // Pick sprite frame based on state
-      let bossSpr=BOSS_IDLE;
+      let bossSpr=boss.sprIdle;
       let bWob=Math.sin(animFrame*.08)*2;
       if(boss.roarTimer&&boss.roarTimer>0){
-        bossSpr=BOSS_ROAR;
+        bossSpr=boss.sprRoar;
         bWob=Math.sin(animFrame*.25)*3;
         // Roar shockwave rings
         if(animFrame%6===0){const rx=boss.x+boss.w/2+(bfl?20:-20),ry=boss.y+boss.h*.35;
           for(let i=0;i<3;i++)spawnParticles(rx+Math.random()*20-10,ry+Math.random()*10-5,'#ffaa44',1);}
       }else if(boss.charging){
-        bossSpr=BOSS_CHARGE;
+        bossSpr=boss.sprCharge;
         bWob=Math.sin(animFrame*.4)*4;
         // Dust particles while charging
         if(animFrame%2===0)spawnParticles(boss.x+(bfl?0:boss.w),boss.y+boss.h,'#aa8866',3);
         // Ground shake effect
         if(animFrame%4===0)spawnParticles(boss.x+Math.random()*boss.w,boss.y+boss.h,'#665544',2);
       }else if(Math.abs(boss.vx)>0.1||boss.chargeTimer>120){
-        bossSpr=boss.frame===0?BOSS_IDLE:BOSS_WALK;
+        bossSpr=boss.frame===0?boss.sprIdle:boss.sprWalk;
         bWob=Math.sin(animFrame*.12)*2;
       }
-      drawSprite(bossSpr,boss.x,boss.y+bWob,BOSS_P,4,bfl);
+      drawSprite(bossSpr,boss.x,boss.y+bWob,boss.sprPalette,4,bfl);
       // Angry eyes glow when low HP
       if(boss.hp<=boss.maxHp*.5){
         const glowI=0.2+Math.sin(animFrame*.15)*0.15;
