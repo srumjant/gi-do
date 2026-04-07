@@ -273,6 +273,7 @@ function sfxCoin(){playTone(880,.08,'square',.1);setTimeout(()=>playTone(1200,.1
 function sfxBlock(){playTone(500,.06,'triangle',.1);setTimeout(()=>playTone(700,.1,'triangle',.08),60)} function sfxShoot(){playTone(600,.08,'sawtooth',.1,900)}
 function sfxPickup(){playTone(440,.1,'triangle',.12);setTimeout(()=>playTone(660,.1,'triangle',.12),80);setTimeout(()=>playTone(880,.15,'triangle',.1),160)}
 function sfxCrateBreak(){playTone(120,.1,'sawtooth',.12);setTimeout(()=>playTone(80,.15,'sawtooth',.1),50);}
+function sfxFart(){playTone(80,.2,'sawtooth',.15,-30);setTimeout(()=>playTone(60,.15,'sawtooth',.1,-20),100);}
 function sfxWin(){[523,659,784,1047].forEach((f,i)=>setTimeout(()=>playTone(f,.2,'square',.1),i*150))}
 
 // ==========================================
@@ -780,7 +781,7 @@ function initLevel(idx){
   const ps=getPlayerSprites(), ph=spriteH(ps.stand,2), pw=spriteW(ps.stand,2);
   player={x:lvl.playerStart[0]*TILE, y:lvl.playerStart[1]*TILE, vx:0, vy:0, w:pw-4, h:ph-4,
     onGround:false, facing:1, frame:0, frameTimer:0, invincible:0,
-    hasBow:false, bowCharges:0, arrowCooldown:0, hasCape:dc.startWithCape};
+    hasBow:false, bowCharges:0, arrowCooldown:0, hasCape:dc.startWithCape, fartTimer:0, bigHeadTimer:0, chickenRayCharges:0};
   enemies=[]; pendingEnemies=lvl.enemyDefs.map(e=>({...e,spawned:false}));
   let bowPos=lvl.bowPositions||[], superPos=lvl.superPositions||[];
   // Extra pickups on super easy
@@ -891,7 +892,11 @@ function update(){
   if(keys['ArrowLeft']||keys['KeyA']){p.vx=-dc.playerSpeed;p.facing=-1;}
   else if(keys['ArrowRight']||keys['KeyD']){p.vx=dc.playerSpeed;p.facing=1;}
   else{p.vx*=.7;if(Math.abs(p.vx)<.1)p.vx=0;}
-  if((keys['Space']||keys['ArrowUp']||keys['KeyW'])&&p.onGround){p.vy=dc.jumpForce;p.onGround=false;sfxJump();}
+  if((keys['Space']||keys['ArrowUp']||keys['KeyW'])&&p.onGround){
+  p.vy=p.fartTimer>0?dc.jumpForce*1.5:dc.jumpForce;p.onGround=false;
+  if(p.fartTimer>0){sfxFart();for(let i=0;i<5;i++)particles.push({x:p.x+p.w/2,y:p.y+p.h,vx:(Math.random()-.5)*3,vy:Math.random()*2+1,life:25+Math.random()*15,color:'#88cc44'});}
+  else sfxJump();
+}
 
   // Shoot
   if(p.arrowCooldown>0)p.arrowCooldown--;
@@ -909,6 +914,7 @@ function update(){
   const pL2=p.x+3,pR2=p.x+p.w-3;
   if(p.vy>0){const fY=p.y+p.h;if(isSolid(getTile(pL2,fY))||isSolid(getTile(pR2,fY))){p.y=Math.floor(fY/TILE)*TILE-p.h;p.vy=0;p.onGround=true;
   const cTy=Math.floor(fY/TILE);[Math.floor(pL2/TILE),Math.floor(pR2/TILE)].forEach(cTx=>{if(map[cTy]&&map[cTy][cTx]===4)breakCrate(cTx,cTy);});
+if(p.fartTimer>0){enemies.forEach(e=>{if(!e.alive)return;const edx=e.x+e.w/2-(p.x+p.w/2),edy=e.y+e.h/2-(p.y+p.h/2);if(Math.sqrt(edx*edx+edy*edy)<50){e.stunTimer=(e.stunTimer||0)+120;spawnParticles(e.x+e.w/2,e.y,'#88cc44',4);}});}
 }}
   else if(p.vy<0){const hY=p.y;if(isSolid(getTile(pL2,hY))||isSolid(getTile(pR2,hY))){p.y=Math.floor(hY/TILE)*TILE+TILE;p.vy=0;
     const h1=Math.floor(pL2/TILE),h2=Math.floor(pR2/TILE),hy=Math.floor(hY/TILE);
@@ -920,6 +926,11 @@ function update(){
   if(p.y>lvl.height*TILE+32){if(DC().capeSavesPit&&p.hasCape){p.hasCape=false;p.invincible=60;p.vy=-10;p.y=lvl.height*TILE-32;spawnParticles(p.x+8,p.y+4,'#ff4400',12);playTone(400,.15,'sawtooth',.12,200);}else{playerDie();}return;}
   if(!p.onGround)p.frame=2;else if(Math.abs(p.vx)>.5){p.frameTimer++;if(p.frameTimer>8){p.frame=p.frame===0?1:0;p.frameTimer=0;}}else p.frame=0;
   if(p.invincible>0)p.invincible--;
+  if(p.fartTimer>0)p.fartTimer--;
+  if(p.bigHeadTimer>0)p.bigHeadTimer--;
+  if(p.fartTimer>0&&animFrame%3===0){
+  particles.push({x:p.x+p.w/2+(Math.random()-.5)*6,y:p.y+p.h,vx:(Math.random()-.5)*1,vy:Math.random()*1.5+0.5,life:15+Math.random()*10,color:['#88cc44','#aadd55','#66aa33'][Math.floor(Math.random()*3)]});
+}
 
   // Pickups
   bowPickups.forEach(b=>{if(!b.collected&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:b.x,y:b.y,w:16,h:16})){b.collected=true;p.hasBow=true;p.bowCharges=dc.bowCharges;sfxPickup();spawnParticles(b.x+8,b.y+8,'#aa6633',6);}});
@@ -993,6 +1004,7 @@ function update(){
   // Enemies AI
   enemies.forEach(e=>{
     if(!e.alive){if(e.squashTimer>0)e.squashTimer--;return;}
+if(e.stunTimer>0){e.stunTimer--;return;}
     if(!e.noGravity){if(e.vy===undefined)e.vy=0;e.vy+=GRAVITY;if(e.vy>8)e.vy=8;e.y+=e.vy;
       const eF=e.y+e.h;if(isSolid(getTile(e.x+e.w/2,eF))||isSolid(getTile(e.x+2,eF))||isSolid(getTile(e.x+e.w-2,eF))){e.y=Math.floor(eF/TILE)*TILE-e.h;e.vy=0;}}
 
@@ -1197,6 +1209,7 @@ else if(tile===5){const rCol=`hsl(${(animFrame*3+tx*20)%360},100%,65%)`;ctx.fill
     if(!e.alive){ctx.save();ctx.translate(e.x,e.y+e.h*.7);ctx.scale(1,.3);drawSprite(info.sprite,0,0,info.palette,ENEMY_SCALE,fl);ctx.restore();}
     else drawSprite(info.sprite,e.x,e.y+wb,info.palette,ENEMY_SCALE,fl);
     if(e.type==='cannon'&&e.alive&&e.shootTimer>e.shootInterval-5){ctx.fillStyle='rgba(255,150,0,0.5)';const dir=player.x>e.x?1:-1;ctx.beginPath();ctx.arc(e.x+e.w/2+dir*10,e.y+e.h/2,5,0,Math.PI*2);ctx.fill();}
+    if(e.stunTimer>0&&e.alive){ctx.fillStyle='#ffdd00';ctx.font='bold 10px monospace';ctx.fillText('*',e.x+e.w/4,e.y-2);ctx.fillText('*',e.x+e.w*3/4,e.y-4);}
     ctx.globalAlpha=1;});
 
   // Boss
