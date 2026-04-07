@@ -921,7 +921,9 @@ function update(){
   p.y+=p.vy;p.onGround=false;
   const pL2=p.x+3,pR2=p.x+p.w-3;
   if(p.vy>0){const fY=p.y+p.h;if(isSolid(getTile(pL2,fY))||isSolid(getTile(pR2,fY))){p.y=Math.floor(fY/TILE)*TILE-p.h;p.vy=0;p.onGround=true;
-  const cTy=Math.floor(fY/TILE);[Math.floor(pL2/TILE),Math.floor(pR2/TILE)].forEach(cTx=>{if(map[cTy]&&map[cTy][cTx]===4)breakCrate(cTx,cTy);});
+  let crateStompBroke=false;
+  const cTy=Math.floor(fY/TILE);[Math.floor(pL2/TILE),Math.floor(pR2/TILE)].forEach(cTx=>{if(map[cTy]&&map[cTy][cTx]===4){breakCrate(cTx,cTy);crateStompBroke=true;}});
+  if(crateStompBroke){p.vy=-7;p.onGround=false;}
 if(p.fartTimer>0){enemies.forEach(e=>{if(!e.alive)return;const edx=e.x+e.w/2-(p.x+p.w/2),edy=e.y+e.h/2-(p.y+p.h/2);if(Math.sqrt(edx*edx+edy*edy)<50){e.stunTimer=(e.stunTimer||0)+120;spawnParticles(e.x+e.w/2,e.y,'#88cc44',4);}});}
 }}
   else if(p.vy<0){const hY=p.y;if(isSolid(getTile(pL2,hY))||isSolid(getTile(pR2,hY))){p.y=Math.floor(hY/TILE)*TILE+TILE;p.vy=0;
