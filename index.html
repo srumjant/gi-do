@@ -594,7 +594,7 @@ const LEVELS = [
       addQBlocks(m,[[14,13],[26,11],[46,12],[58,10],[70,13],[84,11],[96,16],[102,12],[114,10],[126,13],[138,11]]);
       addGaps(m,[[16,2],[35,3],[60,2],[78,3],[105,2],[128,3]],this.height,dc.gapWidth);
       addCrates(m,[[8,19],[14,15],[26,13],[44,14],[56,12],[68,15],[82,13],[94,18],[106,19],[112,12],[130,19],[130,20]]);
-      addRainbowBlock(m,[[50,11]]);
+      addRainbowBlock(m,[[44,12]]);
       return m;
     },
     enemyDefs:[{type:'doll',x:8},{type:'ghost',x:15},{type:'dino',x:22},{type:'bat',x:30},{type:'cannon',x:36},{type:'bouncer',x:42},{type:'doll',x:50},{type:'ghost',x:56},{type:'car',x:64},{type:'bat',x:70},{type:'dino',x:78},{type:'cannon',x:86},{type:'bouncer',x:92},{type:'ghost',x:98},{type:'doll',x:106},{type:'bat',x:112},{type:'dino',x:120},{type:'cannon',x:126},{type:'ghost',x:134},{type:'bouncer',x:140}],
@@ -612,7 +612,7 @@ const LEVELS = [
       addQBlocks(m,[[16,14],[22,12],[42,11],[60,10],[72,16],[78,12],[90,11],[102,13],[114,10],[126,12],[138,15]]);
       addGaps(m,[[25,3],[48,2],[66,3],[85,2],[108,3],[132,2]],this.height,dc.gapWidth);
       addCrates(m,[[10,19],[20,14],[34,17],[46,15],[52,19],[64,16],[76,14],[88,13],[100,15],[112,12],[124,14],[136,17]]);
-      addRainbowBlock(m,[[55,11]]);
+      addRainbowBlock(m,[[46,13]]);
       return m;
     },
     enemyDefs:[{type:'car',x:10},{type:'doll',x:16},{type:'bat',x:24},{type:'ghost',x:32},{type:'dino',x:38},{type:'cannon',x:44},{type:'bouncer',x:52},{type:'doll',x:58},{type:'bat',x:64},{type:'ghost',x:72},{type:'cannon',x:78},{type:'dino',x:84},{type:'car',x:90},{type:'bouncer',x:96},{type:'ghost',x:104},{type:'bat',x:110},{type:'cannon',x:118},{type:'doll',x:124},{type:'dino',x:132},{type:'bouncer',x:138},{type:'ghost',x:142}],
@@ -630,7 +630,7 @@ const LEVELS = [
       addQBlocks(m,[[14,14],[20,12],[40,11],[60,10],[72,12],[92,11],[104,13],[116,10],[128,12],[140,13]]);
       addGaps(m,[[22,2],[35,3],[55,2],[75,3],[100,2],[122,3]],this.height,dc.gapWidth);
       addCrates(m,[[8,19],[18,14],[32,17],[38,13],[52,19],[64,17],[70,14],[84,16],[96,18],[108,19],[120,16],[132,19],[138,17]]);
-      addRainbowBlock(m,[[50,11]]);
+      addRainbowBlock(m,[[44,13]]);
       return m;
     },
     enemyDefs:[{type:'penguin',x:8},{type:'icebat',x:14},{type:'penguin',x:20},{type:'icebat',x:28},{type:'penguin',x:34},{type:'icebat',x:40},{type:'penguin',x:48},{type:'icebat',x:54},{type:'penguin',x:60},{type:'icebat',x:66},{type:'penguin',x:72},{type:'icebat',x:80},{type:'penguin',x:86},{type:'icebat',x:92},{type:'penguin',x:98},{type:'icebat',x:104},{type:'penguin',x:110},{type:'icebat',x:116},{type:'penguin',x:122},{type:'icebat',x:128},{type:'penguin',x:134},{type:'icebat',x:140}],
@@ -665,7 +665,7 @@ let introTimer=0, introPhase=0, betweenTimer=0;
 let boss=null, bossDefeated=false;
 let map=[], camera={x:0,y:0}, player={}, enemies=[], pendingEnemies=[];
 let stars=[], particles=[], questionBlocks=[], arrows=[], enemyProjectiles=[];
-let crateCombo=0, crateComboTimer=0, smashTexts=[];
+let crateCombo=0, crateComboTimer=0, smashTexts=[], crateShake=0;
 let rainbowBlocks=[];
 let bowPickups=[], superPickups=[], catPickup=null, cat=null, animFrame=0;
 
@@ -749,14 +749,14 @@ function breakCrate(tx,ty){
   if(map[ty][tx]!==4)return;
   map[ty][tx]=0;
   const px=tx*TILE+8, py=ty*TILE+8;
-  for(let i=0;i<8;i++){
+  for(let i=0;i<12;i++){
     const c=CRATE_PARTICLES[Math.floor(Math.random()*CRATE_PARTICLES.length)];
-    particles.push({x:px,y:py,vx:(Math.random()-.5)*6,vy:-Math.random()*5-2,life:40+Math.random()*20,color:c});
+    particles.push({x:px,y:py,vx:(Math.random()-.5)*7,vy:-Math.random()*6-2,life:40+Math.random()*25,color:c});
   }
-  if(Math.random()<0.3){
-    stars.push({x:tx*TILE,y:ty*TILE-TILE,vy:-2,collected:false});
-  }
+  stars.push({x:tx*TILE,y:ty*TILE-TILE,vy:-2,collected:false});
+  if(Math.random()<0.3)stars.push({x:tx*TILE+8,y:ty*TILE-TILE*1.5,vy:-2.5,collected:false});
   sfxCrateBreak();
+  crateShake=6;
   crateCombo++;crateComboTimer=60;
   if(crateCombo>=3){
     smashTexts.push({x:px,y:py-10,life:60,text:crateCombo>=5?'MEGA SMASH!':'SMASH!',scale:crateCombo>=5?2:1.5});
@@ -807,7 +807,7 @@ function initLevel(idx){
   for(let y=0;y<lvl.height;y++) for(let x=0;x<lvl.width;x++) if(map[y][x]===3) questionBlocks.push({x,y,hit:false});
   rainbowBlocks=[];
   for(let y=0;y<lvl.height;y++) for(let x=0;x<lvl.width;x++) if(map[y][x]===5) rainbowBlocks.push({x,y,hit:false});
-  particles=[]; crateCombo=0;crateComboTimer=0;smashTexts=[]; camera={x:0,y:0}; gameState='playing';
+  particles=[]; crateCombo=0;crateComboTimer=0;smashTexts=[];crateShake=0; camera={x:0,y:0}; gameState='playing';
   // Boss on final level
   const isFinal=(idx===LEVELS.length-1);
   bossDefeated=false;
@@ -1154,7 +1154,9 @@ function draw(){
   if(lvl.clouds){ctx.fillStyle='rgba(255,255,255,0.7)';lvl.clouds.forEach(([cx,cy])=>{const sx=cx*TILE-camera.x*.3,sy=cy*TILE;
     ctx.beginPath();ctx.ellipse(sx+15,sy+8,18,10,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(sx+5,sy+10,10,8,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(sx+25,sy+10,10,8,0,0,Math.PI*2);ctx.fill();});}
 
-  ctx.save();ctx.translate(-Math.round(camera.x),-Math.round(camera.y));
+  const shakeX=crateShake>0?(Math.random()-.5)*crateShake:0,shakeY=crateShake>0?(Math.random()-.5)*crateShake:0;
+  if(crateShake>0)crateShake--;
+  ctx.save();ctx.translate(-Math.round(camera.x)+shakeX,-Math.round(camera.y)+shakeY);
   const sTX=Math.floor(camera.x/TILE),eTX=Math.ceil((camera.x+BASE_W)/TILE),sTY=Math.floor(camera.y/TILE),eTY=Math.ceil((camera.y+BASE_H)/TILE);
   for(let ty=sTY;ty<=eTY;ty++) for(let tx=sTX;tx<=eTX;tx++){
     if(ty<0||ty>=lvl.height||tx<0||tx>=lvl.width)continue;const tile=map[ty][tx],dx=tx*TILE,dy=ty*TILE;
@@ -1298,7 +1300,7 @@ else if(tile===5){const rCol=`hsl(${(animFrame*3+tx*20)%360},100%,65%)`;ctx.fill
   const p=player;
   if(p.invincible<=0||Math.floor(animFrame/3)%2===0){const ps=getPlayerSprites();let spr;if(p.frame===0)spr=ps.stand;else if(p.frame===1)spr=ps.run;else spr=ps.jump;
     if(p.hasCape){const cx=p.facing>0?p.x-8:p.x+p.w-4,cw=Math.sin(animFrame*.15)*2;drawSprite(CAPE_S,cx,p.y+6+cw,CAPE_P,2,p.facing<0);}
-    if(p.bigHeadTimer>0){const headH=Math.floor(spr.length*0.4),headData=spr.slice(0,headH),bodyData=spr.slice(headH);drawSprite(bodyData,p.x-2,p.y-2+headH*2,ps.palette,2,p.facing<0);drawSprite(headData,p.x-2-headH,p.y-2-headH*2,ps.palette,4,p.facing<0);}
+    if(p.bigHeadTimer>0){const headH=Math.floor(spr.length*0.5),headData=spr.slice(0,headH),bodyData=spr.slice(headH);const bw=spr[0].length,headScale=5,bodyX=p.x-2,bodyY=p.y-2+headH*2;drawSprite(bodyData,bodyX,bodyY,ps.palette,2,p.facing<0);const headW=bw*headScale,bodyW=bw*2,headX=bodyX+(bodyW-headW)/2,headY=bodyY-headH*headScale;drawSprite(headData,headX,headY,ps.palette,headScale,p.facing<0);}
 else drawSprite(spr,p.x-2,p.y-2,ps.palette,2,p.facing<0);}
 
   particles.forEach(pt=>{ctx.fillStyle=pt.color;ctx.globalAlpha=pt.life/40;ctx.fillRect(pt.x,pt.y,3,3);});ctx.globalAlpha=1;
