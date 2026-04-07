@@ -167,7 +167,7 @@ const TRANSLATIONS = {
   // Title screen
   title:              {et:'GIGI & DODO',             en:'GIGI & DODO',             it:'GIGI & DODO'},
   subtitle:           {et:'Julge päästmisseiklus!',  en:'A brave rescue adventure!', it:'Una coraggiosa avventura di salvataggio!'},
-  worlds:             {et:'10 maailma avastamiseks!', en:'10 worlds to explore!',   it:'10 mondi da esplorare!'},
+  worlds:             {et:'12 maailma avastamiseks!', en:'12 worlds to explore!',   it:'12 mondi da esplorare!'},
   press_start:        {et:'VAJUTA [TÜHIK] ALUSTAMISEKS!', en:'PRESS [SPACE] TO START!', it:'PREMI [SPAZIO] PER INIZIARE!'},
   controls:           {et:'[←→] liigu | [TÜHIK] hüppa | [X] tulista', en:'[←→] move | [SPACE] jump | [X] shoot', it:'[←→] muovi | [SPAZIO] salta | [X] arco'},
   // Language selector
@@ -254,12 +254,22 @@ const TRANSLATIONS = {
   ], it:[
     'NON PUOI FERMARMI!','LE MIE MACCHINE NON SI FERMANO!','VIENI SE OSI!'
   ]},
+  pirate_between:     {et:[
+    'EI SAA MIND PEATADA!','MU AHVID SÖÖVAD TEID!','AARDELOOTS ON MINU!'
+  ], en:[
+    'YOU CAN NEVER STOP ME!','MY MONKEYS WILL GET YOU!','THE TREASURE IS MINE!'
+  ], it:[
+    'NON MI FERMERETE MAI!','LE MIE SCIMMIE VI PRENDERANNO!','IL TESORO E MIO!'
+  ]},
   robot_king_defeated:{et:'Robotkuningas on võidetud!', en:'The Robot King is defeated!', it:'Il Re Robot e sconfitto!'},
   // Chapter 2 cutscene
   you_saved:          {et:'Sa päätsid ',              en:'You saved ',               it:'Hai salvato '},
   but_wait:           {et:'Aga oota...',              en:'But wait...',              it:'Ma aspetta...'},
   chapter_2:          {et:'2. PEATÜKK',               en:'CHAPTER 2',               it:'CAPITOLO 2'},
   chapter_2_sub:      {et:'Robotkuninga tõus',        en:'Rise of the Robot King',  it:"L'ascesa del Re Robot"},
+  pirate_reveal:      {et:'LOLLID! Nad olid MINU käsilased!',en:'FOOLS! They were MY minions!',it:'SCIOCCHI! Erano i MIEI servitori!'},
+  chapter_3:          {et:'3. PEATÜKK',               en:'CHAPTER 3',               it:'CAPITOLO 3'},
+  chapter_3_sub:      {et:'Piraatkuninga loss',        en:"The Pirate King's Castle", it:'Il Castello del Re Pirata'},
   // Level names
   level_1:            {et:'Nukuaed',                  en:'Doll Garden',             it:'Giardino delle Bambole'},
   level_2:            {et:'Dinosauruse kanjon',       en:'Dinosaur Canyon',         it:'Canyon dei Dinosauri'},
@@ -1166,7 +1176,7 @@ function update(){
   if(gameState==='dead'){stateTimer--;if(stateTimer<=0){if(lives>0)initLevel(currentLevel);else{gameState='gameover';stateTimer=180;}}return;}
   if(gameState==='gameover'){stateTimer--;if(stateTimer<=0||justPressed['Space']){gameState='title';clearJP();}return;}
   if(gameState==='levelcomplete'){stateTimer--;if(stateTimer<=0){currentLevel++;if(currentLevel>=LEVELS.length){gameState='win';stateTimer=300;sfxWin();}else{gameState='between';betweenTimer=0;}}return;}
-  if(gameState==='between'){betweenTimer++;const betweenMax=currentLevel===6?500:480;if(betweenTimer>betweenMax||(betweenTimer>120&&(justPressed['Space']||justPressed['Enter']))){initLevel(currentLevel);justPressed['Space']=false;justPressed['Enter']=false;}clearJP();return;}
+  if(gameState==='between'){betweenTimer++;const betweenMax=currentLevel===6?500:currentLevel===10?520:480;if(betweenTimer>betweenMax||(betweenTimer>120&&(justPressed['Space']||justPressed['Enter']))){initLevel(currentLevel);justPressed['Space']=false;justPressed['Enter']=false;}clearJP();return;}
   if(gameState==='win'){stateTimer--;if(stateTimer<=0||justPressed['Space']){gameState='title';clearJP();}return;}
   if(gameState!=='playing')return;
 
@@ -1916,6 +1926,89 @@ function drawBetween(){
     return;
   }
 
+  // === CHAPTER 3 INTRO (after defeating Robot King) ===
+  if(currentLevel===10){
+    const t=betweenTimer;
+    ctx.fillStyle='#111';ctx.fillRect(0,0,BASE_W,BASE_H);
+    if(t<100){
+      // Celebrating victory
+      ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.textAlign='center';
+      ctx.fillText(T('you_saved')+rs.name+'!',BASE_W/2,80);
+      drawSprite(heroStand,BASE_W/2-30,BASE_H/2-20,heroPal,3,false);
+      drawSprite(sibStand,BASE_W/2+10,BASE_H/2-20,sibPal,3,false);
+    }else if(t<180){
+      // Shadowy ship appears in background
+      ctx.fillStyle='#1a1a3e';ctx.fillRect(0,0,BASE_W,BASE_H);
+      ctx.fillStyle='#2266aa';ctx.fillRect(0,BASE_H-80,BASE_W,80);
+      ctx.fillStyle='#fff';ctx.font='bold 14px monospace';ctx.textAlign='center';
+      ctx.fillText(T('but_wait'),BASE_W/2,60);
+      drawSprite(heroStand,BASE_W/3,BASE_H/2-10,heroPal,3,false);
+      drawSprite(sibStand,BASE_W/3+30,BASE_H/2-10,sibPal,3,false);
+      // Ship silhouette
+      ctx.fillStyle='#443322';
+      const shipX=BASE_W*0.7+Math.sin(t*0.03)*10;
+      ctx.fillRect(shipX,BASE_H/2+20,80,30);
+      ctx.fillRect(shipX+20,BASE_H/2-10,5,35);
+      ctx.fillRect(shipX+10,BASE_H/2-5,30,10);
+    }else if(t<300){
+      // Monkey Pirate King reveals himself
+      ctx.fillStyle='#1a1a3e';ctx.fillRect(0,0,BASE_W,BASE_H);
+      ctx.fillStyle='#2266aa';ctx.fillRect(0,BASE_H-80,BASE_W,80);
+      ctx.fillStyle='#ffdd00';ctx.font='bold 12px monospace';ctx.textAlign='center';
+      ctx.fillText(T('pirate_reveal'),BASE_W/2,50);
+      const pirateX=Math.max(BASE_W/2+20,BASE_W-(t-180)*3);
+      drawSprite(PIRATE_IDLE,pirateX,BASE_H/2-30,PIRATE_P,3,true);
+      drawSprite(heroStand,BASE_W/3-20,BASE_H/2-10,heroPal,3,false);
+      if(pirateX<=BASE_W/2+20){
+        drawSprite(sibStand,pirateX+15,BASE_H/2-5,sibPal,2,false);
+      }else{
+        drawSprite(sibStand,BASE_W/3+10,BASE_H/2-10,sibPal,3,false);
+      }
+    }else if(t<400){
+      // Pirate sails to castle
+      ctx.fillStyle='#1a1a3e';ctx.fillRect(0,0,BASE_W,BASE_H);
+      ctx.fillStyle='#2266aa';ctx.fillRect(0,BASE_H-80,BASE_W,80);
+      // Castle in distance
+      ctx.fillStyle='#444';
+      ctx.fillRect(BASE_W*0.7,BASE_H/2-40,60,80);
+      ctx.fillRect(BASE_W*0.7+10,BASE_H/2-60,15,25);
+      ctx.fillRect(BASE_W*0.7+35,BASE_H/2-60,15,25);
+      // Ship moving toward castle
+      const shipProgress=(t-300)/100;
+      const sx=BASE_W*0.3+shipProgress*(BASE_W*0.35);
+      ctx.fillStyle='#443322';
+      ctx.fillRect(sx,BASE_H/2+10,50,20);
+      ctx.fillRect(sx+15,BASE_H/2-10,3,25);
+      drawSprite(PIRATE_IDLE,sx+5,BASE_H/2-15,PIRATE_P,1.5,false);
+      // Hero on shore
+      drawSprite(heroStand,80,BASE_H/2-10,heroPal,3,false);
+    }else{
+      // Chapter title
+      ctx.fillStyle='#1a1a3e';ctx.fillRect(0,0,BASE_W,BASE_H);
+      // Castle gate
+      ctx.fillStyle='#444';ctx.fillRect(BASE_W/2-40,BASE_H/2-30,80,80);
+      ctx.fillStyle='#333';ctx.fillRect(BASE_W/2-20,BASE_H/2,40,50);
+      // Hero entering
+      const heroX=BASE_W/2-8;
+      drawSprite(heroStand,heroX,BASE_H/2+10,heroPal,2,false);
+      // Title
+      const scale=Math.min(1,(t-400)/30);
+      ctx.fillStyle='#ffdd00';ctx.font=`bold ${Math.floor(24*scale)}px monospace`;ctx.textAlign='center';
+      ctx.fillText(T('chapter_3'),BASE_W/2,BASE_H/2-60);
+      ctx.fillStyle='#ff6600';ctx.font=`bold ${Math.floor(16*scale)}px monospace`;
+      ctx.fillText(T('chapter_3_sub'),BASE_W/2,BASE_H/2-35);
+    }
+    ctx.textAlign='left';
+    // Skip hint
+    if(t>60){
+      const a=.3+Math.sin(t*.06)*.2;ctx.globalAlpha=a;
+      ctx.fillStyle='#fff';ctx.font='10px monospace';ctx.textAlign='center';
+      drawTextWithKeys(T('press_space'),BASE_W/2,BASE_H-15,12);
+      ctx.textAlign='left';ctx.globalAlpha=1;
+    }
+    return;
+  }
+
   // Background - next level preview colors
   const nextLvl=LEVELS[currentLevel];
 
@@ -2054,7 +2147,7 @@ function drawBetween(){
     }
 
     // Phase 2 (t 130+): Rotating enemy swoops in and grabs sibling
-    const bk=currentLevel>=7?{s:ROBO_IDLE,p:ROBO_P,color:'#ff4400'}:getKidnapper(currentLevel);
+    const bk=currentLevel>=11?{s:PIRATE_IDLE,p:PIRATE_P,color:'#ff8800'}:currentLevel>=7?{s:ROBO_IDLE,p:ROBO_P,color:'#ff4400'}:getKidnapper(currentLevel);
     if(t>=130){
       drawSprite(heroStand,heroX,heroY,heroPal,3,false);
 
@@ -2072,13 +2165,13 @@ function drawBetween(){
         drawSprite(bk.s,runX,eY+bounce,bk.p,4,false);
         drawSprite(sibJump,runX+10,eY-spriteH(sibStand,2)+5+bounce,sibPal,2,false);
         if(grabT<200){
-          const phrases=currentLevel>=7?T('robo_between'):T('dino_between');
+          const phrases=currentLevel>=11?T('pirate_between'):currentLevel>=7?T('robo_between'):T('dino_between');
           const pi=(currentLevel-1)%phrases.length;
-          const isRobo=currentLevel>=7;
+          const isPirate=currentLevel>=11;const isRobo=currentLevel>=7&&currentLevel<11;
           const bubX=Math.min(runX-10,BASE_W-160),bubY=eY-35;
-          ctx.fillStyle=isRobo?'#331111':'#fff';ctx.strokeStyle=isRobo?'#ff3333':'#333';ctx.lineWidth=2;
+          ctx.fillStyle=isPirate?'#2a1a00':isRobo?'#331111':'#fff';ctx.strokeStyle=isPirate?'#ff8800':isRobo?'#ff3333':'#333';ctx.lineWidth=2;
           ctx.beginPath();ctx.moveTo(bubX,bubY);ctx.lineTo(bubX+150,bubY);ctx.lineTo(bubX+150,bubY+25);ctx.lineTo(bubX+25,bubY+25);ctx.lineTo(bubX+15,bubY+35);ctx.lineTo(bubX+10,bubY+25);ctx.lineTo(bubX,bubY+25);ctx.closePath();ctx.fill();ctx.stroke();
-          ctx.fillStyle=isRobo?'#ff4444':bk.color;ctx.font='bold 10px monospace';ctx.textAlign='center';
+          ctx.fillStyle=isPirate?'#ffaa00':isRobo?'#ff4444':bk.color;ctx.font='bold 10px monospace';ctx.textAlign='center';
           ctx.fillText(phrases[pi],bubX+75,bubY+16);ctx.textAlign='left';
         }
         if((grabT)%30<20){ctx.fillStyle='#3388ff';ctx.font='bold 10px monospace';ctx.textAlign='center';ctx.fillText(T('help_cry'),runX+20,eY-spriteH(sibStand,2)-5);ctx.textAlign='left';}
