@@ -1322,6 +1322,10 @@ smashTexts.forEach(st=>{
   let hx=BASE_W-40;if(cat&&cat.hitsLeft>0){drawSprite(CAT_S,hx,30,CAT_P,1.5,false);ctx.fillStyle='#fff';ctx.font='bold 8px monospace';ctx.fillText('x'+cat.hitsLeft,hx+2,48);hx-=22;}
   if(p.hasCape){drawSprite(SUPER_S,hx,32,SUPER_P,1.5,false);hx-=22;}
   if(p.hasBow){drawSprite(BOW_S,hx,32,BOW_P,1.5,false);ctx.fillStyle='#fff';ctx.font='bold 10px monospace';ctx.fillText('x'+p.bowCharges,hx+2,50);}
+  let hudY=30;
+  if(player.fartTimer>0){ctx.fillStyle='#88cc44';ctx.font='bold 10px monospace';ctx.fillText('FART '+Math.ceil(player.fartTimer/60)+'s',BASE_W-80,hudY);hudY+=14;}
+  if(player.bigHeadTimer>0){ctx.fillStyle='#ff69b4';ctx.font='bold 10px monospace';ctx.fillText('BIG HEAD '+Math.ceil(player.bigHeadTimer/60)+'s',BASE_W-80,hudY);hudY+=14;}
+  if(player.chickenRayCharges>0){ctx.fillStyle='#ffffff';ctx.font='bold 10px monospace';ctx.fillText('CHICKEN x'+player.chickenRayCharges,BASE_W-80,hudY);hudY+=14;}
   // Boss HUD
   if(boss&&boss.alive){
     const bHW=120,bHH=10,bHX=BASE_W/2-bHW/2,bHY=BASE_H-22;
