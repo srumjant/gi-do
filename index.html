@@ -908,14 +908,15 @@ const LEVELS = [
     bowPositions:[20,60,100,128], superPositions:[35,75,115], catPosition:55,
     clouds:[[5,2],[25,4],[45,2],[65,3],[85,2],[105,4],[125,2]],
     bgDeco:[
-      // Masts on mast platforms (x,y matches platform positions)
+      // Masts on mast platforms (x=12@y14, x=50@y12, x=88@y13, x=118@y11)
       [13,14,'mast'],[51,12,'mast'],[89,13,'mast'],[119,11,'mast'],
-      // Ropes hanging from mast platforms down to deck
-      [11,14,'rope'],[15,14,'rope'],[49,12,'rope'],[53,12,'rope'],[87,13,'rope'],[91,13,'rope'],[117,11,'rope'],[121,11,'rope'],
-      // Waves visible in the gaps (water below deck)
-      [16,22,'wave'],[34,22,'wave'],[63,22,'wave'],[84,22,'wave'],[110,22,'wave'],
-      // Skulls on deck platforms (on solid ground)
-      [7,19,'skull'],[24,17,'skull'],[42,19,'skull'],[58,18,'skull'],[94,19,'skull'],[115,19,'skull'],[132,19,'skull']
+      // Ropes hanging DOWN from mast platforms (with length param)
+      [11,14,'rope',10],[15,14,'rope',8],[49,12,'rope',12],[53,12,'rope',10],
+      [87,13,'rope',10],[91,13,'rope',8],[117,11,'rope',14],[121,11,'rope',12],
+      // Water in gaps (gaps: [16,2],[34,2],[63,2],[84,2],[110,2] — y=22 is just below ground)
+      [16,21,'wave'],[34,21,'wave'],[63,21,'wave'],[84,21,'wave'],[110,21,'wave'],
+      // Skulls on deck surfaces
+      [7,18,'skull'],[42,18,'skull'],[94,17,'skull'],[132,18,'skull']
     ]
   },
   // --- Level 12: Pirate Castle (Boss) ---
@@ -1556,22 +1557,49 @@ function draw(){
         ctx.beginPath();ctx.moveTo(dx+9,dy-36);ctx.lineTo(dx+9,dy-4);ctx.lineTo(dx+28+swave,dy-10);ctx.lineTo(dx+25+swave,dy-30);ctx.closePath();ctx.fill();
         ctx.strokeStyle='#ccbb99';ctx.lineWidth=1;ctx.stroke();
       }else if(d[2]==='wave'){
-        // Ocean wave (background)
-        const wy=dy+Math.sin(animFrame*0.05+d[0]*0.3)*3;
-        ctx.fillStyle='rgba(50,120,200,0.3)';
-        ctx.beginPath();
-        for(let i=0;i<40;i++){const wx=dx+i*2,wwy=wy+Math.sin(animFrame*0.06+i*0.5+d[0])*2;ctx.lineTo(wx,wwy);}
-        ctx.lineTo(dx+80,dy+16);ctx.lineTo(dx,dy+16);ctx.closePath();ctx.fill();
+        // Water filling a gap — covers from dy down to bottom of level
+        const lvlBottom=LEVELS[currentLevel].height*TILE;
+        // Dark water base
+        ctx.fillStyle='#1a4477';ctx.fillRect(dx,dy,TILE*4,lvlBottom-dy);
+        // Animated surface waves
+        ctx.fillStyle='#2266aa';
+        ctx.beginPath();ctx.moveTo(dx,dy);
+        for(let i=0;i<=TILE*4;i+=2){ctx.lineTo(dx+i,dy+Math.sin(animFrame*0.06+i*0.15+d[0])*3);}
+        ctx.lineTo(dx+TILE*4,dy+8);ctx.lineTo(dx,dy+8);ctx.closePath();ctx.fill();
+        // Foam/highlights
+        ctx.fillStyle='rgba(150,200,255,0.3)';
+        for(let i=0;i<3;i++){const fx=dx+8+i*18+Math.sin(animFrame*0.04+i)*4,fy=dy+2+Math.sin(animFrame*0.07+i*2)*2;
+          ctx.fillRect(fx,fy,6,2);}
       }else if(d[2]==='rope'){
-        // Hanging rope
-        ctx.strokeStyle='#aa8855';ctx.lineWidth=1;ctx.beginPath();
-        for(let i=0;i<8;i++){const rx=dx+8+Math.sin(animFrame*0.04+i*0.8)*2,ry=dy+i*3;ctx.lineTo(rx,ry);}
+        // Rope hanging DOWN from mast/platform — long and swaying
+        ctx.strokeStyle='#aa8855';ctx.lineWidth=2;ctx.beginPath();
+        const ropeLen=d[3]||12;
+        for(let i=0;i<ropeLen;i++){
+          const sway=Math.sin(animFrame*0.03+i*0.6+d[0])*3*(i/ropeLen);
+          ctx.lineTo(dx+8+sway,dy+i*4);
+        }
         ctx.stroke();
+        // Knot at end
+        ctx.fillStyle='#887744';ctx.beginPath();ctx.arc(dx+8+Math.sin(animFrame*0.03+ropeLen*0.6+d[0])*3,dy+ropeLen*4,3,0,Math.PI*2);ctx.fill();
       }else if(d[2]==='skull'){
-        // Skull decoration
-        ctx.fillStyle='#ddddcc';ctx.beginPath();ctx.arc(dx+8,dy+6,5,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle='#222';ctx.fillRect(dx+5,dy+4,2,2);ctx.fillRect(dx+9,dy+4,2,2);
-        ctx.fillRect(dx+7,dy+7,2,1);
+        // Skull and crossbones
+        // Cranium
+        ctx.fillStyle='#ddddcc';
+        ctx.beginPath();ctx.arc(dx+8,dy+5,5,Math.PI,0);ctx.fill();
+        ctx.fillRect(dx+3,dy+5,10,4);
+        // Eye sockets
+        ctx.fillStyle='#222';ctx.beginPath();ctx.arc(dx+6,dy+5,1.5,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.arc(dx+10,dy+5,1.5,0,Math.PI*2);ctx.fill();
+        // Nose hole
+        ctx.fillStyle='#444';ctx.beginPath();ctx.moveTo(dx+8,dy+7);ctx.lineTo(dx+7,dy+8);ctx.lineTo(dx+9,dy+8);ctx.closePath();ctx.fill();
+        // Jaw with teeth
+        ctx.fillStyle='#ccccbb';ctx.fillRect(dx+4,dy+9,8,3);
+        ctx.fillStyle='#222';
+        for(let i=0;i<4;i++)ctx.fillRect(dx+5+i*2,dy+9,1,2);
+        // Crossbones
+        ctx.strokeStyle='#ccccbb';ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.moveTo(dx+2,dy+13);ctx.lineTo(dx+14,dy+17);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(dx+14,dy+13);ctx.lineTo(dx+2,dy+17);ctx.stroke();
       }
     });
     ctx.restore();
