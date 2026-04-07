@@ -928,7 +928,9 @@ if(p.fartTimer>0){enemies.forEach(e=>{if(!e.alive)return;const edx=e.x+e.w/2-(p.
     const h1=Math.floor(pL2/TILE),h2=Math.floor(pR2/TILE),hy=Math.floor(hY/TILE);
     [h1,h2].forEach(hx=>{const qb=questionBlocks.find(q=>q.x===hx&&q.y===hy&&!q.hit);if(qb){qb.hit=true;map[qb.y][qb.x]=2;stars.push({x:qb.x*TILE,y:qb.y*TILE-TILE,vy:-2,collected:false});spawnParticles(qb.x*TILE+8,qb.y*TILE,'#ffdd00',5);sfxBlock();}});
     [h1,h2].forEach(hx=>{const rb=rainbowBlocks.find(q=>q.x===hx&&q.y===hy&&!q.hit);if(rb){rb.hit=true;map[rb.y][rb.x]=2;giveRandomSillyPowerup();spawnParticles(rb.x*TILE+8,rb.y*TILE,'#ff69b4',8);sfxBlock();}});
-    [h1,h2].forEach(hx=>{if(map[hy]&&map[hy][hx]===4)breakCrate(hx,hy);});
+    let crateHeadBroke=false;
+    [h1,h2].forEach(hx=>{if(map[hy]&&map[hy][hx]===4){breakCrate(hx,hy);crateHeadBroke=true;}});
+    if(crateHeadBroke){p.vy=-6;p.y-=4;}
   }}
   if(p.onGround){crateComboTimer--;if(crateComboTimer<=0)crateCombo=0;}
   if(p.x<0)p.x=0;
