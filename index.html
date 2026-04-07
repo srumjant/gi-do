@@ -274,6 +274,7 @@ function sfxBlock(){playTone(500,.06,'triangle',.1);setTimeout(()=>playTone(700,
 function sfxPickup(){playTone(440,.1,'triangle',.12);setTimeout(()=>playTone(660,.1,'triangle',.12),80);setTimeout(()=>playTone(880,.15,'triangle',.1),160)}
 function sfxCrateBreak(){playTone(120,.1,'sawtooth',.12);setTimeout(()=>playTone(80,.15,'sawtooth',.1),50);}
 function sfxFart(){playTone(80,.2,'sawtooth',.15,-30);setTimeout(()=>playTone(60,.15,'sawtooth',.1,-20),100);}
+function sfxBoing(){playTone(300,.1,'sine',.12,600);setTimeout(()=>playTone(500,.15,'sine',.1,200),80);}
 function sfxWin(){[523,659,784,1047].forEach((f,i)=>setTimeout(()=>playTone(f,.2,'square',.1),i*150))}
 
 // ==========================================
@@ -1021,8 +1022,11 @@ if(e.stunTimer>0){e.stunTimer--;return;}
     e.frameTimer++;if(e.frameTimer>15){e.frame=1-e.frame;e.frameTimer=0;}
 
     const shm=dc.stompHitbox||1;
-    if(p.invincible<=0&&rectOverlap({x:p.x+2,y:p.y,w:p.w-4,h:p.h},{x:e.x,y:e.y,w:e.w,h:e.h})){
-      if(!e.noStomp&&p.vy>0&&p.y+p.h-4<e.y+e.h*shm/2){e.alive=false;e.squashTimer=30;p.vy=-5;score+=Math.round(200*dc.scoreMultiplier);spawnParticles(e.x+e.w/2,e.y,'#ff6600',8);sfxStomp();}
+    const bhx=p.bigHeadTimer>0?8:0;
+if(p.invincible<=0&&rectOverlap({x:p.x+2-bhx,y:p.y-bhx,w:p.w-4+bhx*2,h:p.h+bhx},{x:e.x,y:e.y,w:e.w,h:e.h})){
+      if(!e.noStomp&&p.vy>0&&p.y+p.h-4<e.y+e.h*shm/2){e.alive=false;p.vy=-5;score+=Math.round(200*dc.scoreMultiplier);
+if(p.bigHeadTimer>0){e.squashTimer=45;spawnParticles(e.x+e.w/2,e.y,'#ff69b4',12);sfxBoing();}
+else{e.squashTimer=30;spawnParticles(e.x+e.w/2,e.y,'#ff6600',8);sfxStomp();}}
       else{playerHit();return;}}
   });
 
@@ -1281,7 +1285,8 @@ else if(tile===5){const rCol=`hsl(${(animFrame*3+tx*20)%360},100%,65%)`;ctx.fill
   const p=player;
   if(p.invincible<=0||Math.floor(animFrame/3)%2===0){const ps=getPlayerSprites();let spr;if(p.frame===0)spr=ps.stand;else if(p.frame===1)spr=ps.run;else spr=ps.jump;
     if(p.hasCape){const cx=p.facing>0?p.x-8:p.x+p.w-4,cw=Math.sin(animFrame*.15)*2;drawSprite(CAPE_S,cx,p.y+6+cw,CAPE_P,2,p.facing<0);}
-    drawSprite(spr,p.x-2,p.y-2,ps.palette,2,p.facing<0);}
+    if(p.bigHeadTimer>0){const headH=Math.floor(spr.length*0.4),headData=spr.slice(0,headH),bodyData=spr.slice(headH);drawSprite(bodyData,p.x-2,p.y-2+headH*2,ps.palette,2,p.facing<0);drawSprite(headData,p.x-2-headH,p.y-2-headH*2,ps.palette,4,p.facing<0);}
+else drawSprite(spr,p.x-2,p.y-2,ps.palette,2,p.facing<0);}
 
   particles.forEach(pt=>{ctx.fillStyle=pt.color;ctx.globalAlpha=pt.life/40;ctx.fillRect(pt.x,pt.y,3,3);});ctx.globalAlpha=1;
 smashTexts.forEach(st=>{
