@@ -162,103 +162,115 @@ function DC() { return DIFFICULTY_CONFIG[selectedDifficulty]; }
 //  LANGUAGE / TRANSLATIONS
 // ==========================================
 let lang = 'et'; // default Estonian
-const LANG_KEYS = ['et','en'];
+const LANG_KEYS = ['et','en','it'];
 const TRANSLATIONS = {
   // Title screen
-  title:              {et:'GIGI & DODO',             en:'GIGI & DODO'},
-  subtitle:           {et:'Julge päästmisseiklus!',  en:'A brave rescue adventure!'},
-  worlds:             {et:'6 maailma avastamiseks!',  en:'6 worlds to explore!'},
-  press_start:        {et:'VAJUTA SPACE ALUSTAMISEKS!', en:'PRESS SPACE TO START!'},
-  controls:           {et:'Nooled/WASD: liigu | Space: hüppa | X: tulista', en:'Arrows/WASD: move | Space: jump | X: shoot bow'},
+  title:              {et:'GIGI & DODO',             en:'GIGI & DODO',             it:'GIGI & DODO'},
+  subtitle:           {et:'Julge päästmisseiklus!',  en:'A brave rescue adventure!', it:'Una coraggiosa avventura di salvataggio!'},
+  worlds:             {et:'10 maailma avastamiseks!', en:'10 worlds to explore!',   it:'10 mondi da esplorare!'},
+  press_start:        {et:'VAJUTA SPACE ALUSTAMISEKS!', en:'PRESS SPACE TO START!', it:'PREMI SPAZIO PER INIZIARE!'},
+  controls:           {et:'Nooled/WASD: liigu | Space: hüppa | X: tulista', en:'Arrows/WASD: move | Space: jump | X: shoot bow', it:'Frecce/WASD: muovi | Spazio: salta | X: arco'},
   // Language selector
-  lang_hint:          {et:'L = English',              en:'L = Eesti keel'},
+  lang_hint:          {et:'L = English',              en:'L = Italiano',            it:'L = Eesti keel'},
   // Difficulty
-  select_diff:        {et:'VALI RASKUSASTE',          en:'SELECT DIFFICULTY'},
-  super_easy:         {et:'Ülikerge',                 en:'Super Easy'},
-  easy:               {et:'Kerge',                    en:'Easy'},
-  normal:             {et:'Tavaline',                 en:'Normal'},
-  hard:               {et:'Raske',                    en:'Hard'},
-  lives:              {et:'elu',                      en:'lives'},
-  arrows:             {et:'noolt',                    en:'arrows'},
-  cape_pit:           {et:'Keep + augu kaitse',       en:'Cape + pit save'},
-  cape_start:         {et:'Algab keepiga',            en:'Start w/ cape'},
-  no_cape:            {et:'Ilma keepita',              en:'No cape'},
-  enemies_label:      {et:'Vaenlased: ',              en:'Enemies: '},
-  very_slow:          {et:'Väga aeglased',            en:'Very slow'},
-  slow:               {et:'Aeglased',                 en:'Slow'},
-  normal_speed:       {et:'Tavalised',                en:'Normal'},
-  fast:               {et:'Kiired!',                  en:'Fast!'},
-  fewer_enemies:      {et:'Vähem vaenlasi',           en:'Fewer enemies'},
-  lr_choose:          {et:'Vasakule / Paremale valimiseks, Space kinnitab', en:'Left / Right to choose, Space to confirm'},
+  select_diff:        {et:'VALI RASKUSASTE',          en:'SELECT DIFFICULTY',       it:'SCEGLI DIFFICOLTA'},
+  super_easy:         {et:'Ülikerge',                 en:'Super Easy',              it:'Facilissimo'},
+  easy:               {et:'Kerge',                    en:'Easy',                    it:'Facile'},
+  normal:             {et:'Tavaline',                 en:'Normal',                  it:'Normale'},
+  hard:               {et:'Raske',                    en:'Hard',                    it:'Difficile'},
+  lives:              {et:'elu',                      en:'lives',                   it:'vite'},
+  arrows:             {et:'noolt',                    en:'arrows',                  it:'frecce'},
+  cape_pit:           {et:'Keep + augu kaitse',       en:'Cape + pit save',         it:'Mantello + salva fossa'},
+  cape_start:         {et:'Algab keepiga',            en:'Start w/ cape',           it:'Inizia con mantello'},
+  no_cape:            {et:'Ilma keepita',              en:'No cape',                it:'Senza mantello'},
+  enemies_label:      {et:'Vaenlased: ',              en:'Enemies: ',               it:'Nemici: '},
+  very_slow:          {et:'Väga aeglased',            en:'Very slow',               it:'Molto lenti'},
+  slow:               {et:'Aeglased',                 en:'Slow',                    it:'Lenti'},
+  normal_speed:       {et:'Tavalised',                en:'Normal',                  it:'Normali'},
+  fast:               {et:'Kiired!',                  en:'Fast!',                   it:'Veloci!'},
+  fewer_enemies:      {et:'Vähem vaenlasi',           en:'Fewer enemies',           it:'Meno nemici'},
+  lr_choose:          {et:'Vasakule / Paremale valimiseks, Space kinnitab', en:'Left / Right to choose, Space to confirm', it:'Sinistra/Destra per scegliere, Spazio per confermare'},
   // Character select
-  choose_hero:        {et:'VALI OMA KANGELANE!',      en:'CHOOSE YOUR HERO!'},
-  rescue:             {et:'Päästa',                   en:'Rescue'},
+  choose_hero:        {et:'VALI OMA KANGELANE!',      en:'CHOOSE YOUR HERO!',      it:'SCEGLI IL TUO EROE!'},
+  rescue:             {et:'Päästa',                   en:'Rescue',                  it:'Salva'},
   // Intro cutscene
-  la_la:              {et:'LA LA LA...',               en:'LA LA LA...'},
-  help_cry:           {et:'APPI!!',                   en:'HELP!!'},
-  i_come_help:        {et:'MA TULEN APPI!',           en:'I\'M COMING!'},
-  save_sib:           {et:'PÄÄSTA',                   en:'SAVE'},
-  adventure_begins:   {et:'SEIKLUS ALGAB!',           en:'THE ADVENTURE BEGINS!'},
-  press_space:        {et:'VAJUTA SPACE...',           en:'PRESS SPACE...'},
+  la_la:              {et:'LA LA LA...',               en:'LA LA LA...',             it:'LA LA LA...'},
+  help_cry:           {et:'APPI!!',                   en:'HELP!!',                  it:'AIUTO!!'},
+  i_come_help:        {et:'MA TULEN APPI!',           en:'I\'M COMING!',            it:'ARRIVO!'},
+  save_sib:           {et:'PÄÄSTA',                   en:'SAVE',                    it:'SALVA'},
+  adventure_begins:   {et:'SEIKLUS ALGAB!',           en:'THE ADVENTURE BEGINS!',   it:"L'AVVENTURA INIZIA!"},
+  press_space:        {et:'VAJUTA SPACE...',           en:'PRESS SPACE...',          it:'PREMI SPAZIO...'},
   dino_phrases:       {et:['TULE SIIA, PISIKE!','HEH HEH HEH!','SA OLED NII NALJAKAS!','MINA OLEN SUUR DINO!','MÄNGIME PEITUST!'],
-                       en:['COME HERE, LITTLE ONE!','HEH HEH HEH!','YOU ARE SO FUNNY!','I AM A BIG DINO!','LET\'S PLAY HIDE AND SEEK!']},
+                       en:['COME HERE, LITTLE ONE!','HEH HEH HEH!','YOU ARE SO FUNNY!','I AM A BIG DINO!','LET\'S PLAY HIDE AND SEEK!'],
+                       it:['Sei troppo lento!','Non puoi vincere!','Il tuo amico e mio!','Arrenditi!','Mai!']},
   // HUD
-  score:              {et:'PUNKTID: ',                en:'SCORE: '},
-  help_npc:           {et:'Appi!',                    en:'Help!'},
-  meow:               {et:'Mjäu!',                    en:'Meow!'},
-  skin_classic:       {et:'Klassikaline',              en:'Classic'},
-  skin_truck:         {et:'Monstertruck',              en:'Monster Truck'},
-  cat_found:          {et:'Kass leitud!',              en:'Cat found!'},
+  score:              {et:'PUNKTID: ',                en:'SCORE: ',                 it:'PUNTI: '},
+  help_npc:           {et:'Appi!',                    en:'Help!',                   it:'Aiuto!'},
+  meow:               {et:'Mjäu!',                    en:'Meow!',                   it:'Miao!'},
+  skin_classic:       {et:'Klassikaline',              en:'Classic',                it:'Classico'},
+  skin_truck:         {et:'Monstertruck',              en:'Monster Truck',          it:'Monster Truck'},
+  cat_found:          {et:'Kass leitud!',              en:'Cat found!',             it:'Gatto trovato!'},
   // Level complete
-  is_safe:            {et:' ON PÄÄSTETUD!',           en:' IS SAFE!'},
-  next_world:         {et:'Järgmine maailm...',       en:'Next world...'},
-  you_did_it:         {et:'Sa tegid seda!',           en:'You did it!'},
+  is_safe:            {et:' ON PÄÄSTETUD!',           en:' IS SAFE!',               it:' E SALVO!'},
+  next_world:         {et:'Järgmine maailm...',       en:'Next world...',           it:'Prossimo mondo...'},
+  you_did_it:         {et:'Sa tegid seda!',           en:'You did it!',             it:'Ce l hai fatta!'},
   // Death
-  oops:               {et:'Oih!',                     en:'Oops!'},
+  oops:               {et:'Oih!',                     en:'Oops!',                   it:'Ops!'},
   // Game over
-  game_over:          {et:'MÄNG LÄBI',                en:'GAME OVER'},
-  score_label:        {et:'Punktid: ',                en:'Score: '},
-  press_retry:        {et:'Vajuta SPACE uuesti proovimiseks', en:'Press SPACE to try again'},
+  game_over:          {et:'MÄNG LÄBI',                en:'GAME OVER',               it:'FINE DEL GIOCO'},
+  score_label:        {et:'Punktid: ',                en:'Score: ',                 it:'Punti: '},
+  press_retry:        {et:'Vajuta SPACE uuesti proovimiseks', en:'Press SPACE to try again', it:'Premi SPAZIO per riprovare'},
   // Win
-  is_saved:           {et:' ON PÄÄSTETUD!',           en:' IS SAVED!'},
-  is_the_best:        {et:' on parim!',               en:' is the best!'},
-  difficulty_label:   {et:'Raskus: ',                 en:'Difficulty: '},
-  final_score:        {et:' | Punktid: ',             en:' | Final Score: '},
-  press_play_again:   {et:'Vajuta SPACE uuesti mängimiseks', en:'Press SPACE to play again'},
+  is_saved:           {et:' ON PÄÄSTETUD!',           en:' IS SAVED!',              it:' E SALVO!'},
+  is_the_best:        {et:' on parim!',               en:' is the best!',           it:' e il migliore!'},
+  difficulty_label:   {et:'Raskus: ',                 en:'Difficulty: ',             it:'Difficolta: '},
+  final_score:        {et:' | Punktid: ',             en:' | Final Score: ',         it:'| Punteggio: '},
+  press_play_again:   {et:'Vajuta SPACE uuesti mängimiseks', en:'Press SPACE to play again', it:'Premi SPAZIO per rigiocare'},
   // Between-level cutscene
-  oh_no:              {et:'OI EI!',                   en:'OH NO!'},
-  sib_stolen_again:   {et:' RÖÖVITI JÄLLE!',         en:' WAS STOLEN AGAIN!'},
-  keep_going:         {et:'EDASI!',                   en:'KEEP GOING!'},
+  oh_no:              {et:'OI EI!',                   en:'OH NO!',                  it:'OH NO!'},
+  sib_stolen_again:   {et:' RÖÖVITI JÄLLE!',         en:' WAS STOLEN AGAIN!',      it:' E STATO RAPITO DI NUOVO!'},
+  keep_going:         {et:'EDASI!',                   en:'KEEP GOING!',             it:'AVANTI!'},
   boss_taunt:         {et:['SA EI SAA MIND VÕITA!','MINA OLEN BOSS!','HEH HEH HEH!'],
-                       en:['YOU CAN\'T BEAT ME!','I AM THE BOSS!','HEH HEH HEH!']},
-  boss_defeated:      {et:'BOSS ON VÕIDETUD!',       en:'BOSS DEFEATED!'},
-  almost_there:       {et:'Peaaegu kohal...',        en:'Almost there...'},
-  final_battle:       {et:'VIIMANE LAHING!',         en:'FINAL BATTLE!'},
-  boss_awaits:        {et:'Boss ootab sind...',      en:'The Boss awaits...'},
+                       en:['YOU CAN\'T BEAT ME!','I AM THE BOSS!','HEH HEH HEH!'],
+                       it:['Ti schiaccero!','Sei troppo piccolo!','Questo e il mio castello!']},
+  boss_defeated:      {et:'BOSS ON VÕIDETUD!',       en:'BOSS DEFEATED!',          it:'BOSS SCONFITTO!'},
+  almost_there:       {et:'Peaaegu kohal...',        en:'Almost there...',          it:'Quasi arrivati...'},
+  final_battle:       {et:'VIIMANE LAHING!',         en:'FINAL BATTLE!',            it:'BATTAGLIA FINALE!'},
+  boss_awaits:        {et:'Boss ootab sind...',      en:'The Boss awaits...',        it:'Il Boss ti aspetta...'},
   boss_intro_phrases: {et:['TULGE SIIA, KUI JULGED!','KEEGI EI PÄÄSTA TEDA!','MINA OLEN KUNINGAS!','HEH HEH HEH...'],
-                       en:['COME HERE IF YOU DARE!','NO ONE CAN SAVE THEM!','I AM THE KING!','HEH HEH HEH...']},
+                       en:['COME HERE IF YOU DARE!','NO ONE CAN SAVE THEM!','I AM THE KING!','HEH HEH HEH...'],
+                       it:['Chi osa sfidarmi?','Preparati!','Non uscirai vivo!','Hahaha!']},
   dino_between:       {et:[
     'SA EI SAA MIND KÄTTE!','HEH, LIIGA AEGLANE!','PROOVI UUESTI, PISIKE!','MA OLEN LIIGA KIIRE!','TULE JA PÜÜA MIND!'
   ], en:[
     'YOU CAN\'T CATCH ME!','HEH, TOO SLOW!','TRY AGAIN, LITTLE ONE!','I\'M TOO FAST!','COME AND GET ME!'
+  ], it:[
+    'Non mi prenderai mai!','Sono troppo veloce!','Il tuo amico piange!','Arrenditi!','Hahaha!'
   ]},
   robo_between:       {et:[
     'SA EI PEATA MIND!','MU TEHAS EI SEISA!','TULE, KUI JULGED!'
   ], en:[
     'YOU CAN\'T STOP ME!','MY MACHINES NEVER REST!','COME IF YOU DARE!'
+  ], it:[
+    'NON PUOI FERMARMI!','LE MIE MACCHINE NON SI FERMANO!','VIENI SE OSI!'
   ]},
-  robot_king_defeated:{et:'Robotkuningas on võidetud!', en:'The Robot King is defeated!'},
+  robot_king_defeated:{et:'Robotkuningas on võidetud!', en:'The Robot King is defeated!', it:'Il Re Robot e sconfitto!'},
+  // Chapter 2 cutscene
+  you_saved:          {et:'Sa päätsid ',              en:'You saved ',               it:'Hai salvato '},
+  but_wait:           {et:'Aga oota...',              en:'But wait...',              it:'Ma aspetta...'},
+  chapter_2:          {et:'2. PEATÜKK',               en:'CHAPTER 2',               it:'CAPITOLO 2'},
+  chapter_2_sub:      {et:'Robotkuninga tõus',        en:'Rise of the Robot King',  it:"L'ascesa del Re Robot"},
   // Level names
-  level_1:            {et:'Nukuaed',                  en:'Doll Garden'},
-  level_2:            {et:'Dinosauruse kanjon',       en:'Dinosaur Canyon'},
-  level_3:            {et:'Tallinna vanalinn',        en:'Tallinn Old Town'},
-  level_4:            {et:'Palermo väljak',           en:'Palermo Piazza'},
-  level_5:            {et:'Talvine imedemaa',           en:'Winter Wonderland'},
-  level_6:            {et:'Mängulossi',                en:'Toy Castle'},
-  level_7:            {et:'Prügila',                   en:'Junkyard'},
-  level_8:            {et:'Neoonlinn',                 en:'Neon City'},
-  level_9:            {et:'Tehas',                     en:'Factory'},
-  level_10:           {et:'Robotilinnus',               en:'Robot Fortress'},
+  level_1:            {et:'Nukuaed',                  en:'Doll Garden',             it:'Giardino delle Bambole'},
+  level_2:            {et:'Dinosauruse kanjon',       en:'Dinosaur Canyon',         it:'Canyon dei Dinosauri'},
+  level_3:            {et:'Tallinna vanalinn',        en:'Tallinn Old Town',        it:'Citta Vecchia di Tallinn'},
+  level_4:            {et:'Palermo väljak',           en:'Palermo Piazza',          it:'Piazza Palermo'},
+  level_5:            {et:'Talvine imedemaa',           en:'Winter Wonderland',     it:'Paese delle Meraviglie Invernale'},
+  level_6:            {et:'Mängulossi',                en:'Toy Castle',             it:'Castello dei Giocattoli'},
+  level_7:            {et:'Prügila',                   en:'Junkyard',               it:'Discarica'},
+  level_8:            {et:'Neoonlinn',                 en:'Neon City',              it:'Citta al Neon'},
+  level_9:            {et:'Tehas',                     en:'Factory',                it:'Fabbrica'},
+  level_10:           {et:'Robotilinnus',               en:'Robot Fortress',        it:'Fortezza Robot'},
 };
 function T(key){return TRANSLATIONS[key]?TRANSLATIONS[key][lang]||TRANSLATIONS[key]['en']:key;}
 function TDiff(key){
@@ -936,9 +948,9 @@ function breakCrate(tx,ty){
   }
 }
 const POWERUP_INFO={
-  fart:{name:'FART JUMP',desc:'Super bouncy!',color:'#88cc44',icon:'💨'},
-  bighead:{name:'BIG HEAD',desc:'Mega stomp!',color:'#ff69b4',icon:'🤪'},
-  chicken:{name:'CHICKEN RAY',desc:'Bawk bawk!',color:'#ffdd00',icon:'🐔'}
+  fart:{name:{et:'PEERUKAS HÜPE',en:'FART JUMP',it:'SALTO PUZZOLENTE'},desc:{et:'Ülibouncy!',en:'Super bouncy!',it:'Super rimbalzante!'},color:'#88cc44',icon:'💨'},
+  bighead:{name:{et:'SUUR PEA',en:'BIG HEAD',it:'TESTONE'},desc:{et:'Mega tramp!',en:'Mega stomp!',it:'Mega schiacciata!'},color:'#ff69b4',icon:'🤪'},
+  chicken:{name:{et:'KANA KIIR',en:'CHICKEN RAY',it:'RAGGIO POLLO'},desc:{et:'Kaak kaak!',en:'Bawk bawk!',it:'Coccode!'},color:'#ffdd00',icon:'🐔'}
 };
 function giveRandomSillyPowerup(){
   const types=['fart','bighead','chicken'];
@@ -1528,9 +1540,9 @@ smashTexts.forEach(st=>{
   if(p.hasCape){drawSprite(SUPER_S,hx,32,SUPER_P,1.5,false);hx-=22;}
   if(p.hasBow){drawSprite(BOW_S,hx,32,BOW_P,1.5,false);ctx.fillStyle='#fff';ctx.font='bold 10px monospace';ctx.fillText('x'+p.bowCharges,hx+2,50);}
   let hudY=30;
-  if(player.fartTimer>0){ctx.fillStyle='#88cc44';ctx.font='bold 10px monospace';ctx.fillText('FART '+Math.ceil(player.fartTimer/60)+'s',BASE_W-80,hudY);hudY+=14;}
-  if(player.bigHeadTimer>0){ctx.fillStyle='#ff69b4';ctx.font='bold 10px monospace';ctx.fillText('BIG HEAD '+Math.ceil(player.bigHeadTimer/60)+'s',BASE_W-80,hudY);hudY+=14;}
-  if(player.chickenRayCharges>0){ctx.fillStyle='#ffffff';ctx.font='bold 10px monospace';ctx.fillText('CHICKEN x'+player.chickenRayCharges,BASE_W-80,hudY);hudY+=14;}
+  if(player.fartTimer>0){ctx.font='14px serif';ctx.fillText('💨',BASE_W-80,hudY);ctx.fillStyle='#88cc44';ctx.font='bold 10px monospace';ctx.fillText(Math.ceil(player.fartTimer/60)+'s',BASE_W-60,hudY);hudY+=16;}
+  if(player.bigHeadTimer>0){ctx.font='14px serif';ctx.fillText('🤪',BASE_W-80,hudY);ctx.fillStyle='#ff69b4';ctx.font='bold 10px monospace';ctx.fillText(Math.ceil(player.bigHeadTimer/60)+'s',BASE_W-60,hudY);hudY+=16;}
+  if(player.chickenRayCharges>0){ctx.font='14px serif';ctx.fillText('🐔',BASE_W-80,hudY);ctx.fillStyle='#ffffff';ctx.font='bold 10px monospace';ctx.fillText('x'+player.chickenRayCharges,BASE_W-60,hudY);hudY+=16;}
   // Power-up viewport border
   if(player.fartTimer>0||player.bigHeadTimer>0||player.chickenRayCharges>0){
     ctx.save();
@@ -1756,12 +1768,12 @@ function drawBetween(){
     if(t<120){
       // Hero and rescued sibling celebrating
       ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.textAlign='center';
-      ctx.fillText('You saved '+rs.name+'!',BASE_W/2,80);
+      ctx.fillText(T('you_saved')+rs.name+'!',BASE_W/2,80);
       drawSprite(heroStand,BASE_W/2-30,BASE_H/2-20,heroPal,3,false);
       drawSprite(sibStand,BASE_W/2+10,BASE_H/2-20,sibPal,3,false);
     }else if(t<200){
       ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.textAlign='center';
-      ctx.fillText('But wait...',BASE_W/2,80);
+      ctx.fillText(T('but_wait'),BASE_W/2,80);
       drawSprite(heroStand,BASE_W/2-30,BASE_H/2-20,heroPal,3,false);
       drawSprite(sibStand,BASE_W/2+10,BASE_H/2-20,sibPal,3,false);
       // Ground shakes
@@ -1783,9 +1795,9 @@ function drawBetween(){
       // Chapter title
       const scale=Math.min(1,(t-350)/30);
       ctx.fillStyle='#ff4400';ctx.font='bold '+Math.floor(24*scale)+'px monospace';ctx.textAlign='center';
-      ctx.fillText('CHAPTER 2',BASE_W/2,BASE_H/2-30);
+      ctx.fillText(T('chapter_2'),BASE_W/2,BASE_H/2-30);
       ctx.fillStyle='#ffcc00';ctx.font='bold '+Math.floor(18*scale)+'px monospace';
-      ctx.fillText('Rise of the Robot King',BASE_W/2,BASE_H/2+10);
+      ctx.fillText(T('chapter_2_sub'),BASE_W/2,BASE_H/2+10);
       // Robot flying away with sibling
       drawSprite(ROBO_IDLE,BASE_W/2+50,BASE_H/2+50-(t-350)*0.5,ROBO_P,2,false);
     }
@@ -2129,10 +2141,10 @@ function drawPowerupPopup(){
     ctx.fillText(info.icon,BASE_W/2,BASE_H/2-20);
     // Name
     ctx.fillStyle=info.color;ctx.font='bold 20px monospace';
-    ctx.fillText(info.name,BASE_W/2,BASE_H/2+15);
+    ctx.fillText(info.name[lang]||info.name.en,BASE_W/2,BASE_H/2+15);
     // Description
     ctx.fillStyle='#ffffff';ctx.font='12px monospace';
-    ctx.fillText(info.desc,BASE_W/2,BASE_H/2+35);
+    ctx.fillText(info.desc[lang]||info.desc.en,BASE_W/2,BASE_H/2+35);
   }
   ctx.textAlign='left';ctx.textBaseline='alphabetic';
   // Sparkle particles around box
