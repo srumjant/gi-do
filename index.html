@@ -646,6 +646,10 @@ const DRONE_S=[[0,0,6,6,6,6,6,6,0,0],[0,0,0,6,0,0,6,0,0,0],[0,0,1,1,1,1,1,1,0,0]
 const DRONE_P={1:'#888899',2:'#ff0000',3:'#555566',6:'#aaaacc'};
 const PISTONBOT_S=[[0,0,1,1,1,1,0,0],[0,1,1,2,2,1,1,0],[0,1,2,3,3,2,1,0],[0,1,1,1,1,1,1,0],[0,1,1,4,4,1,1,0],[0,1,1,1,1,1,1,0],[0,0,1,1,1,1,0,0],[0,0,5,0,0,5,0,0]];
 const PISTONBOT_P={1:'#555566',2:'#666677',3:'#ff4400',4:'#ffcc00',5:'#333344'};
+const MONKEY_S=[[0,0,1,1,1,0,0,0],[0,1,1,1,1,1,0,0],[0,1,3,1,3,1,0,0],[0,1,1,2,1,1,0,0],[0,0,1,1,1,0,0,0],[4,0,1,1,1,0,4,0],[0,4,1,5,1,4,0,0],[0,0,1,1,1,0,0,0],[0,0,6,0,6,0,0,0],[0,0,6,0,0,6,0,0]];
+const MONKEY_P={1:'#8B6914',2:'#ffaa88',3:'#ffffff',4:'#aa7722',5:'#ffcc00',6:'#665522'};
+const PARROT_S=[[0,0,1,1,0,0,0,0],[0,1,2,2,1,0,0,0],[0,1,3,1,1,0,0,0],[0,1,1,1,1,1,0,0],[0,0,4,4,4,4,4,0],[0,0,0,4,4,0,0,0],[0,0,5,0,5,0,0,0]];
+const PARROT_P={1:'#ff3333',2:'#ffdd00',3:'#ffffff',4:'#33cc33',5:'#ff6600'};
 
 function getEnemySpriteInfo(t){
   switch(t){
@@ -655,6 +659,7 @@ function getEnemySpriteInfo(t){
     case'penguin':return{sprite:PENGUIN_S,palette:PENGUIN_P};case'icebat':return{sprite:ICEBAT_S,palette:ICEBAT_P};
     case'chicken':return{sprite:CHICKEN_S,palette:CHICKEN_P};
     case'trash_bot':return{sprite:TRASHBOT_S,palette:TRASHBOT_P};case'drone':return{sprite:DRONE_S,palette:DRONE_P};case'piston_bot':return{sprite:PISTONBOT_S,palette:PISTONBOT_P};
+    case'monkey':return{sprite:MONKEY_S,palette:MONKEY_P};case'parrot':return{sprite:PARROT_S,palette:PARROT_P};
     default:return{sprite:DINO_S,palette:DINO_P};
   }
 }
@@ -1060,6 +1065,8 @@ function spawnEnemy(def){
   if(def.type==='ghost'){e.y=gy-h-40;e.vx=0;e.originY=e.y;e.noGravity=true;}
   if(def.type==='bat'||def.type==='icebat'){e.y=gy-h-60;e.originY=e.y;e.vx=-1.2*dc.enemySpeed;e.noGravity=true;e.sineOffset=Math.random()*Math.PI*2;}
   if(def.type==='drone'){e.y=gy-h-50;e.originY=e.y;e.vx=-1.0*dc.enemySpeed;e.noGravity=true;e.sineOffset=Math.random()*Math.PI*2;}
+  if(def.type==='parrot'){e.y=gy-h-40;e.originY=e.y;e.vx=-0.9*dc.enemySpeed;e.noGravity=true;e.sineOffset=Math.random()*Math.PI*2;}
+  if(def.type==='monkey'){e.vx=-0.7*dc.enemySpeed;e.shootTimer=80+Math.floor(Math.random()*60);e.shootInterval=Math.floor(dc.enemyShootInterval*0.9);}
   if(def.type==='cannon'){e.vx=0;e.shootTimer=60+Math.floor(Math.random()*60);e.shootInterval=dc.enemyShootInterval;e.noStomp=true;}
   if(def.type==='piston_bot'){e.vx=0;e.shootTimer=40+Math.floor(Math.random()*40);e.shootInterval=Math.floor(dc.enemyShootInterval*0.8);e.noStomp=true;}
   if(def.type==='bouncer'){e.vx=-1.0*dc.enemySpeed;e.bounceTimer=0;}
@@ -1264,11 +1271,13 @@ const ect=getTile(e.x+e.w/2,e.y+e.h+1);if(ect===6||ect===7)e.x+=(ect===6?-0.8:0.
     if(e.type==='ghost'){const dx=p.x-e.x,dy=p.y-e.y,dist=Math.sqrt(dx*dx+dy*dy);
       if(dist<dc.ghostAggroRange){e.x+=(dx/dist)*.7*dc.enemySpeed;e.y+=(dy/dist)*.5*dc.enemySpeed;}else e.y=e.originY+Math.sin(animFrame*.04)*15;
       e.vx=p.x>e.x?.1:-.1;}
-    else if(e.type==='bat'||e.type==='icebat'){e.x+=e.vx;e.y=e.originY+Math.sin(animFrame*.06+e.sineOffset)*30;if(e.x<0||e.x>lvl.width*TILE)e.vx*=-1;}
+    else if(e.type==='bat'||e.type==='icebat'||e.type==='parrot'){e.x+=e.vx;e.y=e.originY+Math.sin(animFrame*.06+e.sineOffset)*30;if(e.x<0||e.x>lvl.width*TILE)e.vx*=-1;}
     else if(e.type==='cannon'){e.shootTimer--;if(e.shootTimer<=0){e.shootTimer=e.shootInterval;const dir=p.x>e.x?1:-1;
       enemyProjectiles.push({x:e.x+e.w/2+dir*8,y:e.y+e.h/2-3,vx:dir*2.5*dc.enemySpeed,vy:0,life:120,type:'fireball'});playTone(150,.1,'sawtooth',.08,300);}}
     else if(e.type==='piston_bot'){e.shootTimer--;if(e.shootTimer<=0){e.shootTimer=e.shootInterval;const dir=p.x>e.x?1:-1;
   enemyProjectiles.push({x:e.x+e.w/2+dir*8,y:e.y+e.h/2-3,vx:dir*3,vy:0,life:15,type:'piston'});playTone(200,.08,'square',.1);}}
+    else if(e.type==='monkey'){e.shootTimer--;if(e.shootTimer<=0){e.shootTimer=e.shootInterval;const dir=player.x>e.x?1:-1;
+  enemyProjectiles.push({x:e.x+e.w/2+dir*6,y:e.y+e.h/3,vx:dir*2*dc.enemySpeed,vy:-2,life:90,type:'banana'});playTone(500,.06,'triangle',.08);}}
     else if(e.type==='bouncer'){e.bounceTimer++;if(e.bounceTimer>40&&e.vy===0){e.vy=dc.bouncerJumpForce;e.bounceTimer=0;e.vx=(p.x>e.x?1.5:-1.5)*dc.enemySpeed;}
       e.x+=e.vx;const ef=e.vx>0?e.x+e.w:e.x;if(isSolid(getTile(ef,e.y+e.h/2)))e.vx*=-1;}
     else{e.x+=e.vx;const ef2=e.y+e.h+2,ef=e.vx>0?e.x+e.w:e.x;if(isSolid(getTile(ef,e.y+e.h/2)))e.vx*=-1;
