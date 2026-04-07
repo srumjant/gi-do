@@ -249,6 +249,10 @@ const TRANSLATIONS = {
   level_4:            {et:'Palermo väljak',           en:'Palermo Piazza'},
   level_5:            {et:'Talvine imedemaa',           en:'Winter Wonderland'},
   level_6:            {et:'Mängulossi',                en:'Toy Castle'},
+  level_7:            {et:'Prügila',                   en:'Junkyard'},
+  level_8:            {et:'Neoonlinn',                 en:'Neon City'},
+  level_9:            {et:'Tehas',                     en:'Factory'},
+  level_10:           {et:'Robotilinnus',               en:'Robot Fortress'},
 };
 function T(key){return TRANSLATIONS[key]?TRANSLATIONS[key][lang]||TRANSLATIONS[key]['en']:key;}
 function TDiff(key){
@@ -1046,7 +1050,7 @@ function update(){
   if(gameState==='dead'){stateTimer--;if(stateTimer<=0){if(lives>0)initLevel(currentLevel);else{gameState='gameover';stateTimer=180;}}return;}
   if(gameState==='gameover'){stateTimer--;if(stateTimer<=0||justPressed['Space']){gameState='title';clearJP();}return;}
   if(gameState==='levelcomplete'){stateTimer--;if(stateTimer<=0){currentLevel++;if(currentLevel>=LEVELS.length){gameState='win';stateTimer=300;sfxWin();}else{gameState='between';betweenTimer=0;}}return;}
-  if(gameState==='between'){betweenTimer++;if(betweenTimer>480||(betweenTimer>120&&(justPressed['Space']||justPressed['Enter']))){initLevel(currentLevel);justPressed['Space']=false;justPressed['Enter']=false;}clearJP();return;}
+  if(gameState==='between'){betweenTimer++;const betweenMax=currentLevel===6?500:480;if(betweenTimer>betweenMax||(betweenTimer>120&&(justPressed['Space']||justPressed['Enter']))){initLevel(currentLevel);justPressed['Space']=false;justPressed['Enter']=false;}clearJP();return;}
   if(gameState==='win'){stateTimer--;if(stateTimer<=0||justPressed['Space']){gameState='title';clearJP();}return;}
   if(gameState!=='playing')return;
 
@@ -1504,7 +1508,7 @@ smashTexts.forEach(st=>{
   if(lives===Infinity){drawSprite(HEART_S,8,8,HEART_P,2,false);ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.fillText('∞',28,22);}
   else{for(let i=0;i<lives;i++)drawSprite(HEART_S,8+i*18,8,HEART_P,2,false);}
   ctx.fillStyle='#fff';ctx.font='bold 14px monospace';ctx.fillText(T('score')+score,BASE_W-140,22);
-  const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6'];
+  const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6','level_7','level_8','level_9','level_10'];
   ctx.fillStyle='#ffffffaa';ctx.font='10px monospace';ctx.fillText(T(lvlNames[currentLevel])+' ['+TDiff(selectedDifficulty)+']',BASE_W/2-60,16);
   let hx=BASE_W-40;if(cat&&cat.hitsLeft>0){drawSprite(CAT_S,hx,30,CAT_P,1.5,false);ctx.fillStyle='#fff';ctx.font='bold 8px monospace';ctx.fillText('x'+cat.hitsLeft,hx+2,48);hx-=22;}
   if(p.hasCape){drawSprite(SUPER_S,hx,32,SUPER_P,1.5,false);hx-=22;}
@@ -1732,6 +1736,58 @@ function drawBetween(){
   const sibJump=selectedChar==='gigi'?DODO_JUMP:GIGI_JUMP;
   const isBossLevel=(currentLevel===LEVELS.length-1);
 
+  // === CHAPTER 2 INTRO (after defeating Toy Castle boss) ===
+  if(currentLevel===6){
+    ctx.fillStyle='#111';ctx.fillRect(0,0,BASE_W,BASE_H);
+    if(t<120){
+      // Hero and rescued sibling celebrating
+      ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.textAlign='center';
+      ctx.fillText('You saved '+rs.name+'!',BASE_W/2,80);
+      drawSprite(heroStand,BASE_W/2-30,BASE_H/2-20,heroPal,3,false);
+      drawSprite(sibStand,BASE_W/2+10,BASE_H/2-20,sibPal,3,false);
+    }else if(t<200){
+      ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.textAlign='center';
+      ctx.fillText('But wait...',BASE_W/2,80);
+      drawSprite(heroStand,BASE_W/2-30,BASE_H/2-20,heroPal,3,false);
+      drawSprite(sibStand,BASE_W/2+10,BASE_H/2-20,sibPal,3,false);
+      // Ground shakes
+      if(t%4<2){ctx.save();ctx.translate(Math.random()*4-2,Math.random()*4-2);}
+    }else if(t<350){
+      // Robot King enters from right
+      const robotX=Math.max(BASE_W/2+40,BASE_W-(t-200)*3);
+      ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.textAlign='center';
+      ctx.fillText('???',BASE_W/2,60);
+      drawSprite(heroStand,BASE_W/2-60,BASE_H/2-20,heroPal,3,false);
+      drawSprite(ROBO_IDLE,robotX,BASE_H/2-40,ROBO_P,3,true);
+      // Robot grabs sibling after arriving
+      if(robotX<=BASE_W/2+40){
+        drawSprite(sibStand,robotX+20,BASE_H/2-15,sibPal,2,false);
+      }else{
+        drawSprite(sibStand,BASE_W/2+10,BASE_H/2-20,sibPal,3,false);
+      }
+    }else{
+      // Chapter title
+      const scale=Math.min(1,(t-350)/30);
+      ctx.fillStyle='#ff4400';ctx.font='bold '+Math.floor(24*scale)+'px monospace';ctx.textAlign='center';
+      ctx.fillText('CHAPTER 2',BASE_W/2,BASE_H/2-30);
+      ctx.fillStyle='#ffcc00';ctx.font='bold '+Math.floor(18*scale)+'px monospace';
+      ctx.fillText('Rise of the Robot King',BASE_W/2,BASE_H/2+10);
+      // Robot flying away with sibling
+      drawSprite(ROBO_IDLE,BASE_W/2+50,BASE_H/2+50-(t-350)*0.5,ROBO_P,2,false);
+    }
+    // Restore transform if shaking
+    if(t>=120&&t<200&&t%4<2){ctx.restore();}
+    ctx.textAlign='left';
+    // Skip hint
+    if(t>60){
+      const a=.3+Math.sin(t*.06)*.2;ctx.globalAlpha=a;
+      ctx.fillStyle='#fff';ctx.font='10px monospace';ctx.textAlign='center';
+      ctx.fillText(T('press_space'),BASE_W/2,BASE_H-10);
+      ctx.textAlign='left';ctx.globalAlpha=1;
+    }
+    return;
+  }
+
   // Background - next level preview colors
   const nextLvl=LEVELS[currentLevel];
 
@@ -1870,7 +1926,7 @@ function drawBetween(){
     }
 
     // Phase 2 (t 130+): Rotating enemy swoops in and grabs sibling
-    const bk=getKidnapper(currentLevel);
+    const bk=currentLevel>=7?{s:ROBO_IDLE,p:ROBO_P,color:'#ff4400'}:getKidnapper(currentLevel);
     if(t>=130){
       drawSprite(heroStand,heroX,heroY,heroPal,3,false);
 
@@ -1916,7 +1972,7 @@ function drawBetween(){
       ctx.strokeText(sibName+T('sib_stolen_again'),0,0);
       ctx.fillText(sibName+T('sib_stolen_again'),0,0);
       ctx.fillStyle='#ffdd00';ctx.font='bold 16px monospace';
-      const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6'];
+      const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6','level_7','level_8','level_9','level_10'];
       const nextName=T(lvlNames[currentLevel]);
       ctx.strokeText(T('keep_going')+' \u2192 '+nextName,0,35);
       ctx.fillText(T('keep_going')+' \u2192 '+nextName,0,35);
@@ -1944,7 +2000,7 @@ function drawDebug(){
   ctx.fillText('Hold B to open \u2022 ESC to close',BASE_W/2,58);
 
   // Level cards
-  const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6'];
+  const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6','level_7','level_8','level_9','level_10'];
   const cardW=85,cardH=120,gap=10;
   const totalW=LEVELS.length*(cardW+gap)-gap;
   const startX=(BASE_W-totalW)/2;
