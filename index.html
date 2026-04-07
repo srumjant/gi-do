@@ -889,7 +889,7 @@ const LEVELS = [
   },
   // --- Level 11: Pirate Ship ---
   {
-    name:"Pirate Ship", bg:'#1a3355', groundColor:'#8B6914', brickColor:'#6B4E0A', groundTop:'#aa8833',
+    name:"Pirate Ship", bg:'#1a3355', groundColor:'#8B6914', brickColor:'#6B4E0A', groundTop:'#aa8833', waterGaps:true,
     width:140, height:25, playerStart:[2,20], rescuePos:[135,20],
     generate(dc){
       const m=makeGround(this.width,this.height);
@@ -913,8 +913,6 @@ const LEVELS = [
       // Ropes hanging DOWN from mast platforms (with length param)
       [11,14,'rope',10],[15,14,'rope',8],[49,12,'rope',12],[53,12,'rope',10],
       [87,13,'rope',10],[91,13,'rope',8],[117,11,'rope',14],[121,11,'rope',12],
-      // Water in gaps (gaps: [16,2],[34,2],[63,2],[84,2],[110,2] — y=22 is just below ground)
-      [16,21,'wave'],[34,21,'wave'],[63,21,'wave'],[84,21,'wave'],[110,21,'wave'],
       // Skulls on deck surfaces
       [7,18,'skull'],[42,18,'skull'],[94,17,'skull'],[132,18,'skull']
     ]
@@ -1556,20 +1554,6 @@ function draw(){
         ctx.fillStyle='#eeddbb';
         ctx.beginPath();ctx.moveTo(dx+9,dy-36);ctx.lineTo(dx+9,dy-4);ctx.lineTo(dx+28+swave,dy-10);ctx.lineTo(dx+25+swave,dy-30);ctx.closePath();ctx.fill();
         ctx.strokeStyle='#ccbb99';ctx.lineWidth=1;ctx.stroke();
-      }else if(d[2]==='wave'){
-        // Water filling a gap — covers from dy down to bottom of level
-        const lvlBottom=LEVELS[currentLevel].height*TILE;
-        // Dark water base
-        ctx.fillStyle='#1a4477';ctx.fillRect(dx,dy,TILE*4,lvlBottom-dy);
-        // Animated surface waves
-        ctx.fillStyle='#2266aa';
-        ctx.beginPath();ctx.moveTo(dx,dy);
-        for(let i=0;i<=TILE*4;i+=2){ctx.lineTo(dx+i,dy+Math.sin(animFrame*0.06+i*0.15+d[0])*3);}
-        ctx.lineTo(dx+TILE*4,dy+8);ctx.lineTo(dx,dy+8);ctx.closePath();ctx.fill();
-        // Foam/highlights
-        ctx.fillStyle='rgba(150,200,255,0.3)';
-        for(let i=0;i<3;i++){const fx=dx+8+i*18+Math.sin(animFrame*0.04+i)*4,fy=dy+2+Math.sin(animFrame*0.07+i*2)*2;
-          ctx.fillRect(fx,fy,6,2);}
       }else if(d[2]==='rope'){
         // Rope hanging DOWN from mast/platform — long and swaying
         ctx.strokeStyle='#aa8855';ctx.lineWidth=2;ctx.beginPath();
@@ -1611,7 +1595,20 @@ function draw(){
   const sTX=Math.floor(camera.x/TILE),eTX=Math.ceil((camera.x+BASE_W)/TILE),sTY=Math.floor(camera.y/TILE),eTY=Math.ceil((camera.y+BASE_H)/TILE);
   for(let ty=sTY;ty<=eTY;ty++) for(let tx=sTX;tx<=eTX;tx++){
     if(ty<0||ty>=lvl.height||tx<0||tx>=lvl.width)continue;const tile=map[ty][tx],dx=tx*TILE,dy=ty*TILE;
-    if(tile===1){ctx.fillStyle=lvl.groundColor;ctx.fillRect(dx,dy,TILE,TILE);if(ty>0&&!isSolid(map[ty-1][tx])){ctx.fillStyle=lvl.groundTop||'#2d8a2d';ctx.fillRect(dx,dy,TILE,3);}}
+    if(tile===0&&lvl.waterGaps&&ty>=lvl.height-2){
+      // Water in gap — fills empty ground-level tiles
+      ctx.fillStyle='#1a4477';ctx.fillRect(dx,dy,TILE,TILE);
+      if(ty===lvl.height-2){
+        // Surface tile — animated waves on top
+        ctx.fillStyle='#2266aa';ctx.fillRect(dx,dy+4,TILE,TILE-4);
+        ctx.fillStyle='#3388cc';
+        const waveY=Math.sin(animFrame*0.06+tx*0.8)*2;
+        ctx.fillRect(dx,dy+2+waveY,TILE,3);
+        // Foam highlights
+        if((tx+Math.floor(animFrame/20))%3===0){ctx.fillStyle='rgba(180,220,255,0.5)';ctx.fillRect(dx+2,dy+1+waveY,TILE-4,2);}
+      }
+    }
+    else if(tile===1){ctx.fillStyle=lvl.groundColor;ctx.fillRect(dx,dy,TILE,TILE);if(ty>0&&!isSolid(map[ty-1][tx])){ctx.fillStyle=lvl.groundTop||'#2d8a2d';ctx.fillRect(dx,dy,TILE,3);}}
     else if(tile===2){ctx.fillStyle=lvl.brickColor;ctx.fillRect(dx,dy,TILE,TILE);ctx.strokeStyle='#00000033';ctx.strokeRect(dx+.5,dy+.5,TILE-1,TILE-1);ctx.fillStyle='#00000022';ctx.fillRect(dx+7,dy,1,TILE);ctx.fillRect(dx,dy+7,TILE,1);}
     else if(tile===3){ctx.fillStyle='#ffcc00';ctx.fillRect(dx,dy,TILE,TILE);ctx.strokeStyle='#cc8800';ctx.strokeRect(dx+.5,dy+.5,TILE-1,TILE-1);ctx.fillStyle='#cc8800';ctx.font='10px monospace';ctx.fillText('?',dx+4,dy+12);}
     else if(tile===4){
