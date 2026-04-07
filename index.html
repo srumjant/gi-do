@@ -534,6 +534,7 @@ function makeGround(w,h){ const m=Array.from({length:h},()=>Array(w).fill(0)); f
 function addPlats(m,ps){ ps.forEach(([px,py,pw])=>{for(let i=0;i<pw;i++)if(px+i<m[0].length)m[py][px+i]=2;}); }
 function addQBlocks(m,qs){ qs.forEach(([qx,qy])=>m[qy][qx]=3); }
 function addCrates(m,cs){ cs.forEach(([cx,cy])=>m[cy][cx]=4); }
+function addRainbowBlock(m,pos){ pos.forEach(([rx,ry])=>m[ry][rx]=5); }
 function addGaps(m,gs,h,gapMult){
   gs.forEach(([gx,gw])=>{
     const actualW = Math.max(1, Math.round(gw * gapMult));
@@ -552,6 +553,7 @@ const LEVELS = [
       addQBlocks(m,[[12,16],[32,13],[55,15],[72,14],[90,15],[102,16]]);
       addGaps(m,[[20,3],[45,2],[75,3],[98,2]],this.height,dc.gapWidth);
       addCrates(m,[[14,20],[16,20],[36,18],[52,19],[52,20],[74,19],[92,20],[104,19]]);
+      addRainbowBlock(m,[[42,12]]);
       return m;
     },
     enemyDefs:[{type:'doll',x:15},{type:'doll',x:28},{type:'car',x:40},{type:'bat',x:48},{type:'dino',x:55},{type:'doll',x:65},{type:'bouncer',x:73},{type:'car',x:80},{type:'dino',x:90},{type:'bat',x:95},{type:'doll',x:105},{type:'dino',x:110}],
@@ -568,6 +570,7 @@ const LEVELS = [
       addQBlocks(m,[[22,13],[36,12],[57,11],[70,13],[82,11],[97,12],[110,14],[124,13]]);
       addGaps(m,[[12,2],[25,3],[45,3],[65,2],[85,3],[105,2],[120,3]],this.height,dc.gapWidth);
       addCrates(m,[[10,20],[11,20],[22,15],[36,14],[50,19],[50,20],[70,19],[88,17],[100,19],[100,20],[115,18]]);
+      addRainbowBlock(m,[[48,14]]);
       return m;
     },
     enemyDefs:[{type:'dino',x:10},{type:'dino',x:22},{type:'cannon',x:29},{type:'car',x:32},{type:'doll',x:42},{type:'bat',x:47},{type:'dino',x:52},{type:'ghost',x:58},{type:'dino',x:62},{type:'bouncer',x:68},{type:'car',x:72},{type:'cannon',x:78},{type:'doll',x:82},{type:'bat',x:87},{type:'dino',x:92},{type:'car',x:102},{type:'bouncer',x:108},{type:'dino',x:112},{type:'ghost',x:118},{type:'dino',x:125}],
@@ -585,6 +588,7 @@ const LEVELS = [
       addQBlocks(m,[[14,13],[26,11],[46,12],[58,10],[70,13],[84,11],[96,16],[102,12],[114,10],[126,13],[138,11]]);
       addGaps(m,[[16,2],[35,3],[60,2],[78,3],[105,2],[128,3]],this.height,dc.gapWidth);
       addCrates(m,[[8,19],[14,15],[26,13],[44,14],[56,12],[68,15],[82,13],[94,18],[106,19],[112,12],[130,19],[130,20]]);
+      addRainbowBlock(m,[[50,11]]);
       return m;
     },
     enemyDefs:[{type:'doll',x:8},{type:'ghost',x:15},{type:'dino',x:22},{type:'bat',x:30},{type:'cannon',x:36},{type:'bouncer',x:42},{type:'doll',x:50},{type:'ghost',x:56},{type:'car',x:64},{type:'bat',x:70},{type:'dino',x:78},{type:'cannon',x:86},{type:'bouncer',x:92},{type:'ghost',x:98},{type:'doll',x:106},{type:'bat',x:112},{type:'dino',x:120},{type:'cannon',x:126},{type:'ghost',x:134},{type:'bouncer',x:140}],
@@ -602,6 +606,7 @@ const LEVELS = [
       addQBlocks(m,[[16,14],[22,12],[42,11],[60,10],[72,16],[78,12],[90,11],[102,13],[114,10],[126,12],[138,15]]);
       addGaps(m,[[25,3],[48,2],[66,3],[85,2],[108,3],[132,2]],this.height,dc.gapWidth);
       addCrates(m,[[10,19],[20,14],[34,17],[46,15],[52,19],[64,16],[76,14],[88,13],[100,15],[112,12],[124,14],[136,17]]);
+      addRainbowBlock(m,[[55,11]]);
       return m;
     },
     enemyDefs:[{type:'car',x:10},{type:'doll',x:16},{type:'bat',x:24},{type:'ghost',x:32},{type:'dino',x:38},{type:'cannon',x:44},{type:'bouncer',x:52},{type:'doll',x:58},{type:'bat',x:64},{type:'ghost',x:72},{type:'cannon',x:78},{type:'dino',x:84},{type:'car',x:90},{type:'bouncer',x:96},{type:'ghost',x:104},{type:'bat',x:110},{type:'cannon',x:118},{type:'doll',x:124},{type:'dino',x:132},{type:'bouncer',x:138},{type:'ghost',x:142}],
@@ -619,6 +624,7 @@ const LEVELS = [
       addQBlocks(m,[[14,14],[20,12],[40,11],[60,10],[72,12],[92,11],[104,13],[116,10],[128,12],[140,13]]);
       addGaps(m,[[22,2],[35,3],[55,2],[75,3],[100,2],[122,3]],this.height,dc.gapWidth);
       addCrates(m,[[8,19],[18,14],[32,17],[38,13],[52,19],[64,17],[70,14],[84,16],[96,18],[108,19],[120,16],[132,19],[138,17]]);
+      addRainbowBlock(m,[[50,11]]);
       return m;
     },
     enemyDefs:[{type:'penguin',x:8},{type:'icebat',x:14},{type:'penguin',x:20},{type:'icebat',x:28},{type:'penguin',x:34},{type:'icebat',x:40},{type:'penguin',x:48},{type:'icebat',x:54},{type:'penguin',x:60},{type:'icebat',x:66},{type:'penguin',x:72},{type:'icebat',x:80},{type:'penguin',x:86},{type:'icebat',x:92},{type:'penguin',x:98},{type:'icebat',x:104},{type:'penguin',x:110},{type:'icebat',x:116},{type:'penguin',x:122},{type:'icebat',x:128},{type:'penguin',x:134},{type:'icebat',x:140}],
@@ -635,6 +641,7 @@ const LEVELS = [
       addQBlocks(m,[[22,13],[36,11],[56,12],[68,10],[80,13],[94,11],[106,13],[118,10],[130,12],[142,9]]);
       addGaps(m,[[12,2],[25,3],[42,2],[62,3],[82,2],[100,3],[120,2],[138,2]],this.height,dc.gapWidth);
       addCrates(m,[[10,19],[20,15],[34,13],[46,16],[60,19],[66,12],[78,15],[92,13],[104,15],[116,12],[128,14],[134,19],[142,15]]);
+      addRainbowBlock(m,[[54,10]]);
       return m;
     },
     enemyDefs:[{type:'doll',x:10},{type:'bat',x:14},{type:'dino',x:18},{type:'cannon',x:26},{type:'car',x:30},{type:'ghost',x:37},{type:'doll',x:42},{type:'bouncer',x:47},{type:'dino',x:50},{type:'car',x:58},{type:'bat',x:63},{type:'doll',x:68},{type:'cannon',x:73},{type:'dino',x:76},{type:'ghost',x:82},{type:'car',x:88},{type:'bouncer',x:93},{type:'dino',x:96},{type:'cannon',x:103},{type:'doll',x:106},{type:'bat',x:110},{type:'dino',x:114},{type:'ghost',x:120},{type:'car',x:124},{type:'bouncer',x:130},{type:'cannon',x:134},{type:'doll',x:136},{type:'bat',x:143},{type:'dino',x:148}],
@@ -653,6 +660,7 @@ let boss=null, bossDefeated=false;
 let map=[], camera={x:0,y:0}, player={}, enemies=[], pendingEnemies=[];
 let stars=[], particles=[], questionBlocks=[], arrows=[], enemyProjectiles=[];
 let crateCombo=0, crateComboTimer=0, smashTexts=[];
+let rainbowBlocks=[];
 let bowPickups=[], superPickups=[], catPickup=null, cat=null, animFrame=0;
 
 const keys={}, justPressed={};
@@ -727,7 +735,7 @@ if('ontouchstart' in window){
 
 function findGroundY(tx){const l=LEVELS[currentLevel];for(let ty=0;ty<l.height;ty++)if(tx>=0&&tx<l.width&&isSolid(map[ty][tx]))return ty*TILE;return(l.height-2)*TILE;}
 function getTile(px,py){const tx=Math.floor(px/TILE),ty=Math.floor(py/TILE),l=LEVELS[currentLevel];if(tx<0||ty<0||ty>=l.height||tx>=l.width)return 0;return map[ty][tx];}
-function isSolid(t){return t===1||t===2||t===3||t===4;}
+function isSolid(t){return t===1||t===2||t===3||t===4||t===5;}
 function rectOverlap(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
 function spawnParticles(x,y,c,n){for(let i=0;i<n;i++)particles.push({x,y,vx:(Math.random()-.5)*4,vy:-Math.random()*4-1,life:30+Math.random()*20,color:c});}
 function breakCrate(tx,ty){
@@ -752,6 +760,14 @@ function breakCrate(tx,ty){
     sfxWin();
     if(crateCombo>=5){player.invincible=Math.max(player.invincible,8);}
   }
+}
+function giveRandomSillyPowerup(){
+  const types=['fart','bighead','chicken'];
+  const type=types[Math.floor(Math.random()*types.length)];
+  if(type==='fart'){player.fartTimer=900;}
+  else if(type==='bighead'){player.bigHeadTimer=1200;}
+  else{player.chickenRayCharges=8;player.hasBow=true;}
+  sfxPickup();
 }
 function clearJP(){Object.keys(justPressed).forEach(k=>justPressed[k]=false);}
 
@@ -783,6 +799,8 @@ function initLevel(idx){
   }else{catPickup=null;}
   stars=[]; questionBlocks=[]; arrows=[]; enemyProjectiles=[];
   for(let y=0;y<lvl.height;y++) for(let x=0;x<lvl.width;x++) if(map[y][x]===3) questionBlocks.push({x,y,hit:false});
+  rainbowBlocks=[];
+  for(let y=0;y<lvl.height;y++) for(let x=0;x<lvl.width;x++) if(map[y][x]===5) rainbowBlocks.push({x,y,hit:false});
   particles=[]; crateCombo=0;crateComboTimer=0;smashTexts=[]; camera={x:0,y:0}; gameState='playing';
   // Boss on final level
   const isFinal=(idx===LEVELS.length-1);
@@ -895,6 +913,7 @@ function update(){
   else if(p.vy<0){const hY=p.y;if(isSolid(getTile(pL2,hY))||isSolid(getTile(pR2,hY))){p.y=Math.floor(hY/TILE)*TILE+TILE;p.vy=0;
     const h1=Math.floor(pL2/TILE),h2=Math.floor(pR2/TILE),hy=Math.floor(hY/TILE);
     [h1,h2].forEach(hx=>{const qb=questionBlocks.find(q=>q.x===hx&&q.y===hy&&!q.hit);if(qb){qb.hit=true;map[qb.y][qb.x]=2;stars.push({x:qb.x*TILE,y:qb.y*TILE-TILE,vy:-2,collected:false});spawnParticles(qb.x*TILE+8,qb.y*TILE,'#ffdd00',5);sfxBlock();}});
+    [h1,h2].forEach(hx=>{const rb=rainbowBlocks.find(q=>q.x===hx&&q.y===hy&&!q.hit);if(rb){rb.hit=true;map[rb.y][rb.x]=2;giveRandomSillyPowerup();spawnParticles(rb.x*TILE+8,rb.y*TILE,'#ff69b4',8);sfxBlock();}});
   }}
   if(p.onGround){crateComboTimer--;if(crateComboTimer<=0)crateCombo=0;}
   if(p.x<0)p.x=0;
@@ -1122,6 +1141,7 @@ function draw(){
   ctx.strokeStyle='#8b5a2b';ctx.beginPath();ctx.moveTo(-8,-TILE);ctx.lineTo(8,0);ctx.moveTo(8,-TILE);ctx.lineTo(-8,0);ctx.stroke();
   ctx.restore();
 }
+else if(tile===5){const rCol=`hsl(${(animFrame*3+tx*20)%360},100%,65%)`;ctx.fillStyle=rCol;ctx.fillRect(dx,dy,TILE,TILE);ctx.strokeStyle='#fff';ctx.strokeRect(dx+.5,dy+.5,TILE-1,TILE-1);ctx.fillStyle='#fff';ctx.font='10px monospace';ctx.fillText('!',dx+5,dy+12);}
   }
 
   // Stars, pickups
