@@ -242,6 +242,12 @@ const TRANSLATIONS = {
   ], en:[
     'YOU CAN\'T CATCH ME!','HEH, TOO SLOW!','TRY AGAIN, LITTLE ONE!','I\'M TOO FAST!','COME AND GET ME!'
   ]},
+  robo_between:       {et:[
+    'SA EI PEATA MIND!','MU TEHAS EI SEISA!','TULE, KUI JULGED!'
+  ], en:[
+    'YOU CAN\'T STOP ME!','MY MACHINES NEVER REST!','COME IF YOU DARE!'
+  ]},
+  robot_king_defeated:{et:'Robotkuningas on võidetud!', en:'The Robot King is defeated!'},
   // Level names
   level_1:            {et:'Nukuaed',                  en:'Doll Garden'},
   level_2:            {et:'Dinosauruse kanjon',       en:'Dinosaur Canyon'},
@@ -1944,12 +1950,13 @@ function drawBetween(){
         drawSprite(bk.s,runX,eY+bounce,bk.p,4,false);
         drawSprite(sibJump,runX+10,eY-spriteH(sibStand,2)+5+bounce,sibPal,2,false);
         if(grabT<200){
-          const phrases=T('dino_between');
+          const phrases=currentLevel>=7?T('robo_between'):T('dino_between');
           const pi=(currentLevel-1)%phrases.length;
+          const isRobo=currentLevel>=7;
           const bubX=Math.min(runX-10,BASE_W-160),bubY=eY-35;
-          ctx.fillStyle='#fff';ctx.strokeStyle='#333';ctx.lineWidth=2;
+          ctx.fillStyle=isRobo?'#331111':'#fff';ctx.strokeStyle=isRobo?'#ff3333':'#333';ctx.lineWidth=2;
           ctx.beginPath();ctx.moveTo(bubX,bubY);ctx.lineTo(bubX+150,bubY);ctx.lineTo(bubX+150,bubY+25);ctx.lineTo(bubX+25,bubY+25);ctx.lineTo(bubX+15,bubY+35);ctx.lineTo(bubX+10,bubY+25);ctx.lineTo(bubX,bubY+25);ctx.closePath();ctx.fill();ctx.stroke();
-          ctx.fillStyle=bk.color;ctx.font='bold 10px monospace';ctx.textAlign='center';
+          ctx.fillStyle=isRobo?'#ff4444':bk.color;ctx.font='bold 10px monospace';ctx.textAlign='center';
           ctx.fillText(phrases[pi],bubX+75,bubY+16);ctx.textAlign='left';
         }
         if((grabT)%30<20){ctx.fillStyle='#3388ff';ctx.font='bold 10px monospace';ctx.textAlign='center';ctx.fillText(T('help_cry'),runX+20,eY-spriteH(sibStand,2)-5);ctx.textAlign='left';}
@@ -2001,7 +2008,7 @@ function drawDebug(){
 
   // Level cards
   const lvlNames=['level_1','level_2','level_3','level_4','level_5','level_6','level_7','level_8','level_9','level_10'];
-  const cardW=85,cardH=120,gap=10;
+  const cardW=56,cardH=110,gap=6;
   const totalW=LEVELS.length*(cardW+gap)-gap;
   const startX=(BASE_W-totalW)/2;
 
@@ -2014,22 +2021,25 @@ function drawDebug(){
     ctx.strokeStyle=sel?'#00ff66':'#334455';ctx.lineWidth=sel?2:1;
     ctx.strokeRect(x,y,cardW,cardH);
     // Level number
-    ctx.fillStyle=sel?'#00ff66':'#667788';ctx.font='bold 14px monospace';ctx.textAlign='center';
-    ctx.fillText((i+1)+'',x+cardW/2,y+20);
+    ctx.fillStyle=sel?'#00ff66':'#667788';ctx.font='bold 12px monospace';ctx.textAlign='center';
+    ctx.fillText((i+1)+'',x+cardW/2,y+16);
     // Level name
-    ctx.fillStyle=sel?'#aaffcc':'#6688aa';ctx.font='9px monospace';
-    ctx.fillText(T(lvlNames[i]),x+cardW/2,y+36);
+    ctx.fillStyle=sel?'#aaffcc':'#6688aa';ctx.font='8px monospace';
+    ctx.fillText(T(lvlNames[i]),x+cardW/2,y+30);
     // Mini color preview
-    ctx.fillStyle=lvl.bg;ctx.fillRect(x+10,y+44,cardW-20,25);
-    ctx.fillStyle=lvl.groundColor;ctx.fillRect(x+10,y+60,cardW-20,9);
+    ctx.fillStyle=lvl.bg;ctx.fillRect(x+5,y+38,cardW-10,20);
+    ctx.fillStyle=lvl.groundColor;ctx.fillRect(x+5,y+50,cardW-10,8);
     // Boss indicator
     if(i===LEVELS.length-1){
-      ctx.fillStyle='#ff4444';ctx.font='bold 8px monospace';
-      ctx.fillText('BOSS',x+cardW/2,y+82);
+      ctx.fillStyle='#ff4444';ctx.font='bold 7px monospace';
+      ctx.fillText('BOSS',x+cardW/2,y+72);
     }
+    // Chapter indicator
+    ctx.fillStyle=i>=6?'#ff6644':'#4488cc';ctx.font='bold 7px monospace';
+    ctx.fillText(i>=6?'CH2':'CH1',x+cardW/2,y+84);
     // Enemy count
-    ctx.fillStyle='#556677';ctx.font='8px monospace';
-    ctx.fillText(lvl.enemyDefs.length+' enemies',x+cardW/2,y+95);
+    ctx.fillStyle='#556677';ctx.font='7px monospace';
+    ctx.fillText(lvl.enemyDefs.length+' foes',x+cardW/2,y+95);
     // Selected arrow
     if(sel){
       ctx.fillStyle='#00ff66';ctx.font='bold 16px monospace';
@@ -2065,9 +2075,10 @@ function drawWin(){
   ctx.fillStyle='#ff69b4';ctx.font='bold 28px monospace';ctx.textAlign='center';ctx.fillText(rn.toUpperCase()+T('is_saved'),BASE_W/2,90);
   ctx.fillStyle='#ffdd00';ctx.font='bold 18px monospace';ctx.fillText(hn+T('is_the_best'),BASE_W/2,130);
   ctx.fillStyle='#aaddff';ctx.font='14px monospace';ctx.fillText(T('difficulty_label')+TDiff(selectedDifficulty)+T('final_score')+score,BASE_W/2,160);
+  ctx.fillStyle='#ff4400';ctx.font='bold 12px monospace';ctx.fillText(T('robot_king_defeated'),BASE_W/2,180);
   const ps=getPlayerSprites(),rs=getRescueSprites();
-  drawSprite(ps.stand,BASE_W/2-45,180,ps.palette,4,false);drawSprite(rs.sprite,BASE_W/2+10,195,rs.palette,4,false);
-  for(let i=0;i<5;i++){const hx=BASE_W/2-60+i*30,hy=175+Math.sin(animFrame*.08+i)*10;drawSprite(HEART_S,hx,hy,HEART_P,1.5,false);}
+  drawSprite(ps.stand,BASE_W/2-45,195,ps.palette,4,false);drawSprite(rs.sprite,BASE_W/2+10,210,rs.palette,4,false);
+  for(let i=0;i<5;i++){const hx=BASE_W/2-60+i*30,hy=190+Math.sin(animFrame*.08+i)*10;drawSprite(HEART_S,hx,hy,HEART_P,1.5,false);}
   ctx.fillStyle='#fff';ctx.font='12px monospace';ctx.fillText(T('press_play_again'),BASE_W/2,330);ctx.textAlign='left';
 }
 
