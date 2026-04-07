@@ -168,8 +168,8 @@ const TRANSLATIONS = {
   title:              {et:'GIGI & DODO',             en:'GIGI & DODO',             it:'GIGI & DODO'},
   subtitle:           {et:'Julge päästmisseiklus!',  en:'A brave rescue adventure!', it:'Una coraggiosa avventura di salvataggio!'},
   worlds:             {et:'10 maailma avastamiseks!', en:'10 worlds to explore!',   it:'10 mondi da esplorare!'},
-  press_start:        {et:'VAJUTA TÜHIK ALUSTAMISEKS!', en:'PRESS SPACE TO START!', it:'PREMI SPAZIO PER INIZIARE!'},
-  controls:           {et:'Nooled/WASD: liigu | Tühik: hüppa | X: tulista', en:'Arrows/WASD: move | Space: jump | X: shoot bow', it:'Frecce/WASD: muovi | Spazio: salta | X: arco'},
+  press_start:        {et:'VAJUTA [TÜHIK] ALUSTAMISEKS!', en:'PRESS [SPACE] TO START!', it:'PREMI [SPAZIO] PER INIZIARE!'},
+  controls:           {et:'[←→] liigu | [TÜHIK] hüppa | [X] tulista', en:'[←→] move | [SPACE] jump | [X] shoot', it:'[←→] muovi | [SPAZIO] salta | [X] arco'},
   // Language selector
   lang_hint:          {et:'L = English',              en:'L = Italiano',            it:'L = Eesti keel'},
   // Difficulty
@@ -189,7 +189,7 @@ const TRANSLATIONS = {
   normal_speed:       {et:'Tavalised',                en:'Normal',                  it:'Normali'},
   fast:               {et:'Kiired!',                  en:'Fast!',                   it:'Veloci!'},
   fewer_enemies:      {et:'Vähem vaenlasi',           en:'Fewer enemies',           it:'Meno nemici'},
-  lr_choose:          {et:'Vasakule / Paremale valimiseks, Tühik kinnitab', en:'Left / Right to choose, Space to confirm', it:'Sinistra/Destra per scegliere, Spazio per confermare'},
+  lr_choose:          {et:'[←] [→] valimiseks, [TÜHIK] kinnitab', en:'[←] [→] to choose, [SPACE] to confirm', it:'[←] [→] per scegliere, [SPAZIO] per confermare'},
   // Character select
   choose_hero:        {et:'VALI OMA KANGELANE!',      en:'CHOOSE YOUR HERO!',      it:'SCEGLI IL TUO EROE!'},
   rescue:             {et:'Päästa',                   en:'Rescue',                  it:'Salva'},
@@ -199,7 +199,7 @@ const TRANSLATIONS = {
   i_come_help:        {et:'MA TULEN APPI!',           en:'I\'M COMING!',            it:'ARRIVO!'},
   save_sib:           {et:'PÄÄSTA',                   en:'SAVE',                    it:'SALVA'},
   adventure_begins:   {et:'SEIKLUS ALGAB!',           en:'THE ADVENTURE BEGINS!',   it:"L'AVVENTURA INIZIA!"},
-  press_space:        {et:'VAJUTA TÜHIK...',           en:'PRESS SPACE...',          it:'PREMI SPAZIO...'},
+  press_space:        {et:'VAJUTA [TÜHIK]...',         en:'PRESS [SPACE]...',        it:'PREMI [SPAZIO]...'},
   dino_phrases:       {et:['TULE SIIA, PISIKE!','HEH HEH HEH!','SA OLED NII NALJAKAS!','MINA OLEN SUUR DINO!','MÄNGIME PEITUST!'],
                        en:['COME HERE, LITTLE ONE!','HEH HEH HEH!','YOU ARE SO FUNNY!','I AM A BIG DINO!','LET\'S PLAY HIDE AND SEEK!'],
                        it:['Sei troppo lento!','Non puoi vincere!','Il tuo amico e mio!','Arrenditi!','Mai!']},
@@ -219,13 +219,13 @@ const TRANSLATIONS = {
   // Game over
   game_over:          {et:'MÄNG LÄBI',                en:'GAME OVER',               it:'FINE DEL GIOCO'},
   score_label:        {et:'Punktid: ',                en:'Score: ',                 it:'Punti: '},
-  press_retry:        {et:'Vajuta TÜHIK uuesti proovimiseks', en:'Press SPACE to try again', it:'Premi SPAZIO per riprovare'},
+  press_retry:        {et:'Vajuta [TÜHIK] uuesti proovimiseks', en:'Press [SPACE] to try again', it:'Premi [SPAZIO] per riprovare'},
   // Win
   is_saved:           {et:' ON PÄÄSTETUD!',           en:' IS SAVED!',              it:' E SALVO!'},
   is_the_best:        {et:' on parim!',               en:' is the best!',           it:' e il migliore!'},
   difficulty_label:   {et:'Raskus: ',                 en:'Difficulty: ',             it:'Difficolta: '},
   final_score:        {et:' | Punktid: ',             en:' | Final Score: ',         it:'| Punteggio: '},
-  press_play_again:   {et:'Vajuta TÜHIK uuesti mängimiseks', en:'Press SPACE to play again', it:'Premi SPAZIO per rigiocare'},
+  press_play_again:   {et:'Vajuta [TÜHIK] uuesti mängimiseks', en:'Press [SPACE] to play again', it:'Premi [SPAZIO] per rigiocare'},
   // Between-level cutscene
   oh_no:              {et:'OI EI!',                   en:'OH NO!',                  it:'OH NO!'},
   sib_stolen_again:   {et:' RÖÖVITI JÄLLE!',         en:' WAS STOLEN AGAIN!',      it:' E STATO RAPITO DI NUOVO!'},
@@ -367,6 +367,34 @@ function stopBGM(){if(bgmTimer){clearTimeout(bgmTimer);bgmTimer=null;}bgmLevel=-
 //  CONSTANTS & HELPERS
 // ==========================================
 const TILE = 16, GRAVITY = 0.4, ENEMY_SCALE = 1.8;
+// Keyboard key badge rendering
+function drawKey(x,y,label,size){
+  const s=size||10,pad=4,tw=ctx.measureText(label).width;
+  const kw=tw+pad*2,kh=s+pad*2,kx=x-kw/2,ky=y-kh/2;
+  ctx.fillStyle='#444';ctx.fillRect(kx,ky,kw,kh);
+  ctx.fillStyle='#666';ctx.fillRect(kx+1,ky+1,kw-2,kh-3);
+  ctx.fillStyle='#555';ctx.fillRect(kx+1,ky+kh-3,kw-2,2);
+  ctx.fillStyle='#fff';ctx.fillText(label,x,y+s*0.35);
+}
+function drawTextWithKeys(text,x,y,size){
+  const s=size||10;
+  const parts=text.split(/(\[[^\]]+\])/);
+  let cx=x,totalW=0;
+  // Measure total width for centering
+  ctx.save();ctx.font=(s)+'px monospace';
+  parts.forEach(p=>{if(p.startsWith('[')){const l=p.slice(1,-1);totalW+=ctx.measureText(l).width+12;}else{totalW+=ctx.measureText(p).width;}});
+  cx=x-totalW/2;
+  ctx.textAlign='left';
+  parts.forEach(p=>{
+    if(p.startsWith('[')){
+      const l=p.slice(1,-1);
+      const kw=ctx.measureText(l).width+8;
+      drawKey(cx+kw/2,y,l,s);
+      cx+=kw+4;
+    }else{ctx.fillText(p,cx,y+s*0.35);cx+=ctx.measureText(p).width;}
+  });
+  ctx.restore();
+}
 const CRATE_PARTICLES = ['#ffdd00','#ff69b4','#33ff88','#ff6633','#66ccff','#ffaa00','#dd44ff'];
 function drawSprite(d,x,y,p,sc,fl) {
   ctx.save(); if(fl){ctx.translate(x+d[0].length*sc,y);ctx.scale(-1,1)}else ctx.translate(x,y);
@@ -1600,8 +1628,8 @@ function drawTitle(){
   drawSprite(CANNON_S,490,BASE_H-60-spriteH(CANNON_S,2),CANNON_P,2,false);
   drawSprite(BAT_S,530,BASE_H-85+b,BAT_P,2,true);
   drawSprite(DINO_S,570,BASE_H-60-spriteH(DINO_S,2)+b,DINO_P,2,true);
-  if(Math.floor(animFrame/30)%2===0){ctx.fillStyle='#ffdd00';ctx.font='bold 16px monospace';ctx.fillText(T('press_start'),BASE_W/2,BASE_H-15);}
-  ctx.fillStyle='#333';ctx.font='10px monospace';ctx.fillText(T('controls'),BASE_W/2,195);
+  if(Math.floor(animFrame/30)%2===0){ctx.fillStyle='#ffdd00';ctx.font='bold 14px monospace';drawTextWithKeys(T('press_start'),BASE_W/2,BASE_H-20,14);}
+  ctx.fillStyle='#333';ctx.font='10px monospace';drawTextWithKeys(T('controls'),BASE_W/2,195,10);
   ctx.fillStyle='#aaa';ctx.font='10px monospace';ctx.fillText(T('lang_hint'),BASE_W/2,BASE_H-30);
   ctx.textAlign='left';
 }
@@ -1701,7 +1729,7 @@ function drawIntro(){
   if(t>90){
     const a=.3+Math.sin(t*.06)*.2;ctx.globalAlpha=a;
     ctx.fillStyle='#fff';ctx.font='10px monospace';ctx.textAlign='center';
-    ctx.fillText(T('press_space'),BASE_W/2,BASE_H-10);
+    drawTextWithKeys(T('press_space'),BASE_W/2,BASE_H-15,12);
     ctx.textAlign='left';ctx.globalAlpha=1;
   }
 }
@@ -1731,7 +1759,7 @@ function drawDifficulty(){
     }
   });
 
-  ctx.fillStyle='#aaaacc';ctx.font='12px monospace';ctx.fillText(T('lr_choose'),BASE_W/2,370);
+  ctx.fillStyle='#aaaacc';ctx.font='12px monospace';drawTextWithKeys(T('lr_choose'),BASE_W/2,365,11);
   ctx.fillStyle='#aaa';ctx.font='10px monospace';ctx.fillText(T('lang_hint'),BASE_W/2,390);
   ctx.textAlign='left';ctx.lineWidth=1;
 }
@@ -1748,7 +1776,7 @@ function drawSelect(){
   const dx=BASE_W/2+20,dy=120;
   if(selectIndex===1){ctx.strokeStyle='#ff69b4';ctx.lineWidth=3;ctx.strokeRect(dx-15,dy-10,110,190);ctx.fillStyle='rgba(255,105,180,0.1)';ctx.fillRect(dx-15,dy-10,110,190);}
   drawSprite(DODO_STAND,dx+15,dy+15,DODO_P,4,false);ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.fillText('DODO',dx+40,dy+175);
-  ctx.fillStyle='#aaaacc';ctx.font='12px monospace';ctx.fillText(T('lr_choose'),BASE_W/2,350);
+  ctx.fillStyle='#aaaacc';ctx.font='12px monospace';drawTextWithKeys(T('lr_choose'),BASE_W/2,345,11);
   ctx.fillStyle='#ffaacc';ctx.font='12px monospace';ctx.fillText(T('rescue')+' '+(selectIndex===0?'Dodo':'Gigi')+'!',BASE_W/2,375);
   ctx.textAlign='left';ctx.lineWidth=1;
 }
@@ -1808,7 +1836,7 @@ function drawBetween(){
     if(t>60){
       const a=.3+Math.sin(t*.06)*.2;ctx.globalAlpha=a;
       ctx.fillStyle='#fff';ctx.font='10px monospace';ctx.textAlign='center';
-      ctx.fillText(T('press_space'),BASE_W/2,BASE_H-10);
+      drawTextWithKeys(T('press_space'),BASE_W/2,BASE_H-15,12);
       ctx.textAlign='left';ctx.globalAlpha=1;
     }
     return;
@@ -2011,7 +2039,7 @@ function drawBetween(){
   if(t>60){
     const a=.3+Math.sin(t*.06)*.2;ctx.globalAlpha=a;
     ctx.fillStyle='#fff';ctx.font='10px monospace';ctx.textAlign='center';
-    ctx.fillText(T('press_space'),BASE_W/2,BASE_H-10);
+    drawTextWithKeys(T('press_space'),BASE_W/2,BASE_H-15,12);
     ctx.textAlign='left';ctx.globalAlpha=1;
   }
 }
@@ -2083,7 +2111,7 @@ function drawDebug(){
 function drawGameOver(){
   ctx.fillStyle='#220000';ctx.fillRect(0,0,BASE_W,BASE_H);ctx.fillStyle='#ff3333';ctx.font='bold 32px monospace';ctx.textAlign='center';
   ctx.fillText(T('game_over'),BASE_W/2,BASE_H/2-20);ctx.fillStyle='#fff';ctx.font='16px monospace';ctx.fillText(T('score_label')+score,BASE_W/2,BASE_H/2+20);
-  ctx.font='12px monospace';ctx.fillText(T('press_retry'),BASE_W/2,BASE_H/2+50);ctx.textAlign='left';
+  ctx.font='12px monospace';drawTextWithKeys(T('press_retry'),BASE_W/2,BASE_H/2+45,12);ctx.textAlign='left';
 }
 
 function drawWin(){
@@ -2099,7 +2127,7 @@ function drawWin(){
   const ps=getPlayerSprites(),rs=getRescueSprites();
   drawSprite(ps.stand,BASE_W/2-45,195,ps.palette,4,false);drawSprite(rs.sprite,BASE_W/2+10,210,rs.palette,4,false);
   for(let i=0;i<5;i++){const hx=BASE_W/2-60+i*30,hy=190+Math.sin(animFrame*.08+i)*10;drawSprite(HEART_S,hx,hy,HEART_P,1.5,false);}
-  ctx.fillStyle='#fff';ctx.font='12px monospace';ctx.fillText(T('press_play_again'),BASE_W/2,330);ctx.textAlign='left';
+  ctx.fillStyle='#fff';ctx.font='12px monospace';drawTextWithKeys(T('press_play_again'),BASE_W/2,325,12);ctx.textAlign='left';
 }
 
 function drawPowerupPopup(){
