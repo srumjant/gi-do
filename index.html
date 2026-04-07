@@ -548,6 +548,7 @@ function addPlats(m,ps){ ps.forEach(([px,py,pw])=>{for(let i=0;i<pw;i++)if(px+i<
 function addQBlocks(m,qs){ qs.forEach(([qx,qy])=>m[qy][qx]=3); }
 function addCrates(m,cs){ cs.forEach(([cx,cy])=>m[cy][cx]=4); }
 function addRainbowBlock(m,pos){ pos.forEach(([rx,ry])=>m[ry][rx]=5); }
+function addConveyors(m,cs){cs.forEach(([cx,cy,dir])=>m[cy][cx]=dir==='l'?6:7);}
 function addGaps(m,gs,h,gapMult){
   gs.forEach(([gx,gw])=>{
     const actualW = Math.max(1, Math.round(gw * gapMult));
@@ -748,7 +749,7 @@ if('ontouchstart' in window){
 
 function findGroundY(tx){const l=LEVELS[currentLevel];for(let ty=0;ty<l.height;ty++)if(tx>=0&&tx<l.width&&isSolid(map[ty][tx]))return ty*TILE;return(l.height-2)*TILE;}
 function getTile(px,py){const tx=Math.floor(px/TILE),ty=Math.floor(py/TILE),l=LEVELS[currentLevel];if(tx<0||ty<0||ty>=l.height||tx>=l.width)return 0;return map[ty][tx];}
-function isSolid(t){return t===1||t===2||t===3||t===4||t===5;}
+function isSolid(t){return t>=1&&t<=8;}
 function rectOverlap(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
 function spawnParticles(x,y,c,n){for(let i=0;i<n;i++)particles.push({x,y,vx:(Math.random()-.5)*4,vy:-Math.random()*4-1,life:30+Math.random()*20,color:c});}
 function breakCrate(tx,ty){
@@ -906,6 +907,7 @@ function update(){
   if(keys['ArrowLeft']||keys['KeyA']){p.vx=-dc.playerSpeed;p.facing=-1;}
   else if(keys['ArrowRight']||keys['KeyD']){p.vx=dc.playerSpeed;p.facing=1;}
   else{p.vx*=.7;if(Math.abs(p.vx)<.1)p.vx=0;}
+  const convTile=getTile(p.x+p.w/2,p.y+p.h+1);if(p.onGround&&(convTile===6||convTile===7))p.vx+=(convTile===6?-1.5:1.5);
   if((keys['Space']||keys['ArrowUp']||keys['KeyW'])&&p.onGround){
   p.vy=p.fartTimer>0?dc.jumpForce*1.5:dc.jumpForce;p.onGround=false;
   if(p.fartTimer>0){sfxFart();for(let i=0;i<5;i++)particles.push({x:p.x+p.w/2,y:p.y+p.h,vx:(Math.random()-.5)*3,vy:Math.random()*2+1,life:25+Math.random()*15,color:'#88cc44'});}
@@ -1032,7 +1034,8 @@ if(p.fartTimer>0){enemies.forEach(e=>{if(!e.alive)return;const edx=e.x+e.w/2-(p.
     if(!e.alive){if(e.squashTimer>0)e.squashTimer--;return;}
 if(e.stunTimer>0){e.stunTimer--;return;}
     if(!e.noGravity){if(e.vy===undefined)e.vy=0;e.vy+=GRAVITY;if(e.vy>8)e.vy=8;e.y+=e.vy;
-      const eF=e.y+e.h;if(isSolid(getTile(e.x+e.w/2,eF))||isSolid(getTile(e.x+2,eF))||isSolid(getTile(e.x+e.w-2,eF))){e.y=Math.floor(eF/TILE)*TILE-e.h;e.vy=0;}}
+      const eF=e.y+e.h;if(isSolid(getTile(e.x+e.w/2,eF))||isSolid(getTile(e.x+2,eF))||isSolid(getTile(e.x+e.w-2,eF))){e.y=Math.floor(eF/TILE)*TILE-e.h;e.vy=0;}
+const ect=getTile(e.x+e.w/2,e.y+e.h+1);if(ect===6||ect===7)e.x+=(ect===6?-0.8:0.8);}
 
     if(e.type==='ghost'){const dx=p.x-e.x,dy=p.y-e.y,dist=Math.sqrt(dx*dx+dy*dy);
       if(dist<dc.ghostAggroRange){e.x+=(dx/dist)*.7*dc.enemySpeed;e.y+=(dy/dist)*.5*dc.enemySpeed;}else e.y=e.originY+Math.sin(animFrame*.04)*15;
@@ -1189,6 +1192,13 @@ function draw(){
   ctx.restore();
 }
 else if(tile===5){const rCol=`hsl(${(animFrame*3+tx*20)%360},100%,65%)`;ctx.fillStyle=rCol;ctx.fillRect(dx,dy,TILE,TILE);ctx.strokeStyle='#fff';ctx.strokeRect(dx+.5,dy+.5,TILE-1,TILE-1);ctx.fillStyle='#fff';ctx.font='10px monospace';ctx.fillText('!',dx+5,dy+12);}
+else if(tile===6||tile===7){
+  const dir=tile===6?-1:1;
+  ctx.fillStyle='#666677';ctx.fillRect(dx,dy,TILE,TILE);
+  ctx.fillStyle='#555566';ctx.fillRect(dx,dy,TILE,2);ctx.fillRect(dx,dy+TILE-2,TILE,2);
+  ctx.fillStyle='#8888aa';
+  for(let i=0;i<3;i++){const ax=((animFrame*dir*2+i*6)%TILE+TILE)%TILE;ctx.fillRect(dx+ax,dy+5,3,6);}
+}
   }
 
   // Stars, pickups
