@@ -272,6 +272,7 @@ function sfxJump(){playTone(300,.15,'square',.12,600)} function sfxStomp(){playT
 function sfxCoin(){playTone(880,.08,'square',.1);setTimeout(()=>playTone(1200,.15,'square',.1),80)} function sfxHurt(){playTone(200,.3,'sawtooth',.15,80)}
 function sfxBlock(){playTone(500,.06,'triangle',.1);setTimeout(()=>playTone(700,.1,'triangle',.08),60)} function sfxShoot(){playTone(600,.08,'sawtooth',.1,900)}
 function sfxPickup(){playTone(440,.1,'triangle',.12);setTimeout(()=>playTone(660,.1,'triangle',.12),80);setTimeout(()=>playTone(880,.15,'triangle',.1),160)}
+function sfxCrateBreak(){playTone(120,.1,'sawtooth',.12);setTimeout(()=>playTone(80,.15,'sawtooth',.1),50);}
 function sfxWin(){[523,659,784,1047].forEach((f,i)=>setTimeout(()=>playTone(f,.2,'square',.1),i*150))}
 
 // ==========================================
@@ -340,6 +341,7 @@ function stopBGM(){if(bgmTimer){clearTimeout(bgmTimer);bgmTimer=null;}bgmLevel=-
 //  CONSTANTS & HELPERS
 // ==========================================
 const TILE = 16, GRAVITY = 0.4, ENEMY_SCALE = 1.8;
+const CRATE_PARTICLES = ['#ffdd00','#ff69b4','#33ff88','#ff6633','#66ccff','#ffaa00','#dd44ff'];
 function drawSprite(d,x,y,p,sc,fl) {
   ctx.save(); if(fl){ctx.translate(x+d[0].length*sc,y);ctx.scale(-1,1)}else ctx.translate(x,y);
   for(let r=0;r<d.length;r++) for(let c=0;c<d[r].length;c++){const v=d[r][c];if(!v)continue;ctx.fillStyle=p[v];ctx.fillRect(c*sc,r*sc,sc,sc);}
@@ -722,6 +724,20 @@ function getTile(px,py){const tx=Math.floor(px/TILE),ty=Math.floor(py/TILE),l=LE
 function isSolid(t){return t===1||t===2||t===3||t===4;}
 function rectOverlap(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
 function spawnParticles(x,y,c,n){for(let i=0;i<n;i++)particles.push({x,y,vx:(Math.random()-.5)*4,vy:-Math.random()*4-1,life:30+Math.random()*20,color:c});}
+function breakCrate(tx,ty){
+  if(tx<0||ty<0||ty>=LEVELS[currentLevel].height||tx>=LEVELS[currentLevel].width)return;
+  if(map[ty][tx]!==4)return;
+  map[ty][tx]=0;
+  const px=tx*TILE+8, py=ty*TILE+8;
+  for(let i=0;i<8;i++){
+    const c=CRATE_PARTICLES[Math.floor(Math.random()*CRATE_PARTICLES.length)];
+    particles.push({x:px,y:py,vx:(Math.random()-.5)*6,vy:-Math.random()*5-2,life:40+Math.random()*20,color:c});
+  }
+  if(Math.random()<0.3){
+    stars.push({x:tx*TILE,y:ty*TILE-TILE,vy:-2,collected:false});
+  }
+  sfxCrateBreak();
+}
 function clearJP(){Object.keys(justPressed).forEach(k=>justPressed[k]=false);}
 
 // ==========================================
@@ -858,7 +874,9 @@ function update(){
   else if(p.vx<0){if(isSolid(getTile(pL,pT))||isSolid(getTile(pL,pB))||isSolid(getTile(pL,pT+(pB-pT)/2))){p.x=Math.floor(pL/TILE)*TILE+TILE-2;p.vx=0;}}
   p.y+=p.vy;p.onGround=false;
   const pL2=p.x+3,pR2=p.x+p.w-3;
-  if(p.vy>0){const fY=p.y+p.h;if(isSolid(getTile(pL2,fY))||isSolid(getTile(pR2,fY))){p.y=Math.floor(fY/TILE)*TILE-p.h;p.vy=0;p.onGround=true;}}
+  if(p.vy>0){const fY=p.y+p.h;if(isSolid(getTile(pL2,fY))||isSolid(getTile(pR2,fY))){p.y=Math.floor(fY/TILE)*TILE-p.h;p.vy=0;p.onGround=true;
+  const cTy=Math.floor(fY/TILE);[Math.floor(pL2/TILE),Math.floor(pR2/TILE)].forEach(cTx=>{if(map[cTy]&&map[cTy][cTx]===4)breakCrate(cTx,cTy);});
+}}
   else if(p.vy<0){const hY=p.y;if(isSolid(getTile(pL2,hY))||isSolid(getTile(pR2,hY))){p.y=Math.floor(hY/TILE)*TILE+TILE;p.vy=0;
     const h1=Math.floor(pL2/TILE),h2=Math.floor(pR2/TILE),hy=Math.floor(hY/TILE);
     [h1,h2].forEach(hx=>{const qb=questionBlocks.find(q=>q.x===hx&&q.y===hy&&!q.hit);if(qb){qb.hit=true;map[qb.y][qb.x]=2;stars.push({x:qb.x*TILE,y:qb.y*TILE-TILE,vy:-2,collected:false});spawnParticles(qb.x*TILE+8,qb.y*TILE,'#ffdd00',5);sfxBlock();}});
@@ -926,7 +944,9 @@ function update(){
   }
 
   // Arrows
-  arrows.forEach(a=>{a.x+=a.vx;a.life--;if(isSolid(getTile(a.x,a.y))||isSolid(getTile(a.x+10,a.y)))a.life=0;
+  arrows.forEach(a=>{a.x+=a.vx;a.life--;
+  const atx1=Math.floor(a.x/TILE),atx2=Math.floor((a.x+10)/TILE),aty=Math.floor(a.y/TILE);
+  if(isSolid(getTile(a.x,a.y))||isSolid(getTile(a.x+10,a.y))){[atx1,atx2].forEach(atx=>{if(map[aty]&&map[aty][atx]===4)breakCrate(atx,aty);});a.life=0;}
     enemies.forEach(e=>{if(!e.alive)return;if(rectOverlap({x:a.x,y:a.y,w:12,h:4},{x:e.x,y:e.y,w:e.w,h:e.h})){e.alive=false;e.squashTimer=30;a.life=0;score+=Math.round(200*dc.scoreMultiplier);spawnParticles(e.x+e.w/2,e.y,'#ff6600',8);sfxStomp();}});
   });
   arrows=arrows.filter(a=>a.life>0);
