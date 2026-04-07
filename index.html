@@ -27,8 +27,7 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; border: 3px s
   .ctrl-btn.big:active, .ctrl-btn.big.pressed { background: rgba(100,200,255,0.45); }
   .ctrl-btn.ok { background: rgba(100,255,100,0.2); border-color: rgba(100,255,100,0.4); font-size: 14px; font-weight: bold; }
   .ctrl-btn.ok:active, .ctrl-btn.ok.pressed { background: rgba(100,255,100,0.45); }
-  #dpad { display: grid; grid-template-columns: 60px 44px 60px; grid-template-rows: 44px 60px; gap: 3px; align-items: center; justify-items: center; }
-  #dpad .spacer { width: 44px; height: 44px; }
+  #dpad { display: flex; gap: 8px; align-items: center; }
   #actions { display: flex; flex-direction: column; gap: 5px; align-items: center; }
   #actions .action-row { display: flex; gap: 8px; align-items: center; }
 }
@@ -37,7 +36,7 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; border: 3px s
   .ctrl-btn { width: 50px; height: 50px; font-size: 18px; }
   .ctrl-btn.small { width: 38px; height: 38px; }
   .ctrl-btn.big { width: 62px; height: 62px; }
-  #dpad { grid-template-columns: 50px 38px 50px; grid-template-rows: 38px 50px; }
+  #dpad { gap: 6px; }
 }
 #rotate-overlay {
   display: none; position: fixed; inset: 0; z-index: 9999;
@@ -61,8 +60,8 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; border: 3px s
 <button id="fullscreen-btn" title="Fullscreen">⛶</button>
 <div id="mobile-controls">
   <div id="dpad">
-    <div class="spacer"></div><button class="ctrl-btn small" id="btn-up">▲</button><div class="spacer"></div>
-    <button class="ctrl-btn" id="btn-left">◀</button><button class="ctrl-btn small" id="btn-down">▼</button><button class="ctrl-btn" id="btn-right">▶</button>
+    <button class="ctrl-btn" id="btn-left">◀</button>
+    <button class="ctrl-btn" id="btn-right">▶</button>
   </div>
   <div id="actions">
     <div class="action-row">
@@ -655,7 +654,6 @@ window.addEventListener('keyup',e=>{keys[e.code]=false;if(e.code==='KeyB')debugH
 function setupMobile(){
   const ids={
     'btn-left':'ArrowLeft','btn-right':'ArrowRight',
-    'btn-up':'ArrowUp','btn-down':'ArrowDown',
     'btn-jump':'Space','btn-shoot':'KeyX','btn-ok':'Enter'
   };
   Object.entries(ids).forEach(([id,code])=>{
