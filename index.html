@@ -906,7 +906,13 @@ const LEVELS = [
     },
     enemyDefs:[{type:'monkey',x:10},{type:'parrot',x:18},{type:'monkey',x:26},{type:'parrot',x:34},{type:'monkey',x:42},{type:'parrot',x:50},{type:'monkey',x:58},{type:'parrot',x:66},{type:'monkey',x:74},{type:'parrot',x:82},{type:'monkey',x:90},{type:'parrot',x:98},{type:'monkey',x:106},{type:'parrot',x:114},{type:'monkey',x:122},{type:'parrot',x:130}],
     bowPositions:[20,60,100,128], superPositions:[35,75,115], catPosition:55,
-    clouds:[[5,2],[25,4],[45,2],[65,3],[85,2],[105,4],[125,2]]
+    clouds:[[5,2],[25,4],[45,2],[65,3],[85,2],[105,4],[125,2]],
+    bgDeco:[
+      [12,10,'mast'],[50,8,'mast'],[88,9,'mast'],[118,7,'mast'],
+      [5,22,'wave'],[20,22,'wave'],[35,22,'wave'],[50,22,'wave'],[65,22,'wave'],[80,22,'wave'],[95,22,'wave'],[110,22,'wave'],[125,22,'wave'],
+      [8,16,'rope'],[30,14,'rope'],[60,15,'rope'],[90,13,'rope'],[120,11,'rope'],
+      [15,19,'skull'],[45,18,'skull'],[75,17,'skull'],[105,18,'skull'],[135,19,'skull']
+    ]
   },
   // --- Level 12: Pirate Castle (Boss) ---
   {
@@ -937,7 +943,31 @@ const LEVELS = [
     },
     enemyDefs:[{type:'monkey',x:10},{type:'parrot',x:14},{type:'monkey',x:20},{type:'parrot',x:26},{type:'monkey',x:32},{type:'parrot',x:38},{type:'monkey',x:44},{type:'parrot',x:50},{type:'monkey',x:56},{type:'parrot',x:62},{type:'monkey',x:68},{type:'parrot',x:74},{type:'monkey',x:80},{type:'parrot',x:86},{type:'monkey',x:92},{type:'parrot',x:98},{type:'monkey',x:104},{type:'parrot',x:110},{type:'monkey',x:116},{type:'parrot',x:122},{type:'monkey',x:128},{type:'parrot',x:134},{type:'monkey',x:140},{type:'parrot',x:146}],
     bowPositions:[15,50,90,130], superPositions:[30,70,110,140], catPosition:60,
-    clouds:[]
+    clouds:[],
+    bgDeco:[
+      // Entrance torches
+      [2,17,'torch'],[10,17,'torch'],
+      // First tower - windows and chains
+      [24,14,'window'],[30,14,'window'],[26,9,'chain'],[28,9,'chain'],
+      // Hallway banners
+      [36,15,'banner','#cc2222'],[42,15,'banner','#cc2222'],[50,15,'banner','#222288'],
+      // Hallway torches
+      [38,17,'torch'],[46,17,'torch'],[56,17,'torch'],
+      // Second tower
+      [62,14,'window'],[68,14,'window'],[64,9,'chain'],[66,9,'chain'],
+      // Battlements - banners and torches
+      [72,10,'banner','#222288'],[76,10,'banner','#cc2222'],[80,8,'torch'],[84,10,'banner','#222288'],
+      // Throne hallway - grand decorations
+      [96,15,'torch'],[102,15,'torch'],[108,15,'torch'],[114,15,'torch'],
+      [98,14,'banner','#ffdd00'],[106,14,'banner','#ffdd00'],[112,14,'banner','#cc2222'],
+      [100,13,'window'],[110,13,'window'],
+      // Throne room - heavy decoration
+      [124,12,'torch'],[128,12,'torch'],[132,12,'torch'],
+      [136,10,'banner','#ffdd00'],[140,10,'banner','#cc2222'],[144,10,'banner','#ffdd00'],
+      [138,9,'window'],[142,9,'window'],[146,9,'window'],
+      [148,8,'skull'],[152,8,'skull'],[156,8,'skull'],
+      [150,11,'chain'],[154,11,'chain']
+    ]
   }
 ];
 
@@ -1476,6 +1506,70 @@ function draw(){
   // Clouds
   if(lvl.clouds){ctx.fillStyle='rgba(255,255,255,0.7)';lvl.clouds.forEach(([cx,cy])=>{const sx=cx*TILE-camera.x*.3,sy=cy*TILE;
     ctx.beginPath();ctx.ellipse(sx+15,sy+8,18,10,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(sx+5,sy+10,10,8,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(sx+25,sy+10,10,8,0,0,Math.PI*2);ctx.fill();});}
+
+  // Level-specific background decorations (behind tiles, in world space)
+  if(lvl.bgDeco){
+    ctx.save();ctx.translate(-Math.round(camera.x),-Math.round(camera.y));
+    lvl.bgDeco.forEach(d=>{
+      const dx=d[0]*TILE,dy=d[1]*TILE;
+      if(dx<camera.x-100||dx>camera.x+BASE_W+100)return;
+      if(d[2]==='torch'){
+        // Wall torch with flickering flame
+        ctx.fillStyle='#664422';ctx.fillRect(dx+6,dy+4,4,10);
+        const flicker=Math.sin(animFrame*0.3+d[0])*2;
+        ctx.fillStyle='#ff8800';ctx.beginPath();ctx.ellipse(dx+8,dy+2+flicker,4,5,0,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#ffdd00';ctx.beginPath();ctx.ellipse(dx+8,dy+1+flicker,2,3,0,0,Math.PI*2);ctx.fill();
+        // Glow
+        ctx.fillStyle='rgba(255,150,50,0.08)';ctx.beginPath();ctx.arc(dx+8,dy+2,20+flicker,0,Math.PI*2);ctx.fill();
+      }else if(d[2]==='banner'){
+        // Hanging banner
+        const wave=Math.sin(animFrame*0.04+d[0])*2;
+        ctx.fillStyle=d[3]||'#cc2222';
+        ctx.fillRect(dx+4,dy,8,2);
+        ctx.beginPath();ctx.moveTo(dx+4,dy+2);ctx.lineTo(dx+12,dy+2);ctx.lineTo(dx+10+wave,dy+18);ctx.lineTo(dx+6+wave,dy+18);ctx.closePath();ctx.fill();
+        ctx.fillStyle='#ffdd00';ctx.fillRect(dx+7+wave*0.5,dy+8,2,2);
+      }else if(d[2]==='window'){
+        // Arched window
+        ctx.fillStyle='#111133';ctx.fillRect(dx+3,dy+4,10,10);
+        ctx.beginPath();ctx.arc(dx+8,dy+4,5,Math.PI,0);ctx.fill();
+        ctx.strokeStyle='#555566';ctx.lineWidth=1;ctx.strokeRect(dx+3,dy+4,10,10);
+        // Moonlight glow
+        ctx.fillStyle='rgba(150,150,255,0.1)';ctx.beginPath();ctx.arc(dx+8,dy+8,12,0,Math.PI*2);ctx.fill();
+      }else if(d[2]==='chain'){
+        // Hanging chain
+        ctx.strokeStyle='#888888';ctx.lineWidth=2;
+        for(let i=0;i<4;i++){const cy2=dy+i*4+Math.sin(animFrame*0.02+i)*0.5;ctx.beginPath();ctx.ellipse(dx+8,cy2,2,2,0,0,Math.PI*2);ctx.stroke();}
+      }else if(d[2]==='mast'){
+        // Ship mast with sail
+        ctx.fillStyle='#664422';ctx.fillRect(dx+7,dy-40,2,56);
+        // Crow's nest
+        ctx.fillStyle='#553311';ctx.fillRect(dx+2,dy-42,12,4);
+        // Sail
+        const swave=Math.sin(animFrame*0.03+d[0])*3;
+        ctx.fillStyle='#eeddbb';
+        ctx.beginPath();ctx.moveTo(dx+9,dy-36);ctx.lineTo(dx+9,dy-4);ctx.lineTo(dx+28+swave,dy-10);ctx.lineTo(dx+25+swave,dy-30);ctx.closePath();ctx.fill();
+        ctx.strokeStyle='#ccbb99';ctx.lineWidth=1;ctx.stroke();
+      }else if(d[2]==='wave'){
+        // Ocean wave (background)
+        const wy=dy+Math.sin(animFrame*0.05+d[0]*0.3)*3;
+        ctx.fillStyle='rgba(50,120,200,0.3)';
+        ctx.beginPath();
+        for(let i=0;i<40;i++){const wx=dx+i*2,wwy=wy+Math.sin(animFrame*0.06+i*0.5+d[0])*2;ctx.lineTo(wx,wwy);}
+        ctx.lineTo(dx+80,dy+16);ctx.lineTo(dx,dy+16);ctx.closePath();ctx.fill();
+      }else if(d[2]==='rope'){
+        // Hanging rope
+        ctx.strokeStyle='#aa8855';ctx.lineWidth=1;ctx.beginPath();
+        for(let i=0;i<8;i++){const rx=dx+8+Math.sin(animFrame*0.04+i*0.8)*2,ry=dy+i*3;ctx.lineTo(rx,ry);}
+        ctx.stroke();
+      }else if(d[2]==='skull'){
+        // Skull decoration
+        ctx.fillStyle='#ddddcc';ctx.beginPath();ctx.arc(dx+8,dy+6,5,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#222';ctx.fillRect(dx+5,dy+4,2,2);ctx.fillRect(dx+9,dy+4,2,2);
+        ctx.fillRect(dx+7,dy+7,2,1);
+      }
+    });
+    ctx.restore();
+  }
 
   const shakeX=crateShake>0?(Math.random()-.5)*crateShake:0,shakeY=crateShake>0?(Math.random()-.5)*crateShake:0;
   if(crateShake>0)crateShake--;
