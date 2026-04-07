@@ -879,7 +879,7 @@ let stars=[], particles=[], questionBlocks=[], arrows=[], enemyProjectiles=[];
 let crateCombo=0, crateComboTimer=0, smashTexts=[], crateShake=0;
 let powerupPopup=null;
 let rainbowBlocks=[];
-let bowPickups=[], superPickups=[], catPickup=null, cat=null, animFrame=0;
+let bowPickups=[], superPickups=[], catPickup=null, cat=null, heartPickups=[], animFrame=0;
 
 const keys={}, justPressed={};
 let debugHoldStart=0, debugLevelIndex=0;
@@ -965,8 +965,13 @@ function breakCrate(tx,ty){
     const c=CRATE_PARTICLES[Math.floor(Math.random()*CRATE_PARTICLES.length)];
     particles.push({x:px,y:py,vx:(Math.random()-.5)*7,vy:-Math.random()*6-2,life:40+Math.random()*25,color:c});
   }
-  stars.push({x:tx*TILE,y:ty*TILE-TILE,vy:-2,collected:false});
-  if(Math.random()<0.3)stars.push({x:tx*TILE+8,y:ty*TILE-TILE*1.5,vy:-2.5,collected:false});
+  const dc=DC();
+  if(dc.lives!==Infinity&&lives<dc.lives&&Math.random()<0.12){
+    heartPickups.push({x:tx*TILE+2,y:ty*TILE-TILE,vy:-2.5,collected:false});
+  }else{
+    stars.push({x:tx*TILE,y:ty*TILE-TILE,vy:-2,collected:false});
+    if(Math.random()<0.3)stars.push({x:tx*TILE+8,y:ty*TILE-TILE*1.5,vy:-2.5,collected:false});
+  }
   sfxCrateBreak();
   crateShake=6;
   crateCombo++;crateComboTimer=60;
@@ -1021,7 +1026,7 @@ function initLevel(idx){
     const cx=lvl.catPosition;
     catPickup={x:cx*TILE,y:findGroundY(cx)-spriteH(CAT_S,2),collected:false};
   }else{catPickup=null;}
-  stars=[]; questionBlocks=[]; arrows=[]; enemyProjectiles=[];
+  stars=[]; heartPickups=[]; questionBlocks=[]; arrows=[]; enemyProjectiles=[];
   for(let y=0;y<lvl.height;y++) for(let x=0;x<lvl.width;x++) if(map[y][x]===3) questionBlocks.push({x,y,hit:false});
   rainbowBlocks=[];
   for(let y=0;y<lvl.height;y++) for(let x=0;x<lvl.width;x++) if(map[y][x]===5) rainbowBlocks.push({x,y,hit:false});
@@ -1244,6 +1249,9 @@ if(p.fartTimer>0){enemies.forEach(e=>{if(!e.alive)return;const edx=e.x+e.w/2-(p.
   // Stars
   stars.forEach(s=>{if(s.collected)return;if(s.vy){s.vy+=.1;s.y+=s.vy;if(s.vy>0)s.vy=0;}
     if(rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:s.x,y:s.y,w:10,h:10})){s.collected=true;score+=Math.round(100*dc.scoreMultiplier);spawnParticles(s.x+5,s.y+5,'#ffdd00',8);sfxCoin();}});
+  // Heart pickups
+  heartPickups.forEach(h=>{if(h.collected)return;if(h.vy){h.vy+=.1;h.y+=h.vy;if(h.vy>0)h.vy=0;}
+    if(rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:h.x,y:h.y,w:14,h:12})){h.collected=true;if(lives<dc.lives)lives++;spawnParticles(h.x+7,h.y+6,'#ff3355',10);sfxWin();}});
 
   // Enemies AI
   enemies.forEach(e=>{
@@ -1424,6 +1432,7 @@ else if(tile===8){
 
   // Stars, pickups
   stars.forEach(s=>{if(!s.collected){const b=Math.sin(animFrame*.1)*2;drawSprite(STAR_S,s.x,s.y+b,STAR_P,1.5,false);}});
+  heartPickups.forEach(h=>{if(!h.collected){const b=Math.sin(animFrame*.08)*3;drawSprite(HEART_S,h.x,h.y+b,HEART_P,2,false);}});
   bowPickups.forEach(b=>{if(b.collected)return;const bob=Math.sin(animFrame*.08+b.x)*3;ctx.fillStyle='rgba(255,200,50,0.15)';ctx.beginPath();ctx.arc(b.x+8,b.y+8,14+Math.sin(animFrame*.1)*3,0,Math.PI*2);ctx.fill();drawSprite(BOW_S,b.x,b.y+bob,BOW_P,2,false);});
   superPickups.forEach(s=>{if(s.collected)return;const bob=Math.sin(animFrame*.06+s.x)*4,r=16+Math.sin(animFrame*.08)*4;ctx.fillStyle='rgba(255,100,0,0.15)';ctx.beginPath();ctx.arc(s.x+8,s.y+8,r,0,Math.PI*2);ctx.fill();drawSprite(SUPER_S,s.x,s.y+bob,SUPER_P,2,false);});
   // Cat pickup (uncollected)
