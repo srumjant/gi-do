@@ -131,7 +131,7 @@ const DIFFICULTY_CONFIG = {
     enemySpeed: 1.0,
     enemyShootInterval: 90,
     playerSpeed: 2.5,
-    jumpForce: -7.5,
+    jumpForce: -8.0,
     bowCharges: 3,
     startWithCape: false,
     gapWidth: 1.0,
@@ -145,10 +145,10 @@ const DIFFICULTY_CONFIG = {
     enemySpeed: 1.4,
     enemyShootInterval: 60,
     playerSpeed: 2.5,
-    jumpForce: -7.2,
+    jumpForce: -8.0,
     bowCharges: 2,
     startWithCape: false,
-    gapWidth: 1.3,
+    gapWidth: 1.2,
     ghostAggroRange: 280,
     bouncerJumpForce: -7,
     scoreMultiplier: 1.5,
@@ -1089,19 +1089,19 @@ function update(){
     if(justPressed['Escape']){gameState='title';justPressed['Escape']=false;}
     clearJP();return;
   }
-  if(gameState==='title'){if(keys['Space']||keys['Enter']){ensureAudio();gameState='difficulty';diffIndex=0;justPressed['Space']=false;justPressed['Enter']=false;}return;}
-  if(gameState==='difficulty'){
-    if(justPressed['ArrowLeft']||justPressed['KeyA']){diffIndex=Math.max(0,diffIndex-1);}
-    if(justPressed['ArrowRight']||justPressed['KeyD']){diffIndex=Math.min(DIFF_KEYS.length-1,diffIndex+1);}
-    if(justPressed['Space']||justPressed['Enter']){selectedDifficulty=DIFF_KEYS[diffIndex];gameState='select';selectIndex=0;justPressed['Space']=false;justPressed['Enter']=false;}
-    clearJP();return;
-  }
+  if(gameState==='title'){if(keys['Space']||keys['Enter']){ensureAudio();gameState='select';selectIndex=0;justPressed['Space']=false;justPressed['Enter']=false;}return;}
   if(gameState==='select'){
     if(justPressed['ArrowLeft']||justPressed['KeyA'])selectIndex=0;
     if(justPressed['ArrowRight']||justPressed['KeyD'])selectIndex=1;
     if(selectIndex===0&&(justPressed['ArrowUp']||justPressed['KeyW'])){gigiSkin=(gigiSkin-1+GIGI_SKINS.length)%GIGI_SKINS.length;}
     if(selectIndex===0&&(justPressed['ArrowDown']||justPressed['KeyS'])){gigiSkin=(gigiSkin+1)%GIGI_SKINS.length;}
-    if(justPressed['Space']||justPressed['Enter']){selectedChar=selectIndex===0?'gigi':'dodo';gameState='intro';introTimer=0;justPressed['Space']=false;justPressed['Enter']=false;}
+    if(justPressed['Space']||justPressed['Enter']){selectedChar=selectIndex===0?'gigi':'dodo';gameState='difficulty';diffIndex=0;justPressed['Space']=false;justPressed['Enter']=false;}
+    clearJP();return;
+  }
+  if(gameState==='difficulty'){
+    if(justPressed['ArrowLeft']||justPressed['KeyA']){diffIndex=Math.max(0,diffIndex-1);}
+    if(justPressed['ArrowRight']||justPressed['KeyD']){diffIndex=Math.min(DIFF_KEYS.length-1,diffIndex+1);}
+    if(justPressed['Space']||justPressed['Enter']){selectedDifficulty=DIFF_KEYS[diffIndex];gameState='intro';introTimer=0;justPressed['Space']=false;justPressed['Enter']=false;}
     clearJP();return;
   }
   if(gameState==='intro'){introTimer++;if(introTimer>660||(introTimer>120&&(justPressed['Space']||justPressed['Enter']))){currentLevel=0;lives=DC().lives;score=0;initLevel(0);justPressed['Space']=false;justPressed['Enter']=false;}clearJP();return;}
@@ -1379,8 +1379,8 @@ function draw(){
   if(gameState==='debug'){drawDebug();clearJP();return;}
   if(gameState==='title'){drawTitle();clearJP();return;}
   if(gameState==='intro'){drawIntro();clearJP();return;}
-  if(gameState==='difficulty'){drawDifficulty();clearJP();return;}
   if(gameState==='select'){drawSelect();clearJP();return;}
+  if(gameState==='difficulty'){drawDifficulty();clearJP();return;}
   if(gameState==='between'){drawBetween();clearJP();return;}
   if(gameState==='gameover'){drawGameOver();clearJP();return;}
   if(gameState==='win'){drawWin();clearJP();return;}
@@ -1792,7 +1792,12 @@ function drawBetween(){
   const heroStand=ps.stand, heroRun=ps.run, heroPal=ps.palette;
   const sibStand=rs.sprite, sibPal=rs.palette;
   const sibJump=selectedChar==='gigi'?DODO_JUMP:GIGI_JUMP;
-  const isBossLevel=(currentLevel===LEVELS.length-1);
+  const isBossLevel=(currentLevel===5||currentLevel===LEVELS.length-1);
+  const isCh2=currentLevel>=6;
+  const bossIdleSpr=isCh2?ROBO_IDLE:BOSS_IDLE;
+  const bossWalkSpr=isCh2?ROBO_WALK:BOSS_WALK;
+  const bossRoarSpr=isCh2?ROBO_ROAR:BOSS_ROAR;
+  const bossPal=isCh2?ROBO_P:BOSS_P;
 
   // === CHAPTER 2 INTRO (after defeating Toy Castle boss) ===
   if(currentLevel===6){
@@ -1914,16 +1919,16 @@ function drawBetween(){
       const bossEnterT=t-200;
       const bossTargetX=BASE_W*0.55;
       const bossX=bossEnterT<120?BASE_W+30-bossEnterT*2.5:bossTargetX;
-      const bossY=BASE_H-70-spriteH(BOSS_IDLE,4);
+      const bossY=BASE_H-70-spriteH(bossIdleSpr,4);
       const bBounce=Math.abs(Math.sin(t*.08))*3;
 
       // Shadow underneath
       ctx.fillStyle='rgba(0,0,0,0.3)';
-      ctx.beginPath();ctx.ellipse(bossX+spriteW(BOSS_IDLE,4)/2,BASE_H-68,40,8,0,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(bossX+spriteW(bossIdleSpr,4)/2,BASE_H-68,40,8,0,0,Math.PI*2);ctx.fill();
 
       // Draw boss — use roar frame when arrived
-      const bSpr=bossEnterT<120?BOSS_WALK:(bossEnterT%80<40?BOSS_ROAR:BOSS_IDLE);
-      drawSprite(bSpr,bossX,bossY+bBounce,BOSS_P,4,true);
+      const bSpr=bossEnterT<120?bossWalkSpr:(bossEnterT%80<40?bossRoarSpr:bossIdleSpr);
+      drawSprite(bSpr,bossX,bossY+bBounce,bossPal,4,true);
 
       // Boss speech bubble
       if(bossEnterT>=120){
