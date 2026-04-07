@@ -367,31 +367,35 @@ function stopBGM(){if(bgmTimer){clearTimeout(bgmTimer);bgmTimer=null;}bgmLevel=-
 //  CONSTANTS & HELPERS
 // ==========================================
 const TILE = 16, GRAVITY = 0.4, ENEMY_SCALE = 1.8;
-// Keyboard key badge rendering
-function drawKey(x,y,label,size){
-  const s=size||10,pad=4,tw=ctx.measureText(label).width;
-  const kw=tw+pad*2,kh=s+pad*2,kx=x-kw/2,ky=y-kh/2;
-  ctx.fillStyle='#444';ctx.fillRect(kx,ky,kw,kh);
-  ctx.fillStyle='#666';ctx.fillRect(kx+1,ky+1,kw-2,kh-3);
-  ctx.fillStyle='#555';ctx.fillRect(kx+1,ky+kh-3,kw-2,2);
-  ctx.fillStyle='#fff';ctx.fillText(label,x,y+s*0.35);
+// Keyboard key badge rendering — x is left edge, y is text baseline
+function drawKeyAt(x,y,label,fs){
+  const pad=3,tw=ctx.measureText(label).width;
+  const kw=tw+pad*2,kh=fs+pad*2;
+  const ky=y-fs-pad+1;
+  ctx.fillStyle='#333';ctx.fillRect(x,ky,kw,kh);
+  ctx.fillStyle='#555';ctx.fillRect(x+1,ky+1,kw-2,kh-3);
+  ctx.fillStyle='#444';ctx.fillRect(x+1,ky+kh-3,kw-2,2);
+  const prevFill=ctx.fillStyle;
+  ctx.fillStyle='#fff';ctx.fillText(label,x+pad,y);
+  ctx.fillStyle=prevFill;
+  return kw+2;
 }
 function drawTextWithKeys(text,x,y,size){
-  const s=size||10;
+  const fs=size||10;
   const parts=text.split(/(\[[^\]]+\])/);
-  let cx=x,totalW=0;
-  // Measure total width for centering
-  ctx.save();ctx.font=(s)+'px monospace';
-  parts.forEach(p=>{if(p.startsWith('[')){const l=p.slice(1,-1);totalW+=ctx.measureText(l).width+12;}else{totalW+=ctx.measureText(p).width;}});
-  cx=x-totalW/2;
-  ctx.textAlign='left';
+  ctx.save();
+  const prevAlign=ctx.textAlign;
+  ctx.font=fs+'px monospace';ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  // Measure total width
+  let totalW=0;
+  parts.forEach(p=>{if(p.startsWith('[')){const l=p.slice(1,-1);totalW+=ctx.measureText(l).width+8;}else{totalW+=ctx.measureText(p).width;}});
+  let cx=x-totalW/2;
+  const prevFill=ctx.fillStyle;
   parts.forEach(p=>{
     if(p.startsWith('[')){
       const l=p.slice(1,-1);
-      const kw=ctx.measureText(l).width+8;
-      drawKey(cx+kw/2,y,l,s);
-      cx+=kw+4;
-    }else{ctx.fillText(p,cx,y+s*0.35);cx+=ctx.measureText(p).width;}
+      cx+=drawKeyAt(cx,y,l,fs);
+    }else{ctx.fillStyle=prevFill;ctx.fillText(p,cx,y);cx+=ctx.measureText(p).width;}
   });
   ctx.restore();
 }
@@ -1065,7 +1069,7 @@ function update(){
   animFrame++;
   if(powerupPopup){powerupPopup.timer--;if(powerupPopup.timer<=0)powerupPopup=null;return;}
   // Language toggle
-  if(justPressed['KeyL']){lang=lang==='et'?'en':'et';justPressed['KeyL']=false;}
+  if(justPressed['KeyL']){const li=LANG_KEYS.indexOf(lang);lang=LANG_KEYS[(li+1)%LANG_KEYS.length];justPressed['KeyL']=false;}
   // Debug level selector — hold B for 3 seconds
   if(debugHoldStart>0&&keys['KeyB']&&gameState!=='debug'&&Date.now()-debugHoldStart>=3000){
     gameState='debug';debugLevelIndex=0;debugHoldStart=0;
