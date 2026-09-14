@@ -995,7 +995,12 @@ function update(){
     if(justPressed['Escape']){gameState='title';justPressed['Escape']=false;}
     clearJP();return;
   }
-  if(gameState==='title'){if(keys['Space']||keys['Enter']){ensureAudio();startBGM(BGM_TITLE);gameState='difficulty';diffIndex=0;justPressed['Space']=false;justPressed['Enter']=false;}return;}
+  if(gameState==='title'){
+    if(keys['Space']||keys['Enter']){ensureAudio();startBGM(BGM_TITLE);gameState='difficulty';diffIndex=0;justPressed['Space']=false;justPressed['Enter']=false;}
+    if(justPressed['KeyO']){ensureAudio();gameState='learnmenu';learnMenuIdx=0;justPressed['KeyO']=false;}
+    return;
+  }
+  if(gameState==='learnmenu'||gameState==='learnletters'||gameState==='learnsyllables'||gameState==='learnresult'){updateLearn();return;}
   if(gameState==='difficulty'){
     if(justPressed['ArrowLeft']||justPressed['KeyA']){diffIndex=Math.max(0,diffIndex-1);}
     if(justPressed['ArrowRight']||justPressed['KeyD']){diffIndex=Math.min(DIFF_KEYS.length-1,diffIndex+1);}
@@ -1283,6 +1288,7 @@ function draw(){
   const lvl=LEVELS[currentLevel];
   if(gameState==='debug'){ctx.fillStyle='#1a1a3a';ctx.fillRect(0,0,BASE_W,BASE_H);drawDebug();clearJP();return;}
   if(gameState==='title'){drawTitle();clearJP();return;}
+  if(gameState==='learnmenu'||gameState==='learnletters'||gameState==='learnsyllables'||gameState==='learnresult'){drawLearn();clearJP();return;}
   if(gameState==='intro'){drawIntro();clearJP();return;}
   if(gameState==='difficulty'){drawDifficulty();clearJP();return;}
   if(gameState==='select'){drawSelect();clearJP();return;}
@@ -1503,6 +1509,10 @@ function drawTitle(){
   if(Math.floor(animFrame/30)%2===0){ctx.fillStyle='#ffdd00';ctx.font='bold 16px monospace';ctx.fillText(T('press_start'),BASE_W/2,BASE_H-15);}
   ctx.fillStyle='#333';ctx.font='10px monospace';ctx.fillText(T('controls'),BASE_W/2,195);
   ctx.fillStyle='#aaa';ctx.font='10px monospace';ctx.fillText(T('lang_hint'),BASE_W/2,BASE_H-30);
+  // Learn mode hint
+  const learnPulse=0.6+Math.sin(animFrame*0.06)*0.3;
+  ctx.fillStyle='rgba(100,255,150,'+learnPulse+')';ctx.font='bold 12px monospace';
+  ctx.fillText('O = ÕPIME! (Learn!)',BASE_W/2,210);
   ctx.textAlign='left';
 }
 
@@ -1943,6 +1953,517 @@ function drawWin(){
   drawSprite(ps.stand,BASE_W/2-45,180,ps.palette,4,false);drawSprite(rs.sprite,BASE_W/2+10,195,rs.palette,4,false);
   for(let i=0;i<5;i++){const hx=BASE_W/2-60+i*30,hy=175+Math.sin(animFrame*.08+i)*10;drawSprite(HEART_S,hx,hy,HEART_P,1.5,false);}
   ctx.fillStyle='#fff';ctx.font='12px monospace';ctx.fillText(T('press_play_again'),BASE_W/2,330);ctx.textAlign='left';
+}
+
+// ==========================================
+//  LEARN MODE — Tower Climb with Letter Gates
+// ==========================================
+let learnMenuIdx=0;
+const LEARN_LETTERS=['A','E','I','O','U','M','N','S','K','T','L','P','R','J','V','H','Ä','Ö','Ü','Õ'];
+const LEARN_SYLLABLES=['MA','PA','SA','KA','TA','LA','NA','ME','SE','KE','TE','LE','MI','SI','KI','TI','MO','KO','TO','MU','KU','TU','LU'];
+const LEARN_WORDS=['KASS','KOER','MAJA','PALL','KALA','LUMI','AUTO','MUNA','PAAT','SUUR'];
+let learn={
+  mode:'letters', // 'letters','syllables','words'
+  platforms:[],gates:[],
+  px:0,py:0,pvx:0,pvy:0,pFacing:1,pFrame:0,pFrameTimer:0,pOnGround:false,
+  pCoyote:0,pJumpBuf:0,
+  camY:0,
+  score:0,round:0,totalRounds:8,
+  feedback:null, // {type:'correct'|'wrong',timer,x,y,text}
+  celebration:0,
+  usedItems:[], // track which letters/syllables used this session
+  currentTarget:'', // what to find
+  gateIdx:0,
+  wordProgress:0, // for word mode: which letter of the word we're on
+  finished:false,
+  particles:[]
+};
+
+function shuffleArray(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+function pickDistractors(correct,pool,count){
+  const distractors=[];
+  const available=pool.filter(x=>x!==correct);
+  const shuffled=shuffleArray(available);
+  for(let i=0;i<count&&i<shuffled.length;i++)distractors.push(shuffled[i]);
+  return distractors;
+}
+
+function initLearnRound(){
+  const L=learn;
+  L.platforms=[];L.gates=[];L.particles=[];
+  L.px=BASE_W/2-10;L.py=0;L.pvx=0;L.pvy=0;L.pOnGround=false;
+  L.pCoyote=0;L.pJumpBuf=0;
+  L.camY=0;L.feedback=null;L.celebration=0;L.gateIdx=0;L.wordProgress=0;L.finished=false;
+
+  // Pick target based on mode
+  let pool,target;
+  if(L.mode==='letters'){
+    pool=LEARN_LETTERS;
+    const unused=pool.filter(x=>!L.usedItems.includes(x));
+    const pick=unused.length>0?unused:pool;
+    target=pick[Math.floor(Math.random()*pick.length)];
+    L.usedItems.push(target);
+  } else if(L.mode==='syllables'){
+    pool=LEARN_SYLLABLES;
+    const unused=pool.filter(x=>!L.usedItems.includes(x));
+    const pick=unused.length>0?unused:pool;
+    target=pick[Math.floor(Math.random()*pick.length)];
+    L.usedItems.push(target);
+  } else {
+    pool=LEARN_WORDS;
+    const unused=pool.filter(x=>!L.usedItems.includes(x));
+    const pick=unused.length>0?unused:pool;
+    target=pick[Math.floor(Math.random()*pick.length)];
+    L.usedItems.push(target);
+  }
+  L.currentTarget=target;
+
+  // Build tower: platforms going UP (negative Y = higher)
+  // Start platform at y=0
+  const startY=50;
+  L.py=startY-30;L.px=BASE_W/2-10;
+  L.platforms.push({x:BASE_W/2-60,y:startY,w:120});
+
+  let curY=startY;
+  if(L.mode==='words'){
+    // For words: one gate per letter
+    const letters=target.split('');
+    for(let i=0;i<letters.length;i++){
+      // Stepping platforms between gates
+      for(let j=0;j<3;j++){
+        curY-=50;
+        const px=80+Math.random()*(BASE_W-220);
+        L.platforms.push({x:px,y:curY,w:70+Math.random()*40});
+      }
+      // Gate
+      curY-=55;
+      const correctLetter=letters[i];
+      const distractors=pickDistractors(correctLetter,LEARN_LETTERS,2);
+      const options=shuffleArray([correctLetter,...distractors]);
+      const gateW=120,gateGap=(BASE_W-gateW*3)/4;
+      const gatePlatforms=options.map((letter,idx)=>({
+        letter,x:gateGap+(gateGap+gateW)*idx,y:curY,w:gateW,
+        correct:letter===correctLetter,hit:false,wrongTimer:0
+      }));
+      L.gates.push({y:curY,options:gatePlatforms,solved:false,target:correctLetter,wordIdx:i});
+    }
+  } else {
+    // For letters/syllables: single gate challenge
+    // Several stepping platforms, then one gate
+    for(let j=0;j<4;j++){
+      curY-=50;
+      const px=60+Math.random()*(BASE_W-200);
+      L.platforms.push({x:px,y:curY,w:80+Math.random()*40});
+    }
+    curY-=55;
+    const correct=target;
+    const distractorPool=L.mode==='letters'?LEARN_LETTERS:LEARN_SYLLABLES;
+    const distractors=pickDistractors(correct,distractorPool,2);
+    const options=shuffleArray([correct,...distractors]);
+    const gateW=L.mode==='syllables'?140:120,gateGap=(BASE_W-gateW*3)/4;
+    const gatePlatforms=options.map((letter,idx)=>({
+      letter,x:gateGap+(gateGap+gateW)*idx,y:curY,w:gateW,
+      correct:letter===correct,hit:false,wrongTimer:0
+    }));
+    L.gates.push({y:curY,options:gatePlatforms,solved:false,target:correct});
+  }
+
+  // Final platform above last gate
+  curY-=60;
+  L.platforms.push({x:BASE_W/2-80,y:curY,w:160,isFinish:true});
+  // Star at finish
+  L.finishY=curY;
+}
+
+function updateLearn(){
+  animFrame++;
+  if(justPressed['KeyL']){lang=lang==='et'?'en':'et';justPressed['KeyL']=false;}
+
+  if(gameState==='learnmenu'){
+    if(justPressed['ArrowLeft']||justPressed['KeyA'])learnMenuIdx=Math.max(0,learnMenuIdx-1);
+    if(justPressed['ArrowRight']||justPressed['KeyD'])learnMenuIdx=Math.min(2,learnMenuIdx+1);
+    if(justPressed['Space']||justPressed['Enter']){
+      learn.mode=['letters','syllables','words'][learnMenuIdx];
+      learn.round=0;learn.score=0;learn.usedItems=[];
+      initLearnRound();
+      gameState='learnletters';
+      justPressed['Space']=false;justPressed['Enter']=false;
+    }
+    if(justPressed['Escape']){gameState='title';justPressed['Escape']=false;}
+    clearJP();return;
+  }
+
+  if(gameState==='learnresult'){
+    if(justPressed['Space']||justPressed['Enter']){
+      learn.round++;
+      if(learn.round>=learn.totalRounds){
+        gameState='learnmenu';
+        justPressed['Space']=false;justPressed['Enter']=false;
+      } else {
+        initLearnRound();
+        gameState='learnletters';
+        justPressed['Space']=false;justPressed['Enter']=false;
+      }
+    }
+    if(justPressed['Escape']){gameState='learnmenu';justPressed['Escape']=false;}
+    clearJP();return;
+  }
+
+  // === TOWER CLIMB GAMEPLAY ===
+  const L=learn,p=L;
+  if(L.celebration>0){L.celebration--;if(L.celebration<=0&&L.finished){gameState='learnresult';}clearJP();return;}
+  if(L.feedback&&L.feedback.timer>0){L.feedback.timer--;}
+
+  // Movement
+  const grndAcc=0.7,airAcc=0.45,grndDec=0.7,airDec=0.9;
+  const acc=L.pOnGround?grndAcc:airAcc;
+  const dec=L.pOnGround?grndDec:airDec;
+  const spd=3.0;
+  if(keys['ArrowLeft']||keys['KeyA']){L.pvx=Math.max(L.pvx-acc,-spd);L.pFacing=-1;}
+  else if(keys['ArrowRight']||keys['KeyD']){L.pvx=Math.min(L.pvx+acc,spd);L.pFacing=1;}
+  else{L.pvx*=dec;if(Math.abs(L.pvx)<0.12)L.pvx=0;}
+
+  // Coyote + buffer
+  if(L.pOnGround){L.pCoyote=6;}else{if(L.pCoyote>0)L.pCoyote--;}
+  const jk=keys['Space']||keys['ArrowUp']||keys['KeyW'];
+  const jj=justPressed['Space']||justPressed['ArrowUp']||justPressed['KeyW'];
+  if(jj)L.pJumpBuf=8;
+  if(L.pJumpBuf>0)L.pJumpBuf--;
+  if((L.pOnGround||L.pCoyote>0)&&L.pJumpBuf>0){L.pvy=-8.5;L.pOnGround=false;L.pCoyote=0;L.pJumpBuf=0;sfxJump();}
+  if(!jk&&L.pvy<-3.4)L.pvy=-3.4;
+
+  // Gravity with apex hang
+  const apex=Math.abs(L.pvy)<1.5&&!L.pOnGround;
+  const gm=L.pvy>0?1.2:(apex?0.6:1.0);
+  L.pvy+=0.4*gm;if(L.pvy>8)L.pvy=8;
+
+  L.px+=L.pvx;
+  // Wrap horizontally
+  if(L.px<-10)L.px=BASE_W-10;
+  if(L.px>BASE_W)L.px=-10;
+
+  L.py+=L.pvy;
+  L.pOnGround=false;
+
+  // Collide with regular platforms (only when falling)
+  if(L.pvy>=0){
+    const pw=16,ph=24;
+    L.platforms.forEach(pl=>{
+      if(L.px+pw>pl.x&&L.px<pl.x+pl.w&&L.py+ph>=pl.y&&L.py+ph<=pl.y+8){
+        L.py=pl.y-ph;L.pvy=0;L.pOnGround=true;
+        if(pl.isFinish&&!L.finished){
+          // Check all gates solved
+          const allSolved=L.gates.every(g=>g.solved);
+          if(allSolved){
+            L.finished=true;L.celebration=90;L.score+=100;
+            sfxWin();
+            for(let i=0;i<20;i++){const a=Math.random()*Math.PI*2,s=1+Math.random()*3;
+              L.particles.push({x:L.px+8,y:L.py,vx:Math.cos(a)*s,vy:Math.sin(a)*s-3,life:40+Math.random()*20,maxLife:60,color:['#ffdd00','#ff69b4','#88ff88','#88ccff'][i%4],size:2+Math.random()*2});}
+          }
+        }
+      }
+    });
+    // Collide with gate platforms
+    L.gates.forEach(gate=>{
+      gate.options.forEach(opt=>{
+        if(opt.wrongTimer>0){opt.wrongTimer--;return;}
+        if(L.px+16>opt.x&&L.px<opt.x+opt.w&&L.py+24>=opt.y&&L.py+24<=opt.y+10){
+          if(opt.correct&&!gate.solved){
+            // CORRECT!
+            gate.solved=true;opt.hit=true;
+            L.pvy=-6;L.pOnGround=false;
+            L.feedback={type:'correct',timer:40,x:opt.x+opt.w/2,y:opt.y-20,text:opt.letter};
+            L.score+=50;
+            sfxCoin();
+            for(let i=0;i<12;i++){const a=Math.random()*Math.PI*2,s=1+Math.random()*2;
+              L.particles.push({x:opt.x+opt.w/2,y:opt.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,life:25+Math.random()*15,maxLife:40,color:'#88ff88',size:2+Math.random()*2});}
+          } else if(!opt.correct&&!gate.solved){
+            // WRONG — bounce down gently
+            opt.wrongTimer=30;
+            L.pvy=-4;L.pOnGround=false;
+            L.feedback={type:'wrong',timer:30,x:opt.x+opt.w/2,y:opt.y-20,text:'✗'};
+            playTone(150,.15,'triangle',.08,100);
+            for(let i=0;i<5;i++){L.particles.push({x:opt.x+opt.w/2,y:opt.y,vx:(Math.random()-0.5)*2,vy:-1-Math.random(),life:15,maxLife:15,color:'#ff6666',size:1.5+Math.random()});}
+          } else if(gate.solved){
+            // Already solved, just land
+            L.py=opt.y-24;L.pvy=0;L.pOnGround=true;
+          }
+        }
+      });
+    });
+  }
+
+  // Fall too far down = reset to last safe platform
+  const lowestGate=L.gates.filter(g=>!g.solved)[0];
+  const resetY=lowestGate?lowestGate.y+120:100;
+  if(L.py>resetY){
+    // Find the highest solved gate or start
+    let safeY=50;
+    L.gates.forEach(g=>{if(g.solved)safeY=Math.min(safeY,g.y);});
+    L.py=safeY-30;L.px=BASE_W/2-10;L.pvy=0;L.pvx=0;
+  }
+
+  // Camera follows player up (only moves up, not down much)
+  const targetCam=L.py-BASE_H*0.55;
+  if(targetCam<L.camY)L.camY+=(targetCam-L.camY)*0.1;
+  else L.camY+=(targetCam-L.camY)*0.04;
+
+  // Particles
+  L.particles.forEach(pt=>{pt.x+=pt.vx;pt.y+=pt.vy;pt.vy+=0.1;pt.life--;});
+  L.particles=L.particles.filter(pt=>pt.life>0);
+
+  // Walk animation
+  if(!L.pOnGround)L.pFrame=2;
+  else if(Math.abs(L.pvx)>0.3){L.pFrameTimer++;if(L.pFrameTimer>6){L.pFrame=L.pFrame===0?1:0;L.pFrameTimer=0;}}
+  else L.pFrame=0;
+
+  if(justPressed['Escape']){gameState='learnmenu';justPressed['Escape']=false;}
+  clearJP();
+}
+
+function drawLearn(){
+  if(gameState==='learnmenu'){drawLearnMenu();return;}
+  if(gameState==='learnresult'){drawLearnResult();return;}
+
+  const L=learn;
+  // Sky gradient
+  const grad=ctx.createLinearGradient(0,0,0,BASE_H);
+  grad.addColorStop(0,'#4488cc');grad.addColorStop(1,'#aaddff');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,BASE_W,BASE_H);
+
+  // Floating clouds (parallax on camY)
+  ctx.fillStyle='rgba(255,255,255,0.5)';
+  for(let i=0;i<6;i++){
+    const cx=(i*130+40+Math.sin(animFrame*0.003+i)*20)%BASE_W;
+    const cy=60+i*60-(L.camY*0.1)%BASE_H;
+    ctx.beginPath();ctx.ellipse(cx,cy,25,12,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(cx-15,cy+5,15,8,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(cx+15,cy+5,15,8,0,0,Math.PI*2);ctx.fill();
+  }
+
+  ctx.save();ctx.translate(0,-Math.round(L.camY));
+
+  // Draw platforms
+  L.platforms.forEach(pl=>{
+    if(pl.isFinish){
+      // Finish platform — golden
+      ctx.fillStyle='#ffcc00';ctx.fillRect(pl.x,pl.y,pl.w,8);
+      ctx.fillStyle='#ddaa00';ctx.fillRect(pl.x,pl.y+8,pl.w,4);
+      // Star on finish
+      const allSolved=L.gates.every(g=>g.solved);
+      if(allSolved){
+        const sb=Math.sin(animFrame*0.12)*3;
+        drawSprite(STAR_S,pl.x+pl.w/2-5,pl.y-16+sb,STAR_P,2,false);
+      }
+    } else {
+      ctx.fillStyle='#66aa55';ctx.fillRect(pl.x,pl.y,pl.w,8);
+      ctx.fillStyle='#558844';ctx.fillRect(pl.x,pl.y+8,pl.w,4);
+      // Grass tufts
+      ctx.fillStyle='#77cc66';
+      for(let gx=pl.x+4;gx<pl.x+pl.w-4;gx+=12){ctx.fillRect(gx,pl.y-2,3,3);}
+    }
+  });
+
+  // Draw gates
+  L.gates.forEach(gate=>{
+    gate.options.forEach(opt=>{
+      const isCorrectAndSolved=opt.correct&&gate.solved;
+      const isWrong=opt.wrongTimer>0;
+
+      // Platform block
+      if(isCorrectAndSolved){
+        ctx.fillStyle='#44dd66';
+      } else if(isWrong){
+        ctx.fillStyle='#dd4444';
+        const shake=Math.sin(opt.wrongTimer*1.5)*3;
+        ctx.save();ctx.translate(shake,0);
+      } else {
+        ctx.fillStyle=gate.solved?'#888899':'#6688bb';
+      }
+      // Draw block
+      const bx=opt.x,by=opt.y,bw=opt.w,bh=28;
+      ctx.fillRect(bx,by,bw,bh);
+      ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=2;ctx.strokeRect(bx+1,by+1,bw-2,bh-2);
+
+      // Letter on block
+      ctx.fillStyle=isCorrectAndSolved?'#ffffff':(isWrong?'#ffcccc':'#ffffff');
+      ctx.font='bold 18px monospace';ctx.textAlign='center';
+      ctx.fillText(opt.letter,bx+bw/2,by+20);
+      ctx.textAlign='left';
+
+      if(isWrong)ctx.restore();
+    });
+
+    // Connecting line between gate blocks (the "gate barrier")
+    if(!gate.solved){
+      ctx.strokeStyle='rgba(255,100,100,0.4)';ctx.lineWidth=2;ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.moveTo(0,gate.y+14);ctx.lineTo(BASE_W,gate.y+14);ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  });
+
+  // Player
+  const ps=getPlayerSprites();
+  let spr;if(L.pFrame===0)spr=ps.stand;else if(L.pFrame===1)spr=ps.run;else spr=ps.jump;
+  drawSprite(spr,L.px-2,L.py-2,ps.palette,2,L.pFacing<0);
+
+  // Feedback text
+  if(L.feedback&&L.feedback.timer>0){
+    const fb=L.feedback,a=fb.timer/40;
+    ctx.globalAlpha=a;
+    ctx.font='bold 20px monospace';ctx.textAlign='center';
+    ctx.fillStyle=fb.type==='correct'?'#44ff66':'#ff4444';
+    ctx.fillText(fb.type==='correct'?'✓ '+fb.text:fb.text,fb.x,fb.y-((40-fb.timer)*0.5));
+    ctx.textAlign='left';ctx.globalAlpha=1;
+  }
+
+  // Particles
+  L.particles.forEach(pt=>{const a=pt.life/(pt.maxLife||40);ctx.fillStyle=pt.color;ctx.globalAlpha=a;const s=pt.size||2;ctx.beginPath();ctx.arc(pt.x,pt.y,s*a,0,Math.PI*2);ctx.fill();});
+  ctx.globalAlpha=1;
+
+  ctx.restore();
+
+  // === HUD (fixed, not scrolled) ===
+  // Target display at top
+  const targetBg=L.mode==='words'?'rgba(0,0,0,0.6)':'rgba(0,0,0,0.5)';
+  ctx.fillStyle=targetBg;
+  const hudH=L.mode==='words'?50:44;
+  ctx.fillRect(0,0,BASE_W,hudH);
+
+  ctx.fillStyle='#ffdd00';ctx.font='bold 14px monospace';ctx.textAlign='center';
+  const modeLabel=L.mode==='letters'?'LEIA TÄHT:':L.mode==='syllables'?'LEIA SILP:':'KIRJUTA SÕNA:';
+  ctx.fillText(modeLabel,BASE_W/2,16);
+
+  // Show target letter/syllable/word
+  if(L.mode==='words'){
+    // Show word with progress
+    const word=L.currentTarget;
+    const solvedCount=L.gates.filter(g=>g.solved).length;
+    ctx.font='bold 24px monospace';
+    let tx=BASE_W/2-(word.length*16)/2;
+    for(let i=0;i<word.length;i++){
+      const solved=i<solvedCount;
+      ctx.fillStyle=solved?'#88ff88':'#ffffff44';
+      ctx.textAlign='left';
+      ctx.fillText(word[i],tx+i*32,44);
+      if(!solved&&i===solvedCount){
+        // Highlight current target letter
+        ctx.fillStyle='#ffffff';
+        ctx.fillText(word[i],tx+i*32,44);
+        ctx.strokeStyle='#ffdd00';ctx.lineWidth=2;
+        ctx.strokeRect(tx+i*32-3,26,26,24);
+      }
+    }
+    ctx.textAlign='left';
+  } else {
+    ctx.fillStyle='#ffffff';ctx.font='bold 28px monospace';
+    ctx.fillText(L.currentTarget,BASE_W/2,40);
+  }
+  ctx.textAlign='left';
+
+  // Score and round
+  ctx.fillStyle='#aaddff';ctx.font='10px monospace';
+  ctx.fillText('⭐ '+(L.round+1)+'/'+L.totalRounds+'  Punktid: '+L.score,8,hudH-4);
+
+  // Celebration overlay
+  if(L.celebration>0){
+    const ca=Math.min(1,L.celebration/30);
+    ctx.fillStyle='rgba(0,0,0,'+(0.3*ca)+')';ctx.fillRect(0,0,BASE_W,BASE_H);
+    ctx.fillStyle='#ffdd00';ctx.font='bold 28px monospace';ctx.textAlign='center';
+    const cheers=['TUBLI!','VÄGA HEA!','SUPER!','SUUREPÄRANE!','FANTASTILINE!'];
+    ctx.fillText(cheers[L.round%cheers.length],BASE_W/2,BASE_H/2-10);
+    ctx.fillStyle='#fff';ctx.font='16px monospace';
+    ctx.fillText(L.currentTarget,BASE_W/2,BASE_H/2+25);
+    ctx.textAlign='left';
+  }
+
+  // Escape hint
+  ctx.fillStyle='#ffffff55';ctx.font='9px monospace';ctx.fillText('ESC = tagasi',8,BASE_H-6);
+}
+
+function drawLearnMenu(){
+  ctx.fillStyle='#2a3a5a';ctx.fillRect(0,0,BASE_W,BASE_H);
+  // Stars bg
+  for(let i=0;i<40;i++){ctx.fillStyle='rgba(255,255,255,'+(0.3+Math.sin(animFrame*.02+i)*.2)+')';ctx.fillRect((i*73+20)%BASE_W,(i*47+10)%BASE_H,2,2);}
+
+  // Title
+  ctx.fillStyle='#88ff88';ctx.font='bold 30px monospace';ctx.textAlign='center';
+  ctx.fillText('ÕPIME!',BASE_W/2,60);
+  ctx.fillStyle='#aaddcc';ctx.font='14px monospace';
+  ctx.fillText('Vali harjutus:',BASE_W/2,85);
+
+  // Three options
+  const opts=[
+    {label:'TÄHED',desc:'Leia õige täht',emoji:'A B C',color:'#88ccff'},
+    {label:'SILBID',desc:'Leia õige silp',emoji:'MA KA',color:'#ffaa66'},
+    {label:'SÕNAD',desc:'Kirjuta sõna',emoji:'KASS',color:'#ff88cc'},
+  ];
+  const ow=160,oh=160,gap=20,totalW=opts.length*ow+(opts.length-1)*gap;
+  const startX=(BASE_W-totalW)/2;
+
+  opts.forEach((opt,i)=>{
+    const x=startX+i*(ow+gap),y=120;
+    if(i===learnMenuIdx){
+      ctx.strokeStyle=opt.color;ctx.lineWidth=3;ctx.strokeRect(x-2,y-2,ow+4,oh+4);
+      ctx.fillStyle=opt.color+'22';ctx.fillRect(x,y,ow,oh);
+    } else {
+      ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fillRect(x,y,ow,oh);
+    }
+    ctx.fillStyle=opt.color;ctx.font='bold 18px monospace';
+    ctx.fillText(opt.label,x+ow/2,y+35);
+    ctx.fillStyle='#fff';ctx.font='bold 24px monospace';
+    ctx.fillText(opt.emoji,x+ow/2,y+80);
+    ctx.fillStyle='#aaa';ctx.font='10px monospace';
+    ctx.fillText(opt.desc,x+ow/2,y+115);
+  });
+
+  // Characters
+  const bob=Math.sin(animFrame*0.06)*3;
+  drawSprite(GIGI_STAND,60,BASE_H-100+bob,GIGI_P,3,false);
+  drawSprite(DODO_STAND,BASE_W-90,BASE_H-100+bob,DODO_P,3,true);
+
+  ctx.fillStyle='#aaddcc';ctx.font='12px monospace';
+  ctx.fillText('← →  Vali  |  SPACE  Alusta',BASE_W/2,340);
+  ctx.fillStyle='#888';ctx.font='10px monospace';
+  ctx.fillText('ESC = tagasi',BASE_W/2,365);
+  ctx.textAlign='left';
+}
+
+function drawLearnResult(){
+  const L=learn;
+  ctx.fillStyle='#1a2a4a';ctx.fillRect(0,0,BASE_W,BASE_H);
+  // Confetti
+  for(let i=0;i<30;i++){
+    ctx.fillStyle=['#ffdd00','#ff69b4','#88ff88','#88ccff','#ffaa44'][i%5];
+    const cx=(i*47+animFrame*0.5+Math.sin(i)*50)%BASE_W;
+    const cy=(i*31+animFrame*1.2)%BASE_H;
+    ctx.fillRect(cx,cy,4,4);
+  }
+
+  ctx.fillStyle='#ffdd00';ctx.font='bold 28px monospace';ctx.textAlign='center';
+  ctx.fillText('TUBLI!',BASE_W/2,80);
+
+  ctx.fillStyle='#fff';ctx.font='18px monospace';
+  const completed=L.mode==='letters'?'Täht: '+L.currentTarget:L.mode==='syllables'?'Silp: '+L.currentTarget:'Sõna: '+L.currentTarget;
+  ctx.fillText(completed,BASE_W/2,130);
+
+  ctx.fillStyle='#aaddff';ctx.font='14px monospace';
+  ctx.fillText('Punktid: '+L.score,BASE_W/2,170);
+  ctx.fillText('Voor: '+(L.round+1)+' / '+L.totalRounds,BASE_W/2,195);
+
+  // Character celebration
+  const bob=Math.sin(animFrame*0.1)*5;
+  drawSprite(GIGI_JUMP,BASE_W/2-30,220+bob,GIGI_P,3,false);
+
+  if(L.round+1>=L.totalRounds){
+    ctx.fillStyle='#88ff88';ctx.font='bold 16px monospace';
+    ctx.fillText('KÕIK TEHTUD! SUUREPÄRANE!',BASE_W/2,320);
+  }
+
+  ctx.fillStyle='#aaddcc';ctx.font='12px monospace';
+  ctx.fillText(L.round+1<L.totalRounds?'SPACE = järgmine':'SPACE = tagasi menüüsse',BASE_W/2,360);
+  ctx.textAlign='left';
 }
 
 // ==========================================
