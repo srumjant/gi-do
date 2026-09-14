@@ -2090,6 +2090,9 @@ function initLearnRound(){
   L.platforms.push({x:BASE_W/2-90,y:curY,w:180,isFinish:true});
   // Star at finish
   L.finishY=curY;
+
+  // Initialize camera so player is near bottom of screen, can see upward
+  L.camY=L.py-BASE_H*0.45;
 }
 
 function updateLearn(){
@@ -2131,28 +2134,28 @@ function updateLearn(){
   if(L.celebration>0){L.celebration--;if(L.celebration<=0&&L.finished){gameState='learnresult';}clearJP();return;}
   if(L.feedback&&L.feedback.timer>0){L.feedback.timer--;}
 
-  // Movement
-  const grndAcc=0.7,airAcc=0.45,grndDec=0.7,airDec=0.9;
+  // Movement — generous for kids
+  const grndAcc=0.8,airAcc=0.55,grndDec=0.7,airDec=0.88;
   const acc=L.pOnGround?grndAcc:airAcc;
   const dec=L.pOnGround?grndDec:airDec;
-  const spd=3.0;
+  const spd=3.5;
   if(keys['ArrowLeft']||keys['KeyA']){L.pvx=Math.max(L.pvx-acc,-spd);L.pFacing=-1;}
   else if(keys['ArrowRight']||keys['KeyD']){L.pvx=Math.min(L.pvx+acc,spd);L.pFacing=1;}
   else{L.pvx*=dec;if(Math.abs(L.pvx)<0.12)L.pvx=0;}
 
-  // Coyote + buffer
-  if(L.pOnGround){L.pCoyote=6;}else{if(L.pCoyote>0)L.pCoyote--;}
+  // Coyote + buffer — extra generous for kids
+  if(L.pOnGround){L.pCoyote=10;}else{if(L.pCoyote>0)L.pCoyote--;}
   const jk=keys['Space']||keys['ArrowUp']||keys['KeyW'];
   const jj=justPressed['Space']||justPressed['ArrowUp']||justPressed['KeyW'];
-  if(jj)L.pJumpBuf=8;
+  if(jj)L.pJumpBuf=12;
   if(L.pJumpBuf>0)L.pJumpBuf--;
-  if((L.pOnGround||L.pCoyote>0)&&L.pJumpBuf>0){L.pvy=-8.5;L.pOnGround=false;L.pCoyote=0;L.pJumpBuf=0;sfxJump();}
-  if(!jk&&L.pvy<-3.4)L.pvy=-3.4;
+  if((L.pOnGround||L.pCoyote>0)&&L.pJumpBuf>0){L.pvy=-9.0;L.pOnGround=false;L.pCoyote=0;L.pJumpBuf=0;sfxJump();}
+  if(!jk&&L.pvy<-3.6)L.pvy=-3.6;
 
-  // Gravity with apex hang
-  const apex=Math.abs(L.pvy)<1.5&&!L.pOnGround;
-  const gm=L.pvy>0?1.2:(apex?0.6:1.0);
-  L.pvy+=0.4*gm;if(L.pvy>8)L.pvy=8;
+  // Gravity with apex hang — floatier for kids
+  const apex=Math.abs(L.pvy)<2.0&&!L.pOnGround;
+  const gm=L.pvy>0?1.1:(apex?0.5:1.0);
+  L.pvy+=0.38*gm;if(L.pvy>7)L.pvy=7;
 
   L.px+=L.pvx;
   // Wrap horizontally
