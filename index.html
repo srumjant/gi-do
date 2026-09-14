@@ -2020,24 +2020,38 @@ function initLearnRound(){
   L.currentTarget=target;
 
   // Build tower: platforms going UP (negative Y = higher)
-  // Start platform at y=0
+  // Each platform stays within reachable jump distance of the previous one
   const startY=50;
   L.py=startY-30;L.px=BASE_W/2-10;
-  L.platforms.push({x:BASE_W/2-60,y:startY,w:120});
+  const startPW=140;
+  L.platforms.push({x:BASE_W/2-startPW/2,y:startY,w:startPW});
 
   let curY=startY;
+  let lastPx=BASE_W/2; // track center of last platform for reachability
+  const MAX_HOP=100; // max horizontal distance between platform centers (jump range ~126px, minus half-widths)
+  function nextPlatX(pw){
+    // Keep new platform center within MAX_HOP of last, clamped to screen
+    const minCx=Math.max(pw/2+10, lastPx-MAX_HOP);
+    const maxCx=Math.min(BASE_W-pw/2-10, lastPx+MAX_HOP);
+    const cx=minCx+Math.random()*Math.max(0,maxCx-minCx);
+    lastPx=cx;
+    return cx-pw/2;
+  }
+
   if(L.mode==='words'){
     // For words: one gate per letter
     const letters=target.split('');
     for(let i=0;i<letters.length;i++){
       // Stepping platforms between gates
       for(let j=0;j<3;j++){
-        curY-=50;
-        const px=80+Math.random()*(BASE_W-220);
-        L.platforms.push({x:px,y:curY,w:70+Math.random()*40});
+        curY-=45;
+        const pw=100+Math.random()*30;
+        const px=nextPlatX(pw);
+        L.platforms.push({x:px,y:curY,w:pw});
       }
       // Gate
-      curY-=55;
+      curY-=50;
+      lastPx=BASE_W/2; // gates span full width, reset tracking
       const correctLetter=letters[i];
       const distractors=pickDistractors(correctLetter,LEARN_LETTERS,2);
       const options=shuffleArray([correctLetter,...distractors]);
@@ -2052,11 +2066,13 @@ function initLearnRound(){
     // For letters/syllables: single gate challenge
     // Several stepping platforms, then one gate
     for(let j=0;j<4;j++){
-      curY-=50;
-      const px=60+Math.random()*(BASE_W-200);
-      L.platforms.push({x:px,y:curY,w:80+Math.random()*40});
+      curY-=45;
+      const pw=100+Math.random()*30;
+      const px=nextPlatX(pw);
+      L.platforms.push({x:px,y:curY,w:pw});
     }
-    curY-=55;
+    curY-=50;
+    lastPx=BASE_W/2; // gates span full width
     const correct=target;
     const distractorPool=L.mode==='letters'?LEARN_LETTERS:LEARN_SYLLABLES;
     const distractors=pickDistractors(correct,distractorPool,2);
@@ -2070,8 +2086,8 @@ function initLearnRound(){
   }
 
   // Final platform above last gate
-  curY-=60;
-  L.platforms.push({x:BASE_W/2-80,y:curY,w:160,isFinish:true});
+  curY-=55;
+  L.platforms.push({x:BASE_W/2-90,y:curY,w:180,isFinish:true});
   // Star at finish
   L.finishY=curY;
 }
@@ -2150,7 +2166,7 @@ function updateLearn(){
   if(L.pvy>=0){
     const pw=16,ph=24;
     L.platforms.forEach(pl=>{
-      if(L.px+pw>pl.x&&L.px<pl.x+pl.w&&L.py+ph>=pl.y&&L.py+ph<=pl.y+8){
+      if(L.px+pw>pl.x&&L.px<pl.x+pl.w&&L.py+ph>=pl.y&&L.py+ph<=pl.y+12){
         L.py=pl.y-ph;L.pvy=0;L.pOnGround=true;
         if(pl.isFinish&&!L.finished){
           // Check all gates solved
@@ -2168,7 +2184,7 @@ function updateLearn(){
     L.gates.forEach(gate=>{
       gate.options.forEach(opt=>{
         if(opt.wrongTimer>0){opt.wrongTimer--;return;}
-        if(L.px+16>opt.x&&L.px<opt.x+opt.w&&L.py+24>=opt.y&&L.py+24<=opt.y+10){
+        if(L.px+16>opt.x&&L.px<opt.x+opt.w&&L.py+24>=opt.y&&L.py+24<=opt.y+12){
           if(opt.correct&&!gate.solved){
             // CORRECT!
             gate.solved=true;opt.hit=true;
@@ -2204,10 +2220,10 @@ function updateLearn(){
     L.py=safeY-30;L.px=BASE_W/2-10;L.pvy=0;L.pvx=0;
   }
 
-  // Camera follows player up (only moves up, not down much)
-  const targetCam=L.py-BASE_H*0.55;
-  if(targetCam<L.camY)L.camY+=(targetCam-L.camY)*0.1;
-  else L.camY+=(targetCam-L.camY)*0.04;
+  // Camera follows player smoothly
+  const targetCam=L.py-BASE_H*0.45;
+  if(targetCam<L.camY)L.camY+=(targetCam-L.camY)*0.15;
+  else L.camY+=(targetCam-L.camY)*0.08;
 
   // Particles
   L.particles.forEach(pt=>{pt.x+=pt.vx;pt.y+=pt.vy;pt.vy+=0.1;pt.life--;});
