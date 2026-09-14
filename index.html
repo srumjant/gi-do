@@ -918,7 +918,8 @@ function initLevel(idx){
   const ps=getPlayerSprites(), ph=spriteH(ps.stand,2), pw=spriteW(ps.stand,2);
   player={x:lvl.playerStart[0]*TILE, y:lvl.playerStart[1]*TILE, vx:0, vy:0, w:pw-4, h:ph-4,
     onGround:false, facing:1, frame:0, frameTimer:0, invincible:0,
-    hasBow:false, bowCharges:0, arrowCooldown:0, hasCape:dc.startWithCape};
+    hasBow:false, bowCharges:0, arrowCooldown:0, hasCape:dc.startWithCape,
+    coyoteTime:0, jumpBuffer:0, wasOnGround:true};
   enemies=[]; pendingEnemies=lvl.enemyDefs.map(e=>({...e,spawned:false}));
   let bowPos=lvl.bowPositions||[], superPos=lvl.superPositions||[];
   // Extra pickups on super easy
@@ -1023,19 +1024,30 @@ function update(){
   const crT=Math.floor((camera.x+BASE_W)/TILE)+1, clT=Math.floor(camera.x/TILE)-1;
   pendingEnemies.forEach(d=>{if(!d.spawned&&d.x>=clT&&d.x<=crT){d.spawned=true;if(dc.enemySkipChance&&Math.random()<dc.enemySkipChance)return;enemies.push(spawnEnemy(d));}});
 
-  // Player movement — smooth acceleration
-  const accel=0.45, decel=0.82;
+  // Player movement — smooth acceleration with air control
+  const grndAccel=0.6, airAccel=0.4, grndDecel=0.72, airDecel=0.92;
+  const accel=p.onGround?grndAccel:airAccel;
+  const decel=p.onGround?grndDecel:airDecel;
   if(keys['ArrowLeft']||keys['KeyA']){
     p.vx=Math.max(p.vx-accel,-dc.playerSpeed);p.facing=-1;
   } else if(keys['ArrowRight']||keys['KeyD']){
     p.vx=Math.min(p.vx+accel,dc.playerSpeed);p.facing=1;
   } else {
-    p.vx*=decel;if(Math.abs(p.vx)<0.15)p.vx=0;
+    p.vx*=decel;if(Math.abs(p.vx)<0.12)p.vx=0;
   }
-  // Variable jump height — hold for higher, tap for short hop
-  if((keys['Space']||keys['ArrowUp']||keys['KeyW'])&&p.onGround){p.vy=dc.jumpForce;p.onGround=false;sfxJump();}
-  // Cut jump short on release (variable jump)
-  if(!(keys['Space']||keys['ArrowUp']||keys['KeyW'])&&p.vy<dc.jumpForce*0.4){p.vy=dc.jumpForce*0.4;}
+
+  // Coyote time — allows jumping a few frames after leaving a ledge
+  if(p.onGround){p.coyoteTime=6;}else{if(p.coyoteTime>0)p.coyoteTime--;}
+  // Jump buffer — press jump slightly before landing
+  const jumpKey=keys['Space']||keys['ArrowUp']||keys['KeyW'];
+  const jumpJust=justPressed['Space']||justPressed['ArrowUp']||justPressed['KeyW'];
+  if(jumpJust)p.jumpBuffer=8;
+  if(p.jumpBuffer>0)p.jumpBuffer--;
+  // Execute jump (coyote time OR on ground) + (just pressed OR buffered)
+  const canJump=p.onGround||p.coyoteTime>0;
+  if(canJump&&p.jumpBuffer>0){p.vy=dc.jumpForce;p.onGround=false;p.coyoteTime=0;p.jumpBuffer=0;sfxJump();}
+  // Variable jump height — release early for short hop
+  if(!jumpKey&&p.vy<dc.jumpForce*0.4){p.vy=dc.jumpForce*0.4;}
 
   // Shoot
   if(p.arrowCooldown>0)p.arrowCooldown--;
@@ -1044,8 +1056,9 @@ function update(){
     p.bowCharges--;if(p.bowCharges<=0)p.hasBow=false;p.arrowCooldown=15;sfxShoot();
   }
 
-  // Better gravity: faster fall than rise for snappier platforming
-  const gMul=p.vy>0?1.15:1.0;
+  // Gravity: apex hang (reduced gravity near jump peak) + faster fall
+  const isApex=Math.abs(p.vy)<1.5&&!p.onGround;
+  const gMul=p.vy>0?1.2:(isApex?0.6:1.0);
   p.vy+=GRAVITY*gMul;if(p.vy>8)p.vy=8;
   p.x+=p.vx;
   const pL=p.x+2,pR=p.x+p.w-2,pT=p.y+1,pB=p.y+p.h-1;
