@@ -2221,6 +2221,10 @@ function initLearnRound(){
     lastPx=cx;
     return cx-pw/2;
   }
+  // The step right under a gate is a centred launch pad: from there every
+  // answer is the same short hop away, so no answer is ever out of reach
+  // and none is given away by being the closest.
+  function launchPadX(pw){lastPx=BASE_W/2;return lastPx-pw/2;}
 
   if(L.mode==='words'){
     // For words: one gate per letter
@@ -2228,9 +2232,11 @@ function initLearnRound(){
     for(let i=0;i<letters.length;i++){
       // Stepping platforms between gates
       for(let j=0;j<3;j++){
-        curY-=45;
+        // the first step after a gate is placed high enough that it cannot be
+        // reached from the launch pad below the gate — the gate can't be skipped
+        curY-=(j===0&&i>0)?65:45;
         const pw=100+Math.random()*30;
-        const px=nextPlatX(pw);
+        const px=j===2?launchPadX(pw):nextPlatX(pw);
         L.platforms.push({x:px,y:curY,w:pw});
       }
       // Gate
@@ -2252,7 +2258,7 @@ function initLearnRound(){
     for(let j=0;j<4;j++){
       curY-=45;
       const pw=100+Math.random()*30;
-      const px=nextPlatX(pw);
+      const px=j===3?launchPadX(pw):nextPlatX(pw);
       L.platforms.push({x:px,y:curY,w:pw});
     }
     curY-=50;
@@ -2269,8 +2275,9 @@ function initLearnRound(){
     L.gates.push({y:curY,options:gatePlatforms,solved:false,target:correct});
   }
 
-  // Final platform above last gate
-  curY-=55;
+  // Final platform above last gate — 65px so a full jump from the launch pad
+  // below the gate lands on the answers, not past them onto the star
+  curY-=65;
   L.platforms.push({x:BASE_W/2-90,y:curY,w:180,isFinish:true});
   // Star at finish
   L.finishY=curY;
@@ -2397,13 +2404,13 @@ function updateLearn(){
     });
   }
 
-  // Fall too far down = reset to last safe platform
-  const lowestGate=L.gates.filter(g=>!g.solved)[0];
-  const resetY=lowestGate?lowestGate.y+120:100;
-  if(L.py>resetY){
-    // Find the highest solved gate or start
-    let safeY=50;
-    L.gates.forEach(g=>{if(g.solved)safeY=Math.min(safeY,g.y);});
+  // Fall too far down = reset to last safe platform.
+  // The tower is built upward, so y gets SMALLER the higher you go:
+  // the checkpoint is the highest solved gate (or the start), and falling
+  // means py grows past it.
+  let safeY=50;
+  L.gates.forEach(g=>{if(g.solved)safeY=Math.min(safeY,g.y);});
+  if(L.py>safeY+160){
     L.py=safeY-30;L.px=BASE_W/2-10;L.pvy=0;L.pvx=0;
   }
 
