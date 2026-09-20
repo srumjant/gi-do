@@ -2786,8 +2786,11 @@ function drawPowerupPopup(){
 }
 
 // ==========================================
-//  SELF TESTS — open index.html?test=1
+//  SELF TESTS — open index.html?test=1, or run scripts/run-tests.js
 // ==========================================
+// `var`, not `const`: top-level const/let in a vm script never attach to the
+// context object, so scripts/run-tests.js could not read the results and every
+// run reported failure however many assertions passed.
 var TEST_RESULTS={pass:0,fail:0};
 function tAssert(name,cond,detail){
   if(cond){TEST_RESULTS.pass++;console.log('[TEST] PASS  '+name);}
