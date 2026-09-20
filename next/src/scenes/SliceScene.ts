@@ -1,17 +1,14 @@
 import Phaser from 'phaser';
-import { BASE_H, BASE_W, STEP_MS, TILE, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
-import { TILE_BRICK, TILE_GROUND, TILE_QUESTION, TILE_RAINBOW } from '../data/levels';
+import { BASE_H, BASE_W, STEP_MS, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
+import { PARALLAX, type ParallaxLayer } from '../data/parallax';
+import { getDodoSkin, getGigiSkin, getSelectedChar } from '../game/run';
 import { createWorld, stepWorld } from '../game/world';
 import type { EnemyState, World } from '../game/types';
+import { cloudPosition, cloudScale, drawRidges, drawSky } from '../gfx/parallax';
+import { createRainbowBlocks, drawStaticTiles, updateRainbowBlocks, type RainbowBlock } from '../gfx/tiles';
+import { cloudTextureKey, enemyTextureKey, playerTextureKey, registerTextures } from '../gfx/textures';
 import type { InputState } from '../input/actions';
 import { createKeyboardInput, type KeyboardInput } from '../input/keyboard';
-
-/**
- * Question and rainbow blocks (tiles 3 and 5) have no level-specific colour in the
- * level data, unlike ground and brick — these are fixed, readable placeholders.
- */
-const QUESTION_COLOR = 0xffcc00;
-const RAINBOW_COLOR = 0xff33cc;
 
 /**
  * Half the difference between the canvas and the zoomed view. See setScroll below —
@@ -20,28 +17,52 @@ const RAINBOW_COLOR = 0xff33cc;
 const CAMERA_PIVOT_X = (BASE_W - VIEW_W) / 2;
 const CAMERA_PIVOT_Y = (BASE_H - VIEW_H) / 2;
 
-/** Flat placeholder colours standing in for the player and enemy sprites. */
-const PLAYER_COLOR = 0xffffff;
-const ENEMY_COLOR = 0xff0000;
+/**
+ * The sprite draws 2px larger than the hitbox on every side (index.html:1838:
+ * `drawSprite(spr,p.x-2,p.y-2,ps.palette,2,p.facing<0)`, because the hitbox itself is
+ * inset from the sprite by `w = spriteW - 4`, `h = spriteH - 4`, player.ts:35-36). Not
+ * cosmetic — get this wrong and the art sits 2px off the hitbox, which reads as a
+ * collision bug.
+ */
+const PLAYER_DRAW_INSET = 2;
+
+/** `player.frame`: 0 stand, 1 run, 2 jump (types.ts, index.html:1424-1429). */
+const PLAYER_POSES = ['stand', 'run', 'jump'] as const;
+
+/** Cloud alpha (index.html:1676: `ctx.globalAlpha=0.75`). */
+const CLOUD_ALPHA = 0.75;
+
+/** One cloud's fixed tile position plus the Image drawing it. */
+interface CloudView {
+  readonly tx: number;
+  readonly ty: number;
+  readonly image: Phaser.GameObjects.Image;
+}
 
 /**
  * The vertical slice: the first Phaser-facing code in this port, and the validation
- * gate for the whole migration. Coloured rectangles driven by the pure simulation in
- * src/game/ — no sprites, no felt, no parallax, no HUD, no sound. It exists to answer
- * one question (does the port feel the same as the live game?), so every hour spent
- * making it prettier is an hour not spent on that.
+ * gate for the whole migration. Driven by the pure simulation in src/game/ and drawn
+ * with the kids' actual pixel art, the real tile grid, and a scrolling parallax sky
+ * now that Plan 3 has a texture pipeline — still no felt shading (deferred), no HUD,
+ * no sound. It exists to answer one question (does the port feel the same as the
+ * live game?), so every hour spent making it prettier is an hour not spent on that.
  *
- * The scene is deliberately thin: build the tile map and the player rectangle once in
- * `create()`, advance the simulation at a fixed rate in `update()`, and copy
- * simulation state onto Phaser objects in `syncSprites()`. It never mutates `world`
- * except by calling `stepWorld`, and it never drives the camera itself — Phaser's
- * camera is only ever told where the simulation's camera already is.
+ * The scene is deliberately thin: build the background, the tile map and the player
+ * image once in `create()`, advance the simulation at a fixed rate in `update()`, and
+ * copy simulation state onto Phaser objects in `syncSprites()`. It never mutates
+ * `world` except by calling `stepWorld`, and it never drives the camera itself —
+ * Phaser's camera is only ever told where the simulation's camera already is.
  */
 export class SliceScene extends Phaser.Scene {
   private world!: World;
   private controls!: KeyboardInput;
-  private playerRect!: Phaser.GameObjects.Rectangle;
-  private readonly enemyRects: Phaser.GameObjects.Rectangle[] = [];
+  private playerImage!: Phaser.GameObjects.Image;
+  private readonly enemyImages: Phaser.GameObjects.Image[] = [];
+  private rainbowBlocks: RainbowBlock[] = [];
+  private rainbowGraphics!: Phaser.GameObjects.Graphics;
+  private hillsGraphics: Phaser.GameObjects.Graphics | undefined;
+  private parallaxLayers: readonly ParallaxLayer[] = [];
+  private clouds: CloudView[] = [];
   private accumulator = 0;
 
   constructor() {
@@ -49,23 +70,99 @@ export class SliceScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.world = createWorld(0, 'normal');
+    const levelIndex = 0;
+    this.world = createWorld(levelIndex, 'normal');
 
-    this.drawTileMap(this.world);
+    registerTextures(this);
 
-    this.playerRect = this.add
-      .rectangle(
-        this.world.player.x,
-        this.world.player.y,
-        this.world.player.w,
-        this.world.player.h,
-        PLAYER_COLOR,
+    this.createParallax(levelIndex);
+
+    drawStaticTiles(this, this.world);
+    const rainbow = createRainbowBlocks(this, this.world);
+    this.rainbowBlocks = rainbow.blocks;
+    this.rainbowGraphics = rainbow.graphics;
+
+    const { player } = this.world;
+    this.playerImage = this.add
+      .image(
+        player.x - PLAYER_DRAW_INSET,
+        player.y - PLAYER_DRAW_INSET,
+        resolvePlayerTextureKey(player.frame),
       )
       .setOrigin(0, 0);
 
     this.cameras.main.setZoom(ZOOM);
 
     this.controls = createKeyboardInput(this);
+  }
+
+  /**
+   * Builds the sky, the parallax hill layers, and the clouds — everything
+   * `drawParallax` and the live game's cloud block draw BEFORE the world's own
+   * `ctx.scale(ZOOM)` (index.html:1044-1072, 1676), i.e. unzoomed and independent of
+   * camera scroll. `PARALLAX[levelIndex]` mirrors the live game's own guard
+   * (`if(!pd)return`, index.html:1045): the one level this slice runs (0) has an
+   * entry, but a level that did not would simply get no sky, hills or clouds rather
+   * than a crash — `hillsGraphics` stays undefined and `clouds` stays empty, both
+   * read defensively in `syncSprites` below.
+   */
+  private createParallax(levelIndex: number): void {
+    const parallax = PARALLAX[levelIndex];
+    if (!parallax) return;
+
+    const sky = this.add.graphics();
+    this.setupFixedLayer(sky);
+    drawSky(sky, this.world.level.bg, parallax.bg2);
+
+    const hills = this.add.graphics();
+    this.setupFixedLayer(hills);
+    this.hillsGraphics = hills;
+    this.parallaxLayers = parallax.layers;
+
+    this.clouds = this.world.level.clouds.map(([tx, ty]) => {
+      const image = this.add
+        .image(0, 0, cloudTextureKey(cloudScale(tx)))
+        .setOrigin(0, 0)
+        .setAlpha(CLOUD_ALPHA);
+      this.setupFixedLayer(image);
+      return { tx, ty, image };
+    });
+  }
+
+  /**
+   * Puts a Graphics or Image on the fixed background layer (sky, hills, clouds). All
+   * three render through the SAME shared main camera as the world (tiles, player,
+   * enemies) — there is no second camera — but must not scroll or zoom with it,
+   * matching the live game drawing them before its own `ctx.scale(ZOOM)`
+   * (index.html:1044-1072, 1676). `scrollFactor(0)` handles the scroll half. The
+   * other half is zoom: Phaser zooms every object about the camera's CENTRE —
+   * including scrollFactor(0) ones — while the live drawing is unzoomed and
+   * top-left-anchored, so positioning at (CAMERA_PIVOT_X, CAMERA_PIVOT_Y) and scaling
+   * by 1/ZOOM cancels the shared camera's zoom back out. After this,
+   * `positionFixedLayer(obj, 0, 0)` — its position immediately below — lands on the
+   * same screen pixel the live canvas's raw (0, 0) would.
+   */
+  private setupFixedLayer(obj: Phaser.GameObjects.Graphics | Phaser.GameObjects.Image): void {
+    obj.setScale(1 / ZOOM).setScrollFactor(0);
+    this.positionFixedLayer(obj, 0, 0);
+  }
+
+  /**
+   * Moves a fixed-background-layer object (`setupFixedLayer` above) so that the
+   * given RAW, unzoomed pixel coordinate — exactly the live formulas in
+   * gfx/parallax.ts, unchanged — lands on the same screen pixel the live canvas
+   * would put it on. The sky and hills Graphics only ever need this once, at (0, 0):
+   * their own drawn path already covers the full raw coordinate range on its own.
+   * Each cloud Image needs it called again every frame, with that cloud's current
+   * `cloudPosition`, since an Image — unlike a Graphics path — has only the one
+   * position to carry its drift.
+   */
+  private positionFixedLayer(
+    obj: Phaser.GameObjects.Graphics | Phaser.GameObjects.Image,
+    rawX: number,
+    rawY: number,
+  ): void {
+    obj.setPosition(rawX / ZOOM + CAMERA_PIVOT_X, rawY / ZOOM + CAMERA_PIVOT_Y);
   }
 
   update(_time: number, delta: number): void {
@@ -83,30 +180,53 @@ export class SliceScene extends Phaser.Scene {
   }
 
   /**
-   * Copies simulation state onto the rectangles, and tells Phaser's camera where the
-   * simulation's camera already is. `world.camera` is simulation state — enemy
-   * spawning reads it, and it is compared frame by frame against the live game in the
-   * test suite — so this scene follows it rather than driving it: no `startFollow`,
-   * ever. Two cameras with different following behaviour would silently disagree, and
-   * the one the tests check would not be the one on screen.
+   * Copies simulation state onto the player/enemy images, and tells Phaser's camera
+   * where the simulation's camera already is. `world.camera` is simulation state —
+   * enemy spawning reads it, and it is compared frame by frame against the live game
+   * in the test suite — so this scene follows it rather than driving it: no
+   * `startFollow`, ever. Two cameras with different following behaviour would
+   * silently disagree, and the one the tests check would not be the one on screen.
    *
    * `Math.round` matches the live game, which rounds only at draw time
    * (index.html:1686) while keeping the camera sub-pixel in logic.
    */
   private syncSprites(): void {
-    const { player, enemies, camera } = this.world;
+    const { player, enemies, camera, animFrame } = this.world;
 
-    this.playerRect.x = player.x;
-    this.playerRect.y = player.y;
+    this.playerImage.setTexture(resolvePlayerTextureKey(player.frame));
+    this.playerImage.setPosition(player.x - PLAYER_DRAW_INSET, player.y - PLAYER_DRAW_INSET);
+    // Sprites face right by default; flip to face left (index.html:1838: `p.facing<0`).
+    this.playerImage.setFlipX(player.facing < 0);
+    // index.html:1838 — `p.invincible<=0||Math.floor(animFrame/3)%2===0`, an
+    // invincibility blink. This slice's PlayerState has no `invincible` field yet
+    // (nothing sets it), so it is hardcoded to 0 here, which makes the left side of
+    // the `||` always true and the blink permanently inert. The expression itself is
+    // wired up so that plumbing a real `invincible` field through later only means
+    // changing this one constant, not this line.
+    const invincible = 0;
+    this.playerImage.setVisible(invincible <= 0 || Math.floor(animFrame / 3) % 2 === 0);
 
     for (let i = 0; i < enemies.length; i++) {
       const enemy = enemies[i];
-      const rect = this.enemyRects[i] ?? this.createEnemyRect(enemy);
-      this.enemyRects[i] = rect;
-      rect.x = enemy.x;
-      rect.y = enemy.y;
-      rect.visible = enemy.alive;
+      const image = this.enemyImages[i] ?? this.createEnemyImage(enemy);
+      this.enemyImages[i] = image;
+      this.syncEnemyImage(image, enemy, animFrame);
     }
+
+    // Parallax: the ridge and clouds scroll at their own rate from world.camera.x,
+    // independent of the world's own camera (see the fixed-layer helpers above). The
+    // sky is static and was drawn once in create().
+    if (this.hillsGraphics) {
+      drawRidges(this.hillsGraphics, this.parallaxLayers, camera.x);
+    }
+    for (const cloud of this.clouds) {
+      const pos = cloudPosition(cloud.tx, cloud.ty, camera.x, animFrame);
+      this.positionFixedLayer(cloud.image, pos.x, pos.y);
+    }
+
+    // The only tile that animates — see gfx/tiles.ts. Everything else the tile grid
+    // draws was drawn once, in create(), and is left alone.
+    updateRainbowBlocks(this.rainbowGraphics, this.rainbowBlocks, animFrame);
 
     // Phaser zooms about the camera's CENTRE; the live game zooms about the top-left
     // (`ctx.scale(ZOOM); ctx.translate(-camera.x, -camera.y)`, index.html:1686). Same
@@ -125,43 +245,65 @@ export class SliceScene extends Phaser.Scene {
    * `world.enemies` starts empty and grows as the camera streams the level in — three
    * enemies already exist after the very first simulation step (doll@15, doll@28 and
    * car@40 all fall inside the 640px-wide spawn window at camera x=0), and more stream
-   * in later. Rectangles are created lazily, one per new array slot, rather than
-   * assuming any fixed count up front.
+   * in later. Images are created lazily, one per new array slot, rather than assuming
+   * any fixed count up front. Whatever state it is created in is overwritten
+   * immediately by `syncEnemyImage` right below, in the same pass.
    */
-  private createEnemyRect(enemy: EnemyState): Phaser.GameObjects.Rectangle {
-    return this.add
-      .rectangle(enemy.x, enemy.y, enemy.w, enemy.h, ENEMY_COLOR)
-      .setOrigin(0, 0);
+  private createEnemyImage(enemy: EnemyState): Phaser.GameObjects.Image {
+    return this.add.image(enemy.x, enemy.y, enemyTextureKey(enemy.type)).setOrigin(0, 0);
   }
 
   /**
-   * Draws the level's tile grid once as filled rectangles into a single Graphics
-   * object. Ground and brick use the level's own colours; question and rainbow blocks
-   * have no level-specific colour in the data, so they get the fixed placeholders
-   * above instead. Empty (0) and the unused code 4 draw nothing.
+   * Port of the enemy branch of index.html:1761-1763. `fl = e.vx>0` — enemy sprites
+   * face left by default (the opposite of the player's convention above), so the
+   * flip is on moving RIGHT, not left. Ghost transparency
+   * (`.6+Math.sin(animFrame*.08)*.2`, index.html:1761) is skipped: `spawnEnemy`
+   * (game/enemy.ts) never creates a 'ghost' in this slice, so there is none to apply
+   * it to.
    */
-  private drawTileMap(world: World): void {
-    const graphics = this.add.graphics();
-    const groundColor = Phaser.Display.Color.HexStringToColor(world.level.groundColor).color;
-    const brickColor = Phaser.Display.Color.HexStringToColor(world.level.brickColor).color;
+  private syncEnemyImage(image: Phaser.GameObjects.Image, enemy: EnemyState, animFrame: number): void {
+    image.setFlipX(enemy.vx > 0);
 
-    for (let ty = 0; ty < world.map.length; ty++) {
-      const row = world.map[ty];
-      for (let tx = 0; tx < row.length; tx++) {
-        const color = tileColor(row[tx], groundColor, brickColor);
-        if (color === undefined) continue;
-        graphics.fillStyle(color).fillRect(tx * TILE, ty * TILE, TILE, TILE);
+    if (!enemy.alive) {
+      if (enemy.squashTimer <= 0) {
+        image.setVisible(false);
+        return;
       }
+      // Squashed: flattened to 30% height, dropped so the flattened image still sits
+      // on the ground it died on, fading out over the same half-second the squash
+      // timer counts down from (index.html:1762). `setOrigin(0,0)` (set at creation)
+      // makes `y` the sprite's top edge, so scaling Y down from there is the same
+      // squash-toward-the-top the live canvas gets from
+      // `ctx.translate(e.x,e.y+e.h*.7);ctx.scale(1,.3)`.
+      image.setVisible(true);
+      image.setPosition(enemy.x, enemy.y + enemy.h * 0.7);
+      image.setScale(1, 0.3);
+      image.setAlpha(enemy.squashTimer / 30);
+      return;
     }
+
+    // Alive: a per-enemy vertical wobble driven by the free-running animFrame counter
+    // plus its own x, so enemies bob out of sync with each other (index.html:1763).
+    // This is draw-time-only, same as the live game — it is never stored in the
+    // simulation.
+    const wobble = Math.sin(animFrame * 0.15 + enemy.x);
+    image.setVisible(true);
+    image.setScale(1, 1);
+    image.setAlpha(1);
+    image.setPosition(enemy.x, enemy.y + wobble);
   }
 }
 
-function tileColor(tile: number, groundColor: number, brickColor: number): number | undefined {
-  switch (tile) {
-    case TILE_GROUND: return groundColor;
-    case TILE_BRICK: return brickColor;
-    case TILE_QUESTION: return QUESTION_COLOR;
-    case TILE_RAINBOW: return RAINBOW_COLOR;
-    default: return undefined;
-  }
+/**
+ * Resolves the texture key for the player's current pose, mirroring the character
+ * and skin lookup `getPlayerSprites` itself does (game/run.ts:116-123) rather than
+ * calling it: that function returns resolved sprite/palette data for the canvas
+ * pipeline, but every combination it could return was already rasterised once, at
+ * boot, by `registerTextures` — so this only needs the same character/skin lookup to
+ * pick the matching pre-baked key, not the sprite data behind it.
+ */
+function resolvePlayerTextureKey(frame: number): string {
+  const character = getSelectedChar();
+  const skinIndex = character === 'dodo' ? getDodoSkin() : getGigiSkin();
+  return playerTextureKey(character, skinIndex, PLAYER_POSES[frame]);
 }

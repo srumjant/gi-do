@@ -53,10 +53,12 @@ describe.each(Object.entries(SCRIPTS))('%s matches the live game', (name, script
       const p = world.player;
       port.push({
         x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
+        frame: p.frame, frameTimer: p.frameTimer, animFrame: world.animFrame,
         camera: { x: world.camera.x, y: world.camera.y },
-        enemies: world.enemies.map((e) => (
-          { type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive }
-        )),
+        enemies: world.enemies.map((e) => ({
+          type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
+          frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
+        })),
       });
       deadEachFrame.push(world.dead);
     }
@@ -136,10 +138,12 @@ describe('enemy trace vs. the live game (stomp, enemies enabled)', () => {
       const p = world.player;
       port.push({
         x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
+        frame: p.frame, frameTimer: p.frameTimer, animFrame: world.animFrame,
         camera: { x: world.camera.x, y: world.camera.y },
-        enemies: world.enemies.map((e) => (
-          { type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive }
-        )),
+        enemies: world.enemies.map((e) => ({
+          type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
+          frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
+        })),
       });
     }
 
@@ -151,6 +155,9 @@ describe('enemy trace vs. the live game (stomp, enemies enabled)', () => {
       expect(port[f].vx).toBe(live[f].vx);
       expect(port[f].vy).toBe(live[f].vy);
       expect(port[f].onGround).toBe(live[f].onGround);
+      expect(port[f].frame).toBe(live[f].frame);
+      expect(port[f].frameTimer).toBe(live[f].frameTimer);
+      expect(port[f].animFrame).toBe(live[f].animFrame);
       expect(port[f].camera).toEqual(live[f].camera);
     }
 
@@ -158,6 +165,7 @@ describe('enemy trace vs. the live game (stomp, enemies enabled)', () => {
     // comparison below proves nothing. doll@15 is enemyDefs[0].
     const doll15Key = keyOf(ALL_DEFS[0].type, ALL_DEFS[0].x);
     let stompFrame = -1;
+    const doll15SquashTimers: number[] = [];
 
     for (let f = 0; f < STOMP_SCRIPT.frames; f++) {
       const liveEnemies = live[f].enemies;
@@ -178,8 +186,12 @@ describe('enemy trace vs. the live game (stomp, enemies enabled)', () => {
         expect(portEnemies[i].y).toBe(liveEnemy!.y);
         expect(portEnemies[i].vx).toBe(liveEnemy!.vx);
         expect(portEnemies[i].alive).toBe(liveEnemy!.alive);
+        expect(portEnemies[i].frame).toBe(liveEnemy!.frame);
+        expect(portEnemies[i].frameTimer).toBe(liveEnemy!.frameTimer);
+        expect(portEnemies[i].squashTimer).toBe(liveEnemy!.squashTimer);
 
         if (key === doll15Key && !portEnemies[i].alive && stompFrame < 0) stompFrame = f + 1;
+        if (key === doll15Key) doll15SquashTimers.push(portEnemies[i].squashTimer);
       }
 
       // bat@48 and everything after it in ALL_DEFS is deliberately absent from BOTH
@@ -192,5 +204,14 @@ describe('enemy trace vs. the live game (stomp, enemies enabled)', () => {
     }
 
     expect(stompFrame).toBeGreaterThan(0); // doll@15 was actually stomped, not just present
+
+    // The squash countdown (index.html:1215, 1525, 1545) is a real behaviour change —
+    // a stomped enemy now persists, flattened, for 30 frames instead of vanishing the
+    // instant it dies — and this window is long enough to watch the whole thing play
+    // out: 30 right after the stomp, decaying strictly, and settled at 0 well before
+    // the trace ends, not just "still counting down when the window runs out".
+    expect(doll15SquashTimers[stompFrame - 1]).toBe(30);
+    expect(doll15SquashTimers[doll15SquashTimers.length - 1]).toBe(0);
+    expect(doll15SquashTimers).toContain(0); // reached 0, not merely trending toward it
   });
 });

@@ -142,6 +142,7 @@ describe('stepEnemy', () => {
       world.map = makeGround(20, 20); // ground far below; both actors float clear of it
       const enemy: EnemyState = {
         type: 'doll', x: 100, y: 150, vx: -0.8, vy: 0, w: 14.4, h: 16.2, alive: true,
+        frame: 0, frameTimer: 0, squashTimer: 0,
       };
       world.player = createPlayer(LEVELS[0], 'gigi'); // w=16, h=24
       world.player.x = 98;
@@ -160,6 +161,7 @@ describe('stepEnemy', () => {
 
       expect(enemy.alive).toBe(false);
       expect(world.player.vy).toBe(-5);
+      expect(enemy.squashTimer).toBe(30); // index.html:1545 — starts the squash countdown
     });
 
     it('is NOT killed by a rising player, even while overlapping the same box', () => {
@@ -172,6 +174,29 @@ describe('stepEnemy', () => {
       // Side/rising contact does nothing yet (no playerHit in this slice) — vy is
       // simply untouched by stepEnemy.
       expect(world.player.vy).toBe(-3);
+      expect(enemy.squashTimer).toBe(0); // never stomped, so never started counting down
+    });
+
+    it('keeps counting down and rendering (alive:false) for 30 frames after the kill, then holds at 0', () => {
+      const { world, enemy } = stompSetup();
+      world.player.vy = 3; // falling
+      stepEnemy(world, enemy); // the kill itself
+      expect(enemy.alive).toBe(false);
+      expect(enemy.squashTimer).toBe(30);
+
+      const seen: number[] = [enemy.squashTimer];
+      for (let i = 0; i < 40; i++) {
+        stepEnemy(world, enemy);
+        seen.push(enemy.squashTimer);
+      }
+
+      // Strictly one-per-frame down to 0, then flat — never negative, never a second
+      // countdown from a "kill" the dead-enemy early return cannot trigger again.
+      expect(seen).toEqual([
+        30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11,
+        10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      ]);
+      expect(enemy.alive).toBe(false); // still dead — nothing revives it
     });
   });
 
@@ -180,6 +205,9 @@ describe('stepEnemy', () => {
     world.map = makeGround(20, 20);
     const enemy: EnemyState = {
       type: 'doll', x: 100, y: 150, vx: -0.8, vy: 2, w: 14.4, h: 16.2, alive: false,
+      // squashTimer already expired: this is testing that a long-dead enemy stays
+      // fully inert, not the countdown itself (see the 'stomp' tests above for that).
+      frame: 0, frameTimer: 0, squashTimer: 0,
     };
     world.player = createPlayer(LEVELS[0], 'gigi');
     world.player.x = 98;
@@ -251,7 +279,18 @@ describe('enemies vs. the live game', () => {
         expect(port[f][i].vx).toBeCloseTo(live[f].enemies[i].vx, 9);
         expect(port[f][i].vy).toBeCloseTo(live[f].enemies[i].vy, 9);
         expect(port[f][i].alive).toBe(live[f].enemies[i].alive);
+        expect(port[f][i].frame).toBe(live[f].enemies[i].frame);
+        expect(port[f][i].frameTimer).toBe(live[f].enemies[i].frameTimer);
+        expect(port[f][i].squashTimer).toBe(live[f].enemies[i].squashTimer);
       }
     }
+
+    // Sanity: the player holds still for all 90 frames here, so nothing is ever
+    // stomped — this window's job is the patrol frame flip, not the squash countdown
+    // (see trace.test.ts's STOMP_SCRIPT trace for that). 90 frames at a 15-frame
+    // threshold is enough to see doll@15 actually flip, more than once, or this proves
+    // nothing about `e.frameTimer++;if(e.frameTimer>15){e.frame=1-e.frame;...}`.
+    const doll15Frames = port.map((frame) => frame[0]?.frame).filter((f) => f !== undefined);
+    expect(new Set(doll15Frames).size).toBeGreaterThan(1);
   });
 });

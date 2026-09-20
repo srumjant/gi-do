@@ -47,7 +47,10 @@ export function spawnEnemy(
   // override in scope (index.html:1220). doll/car/dino keep the default.
   const vx = def.type === 'penguin' ? -0.6 * dc.enemySpeed : -0.8 * dc.enemySpeed;
 
-  return { type: def.type, x: def.x * TILE, y: gy - h, vx, vy: 0, w, h, alive: true };
+  return {
+    type: def.type, x: def.x * TILE, y: gy - h, vx, vy: 0, w, h, alive: true,
+    frame: 0, frameTimer: 0, squashTimer: 0,
+  };
 }
 
 /**
@@ -61,10 +64,17 @@ export function spawnEnemy(
  * mutates `world.player`.
  */
 export function stepEnemy(world: World, e: EnemyState): void {
-  // index.html:1525 — a dead enemy's squashTimer animation is out of scope (no such
-  // field on this port's EnemyState); what matters is the early return: nothing below
-  // runs, so a dead enemy simply stops where it died.
-  if (!e.alive) return;
+  // index.html:1525 — the squash countdown runs even for a dead enemy (set to 30, or
+  // 45 with big-head — out of scope — on the stomp below), so a stomped enemy keeps
+  // rendering, flattened, for half a second rather than vanishing the instant it dies.
+  // Nothing else below runs, so a dead enemy still simply stops where it died. The
+  // live source's very next line, `if(e.stunTimer>0){e.stunTimer--;return;}`
+  // (index.html's fart-stun), is out of scope — no field for it exists on this port's
+  // EnemyState, so there is nothing to reproduce there.
+  if (!e.alive) {
+    if (e.squashTimer > 0) e.squashTimer--;
+    return;
+  }
 
   const map = world.map;
 
@@ -94,6 +104,16 @@ export function stepEnemy(world: World, e: EnemyState): void {
   const gA = getTile(map, ef, ef2);
   if (!isSolid(gA) && isSolid(getTile(map, e.x + e.w / 2, ef2))) e.vx *= -1; // ledge
 
+  // Frame flip (index.html:1540), after the movement branches above — there is only
+  // ever the one (ground-patrol) branch here, but the live source's flip runs after
+  // ALL of its per-type branches, patroller or not, so this is placed the same way
+  // relative to the one this port has.
+  e.frameTimer++;
+  if (e.frameTimer > 15) {
+    e.frame = 1 - e.frame;
+    e.frameTimer = 0;
+  }
+
   // Stomp (index.html:1541-1543). The live box also shrinks/grows for big-head and
   // gates on invincibility; neither exists on this port's PlayerState, which has the
   // same effect as both always being "off" — shm collapses to plain `dc.stompHitbox ||
@@ -108,6 +128,7 @@ export function stepEnemy(world: World, e: EnemyState): void {
   )) {
     if (p.vy > 0 && p.y + p.h - 4 < e.y + (e.h * shm) / 2) {
       e.alive = false;
+      e.squashTimer = 30; // index.html:1545. Big-head's 45 (:1546) is out of scope.
       p.vy = -5;
     }
     // else: side or rising contact. playerHit() (damage/death) is out of scope for this

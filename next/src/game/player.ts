@@ -38,6 +38,8 @@ export function createPlayer(level: Level, character: Character): PlayerState {
     facing: 1,
     coyoteTime: 0,
     jumpBuffer: 0,
+    frame: 0,
+    frameTimer: 0,
   };
 }
 
@@ -169,8 +171,28 @@ export function stepPlayer(world: World, input: InputState): void {
 
   // Pit death (index.html:1413). The cape-saves-the-pit branch is out of scope, so
   // every pit fall here is fatal. Setting world.dead is what makes the next call (and
-  // every call after that) return at the top, freezing the player where it fell.
+  // every call after that) return at the top, freezing the player where it fell. The
+  // live source's own `return` right after this (index.html:1413) skips its walk-cycle
+  // block below on the death frame itself — reproduced here the same way, rather than
+  // letting the animation update once more on the frame the player dies.
   if (p.y > level.height * TILE + 32) {
     world.dead = true;
+    return;
+  }
+
+  // Smooth animation — walk cycle speed matches player speed (index.html:1424-1429).
+  // Runs at the END of the player block, after collision resolution, so it reacts to
+  // this frame's already-resolved onGround/vx rather than last frame's.
+  if (!p.onGround) {
+    p.frame = 2;
+  } else if (Math.abs(p.vx) > 0.3) {
+    const walkSpeed = Math.max(4, Math.round(12 - Math.abs(p.vx) * 3));
+    p.frameTimer++;
+    if (p.frameTimer > walkSpeed) {
+      p.frame = p.frame === 0 ? 1 : 0;
+      p.frameTimer = 0;
+    }
+  } else {
+    p.frame = 0;
   }
 }

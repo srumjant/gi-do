@@ -166,9 +166,11 @@ describe('death freezes the whole world, not just the player', () => {
       const p = world.player;
       port.push({
         x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
+        frame: p.frame, frameTimer: p.frameTimer, animFrame: world.animFrame,
         camera: { x: world.camera.x, y: world.camera.y },
         enemies: world.enemies.map((e) => ({
           type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
+          frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
         })),
       });
     }
@@ -184,7 +186,8 @@ describe('death freezes the whole world, not just the player', () => {
     carveGap(world.map);
 
     let frozenAt = -1;
-    const after: Array<{ cam: number; enemyX: number[] }> = [];
+    const after: Array<{ cam: number; enemyX: number[]; frame: number; frameTimer: number }> = [];
+    const animFrameAfter: number[] = [];
     for (let i = 0; i < 60; i++) {
       stepWorld(world, held({ right: true }));
       if (world.dead) {
@@ -192,13 +195,24 @@ describe('death freezes the whole world, not just the player', () => {
         after.push({
           cam: world.camera.x,
           enemyX: world.enemies.map((e) => e.x),
+          frame: world.player.frame,
+          frameTimer: world.player.frameTimer,
         });
+        animFrameAfter.push(world.animFrame);
       }
     }
 
     expect(frozenAt).toBeGreaterThan(0);
     expect(after.length).toBeGreaterThan(5);
-    // Every sample taken from the death frame onward is identical to the first.
+    // Every sample taken from the death frame onward is identical to the first — the
+    // player's own walk-cycle frame/frameTimer included, frozen exactly like its x/y.
     for (const sample of after) expect(sample).toEqual(after[0]);
+
+    // animFrame is the one exception (index.html:1275 runs even in the live game's own
+    // 'dead' state, before its gameState branch): it keeps counting through death
+    // rather than freezing with everything else.
+    for (let i = 1; i < animFrameAfter.length; i++) {
+      expect(animFrameAfter[i]).toBe(animFrameAfter[i - 1] + 1);
+    }
   });
 });

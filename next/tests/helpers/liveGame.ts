@@ -24,6 +24,11 @@ export interface EnemySample {
   vx: number;
   vy: number;
   alive: boolean;
+  /** Patrol frame (0/1), flipped every 15 frames — index.html:1215, 1540. */
+  frame: number;
+  frameTimer: number;
+  /** Counts down from 30 (45 with big-head, out of scope) after a stomp — index.html:1215, 1525, 1545. */
+  squashTimer: number;
 }
 
 export interface Sample {
@@ -32,6 +37,11 @@ export interface Sample {
   vx: number;
   vy: number;
   onGround: boolean;
+  /** Walk-cycle frame: 0 stand, 1 run, 2 jump — index.html:1168, 1424-1429. */
+  frame: number;
+  frameTimer: number;
+  /** The live game's top-level animFrame, read AFTER update() — index.html:995, 1275. */
+  animFrame: number;
   camera: { x: number; y: number };
   enemies: EnemySample[];
 }
@@ -118,6 +128,23 @@ interface Driver {
   justPressed: Record<string, boolean>;
   getPlayer: () => Sample & Record<string, unknown>;
   getCamera: () => { x: number; y: number };
+  getAnimFrame: () => number;
+  /**
+   * Zeroes the live script's top-level `animFrame` IN PLACE. `initLevel` never resets
+   * it (its one direct assignment in the whole file is the top-level declaration
+   * `animFrame=0` — every other reference is either `animFrame++` or a read), so
+   * without this it carries whatever the script's own bootstrap left in it: the
+   * live source's last line calls `gameLoop()` unconditionally, which runs one
+   * synchronous `update()` (and so one `animFrame++`) the moment the script loads —
+   * before `bootLiveGame` even calls `initLevel` — since `requestAnimationFrame` is a
+   * no-op here rather than a real scheduler. That leftover +1 is real code executing
+   * exactly as written, but it is an artifact of where this harness's setup calls
+   * land relative to that one bootstrap frame, not a fact about the physics under
+   * test, so it is zeroed here, at the same point `createWorld`'s `animFrame: 0`
+   * starts the port's side — mirroring how `clearEnemies` above resets other state
+   * `initLevel` does not own, in place, right after `initLevel` runs.
+   */
+  resetAnimFrame: () => void;
   // The live enemy objects carry extra fields depending on type (originY, sineOffset,
   // shootTimer, ...) that this port does not model — hence the same
   // `& Record<string, unknown>` widening getPlayer uses, and the explicit field-by-field
@@ -181,6 +208,8 @@ function bootLiveGame(): Driver {
   initLevel, update, keys, justPressed,
   getPlayer: () => player,
   getCamera: () => camera,
+  getAnimFrame: () => animFrame,
+  resetAnimFrame: () => { animFrame = 0; },
   getEnemies: () => enemies,
   clearEnemies: () => { pendingEnemies.length = 0; enemies.length = 0; },
   setDifficulty: (d) => { selectedDifficulty = d; },
@@ -219,6 +248,11 @@ export function driveLiveGame(opts: DriveOptions): Sample[] {
   // against another level's dimensions. Invisible at level 0; wrong everywhere else.
   d.setLevel(opts.level);
   d.initLevel(opts.level);
+  // Also after initLevel, though initLevel itself never touches animFrame (see
+  // resetAnimFrame's own comment) — this just puts it at the same starting point,
+  // zero, that createWorld gives the port, undoing the one bootstrap `update()` call
+  // the live script's own trailing `gameLoop();` already made before initLevel ran.
+  d.resetAnimFrame();
   // After initLevel: initLevel is what (re)builds enemies/pendingEnemies in the first
   // place, so clearing any earlier would just be overwritten.
   if (opts.suppressEnemies) d.clearEnemies();
@@ -243,11 +277,14 @@ export function driveLiveGame(opts: DriveOptions): Sample[] {
 
     const p = d.getPlayer();
     const cam = d.getCamera();
+    const anim = d.getAnimFrame();
     const enemies = d.getEnemies().map((e) => ({
       type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: !!e.alive,
+      frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
     }));
     trace.push({
       x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: !!p.onGround,
+      frame: p.frame, frameTimer: p.frameTimer, animFrame: anim,
       camera: { x: cam.x, y: cam.y },
       enemies,
     });

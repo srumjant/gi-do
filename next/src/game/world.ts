@@ -27,6 +27,7 @@ export function createWorld(
     player: createPlayer(level, character),
     enemies: [],
     frame: 0,
+    animFrame: 0,
     dead: false,
     camera: { x: 0, y: 0 },
     pending: level.enemyDefs.map((d) => ({ type: d.type, x: d.x, spawned: false })),
@@ -43,6 +44,13 @@ export function createWorld(
  * would drift apart for a reason that looks nothing like the cause.
  */
 export function stepWorld(world: World, input: InputState): void {
+  // index.html:1275 — the very first line of update(), before every other state check
+  // (including the live game's own dead-state branch), so it advances even while dead,
+  // on the title screen, everywhere. Reproduced by incrementing unconditionally, first,
+  // ahead of the world.dead early return right below — not folded into world.frame,
+  // which counts frames of actual play and is intentionally left alone.
+  world.animFrame++;
+
   // Already dead: nothing runs. The live update() returns at index.html:1348, above the
   // playing branch entirely, so the camera and every enemy freeze along with the player
   // rather than carrying on around a corpse.

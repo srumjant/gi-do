@@ -326,8 +326,28 @@ validation gate comes before any fidelity work.
      failing test rather than an argument.
    - **The kids play it.** Numbers cannot tell us that Phaser's input latency or
      presentation feels different in a real browser. They can.
-5. **Textures and the felt shader.** Sprite arrays rasterised to GPU textures, bevel baked
-   at boot, palette/grain/shadow in a Filter. Visual checkpoint against the live build.
+
+   **Both halves passed.** All twelve trace scripts matched the live game frame for frame
+   with no tolerance, and the children played the rectangle build and said it felt right.
+   The migration's riskiest question is answered; everything after this is refinement.
+5. **Sprites, tiles and parallax — flat style only.** Sprite arrays rasterised to GPU
+   textures and drawn with flip and animation frames; the tile grid with its ground-top
+   strip, brick mortar and animated rainbow block; the sky gradient, hill ridges and
+   clouds. Visual checkpoint against the live build.
+
+   Animation turns out to be *simulation* state rather than presentation: `p.frame` and
+   `p.frameTimer` are updated inside `update()` (`index.html:1424-1429`) with a walk-cycle
+   speed derived from `vx`, and `animFrame` drives the rainbow block's colour, the
+   invincibility blink and the enemy sine motion. So it moves into `src/game/` and joins
+   the frame-by-frame comparison — this step strengthens the gate rather than only
+   changing how things look.
+
+5b. **The felt shader — deferred.** Palette transform, grain and shadow as a Phaser Filter,
+   with the bevel baked at texture-generation time. Split out of step 5 and postponed at
+   the owner's request once the slice had been validated; the texture pipeline is built
+   shader-ready so this can slot in later without rework. Until then the port renders the
+   flat style, which is the live game's default (`STYLE_FELT` starts false and is opt-in
+   per browser).
 6. **The rest of the world** — remaining enemies, boss, cat, projectiles, power-ups.
 7. **Scenes** — title, mode select, difficulty, char select, intro, between, game over,
    win, plus HUD and pause.

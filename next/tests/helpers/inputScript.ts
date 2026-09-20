@@ -161,6 +161,26 @@ const PLATFORM_LANDING = (() => {
   throw new Error('no platform landing found for any jump-start frame in [1,80]');
 })();
 
+/**
+ * Where the walk cycle's own script (below) starts holding right: the frame after
+ * LAND_FRAME, i.e. grounded, at rest, with no residual input. Running right
+ * continuously from spawn instead (as walkOffLedge/runRight/etc. all do) reaches the
+ * speed cap while still AIRBORNE — confirmed empirically: air accel (0.4/frame) alone
+ * covers 0 to the cap in about 7 frames, landing takes 9 — so the walk cycle's own
+ * vx-dependent branch, which only ever runs while onGround, would never see anything
+ * but the already-capped rate. Settling first, with no input, then starting to hold
+ * right only once grounded, makes the ENTIRE grounded acceleration ramp (0.6/frame)
+ * play out where the walk cycle can actually react to it.
+ */
+const WALK_CYCLE_HOLD_START = LAND_FRAME + 1;
+/**
+ * Held long enough (70 frames) for vx to run the full grounded ramp to the speed cap
+ * (4 frames: 0.6, 1.2, 1.8, 2.4, then capped at 2.5) and then sit AT the cap for
+ * dozens more — long enough to see `frame` toggle repeatedly at walkSpeed's fastest
+ * rate (5, i.e. every 6th frame), not just take that value once.
+ */
+const WALK_CYCLE_RELEASE = WALK_CYCLE_HOLD_START + 70;
+
 // ---------------------------------------------------------------------------
 // Scripts.
 // ---------------------------------------------------------------------------
@@ -279,6 +299,30 @@ export const SCRIPTS: Record<string, InputScript> = {
   landOnPlatform: {
     input: (f) => hold({ right: true, jump: f >= PLATFORM_LANDING.jumpStartFrame }),
     frames: PLATFORM_LANDING.landFrame + 20,
+  },
+
+  /**
+   * Exercises the walk cycle itself (index.html:1424-1429) — none of the scripts
+   * above was built with `p.frame`/`p.frameTimer` in mind. Settles to the ground
+   * with no input (WALK_CYCLE_HOLD_START above), then holds right through the
+   * ENTIRE grounded acceleration ramp and on to the speed cap, holds there long
+   * enough for several walk-cycle toggles at the fastest rate, then releases and
+   * decelerates all the way through the |vx|>0.3 threshold to a dead stop.
+   *
+   * Confirmed empirically: walkSpeed — `max(4, round(12-|vx|*3))` — takes six distinct
+   * values across the run (10, 8, 7, 5 while accelerating up to and holding the cap;
+   * 7, 8, 9, 10, 11 again while decelerating back down — two of those, 9 and 11,
+   * appear ONLY during deceleration), and `frame` itself toggles 14 separate times.
+   * Never approaches the first gap (x tops out at 209, against a gap at 320) and never
+   * dies. Also confirmed to earn its place rather than just look busy: mutating the
+   * 0.3 threshold to 0.4, and separately the walk-cycle formula's 12 to 11, each turns
+   * this script (among others) red in trace.test.ts.
+   */
+  walkCycle: {
+    input: (f) => hold({
+      right: f >= WALK_CYCLE_HOLD_START && f < WALK_CYCLE_RELEASE,
+    }),
+    frames: WALK_CYCLE_RELEASE + 70,
   },
 
   /**
