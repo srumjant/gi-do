@@ -56,6 +56,16 @@ export interface LegacySectionOptions {
   expose: string[];
 }
 
+/** The raw text of one section, for tests that need to inspect the source itself. */
+export function legacySectionSource(from: string, to: string): string {
+  const src = legacyScript();
+  const start = src.indexOf(from);
+  if (start < 0) throw new Error(`Start marker not found in index.html: ${from}`);
+  const end = src.indexOf(to, start);
+  if (end < 0) throw new Error(`End marker not found in index.html: ${to}`);
+  return src.slice(start, end);
+}
+
 export function loadLegacySection<T = Record<string, any>>(
   opts: LegacySectionOptions,
 ): T {
