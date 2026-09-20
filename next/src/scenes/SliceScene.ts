@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { STEP_MS, TILE, ZOOM } from '../config/constants';
+import { BASE_H, BASE_W, STEP_MS, TILE, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
 import { TILE_BRICK, TILE_GROUND, TILE_QUESTION, TILE_RAINBOW } from '../data/levels';
 import { createWorld, stepWorld } from '../game/world';
 import type { EnemyState, World } from '../game/types';
@@ -12,6 +12,13 @@ import { createKeyboardInput, type KeyboardInput } from '../input/keyboard';
  */
 const QUESTION_COLOR = 0xffcc00;
 const RAINBOW_COLOR = 0xff33cc;
+
+/**
+ * Half the difference between the canvas and the zoomed view. See setScroll below —
+ * the correction for Phaser zooming about the camera centre rather than its top-left.
+ */
+const CAMERA_PIVOT_X = (BASE_W - VIEW_W) / 2;
+const CAMERA_PIVOT_Y = (BASE_H - VIEW_H) / 2;
 
 /** Flat placeholder colours standing in for the player and enemy sprites. */
 const PLAYER_COLOR = 0xffffff;
@@ -101,7 +108,17 @@ export class SliceScene extends Phaser.Scene {
       rect.visible = enemy.alive;
     }
 
-    this.cameras.main.setScroll(Math.round(camera.x), Math.round(camera.y));
+    // Phaser zooms about the camera's CENTRE; the live game zooms about the top-left
+    // (`ctx.scale(ZOOM); ctx.translate(-camera.x, -camera.y)`, index.html:1686). Same
+    // visible size either way — 426.7 x 266.7 — but Phaser's view sits half the
+    // difference down and to the right, so the simulation's camera position has to be
+    // biased back by that much for the two to show the same region. Measured in the
+    // browser: without this the view started at world (106.7, 199.7) while the
+    // simulation said (0, 133.3), which put the player off-screen to the left.
+    this.cameras.main.setScroll(
+      Math.round(camera.x) - CAMERA_PIVOT_X,
+      Math.round(camera.y) - CAMERA_PIVOT_Y,
+    );
   }
 
   /**
