@@ -1116,6 +1116,34 @@ This is what the plan exists for.
 | `landOnPlatform` | downward Y resolution onto a raised tile |
 | `longRun` | 600 frames, to catch slow numerical drift |
 
+`longRun` is only possible at all with enemies suppressed — see below.
+
+**Every player script must suppress enemies.** This is not optional and it is not a
+shortcut. Contact damage (`playerHit`) is deliberately out of the slice, so the live game
+kills the player on enemy contact and the port does not — from that frame on, the traces
+diverge for a reason that has nothing to do with the physics under test. Level 0's doll@15
+makes this unavoidable, and the numbers are not generous:
+
+| Script behaviour | Frame the doll reaches the player |
+|---|---|
+| running right at the 2.5 cap | **59** |
+| standing perfectly still | **240** |
+
+So even `standStill` collides inside a 600-frame window. Rather than keeping every script
+under 59 frames, give both sides a way to run with no enemies at all:
+
+- **Live side:** add `suppressEnemies?: boolean` to `DriveOptions`. After `initLevel`,
+  empty the live game's own arrays — expose them from the sandbox alongside the rest
+  (`clearEnemies: () => { pendingEnemies.length = 0; enemies.length = 0; }`) and call it.
+  Note they must be emptied in place rather than reassigned, because `initLevel` has
+  already bound them.
+- **Port side:** clear `world.pending` and `world.enemies` after `createWorld`.
+
+The physics under test is untouched by this — enemies do not influence the player except
+through contact and stomping — so a player trace with enemies suppressed is a clean
+comparison of exactly the thing it is meant to compare. The enemy trace in Step 5 runs
+with them switched back on.
+
 **Bound any script that can fall in a pit.** Dying freezes the player in both
 implementations, but 90 frames later the live game respawns at the level start and the
 port does not — respawn is a later plan. So `walkOffLedge` and anything else that can drop
@@ -1154,9 +1182,12 @@ describe.each(Object.entries(SCRIPTS))('%s matches the live game', (name, script
     const live = driveLiveGame({
       level: 0, difficulty: 'normal', character: 'gigi',
       frames: script.frames, input: script.input,
+      suppressEnemies: true, // see above — contact damage is out of the slice
     });
 
     const world = createWorld(0, 'normal');
+    world.pending.length = 0;
+    world.enemies.length = 0;
     const port: typeof live = [];
     let prevJump = false;
     for (let f = 0; f < script.frames; f++) {
