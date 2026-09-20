@@ -270,6 +270,7 @@ describe('stepEnemy', () => {
         type: 'doll', x: 100, y: 150, vx: -0.8, vy: 0, w: 14.4, h: 16.2, alive: true,
         frame: 0, frameTimer: 0, squashTimer: 0,
         noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+      isChicken: false,
       };
       world.player = createPlayer(LEVELS[0], 'gigi'); // w=16, h=24
       world.player.x = 98;
@@ -338,6 +339,7 @@ describe('stepEnemy', () => {
       // fully inert, not the countdown itself (see the 'stomp' tests above for that).
       frame: 0, frameTimer: 0, squashTimer: 0,
       noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+      isChicken: false,
     };
     world.player = createPlayer(LEVELS[0], 'gigi');
     world.player.x = 98;
@@ -385,7 +387,7 @@ describe('stepWorld wiring', () => {
 describe('enemies vs. the live game', () => {
   it('spawns and patrols identically to the real update(), while the player holds still', () => {
     const FRAMES = 90;
-    const script = () => ({ left: false, right: false, jump: false });
+    const script = () => ({ left: false, right: false, jump: false, fire: false });
     const live = driveLiveGame({
       level: 0, difficulty: 'normal', character: 'gigi', frames: FRAMES, input: script,
     });
@@ -452,7 +454,7 @@ describe('bat and bouncer vs. the live game', () => {
     // stationary player by contact (measured against this exact scenario) — this
     // trace is about the bat and the bouncer, not that death, which trace.test.ts and
     // world.test.ts already cover on their own terms.
-    const script = () => ({ left: false, right: false, jump: false });
+    const script = () => ({ left: false, right: false, jump: false, fire: false });
     setRandom(() => 0.5); // matches the live driver's own stubbed Math.random exactly
 
     const live = driveLiveGame({
@@ -547,6 +549,7 @@ describe('the big-head stomp multiplier compounds with dc.stompHitbox', () => {
       type: 'doll', x: 100, y: 150, vx: -0.8, vy: 0, w: 14.4, h: 16.2, alive: true,
       frame: 0, frameTimer: 0, squashTimer: 0,
       noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+      isChicken: false,
     };
     world.player = createPlayer(LEVELS[0], 'gigi'); // w=16, h=24
     world.player.x = 98; // overlaps horizontally with AND without the 8px big-head widening

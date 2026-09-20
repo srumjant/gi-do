@@ -66,7 +66,7 @@ const DIFFICULTY = 'normal' as const;
 const CHARACTER = 'gigi' as const;
 
 function hold(overrides: Partial<FrameInput>): FrameInput {
-  return { left: false, right: false, jump: false, ...overrides };
+  return { left: false, right: false, jump: false, fire: false, ...overrides };
 }
 
 /**
@@ -90,6 +90,9 @@ function step(world: World, input: FrameInput, prevJump: boolean): void {
   stepWorld(world, {
     left: input.left, right: input.right, jump: input.jump,
     jumpPressed: input.jump && !prevJump,
+    // No script in this file shoots — deriving the timings below only needs the
+    // physics. The arrow traces live in trace.test.ts with scripts of their own.
+    firePressed: false,
   });
 }
 

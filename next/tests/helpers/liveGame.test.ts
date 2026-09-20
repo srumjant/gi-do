@@ -8,7 +8,7 @@ describe('live game driver', () => {
       difficulty: 'normal',
       character: 'gigi',
       frames: 20,
-      input: () => ({ left: false, right: true, jump: false }),
+      input: () => ({ left: false, right: true, jump: false, fire: false }),
     });
     expect(trace.length).toBe(20);
     expect(trace[0]).toHaveProperty('x');
@@ -18,7 +18,7 @@ describe('live game driver', () => {
   it('accelerates right up to the difficulty speed cap', () => {
     const trace = driveLiveGame({
       level: 0, difficulty: 'normal', character: 'gigi', frames: 30,
-      input: () => ({ left: false, right: true, jump: false }),
+      input: () => ({ left: false, right: true, jump: false, fire: false }),
     });
     expect(trace[29].vx).toBeCloseTo(2.5, 5); // DIFFICULTY_CONFIG.normal.playerSpeed
     expect(trace[29].x).toBeGreaterThan(trace[0].x);
@@ -27,7 +27,7 @@ describe('live game driver', () => {
   it('is deterministic — the same script twice gives the same trace', () => {
     const script = {
       level: 0, difficulty: 'normal' as const, character: 'gigi' as const, frames: 60,
-      input: (f: number) => ({ left: false, right: true, jump: f >= 20 && f < 30 }),
+      input: (f: number) => ({ left: false, right: true, jump: f >= 20 && f < 30, fire: false }),
     };
     expect(driveLiveGame(script)).toEqual(driveLiveGame(script));
   });
@@ -44,7 +44,7 @@ describe('live game driver', () => {
   it('jumps when told to, and comes back down', () => {
     const trace = driveLiveGame({
       level: 0, difficulty: 'normal', character: 'gigi', frames: 60,
-      input: (f) => ({ left: false, right: false, jump: f >= 10 && f < 25 }),
+      input: (f) => ({ left: false, right: false, jump: f >= 10 && f < 25, fire: false }),
     });
     const apex = Math.min(...trace.map((s) => s.y));
     expect(apex).toBeLessThan(trace[0].y);            // it went up

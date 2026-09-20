@@ -6,14 +6,15 @@ import path from 'node:path';
 import url from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
-import { checkRescue, createWorld, stepCamera, stepWorld } from '../src/game/world';
+import { checkRescue, createWorld, stepArrows, stepCamera, stepWorld } from '../src/game/world';
 import { findGroundY } from '../src/game/tiles';
 import { getRescueSprites, setSelectedChar } from '../src/game/run';
 import { emptyInput, type InputState } from '../src/input/actions';
 import { DIFF_KEYS } from '../src/config/difficulty';
-import { LEVELS } from '../src/data/levels';
+import { LEVELS, TILE_BRICK } from '../src/data/levels';
 import { TILE, VIEW_H, VIEW_W } from '../src/config/constants';
-import type { World } from '../src/game/types';
+import { setRandom } from '../src/game/random';
+import type { EnemyState, World } from '../src/game/types';
 
 function held(overrides: Partial<InputState>): InputState {
   return { ...emptyInput(), ...overrides };
@@ -116,7 +117,7 @@ describe('camera vs. the live game', () => {
   // while the target moves, and snapping once it's close — against the real update().
   it('matches frame by frame over a jump-in-place script', () => {
     const FRAMES = 120;
-    const script = (f: number) => ({ left: false, right: false, jump: f >= 5 && f < 20 });
+    const script = (f: number) => ({ left: false, right: false, jump: f >= 5 && f < 20, fire: false });
     const live = driveLiveGame({
       level: 0, difficulty: 'normal', character: 'gigi', frames: FRAMES, input: script,
     });
@@ -157,7 +158,7 @@ describe('death freezes the whole world, not just the player', () => {
     const FRAMES = 60; // well inside the live game's 90-frame respawn, which is out of scope
     const live = driveLiveGame({
       level: 0, difficulty: 'normal', character: 'gigi', frames: FRAMES,
-      input: () => ({ left: false, right: true, jump: false }),
+      input: () => ({ left: false, right: true, jump: false, fire: false }),
       mutateMap: carveGap,
     });
 
@@ -399,7 +400,7 @@ describe('the rescue vs. the live game', () => {
     let liveWinFrame = -1;
     const live = driveLiveGame({
       level: 0, difficulty: 'normal', character: 'gigi', frames: FRAMES,
-      input: () => ({ left: false, right: true, jump: false }),
+      input: () => ({ left: false, right: true, jump: false, fire: false }),
       suppressEnemies: true,
       beforeRun: (d) => {
         const p = d.getPlayer();
@@ -463,7 +464,7 @@ describe('the level spawn tables vs. the live game', () => {
         // frame needs stepping to read what it built.
         driveLiveGame({
           level, difficulty, character: 'gigi', frames: 0,
-          input: () => ({ left: false, right: false, jump: false }),
+          input: () => ({ left: false, right: false, jump: false, fire: false }),
           beforeRun: (d) => {
             live.push({ difficulty, level, ...snapshot(d.getLevelSpawn()) });
           },
@@ -483,5 +484,99 @@ describe('the level spawn tables vs. the live game', () => {
     // Each entry carries its own difficulty and level, so a mismatch names the cell
     // rather than leaving 24 anonymous ones to be counted through by hand.
     expect(port).toEqual(live);
+  });
+});
+
+// Port of index.html:1494-1508. The flight itself, the kill and the conversion are all
+// driven against the live game in trace.test.ts. Two branches of it are not, because no
+// arrangement of level 0 puts them in front of an arrow: a chicken ray meeting an enemy
+// that is ALREADY a chicken, and an arrow meeting a wall.
+describe('stepArrows', () => {
+  /** An enemy with the doll's real dimensions, parked wherever the test wants it. */
+  function enemyAt(x: number, y: number, over: Partial<EnemyState> = {}): EnemyState {
+    return {
+      type: 'doll', x, y, vx: 0, vy: 0, w: 14.4, h: 16.2, alive: true,
+      frame: 0, frameTimer: 0, squashTimer: 0,
+      noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+      isChicken: false,
+      ...over,
+    };
+  }
+
+  afterEach(() => setRandom(Math.random));
+
+  // The `return` in the live conversion branch is a CONTINUE, not a BREAK — it ends one
+  // enemy's turn inside `enemies.forEach` and the loop carries straight on. Reading it as
+  // a break would stop the pass at the first hit, so this puts THREE enemies in the path
+  // of one ray at once: the two ordinary ones must both be converted, and the one that is
+  // already a chicken must be killed instead, by the branch the `return` skips.
+  it('a chicken ray converts everything it overlaps at once, and kills what is already a chicken', () => {
+    setRandom(() => 0.5);
+    const world = createWorld(0, 'normal');
+    world.pending.length = 0;
+    // Stacked on the same spot, so one 12x4 arrow rect overlaps all three.
+    world.enemies = [
+      enemyAt(100, 200),
+      enemyAt(100, 200, { type: 'chicken', isChicken: true }),
+      enemyAt(100, 200),
+    ];
+    world.arrows = [{ x: 100, y: 202, vx: 0, life: 10, isChicken: true }];
+
+    stepArrows(world);
+
+    const [a, alreadyChicken, b] = world.enemies;
+    expect(a.type).toBe('chicken');
+    expect(b.type).toBe('chicken'); // reached AFTER the one that was killed
+    expect(a.alive).toBe(true);
+    expect(b.alive).toBe(true);
+    expect(alreadyChicken.alive).toBe(false);
+    expect(alreadyChicken.squashTimer).toBe(30);
+    // 100 + 200 + 100: two conversions and one kill, all from a single ray, all in one
+    // pass. A `break` would have scored 100.
+    expect(world.score).toBe(Math.round(100 * world.dc.scoreMultiplier) * 2
+      + Math.round(200 * world.dc.scoreMultiplier));
+    // The arrow is spent either way, and leaves the list at the end of the same pass.
+    expect(world.arrows).toEqual([]);
+  });
+
+  // Tiles are probed at two bare POINTS, `a.x` and `a.x + 10` — not across the 12-wide
+  // box the enemies are tested against — so which of the two is the leading edge depends
+  // on which way the arrow is going. And the check does NOT short-circuit the pass: an
+  // arrow stopped by a wall still runs its enemy loop that frame, and still kills
+  // anything it happens to be overlapping when it stopped.
+  it('a solid tile at whichever probe leads stops an arrow, without cancelling that frame\'s hit', () => {
+    // A single brick well clear of the ground, in a row level 0 leaves empty.
+    const WALL_TX = 20;
+    const WALL_TY = 10;
+    const WALL_X = WALL_TX * TILE;
+    const Y = WALL_TY * TILE + 4;
+
+    function shoot(x: number, vx: number, enemy?: EnemyState): World {
+      const world = createWorld(0, 'normal');
+      world.pending.length = 0;
+      world.map[WALL_TY][WALL_TX] = TILE_BRICK;
+      world.enemies = enemy === undefined ? [] : [enemy];
+      world.arrows = [{ x, y: Y, vx, life: 10, isChicken: false }];
+      stepArrows(world);
+      return world;
+    }
+
+    // Flying right, the leading probe is `x + 10`: `x` itself lands 6px short of the
+    // brick and the arrow still dies.
+    expect(shoot(WALL_X - 16, 6).arrows).toEqual([]);
+    // Flying left, the leading probe is `x`: `x + 10` is 10px past the brick's right
+    // edge, in open air, and the arrow still dies.
+    expect(shoot(WALL_X + TILE + 4, -6).arrows).toEqual([]);
+    // One pixel further back, with neither probe in the brick, it flies on — so the two
+    // above are the tile check firing rather than the arrow simply expiring.
+    expect(shoot(WALL_X - 17, 6).arrows).toHaveLength(1);
+
+    // ...and the kill still happens on the frame the wall stops it. `a.life = 0` is not a
+    // `return`: the enemy loop runs either way, so an enemy standing in the same spot as
+    // the brick dies to an arrow that has already been stopped by it.
+    const hit = shoot(WALL_X - 16, 6, enemyAt(WALL_X, Y - 4));
+    expect(hit.enemies[0].alive).toBe(false);
+    expect(hit.score).toBe(Math.round(200 * hit.dc.scoreMultiplier));
+    expect(hit.arrows).toEqual([]);
   });
 });

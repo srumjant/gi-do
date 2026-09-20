@@ -21,9 +21,10 @@ export interface PlayerState {
   /** Counts up toward the walk cycle's speed-scaled threshold (index.html:1168, 1426-1427). */
   frameTimer: number;
   /**
-   * Set by a bow pickup (index.html:1447) and — later, from the chicken ray — by the
-   * rainbow block's silly power-up. Nothing READS it yet: firing is a later task, and
-   * it is the firing branch (index.html:1392) that consults it alongside `bowCharges`.
+   * Set by a bow pickup (index.html:1447) and, from the chicken ray, by the rainbow
+   * block's silly power-up. Read by the firing branch (index.html:1383), which consults
+   * it alongside `bowCharges` — and cleared there, by the same branch, once both kinds
+   * of charge are spent.
    */
   hasBow: boolean;
   /**
@@ -32,6 +33,14 @@ export interface PlayerState {
    * worth four times as much to a small child as to a grown-up.
    */
   bowCharges: number;
+  /**
+   * Frames until the bow can fire again (index.html:1160, 1382, 1388). Decremented once
+   * per player step, set to 15 by a shot — a quarter of a second between arrows, whether
+   * the shot was an arrow or a chicken ray. It is decremented BEFORE the fire check reads
+   * it, so a cooldown of exactly 1 is already 0 by the time that check runs and the
+   * fifteenth frame after a shot can fire again, not the sixteenth.
+   */
+  arrowCooldown: number;
   /**
    * Set by a super pickup (index.html:1448). The live `initLevel` seeds this from
    * `dc.startWithCape` (index.html:1169) rather than the plain `false` createPlayer
@@ -57,11 +66,10 @@ export interface PlayerState {
   /**
    * Chicken rays left (index.html:1171). Granted 8 — a flat constant, NOT `dc.bowCharges`
    * like the bow pickup — by the `chicken` branch, which also sets `hasBow`. The two are
-   * genuinely separate: the firing path (index.html:1392-1396) fires when EITHER
-   * `hasBow && bowCharges > 0` OR `chickenRayCharges > 0`, picks chicken over arrow
-   * whenever any chicken charge is left, and only clears `hasBow` once BOTH are spent.
-   * Do not collapse them into one flag. Firing itself is a later task; nothing reads
-   * this yet.
+   * genuinely separate: the firing path (index.html:1383-1387, player.ts's fireArrow)
+   * fires when EITHER `hasBow && bowCharges > 0` OR `chickenRayCharges > 0`, picks
+   * chicken over arrow whenever any chicken charge is left, and only clears `hasBow`
+   * once BOTH are spent. Do not collapse them into one flag.
    */
   chickenRayCharges: number;
 }
@@ -186,6 +194,44 @@ export interface EnemyState {
    * starts at 0, so player.ts adds to it directly.
    */
   stunTimer: number;
+  /**
+   * Already been turned into a chicken (index.html:1497-1498). The live game adds this
+   * field only at the moment of conversion, so every un-hit enemy reads `undefined`
+   * there and this port's uniform `false` is the same test; `chickenify` in enemy.ts is
+   * the only thing that ever sets it.
+   *
+   * It is what makes a second chicken ray LETHAL rather than wasted: the conversion
+   * branch is guarded by `a.isChicken && !e.isChicken`, so a chicken arrow that hits an
+   * already-converted chicken falls through to the ordinary kill branch below it. One
+   * ray turns an enemy into a chicken, the next one kills the chicken.
+   */
+  isChicken: boolean;
+}
+
+/**
+ * One arrow in flight (index.html:1385) — fired by the bow, or, when any chicken ray
+ * charge is left, the same object with `isChicken` set. There is no vy and no gravity:
+ * an arrow flies dead straight at `vx` until it runs out of `life`, hits a solid tile,
+ * or hits an enemy.
+ *
+ * Its two collision shapes are DIFFERENT and both deliberate (index.html:1495-1496):
+ * tiles are probed at two bare points, `x` and `x + 10`, while enemies are tested
+ * against a 12x4 rectangle. Neither is derived from the other, and neither is the
+ * drawn sprite's size. See world.ts's stepArrows.
+ */
+export interface Arrow {
+  x: number;
+  y: number;
+  vx: number;
+  /**
+   * Frames left, from 60 — one second of flight, about 360px at the fixed speed of 6.
+   * Also the kill switch: a tile hit or an enemy hit sets it straight to 0, and
+   * world.ts's stepArrows filters out everything that is not still above zero at the
+   * end of the pass.
+   */
+  life: number;
+  /** A chicken ray rather than an arrow. Converts on the first hit instead of killing. */
+  isChicken: boolean;
 }
 
 export interface World {
@@ -299,6 +345,18 @@ export interface World {
    * that paid out. Stepped and collected by world.ts's stepStars.
    */
   stars: Star[];
+  /**
+   * index.html:984, 1179. Arrows and chicken rays currently in flight, in firing order.
+   * Emptied by `initLevel` like every other level collection, which is why a respawn
+   * throws away whatever was mid-air — along with the bow that fired it.
+   *
+   * The live game REPLACES this array every frame (`arrows=arrows.filter(...)`), so
+   * spent arrows leave the list at the end of the arrow pass rather than at the moment
+   * they are spent. world.ts's stepArrows keeps that ordering exactly: an arrow that
+   * has already hit something still sits in the list, with `life` 0, for the rest of
+   * its own pass.
+   */
+  arrows: Arrow[];
   /** index.html:1189-1190. Scanned off the freshly generated map, in tile coordinates. */
   questionBlocks: BlockState[];
   /** index.html:1189, 1191. Same scan, tile code 5. */

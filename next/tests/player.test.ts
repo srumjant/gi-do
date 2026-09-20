@@ -217,7 +217,7 @@ describe('wall collision', () => {
     const FRAMES = 45;
     const live = driveLiveGame({
       level: 0, difficulty: 'normal', character: 'gigi', frames: FRAMES,
-      input: () => ({ left: false, right: true, jump: false }),
+      input: () => ({ left: false, right: true, jump: false, fire: false }),
       mutateMap: buildWall,
     });
 
@@ -436,5 +436,40 @@ describe('the power-up popup freezes the whole world', () => {
     giveRandomSillyPowerup(world);
     respawnLevel(world);
     expect(world.powerupPopup).toBeNull();
+  });
+});
+
+// Port of index.html:1381-1389. The trace suite shoots a real bow at a real enemy and a
+// real chicken ray at a real bat (trace.test.ts), which is where the firing is actually
+// validated. What no trace can show is the END of the ammunition — the bow trace spends
+// two of three charges and the ray trace one of eight, and shooting either counter dry
+// against the live game would need a script four cooldowns long with nothing happening in
+// between. So the last shot is pinned here instead.
+describe('running out of ammunition', () => {
+  it('spends the rays before the arrows, and only drops the bow once both are gone', () => {
+    const world = makeWorld();
+    const p = world.player;
+    p.hasBow = true;
+    p.bowCharges = 1;
+    p.chickenRayCharges = 1;
+
+    // One ray, one arrow, and the ray goes first even though the bow is loaded.
+    stepPlayer(world, held({ firePressed: true }));
+    expect(world.arrows).toHaveLength(1);
+    expect(world.arrows[0].isChicken).toBe(true);
+    expect(p.chickenRayCharges).toBe(0);
+    expect(p.bowCharges).toBe(1); // the ray did not touch it
+    expect(p.hasBow).toBe(true); // ...so the bow stays
+
+    // 15 frames later the arrow goes, and with both counters at zero the bow goes too.
+    for (let i = 0; i < 15; i++) stepPlayer(world, held({ firePressed: true }));
+    expect(world.arrows).toHaveLength(2);
+    expect(world.arrows[1].isChicken).toBe(false);
+    expect(p.bowCharges).toBe(0);
+    expect(p.hasBow).toBe(false);
+
+    // And an empty bow fires nothing, however long the button is held.
+    for (let i = 0; i < 60; i++) stepPlayer(world, held({ firePressed: true }));
+    expect(world.arrows).toHaveLength(2);
   });
 });

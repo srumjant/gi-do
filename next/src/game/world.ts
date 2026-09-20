@@ -3,12 +3,12 @@ import { DIFFICULTY_CONFIG, type DifficultyKey, type DifficultyRecord } from '..
 import { LEVELS, TILE_QUESTION, TILE_RAINBOW, type Level, type TileMap } from '../data/levels';
 import { BOW_S, CAT_S, SUPER_S } from '../data/sprites';
 import type { InputState } from '../input/actions';
-import { spawnEnemy, stepEnemy } from './enemy';
+import { chickenify, spawnEnemy, stepEnemy } from './enemy';
 import { createPlayer, stepPlayer, type Character } from './player';
 import { random } from './random';
 import { getRescueSprites } from './run';
-import { findGroundY, rectOverlap } from './tiles';
-import type { BlockState, Pickup, Star, World } from './types';
+import { findGroundY, getTile, isSolid, rectOverlap } from './tiles';
+import type { Arrow, BlockState, Pickup, Star, World } from './types';
 
 /**
  * Everything `initLevel` rebuilds from scratch every time a level starts — including
@@ -22,6 +22,7 @@ interface LevelSpawnState {
   superPickups: Pickup[];
   catPickup: Pickup | null;
   stars: Star[];
+  arrows: Arrow[];
   questionBlocks: BlockState[];
   rainbowBlocks: BlockState[];
 }
@@ -90,6 +91,9 @@ function buildLevelState(level: Level, dc: DifficultyRecord, map: TileMap): Leve
       collected: false,
     },
     stars: [],
+    // index.html:1179's `arrows=[]`, on the same line as `stars=[]`. In this bundle for
+    // the same reason the stars are: a respawn has to throw away whatever was in flight.
+    arrows: [],
     questionBlocks,
     rainbowBlocks,
   };
@@ -259,12 +263,18 @@ export function stepWorld(world: World, input: InputState): void {
   // stepEnemies' loop) would freeze one frame earlier than the live game does and
   // desync the trace. So: one check, all three calls inside it, exactly like this.
   if (!world.dead) {
-    // index.html:1447-1448 and :1519 — both sit between the player block and the
-    // enemies loop, in this order, with the cat companion and the arrows (later tasks)
-    // in between. Inside the `!world.dead` guard because a PIT death returns from the
-    // live update() at index.html:1423, above all of this: you do not sweep up the
-    // pickups you happen to be falling through on the frame you die.
+    // index.html:1447-1448, :1495-1508 and :1519 — all three sit between the player
+    // block and the enemies loop, in this order, with the cat companion (a later task)
+    // between the first two. Inside the `!world.dead` guard because a PIT death returns
+    // from the live update() at index.html:1423, above all of this: you do not sweep up
+    // the pickups you happen to be falling through on the frame you die.
+    //
+    // Arrows fly BEFORE the enemies move, which is what makes the arrow trace's timing
+    // what it is: an arrow tests this frame's own position against last frame's enemy
+    // positions, and an enemy turned into a chicken here is then stepped as a chicken,
+    // falling and walking, in the very same frame.
     collectPickups(world);
+    stepArrows(world);
     stepStars(world);
     stepEnemies(world);
     checkRescue(world);
@@ -304,6 +314,67 @@ export function collectPickups(world: World): void {
       p.hasCape = true;
     }
   }
+}
+
+/**
+ * Port of index.html:1495-1508 — every arrow and chicken ray in flight, moved, tested
+ * against the tiles, tested against the enemies, then swept up.
+ *
+ * Four details are load-bearing and none of them is tidy:
+ *
+ *   - TWO DIFFERENT WIDTHS, deliberately. Tiles are probed at two bare POINTS, `a.x`
+ *     and `a.x + 10`, both at `a.y`; enemies are tested against a 12x4 RECTANGLE. 10 is
+ *     not 12, a point is not a box, and neither number is the drawn sprite's. Do not
+ *     unify them.
+ *   - The move comes FIRST, so an arrow's very first test is taken one step of `vx`
+ *     downrange of where it was fired, never at the muzzle.
+ *   - `life = 0` is the only kill switch, for a tile hit and an enemy hit alike, and it
+ *     does not remove the arrow immediately — the enemy loop below still runs for a
+ *     tile-stopped arrow that frame, and a spent arrow stays in the list until the
+ *     filter at the end of the pass. The live source rebuilds the array there
+ *     (`arrows=arrows.filter(...)`), so that is where things actually leave.
+ *   - The chicken branch's `return` is a CONTINUE, not a BREAK. It sits inside the live
+ *     `enemies.forEach` callback, so it ends that ONE enemy's turn and skips the kill
+ *     branch for it — which is the entire reason a chicken ray converts instead of
+ *     killing — while the loop carries on through the remaining enemies. The arrow is
+ *     spent either way (`a.life = 0` on both paths), so in practice nothing later
+ *     overlaps it, but the shape is the live one: `continue`, never `break`.
+ *
+ * What the two branches pay differs too: a conversion is worth 100 points, a kill 200,
+ * both rounded at the award site like every other award (see stepStars below). And a
+ * chicken ray that hits something ALREADY converted takes the kill branch — see
+ * EnemyState.isChicken.
+ *
+ * The live source's `spawnParticles(...)`, `sfxCluck()` and `sfxStomp()` are presentation
+ * and sound, which src/game/ does not own.
+ */
+export function stepArrows(world: World): void {
+  for (const a of world.arrows) {
+    a.x += a.vx;
+    a.life--;
+    if (isSolid(getTile(world.map, a.x, a.y)) || isSolid(getTile(world.map, a.x + 10, a.y))) {
+      a.life = 0;
+    }
+    for (const e of world.enemies) {
+      if (!e.alive) continue;
+      if (!rectOverlap({ x: a.x, y: a.y, w: 12, h: 4 }, { x: e.x, y: e.y, w: e.w, h: e.h })) {
+        continue;
+      }
+      if (a.isChicken && !e.isChicken) {
+        chickenify(e);
+        a.life = 0;
+        world.score += Math.round(100 * world.dc.scoreMultiplier);
+        continue; // the live `return` — this enemy only; see the note above
+      }
+      e.alive = false;
+      e.squashTimer = 30;
+      a.life = 0;
+      world.score += Math.round(200 * world.dc.scoreMultiplier);
+    }
+  }
+  // index.html:1508. A fresh array, exactly as the live line assigns one, so anything
+  // holding the old one (nothing does) would see the same thing the live game's would.
+  world.arrows = world.arrows.filter((a) => a.life > 0);
 }
 
 /**

@@ -2,7 +2,7 @@ import { ENEMY_SCALE, GRAVITY, TILE } from '../config/constants';
 import type { DifficultyRecord } from '../config/difficulty';
 import type { EnemyDef, TileMap } from '../data/levels';
 import {
-  BAT_S, BOUNCER_S, CAR_S, DINO_S, DOLL_S, ICEBAT_S, PENGUIN_S, type SpriteData,
+  BAT_S, BOUNCER_S, CAR_S, CHICKEN_S, DINO_S, DOLL_S, ICEBAT_S, PENGUIN_S, type SpriteData,
 } from '../data/sprites';
 import { playerHit } from './player';
 import { random } from './random';
@@ -63,6 +63,7 @@ export function spawnEnemy(
     type: def.type, x: def.x * TILE, y: gy - h, vx, vy: 0, w, h, alive: true,
     frame: 0, frameTimer: 0, squashTimer: 0,
     noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+    isChicken: false,
   };
 
   // index.html:1217 — a fixed-height flyer, not a physics body: no gravity, and its y
@@ -87,6 +88,47 @@ export function spawnEnemy(
   }
 
   return e;
+}
+
+/**
+ * Port of index.html:1497-1500 — what a chicken ray does to whatever it hits. Called
+ * from world.ts's stepArrows, which owns the arrow pass the live source has this inside.
+ *
+ * This REWRITES the enemy in place rather than replacing it: same object, same slot in
+ * `world.enemies`, new everything else. The three flags are the interesting part —
+ *
+ *   - `noGravity` going false is what turns a BAT into a ground animal. A bat writes its
+ *     own `y` every frame off a sine and never falls; clear the flag and stepEnemy's
+ *     gravity block starts running again, so the converted bird drops out of the air,
+ *     lands on the floor, and patrols it like a doll. Its `originY` and `sineOffset` are
+ *     left behind untouched and simply stop being read, exactly as they are on the live
+ *     object.
+ *   - `stunTimer` is ZEROED, so a chicken ray also cures a fart stun. That is a real
+ *     behaviour change, not housekeeping: a stunned enemy is frozen and harmless
+ *     (stepEnemy returns above everything), and this hands it back its legs.
+ *   - The live source also clears `noStomp` here. This port has no such field — only
+ *     cannon sets it (index.html:1218) and spawnEnemy above never creates one — so
+ *     "always off" already IS the post-conversion state and there is nothing to write.
+ *
+ * `type` becomes 'chicken', which no branch of stepEnemy names, so the converted enemy
+ * falls into the ground-patrol `else` — which is precisely what the live game does with
+ * it too. Size comes from the chicken sprite grid at ENEMY_SCALE, the same arithmetic
+ * spawnEnemy uses, so an 8x7 grid at 1.8 makes a 14.4 x 12.6 bird whatever the enemy
+ * used to be.
+ *
+ * The direction is a fresh coin flip — `Math.random() > .5 ? 1 : -1`, times a FLAT 1.5
+ * with no `dc.enemySpeed` anywhere in it, unlike every speed spawnEnemy assigns. Drawn
+ * through random.ts's seam like the other two simulation draws; note the trace harness's
+ * constant 0.5 makes `0.5 > 0.5` FALSE, so a stubbed chicken always walks left.
+ */
+export function chickenify(e: EnemyState): void {
+  e.isChicken = true;
+  e.type = 'chicken';
+  e.vx = (random() > 0.5 ? 1 : -1) * 1.5;
+  e.noGravity = false;
+  e.stunTimer = 0;
+  e.w = CHICKEN_S[0].length * ENEMY_SCALE;
+  e.h = CHICKEN_S.length * ENEMY_SCALE;
 }
 
 /**
@@ -170,7 +212,9 @@ export function stepEnemy(world: World, e: EnemyState): void {
     const ef = e.vx > 0 ? e.x + e.w : e.x;
     if (isSolid(getTile(map, ef, e.y + e.h / 2))) e.vx *= -1;
   } else {
-    // Ground patrol (index.html:1546-1547): doll, car, dino, penguin. No horizontal
+    // Ground patrol (index.html:1546-1547): doll, car, dino, penguin — and 'chicken',
+    // which has no branch of its own here for the same reason it has none in the live
+    // source, so a converted enemy patrols the floor like a doll. No horizontal
     // tile resolution at all, only a direction flip. `ef`/`ef2` are computed once,
     // from the direction of travel AFTER `e.x` has already moved, and reused for both
     // checks — so a wall-flip and a ledge-flip on the same frame can cancel each other

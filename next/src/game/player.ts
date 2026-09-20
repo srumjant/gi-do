@@ -47,6 +47,8 @@ export function createPlayer(level: Level, character: Character): PlayerState {
     // reset. See respawnLevel in world.ts.
     hasBow: false,
     bowCharges: 0,
+    // index.html:1160's `arrowCooldown:0`. Level state like the bow itself.
+    arrowCooldown: 0,
     // index.html:1169 is `hasCape:dc.startWithCape`, not a flat false — true on
     // super_easy, which is the only difficulty where the player spawns already wearing
     // one. Seeding it from the difficulty record belongs with the cape's own behaviour
@@ -166,12 +168,60 @@ function bumpBlocksAbove(world: World, pL2: number, pR2: number, hY: number): vo
 }
 
 /**
+ * Port of index.html:1381-1389 — the bow, and the chicken ray that rides the same
+ * trigger. Called from the middle of `stepPlayer`, exactly where the live source has
+ * it; see the call site.
+ *
+ * Five things here are easy to get subtly wrong:
+ *
+ *   - The trigger is `justPressed`, NEVER `keys`. The live game reads the four fire
+ *     keys (KeyX, KeyZ, ShiftRight, ControlRight) through its `justPressed` map alone,
+ *     so a held button fires exactly one arrow and then nothing until it is released
+ *     and pressed again. That rising edge is `input.firePressed`, computed by the
+ *     caller the same way `jumpPressed` is (input/keyboard.ts) — one mechanism, not two.
+ *   - The COOLDOWN is decremented immediately above the check that reads it, so a
+ *     cooldown of 1 is already 0 by the time the check runs. 15 is therefore 15 frames
+ *     between shots, not 16.
+ *   - The chicken ray WINS whenever any charge is left, even with a full bow in hand:
+ *     `isChicken` is `chickenRayCharges > 0`, tested before anything spends a charge,
+ *     so the rays go first and the arrows wait. And the two counters are spent from
+ *     separately — a chicken shot costs no bow charge.
+ *   - `hasBow` is cleared only once BOTH counters are empty, which is what lets the
+ *     rainbow block's `chicken` grant set `hasBow` without a single bow charge behind it
+ *     (giveRandomSillyPowerup above) and still keep the bow on screen while rays remain.
+ *   - The arrow's spawn `x` is NOT symmetric: `p.x + p.w` facing right (the player's
+ *     right edge) but `p.x - 12` facing left, a hardcoded 12 that happens to equal the
+ *     arrow's collision width and not the player's. Reproduced as written.
+ *
+ * The live function's `sfxCluck()` / `sfxShoot()` are sound, which src/game/ does not own.
+ */
+function fireArrow(world: World, input: InputState): void {
+  const p = world.player;
+  if (p.arrowCooldown > 0) p.arrowCooldown--;
+  const armed = (p.hasBow && p.bowCharges > 0) || p.chickenRayCharges > 0;
+  if (!armed || !input.firePressed || p.arrowCooldown > 0) return;
+
+  const isChicken = p.chickenRayCharges > 0;
+  world.arrows.push({
+    x: p.facing > 0 ? p.x + p.w : p.x - 12,
+    y: p.y + p.h / 2 - 2,
+    vx: p.facing * 6,
+    life: 60,
+    isChicken,
+  });
+  if (isChicken) p.chickenRayCharges--;
+  else p.bowCharges--;
+  if (p.bowCharges <= 0 && p.chickenRayCharges <= 0) p.hasBow = false;
+  p.arrowCooldown = 15;
+}
+
+/**
  * Port of index.html:1361-1423. Mutates `world.player` (and `world.dead`) in place, in
  * exactly the source's order — every step here is load-bearing; see the comments below
  * and the task notes on the jump buffer, apex hang, and the two collision insets.
  *
- * Out of scope, and simply absent below: shooting, landing dust particles, the fart
- * trail's own particles, the cape branch of pit death, sound, and score. Enemy collision
+ * Out of scope, and simply absent below: landing dust particles, the fart trail's own
+ * particles, the cape branch of pit death, sound, and score. Enemy collision
  * is simulated (enemy.ts's stepEnemy), but calls into this file's `playerHit` rather
  * than living here — there is no enemy-collision branch in THIS function because the
  * live game's own equivalent isn't in `update`'s player block either; it is in the
@@ -236,6 +286,13 @@ export function stepPlayer(world: World, input: InputState): void {
   if (!jumpKey && p.vy < dc.jumpForce * 0.4) {
     p.vy = dc.jumpForce * 0.4;
   }
+
+  // Shooting (index.html:1381-1389), between the variable-height clamp above and
+  // gravity below — where the live source has it, and it matters: the arrow's own `y`
+  // is read off the player's position BEFORE this frame's gravity and movement, so an
+  // arrow fired mid-jump leaves from where the player was at the top of the frame, not
+  // from where it ends up.
+  fireArrow(world, input);
 
   // Gravity: apex hang (reduced gravity near the jump peak) + faster fall
   // (index.html:1393-1394). `vy > 0` is tested BEFORE `isApex` — apex hang applies only

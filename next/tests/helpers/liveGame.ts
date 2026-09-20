@@ -14,6 +14,22 @@ export interface FrameInput {
   left: boolean;
   right: boolean;
   jump: boolean;
+  /**
+   * Held fire. The live game only ever reads the four fire keys through `justPressed`
+   * (index.html:1383), so this is turned into a press on its rising edge below and
+   * holding it down fires exactly one arrow — the same treatment `jump` gets, and the
+   * same rule the port's own `firePressed` follows.
+   */
+  fire: boolean;
+}
+
+/** Just the five fields a live `arrows` entry carries (index.html:1385). */
+export interface ArrowSample {
+  x: number;
+  y: number;
+  vx: number;
+  life: number;
+  isChicken: boolean;
 }
 
 /** Just the fields this port's EnemyState tracks — see the note on Driver.getEnemies. */
@@ -187,6 +203,14 @@ export interface Driver {
   /** The live game's own `gameState` string (e.g. 'playing', 'dead', 'levelcomplete'). */
   getGameState: () => string;
   /**
+   * The arrows currently in flight, as a fresh snapshot rather than a live reference —
+   * unlike every other getter here. The live arrow pass REASSIGNS the top-level
+   * `arrows` binding every frame (index.html:1508's `arrows=arrows.filter(...)`), so a
+   * reference captured once would go stale the first time an arrow was spent; reading
+   * the binding through this closure re-resolves it each call.
+   */
+  getArrows: () => ArrowSample[];
+  /**
    * Zeroes the live script's top-level `animFrame` IN PLACE. `initLevel` never resets
    * it (its one direct assignment in the whole file is the top-level declaration
    * `animFrame=0` — every other reference is either `animFrame++` or a read), so
@@ -272,6 +296,7 @@ function bootLiveGame(): Driver {
   getScore: () => score,
   getLevelSpawn: () => ({ bowPickups, superPickups, catPickup, stars, questionBlocks, rainbowBlocks }),
   getGameState: () => gameState,
+  getArrows: () => arrows.map(a => ({ x: a.x, y: a.y, vx: a.vx, life: a.life, isChicken: !!a.isChicken })),
   resetAnimFrame: () => { animFrame = 0; },
   getEnemies: () => enemies,
   clearEnemies: () => { pendingEnemies.length = 0; enemies.length = 0; },
@@ -326,7 +351,7 @@ export function driveLiveGame(opts: DriveOptions): Sample[] {
   opts.beforeRun?.(d);
 
   const trace: Sample[] = [];
-  let prev: FrameInput = { left: false, right: false, jump: false };
+  let prev: FrameInput = { left: false, right: false, jump: false, fire: false };
 
   for (let f = 0; f < opts.frames; f++) {
     const held = opts.input(f);
@@ -337,6 +362,12 @@ export function driveLiveGame(opts: DriveOptions): Sample[] {
     // update() calls clearJP() at the end of every branch, so a press flag must be set
     // on the exact frame it applies to. Rising edge only.
     if (held.jump && !prev.jump) d.justPressed.Space = true;
+    // The four fire keys (KeyX, KeyZ, ShiftRight, ControlRight) are interchangeable —
+    // index.html:1383 ORs them — so driving one is driving all four, and KeyX is the
+    // one on the on-screen instructions (index.html:175). `keys` is deliberately NOT
+    // set for it: the live game never reads the fire keys held, and setting it would
+    // hide a port that wrongly did.
+    if (held.fire && !prev.fire) d.justPressed.KeyX = true;
 
     d.update();
     prev = held;

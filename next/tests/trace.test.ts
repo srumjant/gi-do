@@ -25,7 +25,7 @@
 // scripts run with enemies off, everything else runs with them on, and dieAndRespawn
 // covers the death-and-respawn path deliberately.
 import { afterEach, describe, expect, it } from 'vitest';
-import { driveLiveGame } from './helpers/liveGame';
+import { driveLiveGame, type ArrowSample } from './helpers/liveGame';
 import { SCRIPTS, STOMP_SCRIPT } from './helpers/inputScript';
 import { createWorld, respawnLevel, stepWorld } from '../src/game/world';
 import { findGroundY } from '../src/game/tiles';
@@ -71,6 +71,7 @@ describe.each(Object.entries(SCRIPTS))('%s matches the live game', (name, script
       stepWorld(world, {
         left: held.left, right: held.right, jump: held.jump,
         jumpPressed: held.jump && !prevJump,
+        firePressed: false,
       });
       prevJump = held.jump;
       const p = world.player;
@@ -167,6 +168,7 @@ describe('enemy trace vs. the live game (stomp, enemies enabled)', () => {
       stepWorld(world, {
         left: held.left, right: held.right, jump: held.jump,
         jumpPressed: held.jump && !prevJump,
+        firePressed: false,
       });
       prevJump = held.jump;
       const p = world.player;
@@ -311,7 +313,7 @@ describe('the bow and super pickups vs. the live game', () => {
   interface Powerups { hasBow: boolean; bowCharges: number; hasCape: boolean }
 
   const script = (f: number) => ({
-    left: f >= RIGHT_FRAMES, right: f < RIGHT_FRAMES, jump: false,
+    left: f >= RIGHT_FRAMES, right: f < RIGHT_FRAMES, jump: false, fire: false,
   });
 
   it('grants the bow and the cape on the same frames the live game does', () => {
@@ -348,7 +350,7 @@ describe('the bow and super pickups vs. the live game', () => {
     const portPowerups: Powerups[] = [];
     for (let f = 0; f < FRAMES; f++) {
       const held = script(f);
-      stepWorld(world, { ...held, jumpPressed: false });
+      stepWorld(world, { ...held, jumpPressed: false, firePressed: false });
       const p = world.player;
       port.push({
         x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
@@ -427,7 +429,7 @@ describe('the fart jump vs. the live game', () => {
   // a stationary player around frame 240 for reasons with nothing to do with it.
   const FRAMES = 60;
   const JUMP_FRAME = 5;
-  const script = (f: number) => ({ left: false, right: false, jump: f >= JUMP_FRAME });
+  const script = (f: number) => ({ left: false, right: false, jump: f >= JUMP_FRAME, fire: false });
 
   const REF = createWorld(0, 'normal', 'gigi');
   const START_TILE = LEVELS[0].playerStart[0];
@@ -463,7 +465,7 @@ describe('the fart jump vs. the live game', () => {
     let prevJump = false;
     for (let f = 0; f < FRAMES; f++) {
       const h = script(f);
-      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump });
+      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump, firePressed: false });
       prevJump = h.jump;
       port.push(sampleWorld(world));
       portFartTimers.push(world.player.fartTimer);
@@ -499,7 +501,7 @@ describe('the fart stink cloud vs. the live game', () => {
   // out of range — and short enough to stop before the pit at tile 20, whose death
   // would be about geometry rather than about the fart.
   const FRAMES = 110;
-  const script = () => ({ left: false, right: true, jump: false });
+  const script = () => ({ left: false, right: true, jump: false, fire: false });
 
   it('stuns doll@15 cumulatively, freezes it whole, and lets the player walk through it unharmed', () => {
     const liveStun: number[] = [];
@@ -524,7 +526,7 @@ describe('the fart stink cloud vs. the live game', () => {
     const portStun: number[] = [];
     const portDead: boolean[] = [];
     for (let f = 0; f < FRAMES; f++) {
-      stepWorld(world, { ...script(), jumpPressed: false });
+      stepWorld(world, { ...script(), jumpPressed: false, firePressed: false });
       port.push(sampleWorld(world));
       portStun.push(world.enemies[0]?.stunTimer ?? 0);
       portDead.push(world.dead);
@@ -607,7 +609,7 @@ describe('the big head vs. the live game', () => {
     let prevJump = false;
     for (let f = 0; f < STOMP_SCRIPT.frames; f++) {
       const h = STOMP_SCRIPT.input(f);
-      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump });
+      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump, firePressed: false });
       prevJump = h.jump;
       port.push(sampleWorld(world));
       portBigHead.push(world.player.bigHeadTimer);
@@ -636,7 +638,7 @@ describe('the big head vs. the live game', () => {
     let plainKill = -1;
     for (let f = 0; f < STOMP_SCRIPT.frames; f++) {
       const h = STOMP_SCRIPT.input(f);
-      stepWorld(plain, { ...h, jumpPressed: h.jump && !prevJ });
+      stepWorld(plain, { ...h, jumpPressed: h.jump && !prevJ, firePressed: false });
       prevJ = h.jump;
       if (plainKill < 0 && plain.enemies.some((e) => !e.alive)) plainKill = f;
     }
@@ -716,7 +718,7 @@ describe('the question block vs. the live game', () => {
    * entire ramp, and a long tail with the star provably parked.
    */
   const FRAMES = 60;
-  const script = (f: number) => ({ left: false, right: false, jump: f >= JUMP_FRAME });
+  const script = (f: number) => ({ left: false, right: false, jump: f >= JUMP_FRAME, fire: false });
 
   // Enemies suppressed on both sides: doll@15 and car@40 are both inside the spawn
   // window from the first frame (the camera clamps to 0 at this x), and what they do
@@ -756,7 +758,7 @@ describe('the question block vs. the live game', () => {
     let prevJump = false;
     for (let f = 0; f < FRAMES; f++) {
       const h = script(f);
-      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump });
+      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump, firePressed: false });
       prevJump = h.jump;
       port.push(sampleWorld(world));
       portStars.push(world.stars.map((s) => ({
@@ -839,7 +841,7 @@ describe('the question block vs. the live game', () => {
     let prevJump = false;
     for (let f = 0; f < FRAMES; f++) {
       const h = script(f);
-      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump });
+      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump, firePressed: false });
       prevJump = h.jump;
     }
     // Sanity: there is something to undo.
@@ -886,7 +888,7 @@ describe('the rainbow block vs. the live game', () => {
    * nothing, since a frozen world matching a frozen world is trivially true.
    */
   const FRAMES = 200;
-  const script = (f: number) => ({ left: false, right: false, jump: f >= JUMP_FRAME });
+  const script = (f: number) => ({ left: false, right: false, jump: f >= JUMP_FRAME, fire: false });
 
   interface Powerups {
     fartTimer: number; bigHeadTimer: number; chickenRayCharges: number; hasBow: boolean;
@@ -928,7 +930,7 @@ describe('the rainbow block vs. the live game', () => {
     let prevJump = false;
     for (let f = 0; f < FRAMES; f++) {
       const h = script(f);
-      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump });
+      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump, firePressed: false });
       prevJump = h.jump;
       const p = world.player;
       port.push(sampleWorld(world));
@@ -1008,6 +1010,400 @@ describe('the rainbow block vs. the live game', () => {
     // And the player really does land back on the platform it jumped from.
     expect(port.slice(bump + FREEZE + 1).some((s) => s.onGround)).toBe(true);
     expect(port[FRAMES - 1].y).toBe(START_Y);
+    expect(world.dead).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The bow, arrows and the chicken ray (Plan 5, Task 4) — index.html:1381-1389 (firing,
+// inside the player block) and :1494-1508 (flight and hits, its own pass between the
+// pickups and the stars).
+//
+// Two traces. The first collects a real bow off the map and shoots a real enemy with
+// it; the second seeds chicken ray charges, because the only thing in the game that
+// grants them is the rainbow block and the 0.5 stub makes that always pay out a big
+// head instead (see the rainbow-block trace above). Both fire through the SAME
+// `justPressed` edge the live game uses — `fire` held in the script, turned into a
+// press on its rising edge by driveLiveGame and by `firePressed` here.
+//
+// bat@48 streams in during BOTH windows, which is why both stub `Math.random` (its
+// sineOffset is drawn at spawn) and both project enemy `vy` away with stripEnemyVy.
+// ---------------------------------------------------------------------------
+
+describe('the bow vs. the live game', () => {
+  // Level 1's bow at tile 35 (560, 352), reached exactly the way the pickup trace above
+  // reaches it: planted two tiles short of it on the same ground, then walked onto it.
+  // The player then turns around, stops, and shoots LEFT at doll@28 — the nearest thing
+  // an arrow fired from standing height can actually hit. car@40 is closer, but it
+  // patrols the platform at row 19 and an arrow fired off the floor passes underneath it.
+  //
+  // Enemies run LIVE on both sides: the whole point is killing one. Nothing else in the
+  // window reaches the player — doll@15 and doll@28 both walk away to the left, car@40
+  // stays on its platform, and the camera's spawn window tops out at column 62, so the
+  // seven defs past dino@55 never appear.
+  afterEach(() => setRandom(Math.random));
+
+  const REF = createWorld(0, 'normal', 'gigi');
+  const BOW = REF.bowPickups[0];
+  const START_X = BOW.x - 2 * TILE;
+  const START_Y = findGroundY(REF.map, BOW.x / TILE) - REF.player.h;
+  /** Right long enough to walk onto the bow, then left just long enough to turn around. */
+  const RIGHT_FRAMES = 14;
+  const TURN_FRAMES = 20;
+  /**
+   * Three presses, and the middle one is the point of it. The first fires. The second
+   * comes 6 frames later, inside the 15-frame cooldown, and must do NOTHING — no arrow,
+   * no charge spent. The third comes exactly 15 frames after the first, on the frame the
+   * cooldown has just reached 0, and must fire: that is the boundary between 15 frames
+   * between shots and 16.
+   */
+  const FIRE_FRAMES = [20, 26, 35];
+  /**
+   * 110 frames. The first arrow kills doll@28 on frame 39; the second hits nothing and
+   * has to run its `life` all the way out, which it does on frame 94. Stopping earlier
+   * would leave the 60-frame lifetime untested.
+   */
+  const FRAMES = 110;
+
+  interface Bow { hasBow: boolean; bowCharges: number; arrowCooldown: number }
+
+  const script = (f: number) => ({
+    left: f >= RIGHT_FRAMES && f < TURN_FRAMES,
+    right: f < RIGHT_FRAMES,
+    jump: false,
+    fire: FIRE_FRAMES.includes(f),
+  });
+
+  it('fires on the press, kills on the hit, and honours the cooldown and the arrow lifetime', () => {
+    const liveArrows: ArrowSample[][] = [];
+    const liveBow: Bow[] = [];
+    const live = driveLiveGame({
+      level: 0, difficulty: 'normal', character: 'gigi',
+      frames: FRAMES, input: script,
+      beforeRun: (d) => {
+        const p = d.getPlayer();
+        p.x = START_X; p.y = START_Y; p.vx = 0; p.vy = 0; p.onGround = true;
+      },
+      onFrame: (d) => {
+        const p = d.getPlayer();
+        liveArrows.push(d.getArrows());
+        liveBow.push({
+          hasBow: p.hasBow as boolean,
+          bowCharges: p.bowCharges as number,
+          arrowCooldown: p.arrowCooldown as number,
+        });
+      },
+    });
+
+    setRandom(() => 0.5); // the live driver's own stubbed Math.random, for bat@48
+    const world = createWorld(0, 'normal', 'gigi');
+    world.player.x = START_X;
+    world.player.y = START_Y;
+    world.player.onGround = true;
+
+    const port: typeof live = [];
+    const portArrows: ArrowSample[][] = [];
+    const portBow: Bow[] = [];
+    for (let f = 0; f < FRAMES; f++) {
+      const h = script(f);
+      stepWorld(world, { ...h, jumpPressed: false, firePressed: h.fire });
+      const p = world.player;
+      port.push(sampleWorld(world));
+      portArrows.push(world.arrows.map((a) => ({
+        x: a.x, y: a.y, vx: a.vx, life: a.life, isChicken: a.isChicken,
+      })));
+      portBow.push({
+        hasBow: p.hasBow, bowCharges: p.bowCharges, arrowCooldown: p.arrowCooldown,
+      });
+    }
+
+    // Player, camera, animFrame, score AND every enemy, frame for frame — the usual
+    // comparison, which already covers the kill from the victim's side.
+    expect(port.map(stripEnemyVy)).toEqual(live.map(stripEnemyVy));
+    // ...and the two things this trace is about: every arrow's whole flight, and the bow
+    // state that fired it, on the same frames.
+    expect(portArrows).toEqual(liveArrows);
+    expect(portBow).toEqual(liveBow);
+
+    // The bow is collected off the map, not seeded — the charges are the difficulty's
+    // (3 at normal), and they are what the shots below spend.
+    const bowFrame = portBow.findIndex((b) => b.hasBow);
+    expect(bowFrame).toBeGreaterThanOrEqual(0);
+    expect(bowFrame).toBeLessThan(FIRE_FRAMES[0]);
+    expect(portBow[bowFrame].bowCharges).toBe(world.dc.bowCharges);
+
+    // Shot one. Fired on the press frame, one charge gone, cooldown full — and the arrow
+    // is ALREADY a step downrange, because stepArrows runs later in the same step that
+    // created it. Facing is -1 (the turn-around above), so it leaves from `p.x - 12` at
+    // `p.y + p.h/2 - 2` and flies at -6.
+    const [first, blocked, second] = FIRE_FRAMES;
+    expect(portArrows[first - 1]).toEqual([]);
+    expect(portArrows[first]).toHaveLength(1);
+    expect(portArrows[first][0]).toEqual({
+      x: port[first - 1].x - 12 - 6,
+      y: port[first - 1].y + REF.player.h / 2 - 2,
+      vx: -6,
+      life: 59,
+      isChicken: false,
+    });
+    expect(portBow[first].bowCharges).toBe(world.dc.bowCharges - 1);
+    expect(portBow[first].arrowCooldown).toBe(15);
+
+    // The cooldown. A press 6 frames later buys nothing at all — no second arrow, no
+    // second charge spent — and then the press on the frame the cooldown reaches 0 does
+    // fire, 15 frames after the first and not 16.
+    expect(portArrows[blocked]).toHaveLength(1);
+    expect(portBow[blocked].bowCharges).toBe(world.dc.bowCharges - 1);
+    expect(portBow[second - 1].arrowCooldown).toBe(1);
+    expect(portBow[second].arrowCooldown).toBe(15);
+    expect(portArrows[second]).toHaveLength(2);
+    expect(portBow[second].bowCharges).toBe(world.dc.bowCharges - 2);
+    expect(second - first).toBe(15);
+
+    // The kill. doll@28 is enemies[1] on both sides; the arrow that reaches it is spent
+    // on the same frame, and 200 points land at normal's 1.0 multiplier — the same award
+    // a stomp pays, once, for one doll.
+    const killFrame = port.findIndex((s) => s.enemies.some((e) => !e.alive));
+    expect(killFrame).toBeGreaterThan(first);
+    expect(port[killFrame].enemies[1].type).toBe('doll');
+    // 29, not the 30 the hit assigns: stepEnemies runs after stepArrows in the same
+    // step, and the dead-enemy branch at the top of it spends one straight away.
+    expect(port[killFrame].enemies[1].squashTimer).toBe(29);
+    expect(port[killFrame - 1].score).toBe(0);
+    expect(port[killFrame].score).toBe(Math.round(200 * world.dc.scoreMultiplier));
+    expect(port[FRAMES - 1].score).toBe(Math.round(200 * world.dc.scoreMultiplier));
+    // The arrow that did it left the list on the frame it hit — `life` went to 0 and the
+    // filter at the end of the pass swept it — while the other one flew on.
+    expect(portArrows[killFrame - 1]).toHaveLength(2);
+    expect(portArrows[killFrame]).toHaveLength(1);
+
+    // The survivor dies of old age instead. `life` starts at 60, is decremented on the
+    // frame the arrow is fired, and the arrow is gone the frame it reaches 0 — 59 frames
+    // of flight, and no second kill for the score to have noticed.
+    expect(portArrows[second][1].life).toBe(59);
+    const gone = portArrows.findIndex((a, f) => f > second && a.length === 0);
+    expect(gone).toBe(second + 59);
+    expect(portArrows.slice(gone).every((a) => a.length === 0)).toBe(true);
+
+    // Nothing in this window hurts the player, and no other enemy is touched: exactly one
+    // of the five is dead at the end, which is what makes the score assertions above mean
+    // "one arrow, one kill" rather than "some arrows, some kills".
+    expect(world.dead).toBe(false);
+    expect(port[FRAMES - 1].enemies.filter((e) => !e.alive)).toHaveLength(1);
+    expect(port[FRAMES - 1].enemies).toHaveLength(5);
+  });
+});
+
+describe('the chicken ray vs. the live game', () => {
+  // The ray's own charges are seeded on both sides rather than earned: the only thing
+  // that grants them is the rainbow block, and under the constant 0.5 stub that block
+  // always pays out a big head instead (see the rainbow-block trace above), so no trace
+  // can reach the `chicken` branch through the real trigger. Seeding is the same move
+  // the fart and big-head traces make, for the same reason.
+  //
+  // A BOW is seeded alongside it, fully charged, because that is the trap: the ray wins
+  // whenever any charge is left, even with arrows in hand, and it spends its own counter
+  // and not the bow's.
+  //
+  // The target is bat@48, and it has to be a bat. A chicken is 14.4 x 12.6 against a
+  // bat's 12.6 x 10.8, so both dimensions visibly change, and a bat is the only type in
+  // this level whose `noGravity` is true beforehand — the flag whose clearing turns a
+  // thing that flies a sine wave into a thing that falls.
+  //
+  // The player is planted on the platform at [50,18,6] (columns 50-55, row 18), the one
+  // standing spot in the level whose arrow height (`p.y + p.h/2 - 2`) crosses the band
+  // the bat's sine actually flies through. Column 52 rather than column 50, because the
+  // CAT pickup sits at column 50 (`catPosition: 50`) — standing on it collects it, the
+  // live game spawns the cat companion this port does not have yet, and the cat then
+  // scratches dino@55 for 300 points that the port knows nothing about. Two tiles right
+  // is entirely clear of it.
+  afterEach(() => setRandom(Math.random));
+
+  const REF = createWorld(0, 'normal', 'gigi');
+  const PLATFORM_TILE = 52;
+  const START_X = PLATFORM_TILE * TILE;
+  const START_Y = findGroundY(REF.map, PLATFORM_TILE) - REF.player.h;
+  /**
+   * Fired on frame 10, reaching the bat on frame 19. The window is genuinely narrow: the
+   * bat's sine only lifts it into the arrow's band from about animFrame 13, and it flies
+   * left at 1.2 a frame, so firing earlier only makes the arrow wait and firing much
+   * later runs the bat out of reach.
+   */
+  const FIRE_FRAME = 10;
+  /**
+   * 70 frames: the conversion on frame 19, the whole fall, the landing, and a long look
+   * at the bird walking afterwards. Nothing threatens the player here — dino@55 spawns on
+   * the question block at [55,15] and patrols that single tile 40px above the platform,
+   * never coming down.
+   */
+  const FRAMES = 70;
+
+  const script = (f: number) => ({
+    left: false, right: false, jump: false, fire: f === FIRE_FRAME,
+  });
+
+  /** The bat/chicken's own fields, which the shared Sample shape does not carry. */
+  interface Victim {
+    type: string; w: number; h: number; vx: number; vy: number;
+    noGravity: boolean; isChicken: boolean; stunTimer: number;
+  }
+  interface Rays { chickenRayCharges: number; bowCharges: number; hasBow: boolean }
+
+  /** bat@48 is enemyDefs[3], and the port implements every type before it. */
+  const BAT_INDEX = 3;
+
+  it('converts the bat in place, spends a ray and not an arrow, and grounds the bird', () => {
+    const liveArrows: ArrowSample[][] = [];
+    const liveVictim: Array<Victim | null> = [];
+    const liveRays: Rays[] = [];
+    const live = driveLiveGame({
+      level: 0, difficulty: 'normal', character: 'gigi',
+      frames: FRAMES, input: script,
+      beforeRun: (d) => {
+        const p = d.getPlayer();
+        p.x = START_X; p.y = START_Y; p.vx = 0; p.vy = 0; p.onGround = true;
+        p.facing = -1; // shooting left, at a bat that is already to the left
+        p.hasBow = true;
+        p.bowCharges = 3; // normal's dc.bowCharges — arrows in hand, and they stay there
+        p.chickenRayCharges = 8; // index.html:1144
+      },
+      onFrame: (d) => {
+        const p = d.getPlayer();
+        liveArrows.push(d.getArrows());
+        liveRays.push({
+          chickenRayCharges: p.chickenRayCharges as number,
+          bowCharges: p.bowCharges as number,
+          hasBow: p.hasBow as boolean,
+        });
+        const e = d.getEnemies()[BAT_INDEX];
+        liveVictim.push(e === undefined ? null : {
+          type: e.type, w: e.w as number, h: e.h as number, vx: e.vx,
+          // A bat never has `vy` written on the live side — the gravity block that is its
+          // only writer is skipped while noGravity holds — so it reads `undefined` right
+          // up to the conversion. Normalised to 0, which is exactly what that same live
+          // block assigns (`if(e.vy===undefined)e.vy=0`) the moment it first runs.
+          vy: (e.vy as number | undefined) ?? 0,
+          noGravity: !!e.noGravity,
+          // Both of these are added to the live object by the conversion itself and are
+          // simply absent before it, which is the same `false`/`0` this port starts from.
+          isChicken: !!e.isChicken,
+          stunTimer: (e.stunTimer as number | undefined) ?? 0,
+        });
+      },
+    });
+
+    setRandom(() => 0.5); // the live driver's own stubbed Math.random
+    const world = createWorld(0, 'normal', 'gigi');
+    world.player.x = START_X;
+    world.player.y = START_Y;
+    world.player.onGround = true;
+    world.player.facing = -1;
+    world.player.hasBow = true;
+    world.player.bowCharges = 3;
+    world.player.chickenRayCharges = 8;
+
+    const port: typeof live = [];
+    const portArrows: ArrowSample[][] = [];
+    const portVictim: Array<Victim | null> = [];
+    const portRays: Rays[] = [];
+    for (let f = 0; f < FRAMES; f++) {
+      const h = script(f);
+      stepWorld(world, { ...h, jumpPressed: false, firePressed: h.fire });
+      const p = world.player;
+      port.push(sampleWorld(world));
+      portArrows.push(world.arrows.map((a) => ({
+        x: a.x, y: a.y, vx: a.vx, life: a.life, isChicken: a.isChicken,
+      })));
+      portRays.push({
+        chickenRayCharges: p.chickenRayCharges, bowCharges: p.bowCharges, hasBow: p.hasBow,
+      });
+      const e = world.enemies[BAT_INDEX];
+      portVictim.push(e === undefined ? null : {
+        type: e.type, w: e.w, h: e.h, vx: e.vx, vy: e.vy,
+        noGravity: e.noGravity, isChicken: e.isChicken, stunTimer: e.stunTimer,
+      });
+    }
+
+    // Player, camera, animFrame, score and every enemy's position, frame for frame. Enemy
+    // `vy` alone is projected away (stripEnemyVy above); `portVictim` compares the victim's
+    // own vy directly instead, which is the interesting one here.
+    expect(port.map(stripEnemyVy)).toEqual(live.map(stripEnemyVy));
+    expect(portArrows).toEqual(liveArrows);
+    expect(portVictim).toEqual(liveVictim);
+    expect(portRays).toEqual(liveRays);
+
+    // The shot must be a RAY, not an arrow. The bow is fully charged and the ray still
+    // goes first (index.html:1384's `isChicken = p.chickenRayCharges > 0`, tested before
+    // anything is spent), and only the ray counter moves.
+    expect(portArrows[FIRE_FRAME]).toHaveLength(1);
+    expect(portArrows[FIRE_FRAME][0].isChicken).toBe(true);
+    expect(portRays[FIRE_FRAME].chickenRayCharges).toBe(7);
+    expect(portRays.every((r) => r.bowCharges === 3)).toBe(true);
+    expect(portRays.every((r) => r.hasBow)).toBe(true);
+
+    // The conversion itself: same object, same slot in `enemies`, everything else new —
+    // type, both dimensions, direction, and the flags. `vx` is a flat -1.5 with no
+    // dc.enemySpeed in it, negative because the stub makes `0.5 > 0.5` false.
+    const convertFrame = portVictim.findIndex((v) => v !== null && v.isChicken);
+    expect(convertFrame).toBeGreaterThan(FIRE_FRAME);
+    const before = portVictim[convertFrame - 1]!;
+    const after = portVictim[convertFrame]!;
+    expect(before).toEqual({
+      type: 'bat', w: 12.6, h: 10.8, vx: -1.2, vy: 0,
+      noGravity: true, isChicken: false, stunTimer: 0,
+    });
+    expect(after).toEqual({
+      type: 'chicken', w: 14.4, h: 12.6, vx: -1.5,
+      // The enemy pass runs after the arrow pass in the same step, so gravity has already
+      // touched the new bird once by the time anything can look at it.
+      vy: GRAVITY,
+      noGravity: false, isChicken: true, stunTimer: 0,
+    });
+    // Bigger in BOTH directions, from the chicken sprite grid rather than a constant.
+    expect(after.w).toBeGreaterThan(before.w);
+    expect(after.h).toBeGreaterThan(before.h);
+    // 100 points, not the 200 a kill pays, and the enemy is very much still alive.
+    expect(port[convertFrame - 1].score).toBe(0);
+    expect(port[convertFrame].score).toBe(Math.round(100 * world.dc.scoreMultiplier));
+    expect(port[convertFrame].enemies[BAT_INDEX].alive).toBe(true);
+    // The ray is spent on the hit, exactly like an arrow — one bird per ray.
+    expect(portArrows[convertFrame]).toHaveLength(0);
+    expect(portRays[FRAMES - 1].chickenRayCharges).toBe(7); // and no second shot fired
+
+    // ...and what clearing `noGravity` actually buys. A bat has no vy at all and rewrites
+    // its own y every frame from `originY` plus a sine; this bird falls instead,
+    // accelerating by GRAVITY a frame, until it lands on the floor and stops.
+    const victims = portVictim.slice(convertFrame).map((v) => v!);
+    expect(victims[1].vy).toBe(GRAVITY * 2);
+    expect(victims[2].vy).toBe(GRAVITY * 3);
+    const landed = victims.findIndex((v, i) => i > 0 && v.vy === 0);
+    expect(landed).toBeGreaterThan(0);
+    expect(Math.max(...victims.map((v) => v.vy))).toBeGreaterThan(GRAVITY * 10);
+    const ys = port.slice(convertFrame).map((s) => s.enemies[BAT_INDEX].y);
+    // Monotonically DOWN, never back up: nothing about a sine wave left in it.
+    expect(ys.every((y, i) => i === 0 || y >= ys[i - 1])).toBe(true);
+    // It lands on the base ground, sitting exactly its own new height above the floor —
+    // the chicken's height, not the bat's, which is the size change showing up in the
+    // physics rather than only in a field.
+    //
+    // Deliberately NOT findGroundY: that scans DOWNWARD from row 0 and stops at the first
+    // solid tile, which over these columns is the platform at [42,15,3] four rows up, not
+    // the floor the bird is standing on. The base ground makeGround writes is the bottom
+    // two rows, so its top is `(height - 2) * TILE`.
+    const bat = world.enemies[BAT_INDEX];
+    const baseGroundY = (LEVELS[0].height - 2) * TILE;
+    expect(ys[landed]).toBe(baseGroundY - after.h);
+    expect(bat.y).toBe(baseGroundY - after.h);
+    // That resting height is far below anything its old flight path could reach: the sine
+    // is 30px either side of originY, and this is well past the bottom of it.
+    expect(bat.y).toBeGreaterThan(bat.originY + 30);
+    // And then it WALKS, on the ground, like the doll it now behaves as: 1.5px a frame,
+    // leftward, still alive and still able to be stomped.
+    expect(bat.alive).toBe(true);
+    expect(bat.vx).toBe(-1.5);
+    expect(ys.slice(landed).every((y) => y === ys[landed])).toBe(true);
+    const walk = port.slice(convertFrame + landed).map((s) => s.enemies[BAT_INDEX].x);
+    expect(walk[walk.length - 1]).toBe(walk[0] - 1.5 * (walk.length - 1));
     expect(world.dead).toBe(false);
   });
 });
