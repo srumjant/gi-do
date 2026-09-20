@@ -18,11 +18,21 @@ This project has **no test runner, no build step and no dependencies** — that 
 
 So the plan splits verification two ways, and neither is ceremony:
 
-1. **Pure logic is genuinely test-driven** through a self-test harness at
-   `index.html?test=1`. Crucially, the tests call the *same* extracted functions
-   the game runs — `learnVertStep`, `zoneAt`, `detectPadKind` — so a passing test
-   is evidence about real behaviour, not a parallel reimplementation. Assertions
-   log with a `[TEST]` prefix for easy filtering.
+1. **Pure logic is genuinely test-driven** through a self-test harness that runs
+   two ways: in the browser at `index.html?test=1`, and headlessly via
+   `node scripts/run-tests.js`. The node runner evaluates the game's own inline
+   `<script>` in a VM with a small DOM shim, so the tests call the *same*
+   functions the game runs — `learnVertStep`, `zoneAt`, `detectPadKind`. Nothing
+   is copied or reimplemented, so the tests cannot drift. It exits non-zero on
+   failure, which makes it the verification command for every task.
+
+   This adds one dev-only file in `scripts/`. The game itself stays a single
+   HTML file with no build step and no dependencies — `scripts/run-tests.js`
+   uses only node builtins and is never loaded by the game.
+
+   The shim deliberately omits `speechSynthesis`. That is not laziness: it means
+   every test run also proves the game loads and plays on a device with no
+   voices installed, which is the likely state of the kids' iPad.
 2. **Feel, visuals and audio are verified by scripted manual playtest**, with
    exact expected observations. There is no honest way to unit-test "does the
    jump feel good".
@@ -37,6 +47,7 @@ is only catchable by watching one use it.
 | File | Responsibility | Change |
 |---|---|---|
 | `index.html` | The entire game | Modified throughout |
+| `scripts/run-tests.js` | Headless runner for the in-file self-tests | Created in Task 1 |
 | `docs/plans/2026-09-20-learn-path-refinement.md` | Design spec | Reference only |
 
 `index.html` is ~3000 lines and organised in clearly commented sections
@@ -132,15 +143,128 @@ function runSelfTests(){
 if(location.search.indexOf('test=1')>=0)window.addEventListener('load',runSelfTests);
 ```
 
-- [ ] **Step 3: Run to verify it fails**
+- [ ] **Step 3: Create the headless test runner**
 
-```bash
-open 'file:///Users/sergei/Work/gi-do/.claude/worktrees/next/index.html?test=1'
+Create `scripts/run-tests.js`. This has been verified to load the current
+`index.html` cleanly, so if it reports a load failure, the fault is in your
+edit, not the shim:
+
+```js
+#!/usr/bin/env node
+// Runs the game's in-file self-tests headlessly.
+//
+// index.html is a single file with one inline <script>. We evaluate that exact
+// script in a VM with a minimal DOM shim, then call runSelfTests(). Because it
+// loads the real file, the tests exercise the real functions — nothing is
+// copied or reimplemented here, so the tests cannot drift from the game.
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+const htmlPath = process.argv[2] || path.join(__dirname, '..', 'index.html');
+const html = fs.readFileSync(htmlPath, 'utf8');
+
+const m = html.match(/<script>([\s\S]*)<\/script>/);
+if (!m) { console.error('No <script> block found in ' + htmlPath); process.exit(2); }
+const source = m[1];
+
+// --- minimal DOM shim -------------------------------------------------------
+const noop = () => {};
+function makeCtx() {
+  const store = {};
+  return new Proxy(store, {
+    get(t, p) {
+      if (p === 'measureText') return () => ({ width: 10 });
+      if (p === 'createLinearGradient' || p === 'createRadialGradient')
+        return () => ({ addColorStop: noop });
+      if (p === 'getImageData') return () => ({ data: new Uint8ClampedArray(4) });
+      if (p in t) return t[p];
+      return noop;
+    },
+    set(t, p, v) { t[p] = v; return true; }
+  });
+}
+function makeEl(id) {
+  return {
+    id, width: 640, height: 400, textContent: '', title: '',
+    style: {}, classList: { add: noop, remove: noop, toggle: noop, contains: () => false },
+    addEventListener: noop, removeEventListener: noop,
+    getContext: () => makeCtx(),
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 400 }),
+    appendChild: noop, focus: noop, click: noop
+  };
+}
+const elements = {};
+const documentShim = {
+  getElementById: (id) => (elements[id] || (elements[id] = makeEl(id))),
+  querySelector: () => null, querySelectorAll: () => [],
+  createElement: (t) => makeEl(t),
+  addEventListener: noop, removeEventListener: noop,
+  documentElement: makeEl('html'), body: makeEl('body'),
+  fullscreenElement: null, webkitFullscreenElement: null,
+  exitFullscreen: () => Promise.resolve()
+};
+
+function FakeAudioParam() { return { value: 0, setValueAtTime: noop, linearRampToValueAtTime: noop, exponentialRampToValueAtTime: noop }; }
+function FakeAudioNode() {
+  return { connect: noop, disconnect: noop, start: noop, stop: noop,
+           frequency: FakeAudioParam(), gain: FakeAudioParam(),
+           type: 'sine', buffer: null, loop: false };
+}
+function FakeAudioContext() {
+  return { currentTime: 0, destination: {}, state: 'running', sampleRate: 44100,
+           resume: () => Promise.resolve(), close: () => Promise.resolve(),
+           createOscillator: FakeAudioNode, createGain: FakeAudioNode,
+           createBiquadFilter: FakeAudioNode, createBufferSource: FakeAudioNode,
+           createBuffer: () => ({ getChannelData: () => new Float32Array(8) }) };
+}
+
+const sandbox = {
+  console, Math, Date, JSON, Object, Array, String, Number, Boolean, Set, Map,
+  Float32Array, Uint8ClampedArray, Promise, RegExp, Error, isNaN, parseInt, parseFloat,
+  document: documentShim,
+  location: { search: '?test=1', href: 'file://' + htmlPath, hash: '' },
+  navigator: { getGamepads: () => [], userAgent: 'node', vibrate: noop },
+  screen: { orientation: { lock: () => Promise.resolve(), unlock: noop } },
+  AudioContext: FakeAudioContext, webkitAudioContext: FakeAudioContext,
+  // Speech synthesis is absent by design: every run therefore also proves the
+  // game works on a device with no voices installed.
+  requestAnimationFrame: noop, cancelAnimationFrame: noop,
+  setTimeout: noop, clearTimeout: noop, setInterval: noop, clearInterval: noop,
+  addEventListener: noop, removeEventListener: noop,
+  innerWidth: 1280, innerHeight: 800, devicePixelRatio: 1
+};
+sandbox.window = sandbox;
+sandbox.globalThis = sandbox;
+
+// --- run --------------------------------------------------------------------
+const context = vm.createContext(sandbox);
+try {
+  vm.runInContext(source, context, { filename: 'index.html', timeout: 20000 });
+} catch (e) {
+  console.error('Script failed to load: ' + (e && e.stack || e));
+  process.exit(2);
+}
+
+if (typeof context.runSelfTests !== 'function') {
+  console.error('Loaded OK, but runSelfTests() is not defined.');
+  process.exit(3);
+}
+context.runSelfTests();
+const r = context.TEST_RESULTS || { pass: 0, fail: 1 };
+process.exit(r.fail > 0 ? 1 : 0);
 ```
 
-Open DevTools console. Expected: `Uncaught ReferenceError: learnVertStep is not defined`.
+- [ ] **Step 4: Run to verify the tests fail**
 
-- [ ] **Step 4: Extract the shared vertical step**
+```bash
+node scripts/run-tests.js; echo "exit=$?"
+```
+
+Expected: `Script failed to load: ReferenceError: learnVertStep is not defined`
+and `exit=2`.
+
+- [ ] **Step 5: Extract the shared vertical step**
 
 In `updateLearn`, replace these lines:
 
@@ -192,13 +316,13 @@ with:
   if((L.pOnGround||L.pCoyote>0)&&L.pJumpBuf>0){L.pvy=LEARN_JUMP;L.pOnGround=false;L.pCoyote=0;L.pJumpBuf=0;sfxJump();}
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [ ] **Step 6: Run to verify it passes**
 
 ```bash
-open 'file:///Users/sergei/Work/gi-do/.claude/worktrees/next/index.html?test=1'
+node scripts/run-tests.js; echo "exit=$?"
 ```
 
-Expected console output — **all 8 PASS, 0 FAIL**:
+Expected output — **all 8 PASS, 0 FAIL, `exit=0`**:
 
 ```
 [TEST] ===== start =====
@@ -213,16 +337,17 @@ Expected console output — **all 8 PASS, 0 FAIL**:
 [TEST] ===== 8 passed, 0 failed =====
 ```
 
-- [ ] **Step 6: Verify the game still plays**
+- [ ] **Step 7: Verify the game still plays**
 
-Open `index.html` with no query string, press SPACE → ÕPIME! → TÄHED. Confirm
-the player still jumps and moves exactly as before. The extraction must be
-behaviour-preserving.
+Open `index.html` in a browser with no query string, press SPACE → ÕPIME! →
+TÄHED. Confirm the player still jumps and moves exactly as before. The
+extraction must be behaviour-preserving. If you cannot open a browser, say so
+in your report rather than claiming this step passed.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add index.html
+git add index.html scripts/run-tests.js
 git commit -m "test: add self-test harness and extract shared learn-mode physics step"
 ```
 
@@ -431,10 +556,10 @@ function testBackNav(){
 - [ ] **Step 8: Run the tests**
 
 ```bash
-open 'file:///Users/sergei/Work/gi-do/.claude/worktrees/next/index.html?test=1'
+node scripts/run-tests.js; echo "exit=$?"
 ```
 
-Expected: 8 physics PASS + 19 back-nav PASS, 0 FAIL.
+Expected: 8 physics PASS + 19 back-nav PASS, 0 FAIL, `exit=0`.
 
 - [ ] **Step 9: Manual verification**
 
@@ -566,10 +691,10 @@ function testPadDetect(){
 - [ ] **Step 2: Run to verify it fails**
 
 ```bash
-open 'file:///Users/sergei/Work/gi-do/.claude/worktrees/next/index.html?test=1'
+node scripts/run-tests.js; echo "exit=$?"
 ```
 
-Expected: `Uncaught ReferenceError: detectPadKind is not defined`.
+Expected: `Script failed to load: ReferenceError: detectPadKind is not defined`, `exit=2`.
 
 - [ ] **Step 3: Implement detection**
 
@@ -801,7 +926,11 @@ function testVoicePick(){
 
 - [ ] **Step 2: Run to verify it fails**
 
-Expected: `Uncaught ReferenceError: pickVoiceFrom is not defined`.
+```bash
+node scripts/run-tests.js; echo "exit=$?"
+```
+
+Expected: `Script failed to load: ReferenceError: pickVoiceFrom is not defined`, `exit=2`.
 
 - [ ] **Step 3: Implement the voice module**
 
@@ -939,7 +1068,11 @@ function testZones(){
 
 - [ ] **Step 2: Run to verify it fails**
 
-Expected: `Uncaught ReferenceError: zoneAt is not defined`.
+```bash
+node scripts/run-tests.js; echo "exit=$?"
+```
+
+Expected: `Script failed to load: ReferenceError: zoneAt is not defined`, `exit=2`.
 
 - [ ] **Step 3: Implement zone mapping**
 
@@ -1641,7 +1774,8 @@ git commit -m "feat: star progress, translated learn chrome, voice replay on X"
 
 Run the full checklist from the spec before calling this done:
 
-- [ ] `index.html?test=1` → all suites pass, 0 failures
+- [ ] `node scripts/run-tests.js` → all suites pass, 0 failures, exit 0
+- [ ] `index.html?test=1` in a real browser → same result
 - [ ] A held jump from a gate floor cannot reach the platform above
 - [ ] A **tapped** jump on a correct arch still clears it (the jump-cut trap)
 - [ ] A rocket from zone 0 and zone 2, not just the centre, lands above
