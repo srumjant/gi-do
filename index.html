@@ -1049,10 +1049,17 @@ const BACK_TARGET={
 const PAUSABLE=['playing','dead','between','levelcomplete'];
 const LEARN_STATES=['learnmenu','learnletters','learnsyllables','learnresult'];
 
+// Both are meaningful only while paused, and openPause() refreshes them every
+// time, so they can never be read stale.
 let pausePrev='playing', pauseIdx=0;
 function openPause(){pausePrev=gameState;gameState='paused';pauseIdx=0;sfxPickup();}
-function resumeFromPause(){gameState=pausePrev;}
+function resumeFromPause(){gameState=pausePrev;sfxPickup();}
 
+// "Is the player in a menu rather than mid-run?" Drives two things: which
+// gamepad buttons mean cancel/confirm, and whether the language toggle works
+// at all. That toggle sits on button 3 — triangle on a DualSense, right where
+// a small child's thumb lands — so leaving it live during play let them flip
+// the whole game between Estonian and English mid-level by accident.
 function isMenuState(){
   return ['title','modeselect','difficulty','select','learnmenu','learnresult',
           'gameover','win','debug','paused'].indexOf(gameState)>=0;
@@ -1064,6 +1071,8 @@ function handleBack(){
   if(gameState==='paused'){resumeFromPause();return true;}
   if(PAUSABLE.indexOf(gameState)>=0){openPause();return true;}
   const target=BACK_TARGET[gameState];
+  // Escape is consumed either way. Returning false here means "pressed, but
+  // this state has nowhere to go" — only `title`, the root — not "not pressed".
   if(!target)return false;
   if(target==='modeselect')modeIndex=LEARN_STATES.indexOf(gameState)>=0?1:0;
   sfxPickup();
@@ -1124,7 +1133,7 @@ function update(){
     }
     clearJP();return;
   }
-  if(gameState==='learnmenu'||gameState==='learnletters'||gameState==='learnsyllables'||gameState==='learnresult'){updateLearn();return;}
+  if(LEARN_STATES.indexOf(gameState)>=0){updateLearn();return;}
   if(gameState==='difficulty'){
     if(justPressed['ArrowLeft']||justPressed['KeyA']){diffIndex=Math.max(0,diffIndex-1);}
     if(justPressed['ArrowRight']||justPressed['KeyD']){diffIndex=Math.min(DIFF_KEYS.length-1,diffIndex+1);}
@@ -1460,7 +1469,7 @@ function drawWorldFrame(){
   if(gameState==='debug'){ctx.fillStyle='#1a1a3a';ctx.fillRect(0,0,BASE_W,BASE_H);drawDebug();clearJP();return;}
   if(gameState==='title'){drawTitle();clearJP();return;}
   if(gameState==='modeselect'){drawModeSelect();clearJP();return;}
-  if(gameState==='learnmenu'||gameState==='learnletters'||gameState==='learnsyllables'||gameState==='learnresult'){drawLearn();clearJP();return;}
+  if(LEARN_STATES.indexOf(gameState)>=0){drawLearn();clearJP();return;}
   if(gameState==='intro'){drawIntro();clearJP();return;}
   if(gameState==='difficulty'){drawDifficulty();clearJP();return;}
   if(gameState==='select'){drawSelect();clearJP();return;}
@@ -1719,7 +1728,10 @@ function drawPauseOverlay(){
 
   ctx.fillStyle='#aaddcc';ctx.font='12px monospace';
   ctx.fillText(T('pause_hint'),BASE_W/2,BASE_H-40);
-  ctx.textAlign='left';
+  // lineWidth must go back to 1: the tile loop strokes bricks, question blocks
+  // and rainbow blocks without setting its own width, so leaving it at 3 draws
+  // every block border fat for the rest of the level after a single pause.
+  ctx.textAlign='left';ctx.lineWidth=1;
 }
 
 // ==========================================
@@ -3027,6 +3039,21 @@ function testBackNav(){
           Object.values(BACK_TARGET).every(v=>ALL.indexOf(v)>=0));
   tAssert('pausable states are not also in BACK_TARGET',
           PAUSABLE.every(s=>!BACK_TARGET[s]));
+
+  // isMenuState() decides gamepad cancel/confirm AND whether the language
+  // toggle is live. A state drifting into or out of it silently changes what
+  // the buttons do, so pin the two halves that must never blur together.
+  const wasState=gameState;
+  const menuOf=s=>{gameState=s;const m=isMenuState();gameState=wasState;return m;};
+  tAssert('no live-run state counts as a menu',
+          PAUSABLE.every(s=>!menuOf(s)),
+          'a PAUSABLE state is being treated as a menu');
+  tAssert('title and paused count as menus',
+          menuOf('title')&&menuOf('paused'));
+  tAssert('the learn climb is not a menu',!menuOf('learnletters'),
+          'language toggle would be live mid-climb');
+  tAssert('the learn menu is a menu',menuOf('learnmenu'));
+  tAssert('isMenuState left gameState untouched',gameState===wasState);
 }
 
 function testPadDetect(){
