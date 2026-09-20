@@ -2,8 +2,9 @@ import { GRAVITY, TILE } from '../config/constants';
 import type { Level } from '../data/levels';
 import { GIGI_SKINS, DODO_SKINS } from '../data/sprites';
 import type { InputState } from '../input/actions';
+import { random } from './random';
 import { getTile, isSolid } from './tiles';
-import type { PlayerState, World } from './types';
+import type { PlayerState, PowerupType, World } from './types';
 
 export type Character = 'gigi' | 'dodo';
 
@@ -52,7 +53,53 @@ export function createPlayer(level: Level, character: Character): PlayerState {
     // (Task 6 of this plan); what the pickup grants is all that reads it today, and no
     // trace runs anything but `normal`, where the live value is false either way.
     hasCape: false,
+    // index.html:1171's `fartTimer:0, bigHeadTimer:0, chickenRayCharges:0`. Level state
+    // like the bow, not run state: every respawn goes through initLevel, so dying
+    // cancels a silly power-up mid-countdown. Only giveRandomSillyPowerup below ever
+    // makes any of them non-zero.
+    fartTimer: 0,
+    bigHeadTimer: 0,
+    chickenRayCharges: 0,
   };
+}
+
+/**
+ * Port of index.html:1148-1156 — what a rainbow block pays out. One of three effects,
+ * picked uniformly at random, plus the announcement that freezes the whole game while
+ * it shows.
+ *
+ * NOTHING CALLS THIS YET. The rainbow block bump that does is the next task; this is
+ * the payout on its own, built and covered so that task only has to wire the trigger.
+ *
+ * Three things about the draw and the branches are worth stating out loud:
+ *
+ *   - The type is picked with `Math.random()` via random.ts's seam, exactly as the two
+ *     other simulation draws are. Under the trace harness's constant 0.5 stub,
+ *     `Math.floor(0.5*3)` is 1, so the live game always lands on `bighead` — which is
+ *     why the other two branches are covered by direct unit tests pinning the injected
+ *     value instead of by a trace.
+ *   - `chicken` sets `hasBow` TOO, and its charge count is a flat 8, not `dc.bowCharges`.
+ *     The chicken ray rides the bow's firing path (index.html:1392-1396) rather than
+ *     having one of its own, so both fields are genuinely consulted; see PlayerState.
+ *   - The popup is not decoration. index.html:1276 returns out of `update()` for as
+ *     long as it exists, so granting a power-up stops the world for 120 frames. See
+ *     PowerupPopup in types.ts and the gate at the top of stepWorld.
+ *
+ * The live function's trailing `sfxPickup();sfxWin();padRumble(...)` is sound and
+ * haptics, which src/game/ does not own.
+ */
+export function giveRandomSillyPowerup(world: World): void {
+  const types: PowerupType[] = ['fart', 'bighead', 'chicken'];
+  const type = types[Math.floor(random() * types.length)];
+  if (type === 'fart') {
+    world.player.fartTimer = 900;
+  } else if (type === 'bighead') {
+    world.player.bigHeadTimer = 1200;
+  } else {
+    world.player.chickenRayCharges = 8;
+    world.player.hasBow = true;
+  }
+  world.powerupPopup = { type, timer: 120, maxTimer: 120 };
 }
 
 /**
@@ -60,10 +107,10 @@ export function createPlayer(level: Level, character: Character): PlayerState {
  * exactly the source's order — every step here is load-bearing; see the comments below
  * and the task notes on the jump buffer, apex hang, and the two collision insets.
  *
- * Out of scope, and simply absent below: shooting, fart/big-head power-ups, landing
- * dust particles, question/rainbow block bumps, the cape branch of pit death, sound,
- * and score. Enemy collision is simulated (enemy.ts's stepEnemy), but calls into this
- * file's `playerHit` rather than living here — there is no enemy-collision branch in
+ * Out of scope, and simply absent below: shooting, landing dust particles, the fart
+ * trail's own particles, question/rainbow block bumps, the cape branch of pit death,
+ * sound, and score. Enemy collision is simulated (enemy.ts's stepEnemy), but calls into
+ * this file's `playerHit` rather than living here — there is no enemy-collision branch in
  * THIS function because the live game's own equivalent isn't in `update`'s player
  * block either; it is in the enemies loop, ported alongside the enemies themselves.
  */
@@ -107,12 +154,14 @@ export function stepPlayer(world: World, input: InputState): void {
   if (p.jumpBuffer > 0) p.jumpBuffer--;
 
   // Execute jump: (coyote time OR on ground) AND (just pressed OR still buffered)
-  // (index.html:1378-1383). The live branch also picks a 1.5x force while a fart timer
-  // is running; fart power-ups are out of scope, so this always takes the plain
-  // dc.jumpForce path.
+  // (index.html:1378-1383). The fart multiplies the force IN PLACE — 1.5x a jumpForce
+  // that is already negative, so -7.5 becomes -11.25 at normal. It is applied here, at
+  // the assignment, and nowhere else: the variable-height clamp just below still
+  // measures against the UNMULTIPLIED `dc.jumpForce * 0.4`, so releasing the key early
+  // cuts a fart jump back to exactly the same short hop as a plain one.
   const canJump = p.onGround || p.coyoteTime > 0;
   if (canJump && p.jumpBuffer > 0) {
-    p.vy = dc.jumpForce;
+    p.vy = p.fartTimer > 0 ? dc.jumpForce * 1.5 : dc.jumpForce;
     p.onGround = false;
     p.coyoteTime = 0;
     p.jumpBuffer = 0;
@@ -209,6 +258,35 @@ export function stepPlayer(world: World, input: InputState): void {
     }
   } else {
     p.frame = 0;
+  }
+
+  // Power-up timers (index.html:1432-1433), after the walk cycle and therefore after
+  // this frame's jump has already read `fartTimer` and this frame's stomp check has
+  // not yet read `bigHeadTimer` (that happens in stepEnemy, later in the step). The
+  // live `if(p.invincible>0)p.invincible--;` sits between the animation and these two;
+  // there is no invincibility on this port yet, so nothing stands in for it.
+  if (p.fartTimer > 0) p.fartTimer--;
+  if (p.bigHeadTimer > 0) p.bigHeadTimer--;
+
+  // Fart stink cloud (index.html:1439-1443). Every LIVING enemy whose centre is within
+  // 50px of the player's centre gets 120 more frames of stun — added, not assigned, and
+  // re-added every single frame the player stays in range. Two seconds of loitering is
+  // four minutes of paralysis. Unbounded on purpose: this is the live behaviour.
+  //
+  // Note the order against the decrement above: a fart timer of exactly 1 is spent to 0
+  // first and stuns nobody on its final frame. And note the distance is measured
+  // centre-to-centre with a real `Math.sqrt`, not a squared comparison — keep it, so the
+  // floating-point result is bit-for-bit the live game's.
+  //
+  // The live `(e.stunTimer||0)+120` guard is for a field it adds lazily; this port's
+  // EnemyState always has one, starting at 0, so a plain `+=` is the same arithmetic.
+  if (p.fartTimer > 0) {
+    for (const e of world.enemies) {
+      if (!e.alive) continue;
+      const edx = e.x + e.w / 2 - (p.x + p.w / 2);
+      const edy = e.y + e.h / 2 - (p.y + p.h / 2);
+      if (Math.sqrt(edx * edx + edy * edy) < 50) e.stunTimer += 120;
+    }
   }
 }
 

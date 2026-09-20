@@ -30,7 +30,7 @@ import { SCRIPTS, STOMP_SCRIPT } from './helpers/inputScript';
 import { createWorld, stepWorld } from '../src/game/world';
 import { findGroundY } from '../src/game/tiles';
 import { LEVELS } from '../src/data/levels';
-import { TILE } from '../src/config/constants';
+import { GRAVITY, TILE } from '../src/config/constants';
 
 /**
  * Scripts whose player is expected to die within their own frame window — a pit fall
@@ -383,5 +383,261 @@ describe('the bow and super pickups vs. the live game', () => {
     // Neither pickup is worth points. Stars, stomps, arrow kills, the cat and the
     // rescue score; picking up the bow or the cape does not.
     expect(live.every((s) => s.score === 0)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The three silly power-ups (Plan 5, Task 2).
+//
+// `giveRandomSillyPowerup` itself has no caller until the rainbow block lands, so no
+// trace can grant one. What a trace CAN do is seed the timers on both sides — the
+// driver's `beforeRun` writes the live game's own `player` object, and the port's is
+// just a field — and then compare what the live game does with a fart or a big head
+// against what the port does. That is where these three live: the effects are the
+// interesting part, and they are all reachable this way. The GRANT (which branch sets
+// which field) is unit-tested in player.test.ts, because 0.5 * 3 floors to 1 and the
+// live game would only ever pick `bighead` here.
+// ---------------------------------------------------------------------------
+
+/** Standard Sample projection off the port's World — the same shape every trace pushes. */
+function sampleWorld(world: ReturnType<typeof createWorld>) {
+  const p = world.player;
+  return {
+    x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
+    frame: p.frame, frameTimer: p.frameTimer, animFrame: world.animFrame,
+    camera: { x: world.camera.x, y: world.camera.y },
+    enemies: world.enemies.map((e) => ({
+      type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
+      frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
+    })),
+    score: world.score,
+  };
+}
+
+describe('the fart jump vs. the live game', () => {
+  // index.html:1383 — `p.vy = p.fartTimer>0 ? dc.jumpForce*1.5 : dc.jumpForce`. The
+  // multiplier is applied at the assignment and NOWHERE else, which matters: the
+  // variable-height cut on the very next line still measures against the unmultiplied
+  // `dc.jumpForce*0.4`, so this script holds the button down through the whole rise
+  // rather than tapping it, and the jump is the full 1.5x one all the way up.
+  //
+  // Enemies suppressed: this is about one number on one frame, and doll@15 would kill
+  // a stationary player around frame 240 for reasons with nothing to do with it.
+  const FRAMES = 60;
+  const JUMP_FRAME = 5;
+  const script = (f: number) => ({ left: false, right: false, jump: f >= JUMP_FRAME });
+
+  const REF = createWorld(0, 'normal', 'gigi');
+  const START_TILE = LEVELS[0].playerStart[0];
+  const START_X = START_TILE * TILE;
+  const START_Y = findGroundY(REF.map, START_TILE) - REF.player.h;
+
+  it('jumps 1.5x as hard while the fart timer runs, and burns the timer down a frame at a time', () => {
+    const liveFartTimers: number[] = [];
+    const live = driveLiveGame({
+      level: 0, difficulty: 'normal', character: 'gigi',
+      frames: FRAMES, input: script,
+      suppressEnemies: true,
+      beforeRun: (d) => {
+        // Planted on the ground rather than dropped from playerStart, so the jump fires
+        // on a known frame instead of whenever the fall happens to land.
+        const p = d.getPlayer();
+        p.x = START_X; p.y = START_Y; p.vx = 0; p.vy = 0; p.onGround = true;
+        p.fartTimer = 900; // index.html:1151
+      },
+      onFrame: (d) => { liveFartTimers.push(d.getPlayer().fartTimer as number); },
+    });
+
+    const world = createWorld(0, 'normal', 'gigi');
+    world.pending.length = 0;
+    world.enemies.length = 0;
+    world.player.x = START_X;
+    world.player.y = START_Y;
+    world.player.onGround = true;
+    world.player.fartTimer = 900;
+
+    const port: typeof live = [];
+    const portFartTimers: number[] = [];
+    let prevJump = false;
+    for (let f = 0; f < FRAMES; f++) {
+      const h = script(f);
+      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump });
+      prevJump = h.jump;
+      port.push(sampleWorld(world));
+      portFartTimers.push(world.player.fartTimer);
+    }
+
+    expect(port).toEqual(live);
+    // The countdown itself (index.html:1432): one per frame, from 900, starting on the
+    // very first stepped frame — so a 900-frame power-up really does last 900 frames.
+    expect(portFartTimers).toEqual(liveFartTimers);
+    expect(portFartTimers[0]).toBe(899);
+    expect(portFartTimers[FRAMES - 1]).toBe(900 - FRAMES);
+
+    // The number the whole feature is: jumpForce (-7.5 at normal) times 1.5, plus the
+    // same frame's gravity, which is applied after the jump assignment. A plain jump
+    // would read -7.1 here; this is -10.85.
+    expect(port[JUMP_FRAME].vy).toBe(world.dc.jumpForce * 1.5 + GRAVITY);
+    expect(port[JUMP_FRAME].onGround).toBe(false);
+    // ...and it really does clear more height than an unmultiplied jump could. Ideal
+    // rise for an initial vy is vy^2 / (2*GRAVITY); the plain force cannot reach even
+    // that bound, so beating it is proof the 1.5x was applied and not merely asserted.
+    const plainBound = START_Y - (world.dc.jumpForce ** 2) / (2 * GRAVITY);
+    expect(Math.min(...port.map((f) => f.y))).toBeLessThan(plainBound);
+  });
+});
+
+describe('the fart stink cloud vs. the live game', () => {
+  // index.html:1439-1443 (the cloud) and :1526 (what a stun does). Enemies LIVE — the
+  // whole point is what happens to doll@15, which without a fart kills this exact
+  // hold-right script on contact at frame 60 (see EXPECT_DEATH above).
+  //
+  // 110 frames: long enough to see the stun start, watch the player walk clean through
+  // the paralysed doll, and watch the counter tick back down alone once the player is
+  // out of range — and short enough to stop before the pit at tile 20, whose death
+  // would be about geometry rather than about the fart.
+  const FRAMES = 110;
+  const script = () => ({ left: false, right: true, jump: false });
+
+  it('stuns doll@15 cumulatively, freezes it whole, and lets the player walk through it unharmed', () => {
+    const liveStun: number[] = [];
+    const live = driveLiveGame({
+      level: 0, difficulty: 'normal', character: 'gigi',
+      frames: FRAMES, input: script,
+      beforeRun: (d) => { d.getPlayer().fartTimer = 900; },
+      // The live enemy has NO stunTimer field until the cloud first adds one
+      // (index.html:1442's `(e.stunTimer||0)+120` is lazy). The port's EnemyState always
+      // carries one, starting at 0, so the live side is normalised the same way its own
+      // source normalises it — that `||0` is the live game agreeing this is 0.
+      onFrame: (d) => {
+        const doll = d.getEnemies()[0];
+        liveStun.push(doll === undefined ? 0 : ((doll.stunTimer as number) ?? 0));
+      },
+    });
+
+    const world = createWorld(0, 'normal', 'gigi');
+    world.player.fartTimer = 900;
+
+    const port: typeof live = [];
+    const portStun: number[] = [];
+    const portDead: boolean[] = [];
+    for (let f = 0; f < FRAMES; f++) {
+      stepWorld(world, { ...script(), jumpPressed: false });
+      port.push(sampleWorld(world));
+      portStun.push(world.enemies[0]?.stunTimer ?? 0);
+      portDead.push(world.dead);
+    }
+
+    // Position, velocity, camera, score AND every enemy's own motion, frame for frame.
+    // A stunned enemy is frozen whole, so this alone is most of the claim.
+    expect(port).toEqual(live);
+    expect(portStun).toEqual(liveStun);
+
+    // doll@15 is enemies[0] on both sides for this whole window, and nothing past
+    // car@40 streams in — asserted so the keying above stays honest if the script grows.
+    expect(port.every((f) => f.enemies.length <= 3)).toBe(true);
+    expect(port[FRAMES - 1].enemies[0].type).toBe('doll');
+
+    // The cloud is CUMULATIVE and UNBOUNDED: +120 every frame in range, -1 for that
+    // frame's own countdown, so a net +119 per frame. Ten frames of standing near an
+    // enemy is nearly twenty seconds of paralysis, and this script is nowhere near
+    // standing still.
+    const first = portStun.findIndex((v) => v > 0);
+    expect(first).toBeGreaterThan(0);
+    expect(portStun[first]).toBe(119);
+    expect(portStun[first + 1]).toBe(238);
+    expect(portStun[first + 9]).toBe(119 * 10);
+    // It keeps climbing well past any single grant, then decays by exactly 1 a frame
+    // once the player is out of range — never reset, never capped.
+    const peak = Math.max(...portStun);
+    expect(peak).toBeGreaterThan(4000);
+    const peakAt = portStun.indexOf(peak);
+    expect(portStun[peakAt + 1]).toBe(peak - 1);
+    expect(portStun[FRAMES - 1]).toBeGreaterThan(4000);
+
+    // Frozen whole from the first stunned frame on: no walking, no gravity, no frame
+    // flip. The live doll walks left at -0.8 until then, so this is a real change.
+    const dollAt = (f: number) => port[f].enemies[0];
+    expect(dollAt(first - 1).x).toBeLessThan(dollAt(0).x); // was walking
+    expect(dollAt(FRAMES - 1).x).toBe(dollAt(first).x); // has not moved since
+    expect(dollAt(FRAMES - 1).frameTimer).toBe(dollAt(first).frameTimer);
+
+    // And the payoff: the stun `return` at index.html:1526 sits ABOVE the stomp box and
+    // the contact check, so a stunned enemy cannot hurt you. This script walks the
+    // player's box straight across the doll's — the same contact that kills it at frame
+    // 60 without a fart — and nothing happens to either of them.
+    const overlapped = port.some((f) => {
+      const d = f.enemies[0];
+      return f.x + 2 < d.x + 14.4 && f.x + 2 + 12 > d.x;
+    });
+    expect(overlapped).toBe(true);
+    expect(portDead.includes(true)).toBe(false);
+    expect(port[FRAMES - 1].enemies[0].alive).toBe(true); // not stomped either
+    expect(port[FRAMES - 1].score).toBe(0);
+  });
+});
+
+describe('the big head vs. the live game', () => {
+  // index.html:1542-1546. Two separate changes to the same check, both pinned here by
+  // running the existing stomp script with the timer seeded:
+  //
+  //   - `bhx` widens the player/enemy overlap box by 8px each side, so contact happens
+  //     EARLIER. Without a big head this script stomps doll@15 on frame 60; with one,
+  //     on frame 58. That is the widened box, visible as a date on the calendar.
+  //   - `squashTimer` is overwritten from 30 to 45, so the flattened doll lingers half
+  //     again as long.
+  //
+  // The `shm` multiplier is exercised too (1 * 1.5 at normal), though not separably
+  // from `bhx` in a single trace. Its COMPOUNDING with `dc.stompHitbox` is a super_easy
+  // behaviour no trace can reach yet — see enemy.test.ts.
+  it('stomps earlier through a wider box and flattens for 45 frames instead of 30', () => {
+    const live = driveLiveGame({
+      level: 0, difficulty: 'normal', character: 'gigi',
+      frames: STOMP_SCRIPT.frames, input: STOMP_SCRIPT.input,
+      beforeRun: (d) => { d.getPlayer().bigHeadTimer = 1200; }, // index.html:1152
+    });
+
+    const world = createWorld(0, 'normal', 'gigi');
+    world.player.bigHeadTimer = 1200;
+
+    const port: typeof live = [];
+    const portBigHead: number[] = [];
+    let prevJump = false;
+    for (let f = 0; f < STOMP_SCRIPT.frames; f++) {
+      const h = STOMP_SCRIPT.input(f);
+      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump });
+      prevJump = h.jump;
+      port.push(sampleWorld(world));
+      portBigHead.push(world.player.bigHeadTimer);
+    }
+
+    expect(port).toEqual(live);
+    // index.html:1433, the same one-a-frame countdown the fart timer gets.
+    expect(portBigHead[0]).toBe(1199);
+    expect(portBigHead[STOMP_SCRIPT.frames - 1]).toBe(1200 - STOMP_SCRIPT.frames);
+
+    // The stomp must actually happen, or everything below is comparing two runs in
+    // which nothing occurred.
+    const killFrame = port.findIndex((f) => f.enemies.some((e) => !e.alive));
+    expect(killFrame).toBeGreaterThan(0);
+    // 45, not 30 (index.html:1546 overwriting :1545), and it counts down from there.
+    expect(port[killFrame].enemies[0].squashTimer).toBe(45);
+    expect(port[killFrame + 1].enemies[0].squashTimer).toBe(44);
+    // Same 200 points as a plain stomp — big head does not change the award.
+    expect(port[killFrame].score).toBe(Math.round(200 * world.dc.scoreMultiplier));
+
+    // The widened box, as a frame number: the identical script without a big head
+    // stomps this same doll two frames later. Anchored to the existing enemy trace
+    // above, which already pins that run against the live game frame for frame.
+    const plain = createWorld(0, 'normal', 'gigi');
+    let prevJ = false;
+    let plainKill = -1;
+    for (let f = 0; f < STOMP_SCRIPT.frames; f++) {
+      const h = STOMP_SCRIPT.input(f);
+      stepWorld(plain, { ...h, jumpPressed: h.jump && !prevJ });
+      prevJ = h.jump;
+      if (plainKill < 0 && plain.enemies.some((e) => !e.alive)) plainKill = f;
+    }
+    expect(plainKill).toBe(killFrame + 2);
   });
 });

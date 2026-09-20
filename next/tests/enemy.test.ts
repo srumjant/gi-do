@@ -5,7 +5,8 @@
 // for where they are recognised and skipped rather than half-simulated.
 import { afterEach, describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
-import { setRandom, spawnEnemy, stepEnemy } from '../src/game/enemy';
+import { spawnEnemy, stepEnemy } from '../src/game/enemy';
+import { setRandom } from '../src/game/random';
 import { createWorld, spawnEnemiesInView, stepEnemies, stepWorld } from '../src/game/world';
 import { createPlayer } from '../src/game/player';
 import { LEVELS, makeGround, TILE_GROUND } from '../src/data/levels';
@@ -268,7 +269,7 @@ describe('stepEnemy', () => {
       const enemy: EnemyState = {
         type: 'doll', x: 100, y: 150, vx: -0.8, vy: 0, w: 14.4, h: 16.2, alive: true,
         frame: 0, frameTimer: 0, squashTimer: 0,
-        noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0,
+        noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
       };
       world.player = createPlayer(LEVELS[0], 'gigi'); // w=16, h=24
       world.player.x = 98;
@@ -336,7 +337,7 @@ describe('stepEnemy', () => {
       // squashTimer already expired: this is testing that a long-dead enemy stays
       // fully inert, not the countdown itself (see the 'stomp' tests above for that).
       frame: 0, frameTimer: 0, squashTimer: 0,
-      noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0,
+      noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
     };
     world.player = createPlayer(LEVELS[0], 'gigi');
     world.player.x = 98;
@@ -516,5 +517,73 @@ describe('bat and bouncer vs. the live game', () => {
     expect(bouncerVys.some((vy) => vy < 0)).toBe(true); // it hopped at least once
     expect(bouncerVys.some((vy) => vy === 0)).toBe(true); // and rested between hops, too
     expect(world.dead).toBe(false); // see the FRAMES budget comment above
+  });
+});
+
+// index.html:1542's `const shm=(dc.stompHitbox||1)*(p.bigHeadTimer>0?1.5:1)`. The two
+// factors COMPOUND, and neither the fallback nor the multiplication can be seen from a
+// trace: `stompHitbox` exists on super_easy alone (difficulty.ts), and a super_easy
+// trace is not available yet — the live game starts that difficulty with a cape
+// (`startWithCape`), which the port cannot yet honour because absorbing a hit is Task 6
+// of this plan, so the two sides part company the moment anything touches the player.
+// So this is port-side only, and deliberately so; the big head's OTHER two effects (the
+// widened box and the 45-frame squash) are pinned against the live game in
+// trace.test.ts, where normal difficulty can reach them.
+describe('the big-head stomp multiplier compounds with dc.stompHitbox', () => {
+  /**
+   * One fixed geometry, three difficulties-and-timers. The player is placed so that its
+   * stomp line (`p.y+p.h-4`, i.e. 170) falls in the narrow band that only the LARGEST
+   * of the three reaches — the enemy's own box ends at 166.6 — while the overlap box
+   * itself is satisfied in every case, so the only thing that varies is `shm`:
+   *
+   *   normal     + big head -> 1 * 1.5 = 1.5 -> line must clear 150.4 + 12.15 = 162.55
+   *   super_easy no big head -> 2.0       -> ... 150.4 + 16.20 = 166.60
+   *   super_easy + big head  -> 2.0 * 1.5 = 3.0 -> ... 150.4 + 24.30 = 174.70
+   */
+  function setup(difficulty: 'normal' | 'super_easy', bigHead: boolean) {
+    const world = createWorld(0, difficulty);
+    world.map = makeGround(20, 20); // ground far below; both actors float clear of it
+    const enemy: EnemyState = {
+      type: 'doll', x: 100, y: 150, vx: -0.8, vy: 0, w: 14.4, h: 16.2, alive: true,
+      frame: 0, frameTimer: 0, squashTimer: 0,
+      noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+    };
+    world.player = createPlayer(LEVELS[0], 'gigi'); // w=16, h=24
+    world.player.x = 98; // overlaps horizontally with AND without the 8px big-head widening
+    world.player.y = 150; // stomp line at 170, between the 2.0 and 3.0 thresholds
+    world.player.vy = 3; // falling — the stomp branch needs it
+    if (bigHead) world.player.bigHeadTimer = 1200;
+    return { world, enemy };
+  }
+
+  it('needs BOTH factors to reach this enemy — neither one alone is enough', () => {
+    // 1.5 alone (big head at normal): too short — this is a hit, not a stomp.
+    const a = setup('normal', true);
+    // Read off the real records, so this fails loudly if the difficulty table ever
+    // moves rather than quietly testing arithmetic against a stale assumption. normal
+    // having NO stompHitbox at all is the whole reason the `||1` fallback is load-bearing.
+    expect(a.world.dc.stompHitbox).toBeUndefined();
+    stepEnemy(a.world, a.enemy);
+    expect(a.enemy.alive).toBe(true);
+    expect(a.world.dead).toBe(true);
+
+    // 2.0 alone (super_easy, no big head): also too short, by 3.4px.
+    const b = setup('super_easy', false);
+    expect(b.world.dc.stompHitbox).toBe(2);
+    stepEnemy(b.world, b.enemy);
+    expect(b.enemy.alive).toBe(true);
+    expect(b.world.dead).toBe(true);
+
+    // 2.0 * 1.5: reaches. If the two were added, or if either replaced the other, this
+    // would be 3.5, 2.0 or 1.5 — and only the first of those also lands here, so the
+    // 45-frame squash below is what separates a compounded 3.0 from a mistaken sum.
+    const c = setup('super_easy', true);
+    stepEnemy(c.world, c.enemy);
+    expect(c.enemy.alive).toBe(false);
+    expect(c.world.dead).toBe(false);
+    expect(c.world.player.vy).toBe(-5);
+    expect(c.enemy.squashTimer).toBe(45); // index.html:1546, not :1545's 30
+    // super_easy's 0.5 multiplier, rounded at the award site like every other award.
+    expect(c.world.score).toBe(Math.round(200 * c.world.dc.scoreMultiplier));
   });
 });

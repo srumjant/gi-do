@@ -4,14 +4,18 @@
 // hardcodes a tile-x for the gap — tests either derive it by walking the real
 // generated map, or (for the wall test, where no real wall exists at player height)
 // build one into a copy of that map.
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
-import { createPlayer, stepPlayer, GRND_DECEL } from '../src/game/player';
-import { createWorld, stepWorld } from '../src/game/world';
+import {
+  createPlayer, giveRandomSillyPowerup, stepPlayer, GRND_DECEL,
+} from '../src/game/player';
+import { setRandom } from '../src/game/random';
+import { createWorld, respawnLevel, stepWorld } from '../src/game/world';
 import { emptyInput, type InputState } from '../src/input/actions';
 import { LEVELS, TILE_GROUND } from '../src/data/levels';
 import { GIGI_SKINS, DODO_SKINS } from '../src/data/sprites';
 import { TILE, GRAVITY } from '../src/config/constants';
+import { findGroundY } from '../src/game/tiles';
 import type { World } from '../src/game/types';
 
 function held(overrides: Partial<InputState>): InputState {
@@ -304,5 +308,133 @@ describe('pit death', () => {
     expect(world.player.vx).toBe(frozen.vx);
     expect(world.player.vy).toBe(frozen.vy);
     expect(world.dead).toBe(true);
+  });
+});
+
+// Port of index.html:1148-1156. The one place in this plan where unit tests genuinely
+// earn their keep: the trace harness stubs Math.random to a constant 0.5, and
+// `Math.floor(0.5*3)` is 1, so the live game's own draw ALWAYS lands on `bighead` —
+// and nothing calls this function until the rainbow block does (the next task), so a
+// trace cannot reach it at all yet. Pinning the injected value is the only way to see
+// the other two branches. One test per branch, asserting the state that branch sets;
+// what each power-up then DOES is covered against the live game in trace.test.ts.
+describe('giveRandomSillyPowerup', () => {
+  afterEach(() => setRandom(Math.random)); // never leak a stub into an unrelated test
+
+  /**
+   * `types[Math.floor(r*3)]`, so r<1/3 picks fart, r<2/3 bighead, else chicken. These
+   * are the midpoints of the three thirds, not boundary values: this is testing which
+   * branch does what, not how the index is computed.
+   */
+  const PICKS = { fart: 1 / 6, bighead: 0.5, chicken: 5 / 6 };
+
+  it('fart sets a 900-frame timer and nothing else', () => {
+    const world = makeWorld();
+    setRandom(() => PICKS.fart);
+    giveRandomSillyPowerup(world);
+
+    expect(world.player.fartTimer).toBe(900);
+    expect(world.player.bigHeadTimer).toBe(0);
+    expect(world.player.chickenRayCharges).toBe(0);
+    expect(world.player.hasBow).toBe(false);
+    expect(world.powerupPopup).toEqual({ type: 'fart', timer: 120, maxTimer: 120 });
+  });
+
+  it('bighead sets a 1200-frame timer and nothing else — the only branch a trace could reach', () => {
+    const world = makeWorld();
+    // Also exactly what the live game draws under the trace harness's constant 0.5.
+    setRandom(() => PICKS.bighead);
+    giveRandomSillyPowerup(world);
+
+    expect(world.player.bigHeadTimer).toBe(1200);
+    expect(world.player.fartTimer).toBe(0);
+    expect(world.player.chickenRayCharges).toBe(0);
+    expect(world.player.hasBow).toBe(false);
+    expect(world.powerupPopup).toEqual({ type: 'bighead', timer: 120, maxTimer: 120 });
+  });
+
+  it('chicken sets EIGHT ray charges and hasBow as well — two fields, not one flag', () => {
+    const world = makeWorld();
+    setRandom(() => PICKS.chicken);
+    giveRandomSillyPowerup(world);
+
+    expect(world.player.chickenRayCharges).toBe(8);
+    // hasBow too: the chicken ray rides the bow's firing path (index.html:1392-1396)
+    // rather than having one of its own, so both are consulted. And the 8 is a flat
+    // literal, NOT dc.bowCharges — which is 3 at normal, so this would fail if the
+    // difficulty record had been used by mistake.
+    expect(world.player.hasBow).toBe(true);
+    expect(world.dc.bowCharges).toBe(3);
+    // ...and it does not touch bowCharges itself, so a chicken ray on its own leaves
+    // hasBow true with zero arrows behind it.
+    expect(world.player.bowCharges).toBe(0);
+    expect(world.player.fartTimer).toBe(0);
+    expect(world.player.bigHeadTimer).toBe(0);
+    expect(world.powerupPopup).toEqual({ type: 'chicken', timer: 120, maxTimer: 120 });
+  });
+});
+
+// index.html:1276 — the second line of update(), right after `animFrame++` and above
+// every other state check. This is the reason `powerupPopup` is simulation state and
+// not HUD state: while it exists, update() returns immediately and NOTHING moves.
+// Unreachable in play until the rainbow block calls giveRandomSillyPowerup, so no
+// trace can cover it; pinned here instead.
+describe('the power-up popup freezes the whole world', () => {
+  afterEach(() => setRandom(Math.random));
+
+  function snapshot(world: World): string {
+    return JSON.stringify({
+      player: world.player, enemies: world.enemies, camera: world.camera,
+    });
+  }
+
+  it('stops the player, the enemies and the camera for exactly 120 frames, but not animFrame', () => {
+    setRandom(() => 0.5); // a bat streams in below and draws its sineOffset from this
+    const world = makeWorld();
+    // "Nothing moves" has to be a claim about three moving things, not about an empty
+    // world — so: enemies streamed in, and a camera actually mid-lerp. The camera only
+    // leaves 0 once the player passes VIEW_W/2 - p.w/2 (~205px), and doll@15 kills a
+    // hold-right player at frame 60 while it is still short of that, so this teleports
+    // rather than walks — the same trick trace.test.ts's pickup and rescue traces use.
+    // Column 45 is clear ground well past doll@15, doll@28 and car@40, all three of
+    // which spawn behind it and walk away from it.
+    const START_TILE = 45;
+    world.player.x = START_TILE * TILE;
+    world.player.y = findGroundY(world.map, START_TILE) - world.player.h;
+    world.player.onGround = true;
+    for (let i = 0; i < 10; i++) stepWorld(world, held({ right: true }));
+    expect(world.dead).toBe(false);
+    expect(world.enemies.length).toBeGreaterThan(0);
+    expect(world.camera.x).toBeGreaterThan(0);
+
+    giveRandomSillyPowerup(world);
+    const frozen = snapshot(world);
+    const animAtGrant = world.animFrame;
+    const xAtGrant = world.player.x;
+
+    // 119 frames of held input that would otherwise walk, spawn and scroll.
+    for (let i = 0; i < 119; i++) stepWorld(world, held({ right: true }));
+    expect(snapshot(world)).toBe(frozen);
+    // animFrame keeps counting through the freeze — it is incremented ABOVE the gate,
+    // which is why the drawn scene behind the popup still animates.
+    expect(world.animFrame).toBe(animAtGrant + 119);
+    expect(world.powerupPopup).toEqual({ type: 'bighead', timer: 1, maxTimer: 120 });
+
+    // The 120th frame is the last frozen one; it is also the one that clears the popup.
+    stepWorld(world, held({ right: true }));
+    expect(world.powerupPopup).toBeNull();
+    expect(snapshot(world)).toBe(frozen);
+
+    // ...and the 121st moves again.
+    stepWorld(world, held({ right: true }));
+    expect(world.player.x).toBeGreaterThan(xAtGrant);
+  });
+
+  it('is thrown away by a respawn, so a death mid-announcement does not freeze the rebuilt level', () => {
+    const world = makeWorld();
+    setRandom(() => 0.5);
+    giveRandomSillyPowerup(world);
+    respawnLevel(world);
+    expect(world.powerupPopup).toBeNull();
   });
 });

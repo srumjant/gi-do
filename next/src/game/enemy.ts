@@ -5,6 +5,7 @@ import {
   BAT_S, BOUNCER_S, CAR_S, DINO_S, DOLL_S, ICEBAT_S, PENGUIN_S, type SpriteData,
 } from '../data/sprites';
 import { playerHit } from './player';
+import { random } from './random';
 import { findGroundY, getTile, isSolid, rectOverlap } from './tiles';
 import type { EnemyState, World } from './types';
 
@@ -35,22 +36,6 @@ const ENEMY_SPRITES: Partial<Record<string, SpriteData>> = {
 };
 
 /**
- * The one Math.random() call in this slice's simulation (the bat/icebat sineOffset
- * below). An injectable source rather than a call to the global directly, so the
- * golden trace suite can point it at the exact same value the live driver's sandboxed
- * Math.random already resolves to (tests/helpers/liveGame.ts stubs it to a constant
- * 0.5) and have both sides draw the identical number. Deliberately NOT a seeded PRNG:
- * the live stub is a constant, not a sequence, so matching it only ever needs a
- * constant back, never a reproducible sequence of different ones.
- */
-let randomSource: () => number = Math.random;
-
-/** Test seam for `randomSource` above — production code never calls this. */
-export function setRandom(fn: () => number): void {
-  randomSource = fn;
-}
-
-/**
  * Port of index.html:1212-1222, now covering every type level 1 spawns (doll, car,
  * dino, bat, bouncer — penguin/icebat besides, for levels this slice does not reach
  * yet). Returns undefined for every other streamed type (ghost, cannon) so the caller
@@ -77,7 +62,7 @@ export function spawnEnemy(
   const e: EnemyState = {
     type: def.type, x: def.x * TILE, y: gy - h, vx, vy: 0, w, h, alive: true,
     frame: 0, frameTimer: 0, squashTimer: 0,
-    noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0,
+    noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
   };
 
   // index.html:1217 — a fixed-height flyer, not a physics body: no gravity, and its y
@@ -92,7 +77,7 @@ export function spawnEnemy(
     e.originY = e.y;
     e.vx = -1.2 * dc.enemySpeed;
     e.noGravity = true;
-    e.sineOffset = randomSource() * Math.PI * 2;
+    e.sineOffset = random() * Math.PI * 2;
   } else if (def.type === 'bouncer') {
     // index.html:1219 — starts at rest (vy stays 0, the base object's default, until
     // gravity below first touches it) with the hop countdown at zero; stepEnemy fires
@@ -116,15 +101,24 @@ export function spawnEnemy(
  * `world.player` and `world.dead`.
  */
 export function stepEnemy(world: World, e: EnemyState): void {
-  // index.html:1525 — the squash countdown runs even for a dead enemy (set to 30, or
-  // 45 with big-head — out of scope — on the stomp below), so a stomped enemy keeps
+  // index.html:1525 — the squash countdown runs even for a dead enemy (set to 30, or 45
+  // when a big head did the stomping — see the stomp below), so a stomped enemy keeps
   // rendering, flattened, for half a second rather than vanishing the instant it dies.
-  // Nothing else below runs, so a dead enemy still simply stops where it died. The
-  // live source's very next line, `if(e.stunTimer>0){e.stunTimer--;return;}`
-  // (index.html's fart-stun), is out of scope — no field for it exists on this port's
-  // EnemyState, so there is nothing to reproduce there.
+  // Nothing else below runs, so a dead enemy still simply stops where it died.
   if (!e.alive) {
     if (e.squashTimer > 0) e.squashTimer--;
+    return;
+  }
+
+  // Fart stun (index.html:1526). A stunned enemy is frozen WHOLE: no gravity, no floor
+  // snap, no movement branch, no frame flip — and, the part that actually changes play,
+  // no stomp box and no contact damage either, because this `return` is above all of
+  // them. You can walk straight through a stunned enemy unharmed. The counter itself is
+  // topped up by stepPlayer's stink cloud (player.ts), 120 frames at a time, EVERY frame
+  // the player stands within 50px — so a second of loitering buys minutes of paralysis.
+  // Unbounded and cumulative on purpose; that is what the live game does.
+  if (e.stunTimer > 0) {
+    e.stunTimer--;
     return;
   }
 
@@ -201,24 +195,42 @@ export function stepEnemy(world: World, e: EnemyState): void {
     e.frameTimer = 0;
   }
 
-  // Stomp (index.html:1541-1543). The live box also shrinks/grows for big-head and
-  // gates on invincibility; neither exists on this port's PlayerState, which has the
-  // same effect as both always being "off" — shm collapses to plain `dc.stompHitbox ||
-  // 1` and the overlap box is the plain +2/-4 inset. This is NOT the tile-collision box
-  // from player.ts: that one insets y by 1-3px too; this one does not.
-  const shm = dc.stompHitbox || 1;
+  // Stomp (index.html:1542-1546). Two big-head adjustments, and they are not the same
+  // adjustment twice:
+  //
+  //   - `shm` scales how far DOWN the enemy the stomp still counts, and the two factors
+  //     COMPOUND: `(dc.stompHitbox||1) * 1.5`. super_easy's stompHitbox of 2.0 becomes
+  //     3.0, i.e. the whole enemy and half again below it. The `|| 1` fallback is
+  //     load-bearing — stompHitbox exists on super_easy alone (difficulty.ts).
+  //   - `bhx` widens the OVERLAP box by 8px on each side (`-bhx` on x, `+bhx*2` on w)
+  //     and leaves the height alone. That cuts both ways: a big head is easier to stomp
+  //     WITH and easier to get hit WITH, since the same wider box feeds the `else`
+  //     branch below.
+  //
+  // The live source's `p.invincible<=0` gate on the whole check, and its `!e.noStomp`
+  // gate on the stomp branch, are still absent: neither field exists on this port (the
+  // cape's invincibility window is a later task; noStomp is set by cannon alone,
+  // index.html:1218, a type spawnEnemy never creates), which has the same effect as both
+  // always being "off". This is NOT the tile-collision box from player.ts: that one
+  // insets y by 1-3px too; this one does not.
+  const shm = (dc.stompHitbox || 1) * (p.bigHeadTimer > 0 ? 1.5 : 1);
+  const bhx = p.bigHeadTimer > 0 ? 8 : 0;
   if (rectOverlap(
-    { x: p.x + 2, y: p.y, w: p.w - 4, h: p.h },
+    { x: p.x + 2 - bhx, y: p.y, w: p.w - 4 + bhx * 2, h: p.h },
     { x: e.x, y: e.y, w: e.w, h: e.h },
   )) {
     if (p.vy > 0 && p.y + p.h - 4 < e.y + (e.h * shm) / 2) {
       e.alive = false;
-      e.squashTimer = 30; // index.html:1545. Big-head's 45 (:1546) is out of scope.
+      e.squashTimer = 30; // index.html:1545
       p.vy = -5;
       // Also index.html:1545, in this position, and only portable now that `score`
       // exists on the World at all. Rounded at the award site, never accumulated —
       // see world.ts's stepStars for why that distinction is load-bearing.
       world.score += Math.round(200 * dc.scoreMultiplier);
+      // index.html:1546 — written AFTER the 30 above, overwriting it, exactly as the
+      // live source does rather than as a ternary on the assignment. Same result, but
+      // this is the shape that stays obviously faithful if either number ever moves.
+      if (p.bigHeadTimer > 0) e.squashTimer = 45;
     } else {
       // Side or rising contact (index.html:1547's `else{playerHit();return;}`). No
       // cape in this slice, so this goes straight to death — see player.ts's

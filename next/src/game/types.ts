@@ -40,6 +40,30 @@ export interface PlayerState {
    * that grants it is ported here.
    */
   hasCape: boolean;
+  /**
+   * Frames of fart jump left (index.html:1171, 1432). Granted 900 — fifteen seconds —
+   * by the `fart` branch of `giveRandomSillyPowerup`. While it runs, the jump force is
+   * multiplied by 1.5 (player.ts) and every living enemy within 50px is stunned for a
+   * further 120 frames EVERY FRAME (see EnemyState.stunTimer below).
+   */
+  fartTimer: number;
+  /**
+   * Frames of big head left (index.html:1171, 1433). Granted 1200 — twenty seconds — by
+   * the `bighead` branch. While it runs, the stomp reach multiplier gains a 1.5x factor
+   * ON TOP of `dc.stompHitbox`, the player/enemy overlap box grows 8px on each side, and
+   * a stomp flattens for 45 frames instead of 30 (enemy.ts).
+   */
+  bigHeadTimer: number;
+  /**
+   * Chicken rays left (index.html:1171). Granted 8 — a flat constant, NOT `dc.bowCharges`
+   * like the bow pickup — by the `chicken` branch, which also sets `hasBow`. The two are
+   * genuinely separate: the firing path (index.html:1392-1396) fires when EITHER
+   * `hasBow && bowCharges > 0` OR `chickenRayCharges > 0`, picks chicken over arrow
+   * whenever any chicken charge is left, and only clears `hasBow` once BOTH are spent.
+   * Do not collapse them into one flag. Firing itself is a later task; nothing reads
+   * this yet.
+   */
+  chickenRayCharges: number;
 }
 
 /**
@@ -65,6 +89,28 @@ export interface Star {
    */
   vy: number;
   collected: boolean;
+}
+
+/** Which silly power-up the rainbow block handed out (index.html:1149). */
+export type PowerupType = 'fart' | 'bighead' | 'chicken';
+
+/**
+ * The silly power-up announcement (index.html:1154). Presentation, except that it is
+ * NOT: index.html:1276 — the second line of `update()`, right after `animFrame++` and
+ * above every other state check — freezes the ENTIRE game while it exists:
+ *
+ *   if(powerupPopup){powerupPopup.timer--;if(powerupPopup.timer<=0)powerupPopup=null;clearJP();return;}
+ *
+ * So a rainbow block does not just grant a power-up, it stops the world for 120 frames
+ * — two whole seconds in which the player, the enemies and the camera are all frozen
+ * while `animFrame` keeps counting. `maxTimer` is only ever read by the drawing code (it
+ * scales the pop-in), but it is carried here rather than dropped so the field set stays
+ * the live object's.
+ */
+export interface PowerupPopup {
+  type: PowerupType;
+  timer: number;
+  maxTimer: number;
 }
 
 /**
@@ -93,9 +139,9 @@ export interface EnemyState {
   /** Counts up toward the 15-frame flip threshold (index.html:1215, 1540). */
   frameTimer: number;
   /**
-   * Counts down from 30 (45 with big-head, out of scope) after a stomp, so a squashed
-   * enemy keeps rendering — flattened — for half a second instead of vanishing the
-   * instant it dies (index.html:1215, 1525, 1545).
+   * Counts down from 30 after a stomp — 45 if a big head did the stomping
+   * (index.html:1546) — so a squashed enemy keeps rendering, flattened, for half a
+   * second instead of vanishing the instant it dies (index.html:1215, 1525, 1545).
    */
   squashTimer: number;
   /**
@@ -116,7 +162,7 @@ export interface EnemyState {
   /**
    * A bat/icebat's per-instance phase on the shared sine clock (index.html:1217's
    * `Math.random()*Math.PI*2`), so two bats on screen at once don't move in lockstep.
-   * Drawn once at spawn from enemy.ts's injectable random, not Math.random() directly
+   * Drawn once at spawn from random.ts's injectable seam, not Math.random() directly
    * — see that module's own comment for why. Inert (0) for every other type.
    */
   sineOffset: number;
@@ -126,6 +172,18 @@ export interface EnemyState {
    * (index.html:1219, 1537). Inert (0) for every other type.
    */
   bounceTimer: number;
+  /**
+   * Frames of fart stun left (index.html:1442, 1526). While positive, stepEnemy freezes
+   * the enemy COMPLETELY and returns before its stomp box and contact damage are ever
+   * evaluated — a stunned enemy is harmless as well as motionless.
+   *
+   * Unbounded and cumulative by design: the live stink cloud adds 120 to it on EVERY
+   * frame the player is within 50px (`e.stunTimer=(e.stunTimer||0)+120`), so a second
+   * spent standing next to an enemy leaves it paralysed for minutes. The live `||0`
+   * guard exists because the field is added lazily there; here it is always present and
+   * starts at 0, so player.ts adds to it directly.
+   */
+  stunTimer: number;
 }
 
 export interface World {
@@ -244,6 +302,17 @@ export interface World {
   questionBlocks: BlockState[];
   /** index.html:1189, 1191. Same scan, tile code 5. */
   rainbowBlocks: BlockState[];
+  /**
+   * index.html:994, 1154, 1188. `null` except for the 120 frames after a silly power-up
+   * is granted, during which `stepWorld` returns early and NOTHING moves — see
+   * PowerupPopup above, and the gate at the top of stepWorld. Cleared by `initLevel`
+   * (index.html:1188), so respawnLevel clears it too.
+   *
+   * Nothing sets it yet: `giveRandomSillyPowerup` is the only writer and the rainbow
+   * block that calls it is the next task. The freeze is therefore unreachable in play
+   * today and cannot affect any existing trace.
+   */
+  powerupPopup: PowerupPopup | null;
 }
 
 export interface PendingEnemy {

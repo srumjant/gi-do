@@ -5,6 +5,7 @@ import { BOW_S, CAT_S, SUPER_S } from '../data/sprites';
 import type { InputState } from '../input/actions';
 import { spawnEnemy, stepEnemy } from './enemy';
 import { createPlayer, stepPlayer, type Character } from './player';
+import { random } from './random';
 import { getRescueSprites } from './run';
 import { findGroundY, rectOverlap } from './tiles';
 import type { BlockState, Pickup, Star, World } from './types';
@@ -135,6 +136,10 @@ export function createWorld(
     // A run starts at zero (index.html:1347's `score=0`, beside `lives=DC().lives`
     // above). Nothing else ever zeroes it — see the field's own comment in types.ts.
     score: 0,
+    // index.html:1188's `powerupPopup=null`, alongside the collections buildLevelState
+    // owns. Kept out of that bundle because it is not a spawn table — but for the same
+    // reason the bundle exists, respawnLevel below must clear it too.
+    powerupPopup: null,
     ...buildLevelState(level, dc, map),
   };
 }
@@ -158,6 +163,9 @@ export function respawnLevel(world: World): void {
   world.pending = world.level.enemyDefs.map((d) => ({ type: d.type, x: d.x, spawned: false }));
   world.camera = { x: 0, y: 0 };
   world.dead = false;
+  // index.html:1188. Dying mid-announcement throws the announcement away with everything
+  // else; without this the freeze gate below would still be holding the rebuilt level.
+  world.powerupPopup = null;
   // Rebuilt from the FRESH map above, exactly as initLevel derives them, so a question
   // block bumped before the death is a question block again after it.
   Object.assign(world, buildLevelState(world.level, world.dc, world.map));
@@ -179,6 +187,27 @@ export function stepWorld(world: World, input: InputState): void {
   // ahead of the world.dead early return right below — not folded into world.frame,
   // which counts frames of actual play and is intentionally left alone.
   world.animFrame++;
+
+  // The silly power-up announcement (index.html:1276) — the very next line after
+  // `animFrame++` in the live update(), ABOVE the dead check, the pause menu and
+  // everything else. While it exists the whole game is frozen: no player, no enemies,
+  // no camera, for the full 120 frames. `animFrame` keeps counting (it was already
+  // incremented above), which is exactly why the live game's bats keep flapping on the
+  // sine clock in the drawn frame behind the popup even though nothing simulates.
+  //
+  // The live line also calls `clearJP()`. There is no port equivalent and none is
+  // needed: `justPressed` is a live global the live update() has to scrub by hand on
+  // every early return, whereas this port is handed `jumpPressed` as a rising edge the
+  // caller computes per step. Nothing carries over to scrub.
+  //
+  // Unreachable today — `giveRandomSillyPowerup` (player.ts) is the only writer and
+  // nothing calls it until the rainbow block lands.
+  if (world.powerupPopup) {
+    world.powerupPopup.timer--;
+    if (world.powerupPopup.timer <= 0) world.powerupPopup = null;
+    world.frame++;
+    return;
+  }
 
   // Already dead: nothing plays. The live update() returns at index.html:1348, above
   // the playing branch entirely, so the camera and every enemy freeze along with the
@@ -389,7 +418,9 @@ export function spawnEnemiesInView(world: World): void {
   for (const d of world.pending) {
     if (d.spawned || d.x < clT || d.x > crT) continue;
     d.spawned = true;
-    if (world.dc.enemySkipChance && Math.random() < world.dc.enemySkipChance) continue;
+    // index.html:1359. Through random.ts's seam rather than Math.random() directly, so
+    // a super_easy test can pin the roll to the same constant the live driver stubs.
+    if (world.dc.enemySkipChance && random() < world.dc.enemySkipChance) continue;
     const enemy = spawnEnemy(world.map, world.dc, d);
     if (enemy) world.enemies.push(enemy);
   }
