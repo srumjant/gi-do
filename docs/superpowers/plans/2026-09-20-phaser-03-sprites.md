@@ -218,9 +218,26 @@ colour function that currently returns its input unchanged. That is where `FC()`
 later. One indirection now, no rework later.
 
 Register every sprite at boot via `textures.addCanvas`. Name them predictably
-(`gigi.classic.stand`, `enemy.doll`, `cloud`), and generate at a scale that matches how the
-live game draws each: player and rescue NPC at 2, enemies at `ENEMY_SCALE` 1.8, clouds at
-5-6, HUD items at 1.5.
+(`gigi.classic.stand`, `enemy.doll`, `cloud`), and generate at the scale the live game
+draws each at.
+
+**Scale is per draw-site, not per sprite.** The same art appears at different sizes in
+different places, so a sprite can need more than one texture:
+
+| Sprite | Scale | Where |
+|---|---|---|
+| player, rescue NPC | 2 | in-world (`index.html:1838`) |
+| enemies | `ENEMY_SCALE` 1.8 | in-world (`:1763`) |
+| clouds | 5 and 6 | background (`:1676`) |
+| heart | **2** | HUD lives |
+| heart | 1.5 | win screen only |
+| bow | **2** | in-world pickup |
+| bow | 1.5 | HUD icon |
+| star, cape icon | 1.5 | HUD |
+
+Only the player, enemies and clouds are needed for this plan. The HUD rows are recorded
+because the table originally said "HUD items at 1.5", which is wrong for the hearts that
+are actually on screen during play.
 
 - [ ] Tests, in the `node` environment with a canvas stub or by asserting on the pixel
   grid the rasteriser produces rather than on a real canvas: a sprite's dimensions are
