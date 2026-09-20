@@ -234,10 +234,12 @@ describe('wall collision', () => {
       const p = world.player;
       port.push({
         x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
+        frame: p.frame, frameTimer: p.frameTimer, animFrame: world.animFrame,
         camera: { x: world.camera.x, y: world.camera.y },
-        enemies: world.enemies.map((e) => (
-          { type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive }
-        )),
+        enemies: world.enemies.map((e) => ({
+          type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
+          frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
+        })),
       });
     }
 

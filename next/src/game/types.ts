@@ -16,6 +16,10 @@ export interface PlayerState {
   facing: 1 | -1;
   coyoteTime: number;
   jumpBuffer: number;
+  /** Which walk-cycle frame to draw: 0 stand, 1 run, 2 jump (index.html:1168, 1424-1429). */
+  frame: number;
+  /** Counts up toward the walk cycle's speed-scaled threshold (index.html:1168, 1426-1427). */
+  frameTimer: number;
 }
 
 export interface EnemyState {
@@ -27,6 +31,16 @@ export interface EnemyState {
   w: number;
   h: number;
   alive: boolean;
+  /** Which patrol frame to draw, flipped every 15 frames (index.html:1215, 1540). */
+  frame: number;
+  /** Counts up toward the 15-frame flip threshold (index.html:1215, 1540). */
+  frameTimer: number;
+  /**
+   * Counts down from 30 (45 with big-head, out of scope) after a stomp, so a squashed
+   * enemy keeps rendering — flattened — for half a second instead of vanishing the
+   * instant it dies (index.html:1215, 1525, 1545).
+   */
+  squashTimer: number;
 }
 
 export interface World {
@@ -37,6 +51,15 @@ export interface World {
   enemies: EnemyState[];
   /** Frames since the level started. Everything here is frame-counted, not seconds. */
   frame: number;
+  /**
+   * Free-running frame counter, incremented first thing every step — even while dead
+   * — exactly like the live game's top-level `animFrame++` at the very first line of
+   * `update()` (index.html:1275). Nothing in this slice reads it yet (it drives sine
+   * motion for enemy types this slice does not implement, and a fart-trail interval
+   * that is also out of scope), but it has to advance on the same frame the live game's
+   * does, so a later trace that does depend on it starts from an identical count.
+   */
+  animFrame: number;
   /**
    * Set once the player has fallen into a pit (index.html's `playerDie` -> `gameState
    * = 'dead'`). The live `update()` checks its own dead-state branch before it ever
