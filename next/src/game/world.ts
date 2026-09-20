@@ -1,12 +1,96 @@
 import { BASE_W, TILE, VIEW_H, VIEW_W } from '../config/constants';
-import { DIFFICULTY_CONFIG, type DifficultyKey } from '../config/difficulty';
-import { LEVELS } from '../data/levels';
+import { DIFFICULTY_CONFIG, type DifficultyKey, type DifficultyRecord } from '../config/difficulty';
+import { LEVELS, TILE_QUESTION, TILE_RAINBOW, type Level, type TileMap } from '../data/levels';
+import { BOW_S, CAT_S, SUPER_S } from '../data/sprites';
 import type { InputState } from '../input/actions';
 import { spawnEnemy, stepEnemy } from './enemy';
 import { createPlayer, stepPlayer, type Character } from './player';
 import { getRescueSprites } from './run';
 import { findGroundY, rectOverlap } from './tiles';
-import type { World } from './types';
+import type { BlockState, Pickup, Star, World } from './types';
+
+/**
+ * Everything `initLevel` rebuilds from scratch every time a level starts — including
+ * after a death (index.html:1180-1191). Bundled into one builder rather than written
+ * out twice because `createWorld` and `respawnLevel` must agree exactly: the whole
+ * point of the respawn path is that a bumped block comes back and a collected pickup
+ * reappears. Note what is NOT in here — `score` (World, survives death) and `lives`.
+ */
+interface LevelSpawnState {
+  bowPickups: Pickup[];
+  superPickups: Pickup[];
+  catPickup: Pickup | null;
+  stars: Star[];
+  questionBlocks: BlockState[];
+  rainbowBlocks: BlockState[];
+}
+
+/**
+ * Port of index.html:1173-1191.
+ *
+ * The pickup columns are NOT simply the level record's `bowPositions` /
+ * `superPositions`. `dc.enemySkipChance` — the super_easy-only field whose name says
+ * it only makes enemies spawn less often — ALSO injects a pickup every 20 tiles, a
+ * super at `i` and a bow at `i+5`, from tile 10 to ten tiles short of the level's
+ * right edge. There is no separate flag: the field being truthy is the entire
+ * condition, so the two behaviours cannot be separated. Level 1 (width 120) gains ten
+ * pickups its record does not list — supers at 10, 30, 50, 70, 90 and bows at 15, 35,
+ * 55, 75, 95 — which includes a SECOND bow sitting exactly on top of the record's own
+ * bow at 35. Both are collected on the same frame and both set the same charge count,
+ * so the duplicate changes nothing in play; it is drawn twice, and it is the live
+ * game's, so it stays.
+ * Every trace in this suite runs at `normal`, which has no `enemySkipChance` at all,
+ * so nothing here goes red if this branch is wrong — it is correct by reading the live
+ * source, not by going green.
+ *
+ * The live source's `lvl.bowPositions||[]` guard is dropped: this port's `Level` type
+ * requires both arrays, and all six records define them, so the fallback is dead code
+ * here rather than a behaviour being discarded.
+ *
+ * Each pickup's `y` is `findGroundY(column) - spriteH(SPRITE, 2)` — the sprite's own
+ * drawn height (`rows * 2`, index.html:670), which is why the three kinds sit at three
+ * different heights. It is NOT the collision size: see collectPickups below, where the
+ * hitboxes are flat literals that match no sprite.
+ */
+function buildLevelState(level: Level, dc: DifficultyRecord, map: TileMap): LevelSpawnState {
+  let bowPos = level.bowPositions;
+  let superPos = level.superPositions;
+  if (dc.enemySkipChance) {
+    const extra: number[] = [];
+    for (let i = 10; i < level.width - 10; i += 20) extra.push(i);
+    superPos = [...superPos, ...extra];
+    bowPos = [...bowPos, ...extra.map((x) => x + 5)];
+  }
+
+  const questionBlocks: BlockState[] = [];
+  const rainbowBlocks: BlockState[] = [];
+  for (let y = 0; y < level.height; y++) {
+    for (let x = 0; x < level.width; x++) {
+      if (map[y][x] === TILE_QUESTION) questionBlocks.push({ x, y, hit: false });
+      else if (map[y][x] === TILE_RAINBOW) rainbowBlocks.push({ x, y, hit: false });
+    }
+  }
+
+  return {
+    bowPickups: bowPos.map((tx) => ({
+      x: tx * TILE, y: findGroundY(map, tx) - BOW_S.length * 2, collected: false,
+    })),
+    superPickups: superPos.map((tx) => ({
+      x: tx * TILE, y: findGroundY(map, tx) - SUPER_S.length * 2, collected: false,
+    })),
+    // index.html:1183-1187. Always non-null for the six records this port carries, but
+    // the live guard is real and kept. The `cat=null` on the line above it belongs to
+    // the companion, which is a later task.
+    catPickup: level.catPosition == null ? null : {
+      x: level.catPosition * TILE,
+      y: findGroundY(map, level.catPosition) - CAT_S.length * 2,
+      collected: false,
+    },
+    stars: [],
+    questionBlocks,
+    rainbowBlocks,
+  };
+}
 
 /**
  * Port of the state built by `initLevel` (index.html, around the level-generation
@@ -29,9 +113,10 @@ export function createWorld(
 ): World {
   const level = LEVELS[levelIndex];
   const dc = DIFFICULTY_CONFIG[difficulty];
+  const map = level.generate(dc);
   return {
     level,
-    map: level.generate(dc),
+    map,
     dc,
     player: createPlayer(level, character),
     enemies: [],
@@ -45,18 +130,24 @@ export function createWorld(
     gameOver: false,
     won: false,
     character,
+    // A run starts at zero (index.html:1347's `score=0`, beside `lives=DC().lives`
+    // above). Nothing else ever zeroes it — see the field's own comment in types.ts.
+    score: 0,
+    ...buildLevelState(level, dc, map),
   };
 }
 
 /**
  * Port of `initLevel(currentLevel)` (index.html:1163-1209), called from `stepWorld`'s
  * dead branch once the 90-frame respawn countdown reaches zero with lives still left.
- * Rebuilds exactly the five things `createWorld` builds for a fresh game — map,
- * player, enemies, pending queue, camera — and clears `dead` so play resumes next
- * frame. Deliberately does NOT touch `lives` (or the live game's `score`, out of
- * scope here): index.html:1163's `initLevel` never assigns either, which is precisely
- * why a respawn is not a new game. `stateTimer` is also left alone — meaningless
- * until the next death sets it fresh, exactly as on the live side.
+ * Rebuilds exactly what `createWorld` builds for a fresh game — map, player, enemies,
+ * pending queue, camera — plus everything `buildLevelState` owns
+ * (pickups back where they started, blocks un-bumped, stars gone), and clears `dead`
+ * so play resumes next frame. Deliberately does NOT touch `lives` or `score`:
+ * index.html:1163's `initLevel` never assigns either, which is precisely why a respawn
+ * is not a new game — you keep the points and the lives counter, you lose the bow.
+ * `stateTimer` is also left alone — meaningless until the next death sets it fresh,
+ * exactly as on the live side.
  */
 export function respawnLevel(world: World): void {
   world.map = world.level.generate(world.dc);
@@ -65,6 +156,9 @@ export function respawnLevel(world: World): void {
   world.pending = world.level.enemyDefs.map((d) => ({ type: d.type, x: d.x, spawned: false }));
   world.camera = { x: 0, y: 0 };
   world.dead = false;
+  // Rebuilt from the FRESH map above, exactly as initLevel derives them, so a question
+  // block bumped before the death is a question block again after it.
+  Object.assign(world, buildLevelState(world.level, world.dc, world.map));
 }
 
 /**
@@ -133,12 +227,91 @@ export function stepWorld(world: World, input: InputState): void {
   // stepEnemies' loop) would freeze one frame earlier than the live game does and
   // desync the trace. So: one check, all three calls inside it, exactly like this.
   if (!world.dead) {
+    // index.html:1447-1448 and :1519 — both sit between the player block and the
+    // enemies loop, in this order, with the cat companion and the arrows (later tasks)
+    // in between. Inside the `!world.dead` guard because a PIT death returns from the
+    // live update() at index.html:1423, above all of this: you do not sweep up the
+    // pickups you happen to be falling through on the frame you die.
+    collectPickups(world);
+    stepStars(world);
     stepEnemies(world);
     checkRescue(world);
     stepCamera(world);
   }
 
   world.frame++;
+}
+
+/**
+ * Port of index.html:1447-1448 — the bow and super pickups. The cat's own overlap
+ * check sits between them in the live source (index.html:1450) and is deliberately
+ * absent: it spawns the cat companion, which is a later task in this plan.
+ *
+ * The pickup hitboxes are FLAT LITERALS, 16x16 for both, and they match neither
+ * sprite: BOW_S and SUPER_S are 8x8 grids drawn at scale 2, so 16 wide happens to
+ * agree while the cat's is 16x22 against a 20x26 drawn sprite. Do not derive one from
+ * the other in either direction — the spawn `y` above genuinely uses the sprite
+ * height, and this genuinely does not.
+ *
+ * `bowCharges` comes off the difficulty record, not a constant (see PlayerState).
+ * Neither pickup awards score; only stars, stomps, kills and the rescue do.
+ */
+export function collectPickups(world: World): void {
+  const p = world.player;
+  const box = { x: p.x, y: p.y, w: p.w, h: p.h };
+  for (const b of world.bowPickups) {
+    if (!b.collected && rectOverlap(box, { x: b.x, y: b.y, w: 16, h: 16 })) {
+      b.collected = true;
+      p.hasBow = true;
+      p.bowCharges = world.dc.bowCharges;
+    }
+  }
+  for (const s of world.superPickups) {
+    if (!s.collected && rectOverlap(box, { x: s.x, y: s.y, w: 16, h: 16 })) {
+      s.collected = true;
+      p.hasCape = true;
+    }
+  }
+}
+
+/**
+ * Port of index.html:1519-1521. A star's rise is a ONE-WAY RAMP, and the exact shape
+ * of it matters:
+ *
+ *   - It leaves a bumped question block at `vy = -2` and gains +0.1 a frame, so it
+ *     drifts up, decelerating, for about twenty frames (0.1 does not accumulate
+ *     exactly, so which frame it finally crosses zero on is up to IEEE-754 — the
+ *     clamp below is what makes that not matter).
+ *   - `if (s.vy > 0) s.vy = 0` clamps it the moment it would start falling. It never
+ *     comes back down.
+ *   - The whole movement block is guarded by `if (s.vy)` — truthiness, not a null
+ *     check — so once that clamp writes exactly 0, every later frame skips the block
+ *     entirely and the star is frozen in the air for the rest of the level.
+ *
+ * Nothing creates a star yet: that is the question block, a later task. The logic
+ * lives here because this is where the live game runs it, and because `stars` is
+ * already built (empty) by the spawn above.
+ */
+export function stepStars(world: World): void {
+  const p = world.player;
+  const box = { x: p.x, y: p.y, w: p.w, h: p.h };
+  for (const s of world.stars) {
+    if (s.collected) continue;
+    if (s.vy) {
+      s.vy += 0.1;
+      s.y += s.vy;
+      if (s.vy > 0) s.vy = 0;
+    }
+    // 10x10, another flat literal against a 7x7 sprite grid.
+    if (rectOverlap(box, { x: s.x, y: s.y, w: 10, h: 10 })) {
+      s.collected = true;
+      // Rounded HERE, at the award, not accumulated and rounded at the end. The two
+      // orders are not the same function: easy's 0.75 multiplier against the 50-point
+      // award elsewhere in the live game gives 38 twice (76) rounded per award, and 75
+      // rounded once at the end. Keep every award site shaped exactly like this one.
+      world.score += Math.round(100 * world.dc.scoreMultiplier);
+    }
+  }
 }
 
 /**
@@ -179,6 +352,9 @@ export function checkRescue(world: World): void {
   )) {
     world.won = true;
     world.stateTimer = 200; // index.html:1631. No level-advance in this slice — won is terminal.
+    // Also index.html:1631, and only reachable now that `score` exists. Same
+    // round-at-the-award-site shape as every other award; see stepStars.
+    world.score += Math.round(500 * world.dc.scoreMultiplier);
   }
 }
 

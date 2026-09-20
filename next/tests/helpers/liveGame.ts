@@ -44,6 +44,14 @@ export interface Sample {
   animFrame: number;
   camera: { x: number; y: number };
   enemies: EnemySample[];
+  /**
+   * The live game's top-level `score` (index.html:988). A run-level global like
+   * animFrame above, not a per-actor field — which is why it is in the standard shape
+   * rather than pulled out through `onFrame` by the one trace that cares: award sites
+   * are scattered across stomps, stars, arrows, the cat, the boss and the rescue, and
+   * every trace that touches any of them should be comparing this for free.
+   */
+  score: number;
 }
 
 export interface DriveOptions {
@@ -155,6 +163,8 @@ export interface Driver {
   /** A live reference to the script's own top-level `camera`, not a copy — see getPlayer's own comment. */
   getCamera: () => { x: number; y: number };
   getAnimFrame: () => number;
+  /** The live game's own top-level `score` (index.html:988). */
+  getScore: () => number;
   /** The live game's own `gameState` string (e.g. 'playing', 'dead', 'levelcomplete'). */
   getGameState: () => string;
   /**
@@ -240,6 +250,7 @@ function bootLiveGame(): Driver {
   getPlayer: () => player,
   getCamera: () => camera,
   getAnimFrame: () => animFrame,
+  getScore: () => score,
   getGameState: () => gameState,
   resetAnimFrame: () => { animFrame = 0; },
   getEnemies: () => enemies,
@@ -323,6 +334,7 @@ export function driveLiveGame(opts: DriveOptions): Sample[] {
       frame: p.frame, frameTimer: p.frameTimer, animFrame: anim,
       camera: { x: cam.x, y: cam.y },
       enemies,
+      score: d.getScore(),
     });
   }
   return trace;

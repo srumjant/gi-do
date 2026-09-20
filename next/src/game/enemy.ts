@@ -215,6 +215,10 @@ export function stepEnemy(world: World, e: EnemyState): void {
       e.alive = false;
       e.squashTimer = 30; // index.html:1545. Big-head's 45 (:1546) is out of scope.
       p.vy = -5;
+      // Also index.html:1545, in this position, and only portable now that `score`
+      // exists on the World at all. Rounded at the award site, never accumulated —
+      // see world.ts's stepStars for why that distinction is load-bearing.
+      world.score += Math.round(200 * dc.scoreMultiplier);
     } else {
       // Side or rising contact (index.html:1547's `else{playerHit();return;}`). No
       // cape in this slice, so this goes straight to death — see player.ts's

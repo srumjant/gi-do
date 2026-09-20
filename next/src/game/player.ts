@@ -40,6 +40,18 @@ export function createPlayer(level: Level, character: Character): PlayerState {
     jumpBuffer: 0,
     frame: 0,
     frameTimer: 0,
+    // index.html:1169's `hasBow:false, bowCharges:0`. Both are level state, not run
+    // state: every respawn goes through initLevel, so dying really does cost you the
+    // bow you picked up — unlike `score`, one field over on the World, which does not
+    // reset. See respawnLevel in world.ts.
+    hasBow: false,
+    bowCharges: 0,
+    // index.html:1169 is `hasCape:dc.startWithCape`, not a flat false — true on
+    // super_easy, which is the only difficulty where the player spawns already wearing
+    // one. Seeding it from the difficulty record belongs with the cape's own behaviour
+    // (Task 6 of this plan); what the pickup grants is all that reads it today, and no
+    // trace runs anything but `normal`, where the live value is false either way.
+    hasCape: false,
   };
 }
 

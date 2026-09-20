@@ -175,6 +175,7 @@ describe('death freezes the whole world, not just the player', () => {
           type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
           frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
         })),
+        score: world.score,
       });
     }
 
@@ -426,5 +427,10 @@ describe('the rescue vs. the live game', () => {
     expect(portWinFrame).toBe(liveWinFrame);
     expect(world.player.x).toBe(live[FRAMES - 1].x);
     expect(world.player.y).toBe(live[FRAMES - 1].y);
+    // The rescue is a scoring event too (index.html:1631's `score+=Math.round(500*
+    // dc.scoreMultiplier)`) — 500 at normal's 1.0 multiplier, awarded on the win frame
+    // and exactly once, since `won` freezes the world from the next frame on.
+    expect(world.score).toBe(live[FRAMES - 1].score);
+    expect(world.score).toBe(500);
   });
 });

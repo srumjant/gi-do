@@ -28,7 +28,9 @@ import { describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
 import { SCRIPTS, STOMP_SCRIPT } from './helpers/inputScript';
 import { createWorld, stepWorld } from '../src/game/world';
+import { findGroundY } from '../src/game/tiles';
 import { LEVELS } from '../src/data/levels';
+import { TILE } from '../src/config/constants';
 
 /**
  * Scripts whose player is expected to die within their own frame window — a pit fall
@@ -79,6 +81,7 @@ describe.each(Object.entries(SCRIPTS))('%s matches the live game', (name, script
           type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
           frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
         })),
+        score: world.score,
       });
       deadEachFrame.push(world.dead);
     }
@@ -174,6 +177,7 @@ describe('enemy trace vs. the live game (stomp, enemies enabled)', () => {
           type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
           frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
         })),
+        score: world.score,
       });
     }
 
@@ -189,6 +193,11 @@ describe('enemy trace vs. the live game (stomp, enemies enabled)', () => {
       expect(port[f].frameTimer).toBe(live[f].frameTimer);
       expect(port[f].animFrame).toBe(live[f].animFrame);
       expect(port[f].camera).toEqual(live[f].camera);
+      // The stomp is a scoring event (index.html:1545's `score+=Math.round(200*
+      // dc.scoreMultiplier)`), so this trace is where that award is pinned: 0 for
+      // every frame before the stomp, 200 at normal's 1.0 multiplier from the stomp
+      // frame on, and never a second time for the same already-dead doll.
+      expect(port[f].score).toBe(live[f].score);
     }
 
     // Sanity: the script must actually DO the thing it is named for, or the
@@ -235,6 +244,13 @@ describe('enemy trace vs. the live game (stomp, enemies enabled)', () => {
 
     expect(stompFrame).toBeGreaterThan(0); // doll@15 was actually stomped, not just present
 
+    // ...and the stomp really did pay out on the live side, so the per-frame `score`
+    // comparison above is two sides agreeing on 200, not two sides agreeing on 0.
+    // 200 is `Math.round(200 * dc.scoreMultiplier)` at normal's multiplier of 1.0, and
+    // it is awarded exactly once — a squashed doll is not re-stomped while its
+    // squashTimer runs down.
+    expect(live[live.length - 1].score).toBe(200);
+
     // The squash countdown (index.html:1215, 1525, 1545) is a real behaviour change —
     // a stomped enemy now persists, flattened, for 30 frames instead of vanishing the
     // instant it dies — and this window is long enough to watch the whole thing play
@@ -243,5 +259,129 @@ describe('enemy trace vs. the live game (stomp, enemies enabled)', () => {
     expect(doll15SquashTimers[stompFrame - 1]).toBe(30);
     expect(doll15SquashTimers[doll15SquashTimers.length - 1]).toBe(0);
     expect(doll15SquashTimers).toContain(0); // reached 0, not merely trending toward it
+  });
+});
+
+describe('the bow and super pickups vs. the live game', () => {
+  // Level 1's record is `bowPositions:[35,70], superPositions:[22,85]`, which the spawn
+  // (world.ts's buildLevelState) resolves against the real map into the bow at
+  // (560, 352) — resting on the base ground — and the super at (352, 352).
+  //
+  // Tile 22 is INSIDE the level's first pit, which is worth knowing before reading the
+  // script below. `addGaps` carves `[[20,3]]` at normal's gapWidth of 1.0, i.e. columns
+  // 20, 21 AND 22, so the super's own column has no solid tile anywhere in it,
+  // `findGroundY` falls through to its bottom-row fallback, and the pickup ends up
+  // hanging in mid-air over the hole. It is still collectable on foot from the right-
+  // hand lip: the player keeps standing while EITHER of its two floor probes is still
+  // over column 23, and that leaves a few pixels where the hitboxes already overlap and
+  // the ground has not yet run out. This script takes exactly that — walk right onto
+  // the bow, turn around, walk back, clip the super off the lip, and carry on into the
+  // pit — which is why it ends in a death that has nothing to do with the pickups.
+  //
+  // Real, unmutated level-1 geometry throughout; no mutateMap. The teleport is only to
+  // skip the walk (the same reason world.test.ts's rescue trace teleports): tile 33 is
+  // 31 tiles from spawn, across that same pit, and choreographing a script that clears
+  // it is a jump-timing problem with nothing to do with pickups. Enemies are suppressed
+  // on both sides for the same reason they are in the rescue trace — doll@28 and car@40
+  // are both inside the spawn window the instant the camera starts moving, and what
+  // they do to a player walking back and forth is not what this trace is about.
+  const REF = createWorld(0, 'normal', 'gigi');
+  const BOW = REF.bowPickups[0];
+  const BOW_TILE = BOW.x / TILE;
+  /** Two tiles short of the bow, standing on the ground the bow itself rests on. */
+  const START_X = BOW.x - 2 * TILE;
+  const START_Y = findGroundY(REF.map, BOW_TILE) - REF.player.h;
+  /**
+   * Frames of "hold right" before turning around. Nine would do (the grounded ramp
+   * covers 0.6, 1.2, 1.8, 2.4 and then 2.5 a frame, and a 16px-wide player only has to
+   * reach BOW.x - 16); fourteen leaves margin without carrying the player past the
+   * pickup. If it ever stopped being enough, `bowFrame` below fails outright rather
+   * than quietly asserting nothing.
+   */
+  const RIGHT_FRAMES = 14;
+  /**
+   * The walk back is the long part: ~13 tiles at 2.5px a frame, then the fall. The
+   * player dies in the pit at frame 121 and 140 leaves it frozen for the rest — well
+   * short of the 90-frame respawn, which would take the bow and the cape straight back
+   * off it again (respawnLevel rebuilds the pickups; only `score` survives a death).
+   */
+  const FRAMES = 140;
+
+  interface Powerups { hasBow: boolean; bowCharges: number; hasCape: boolean }
+
+  const script = (f: number) => ({
+    left: f >= RIGHT_FRAMES, right: f < RIGHT_FRAMES, jump: false,
+  });
+
+  it('grants the bow and the cape on the same frames the live game does', () => {
+    // hasBow/bowCharges/hasCape are per-actor fields only this trace cares about, so
+    // they come through `onFrame` into a side channel rather than growing the shared
+    // Sample shape. `score` is in Sample already — it is a run-level global.
+    const livePowerups: Powerups[] = [];
+    const live = driveLiveGame({
+      level: 0, difficulty: 'normal', character: 'gigi',
+      frames: FRAMES, input: script,
+      suppressEnemies: true,
+      beforeRun: (d) => {
+        const p = d.getPlayer();
+        p.x = START_X; p.y = START_Y; p.vx = 0; p.vy = 0; p.onGround = true;
+      },
+      onFrame: (d) => {
+        const p = d.getPlayer();
+        livePowerups.push({
+          hasBow: p.hasBow as boolean,
+          bowCharges: p.bowCharges as number,
+          hasCape: p.hasCape as boolean,
+        });
+      },
+    });
+
+    const world = createWorld(0, 'normal', 'gigi');
+    world.pending.length = 0;
+    world.enemies.length = 0;
+    world.player.x = START_X;
+    world.player.y = START_Y;
+    world.player.onGround = true;
+
+    const port: typeof live = [];
+    const portPowerups: Powerups[] = [];
+    for (let f = 0; f < FRAMES; f++) {
+      const held = script(f);
+      stepWorld(world, { ...held, jumpPressed: false });
+      const p = world.player;
+      port.push({
+        x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
+        frame: p.frame, frameTimer: p.frameTimer, animFrame: world.animFrame,
+        camera: { x: world.camera.x, y: world.camera.y },
+        enemies: [],
+        score: world.score,
+      });
+      portPowerups.push({
+        hasBow: p.hasBow, bowCharges: p.bowCharges, hasCape: p.hasCape,
+      });
+    }
+
+    // Position, velocity, camera and score, frame for frame — the usual comparison.
+    expect(port).toEqual(live);
+    // And the pickup state itself, frame for frame: not just "both ended up with a
+    // bow" but "both gained it, and its charges, on the same frame".
+    expect(portPowerups).toEqual(livePowerups);
+
+    // The script must actually collect both, in that order, or everything above is
+    // comparing two identically empty runs.
+    const bowFrame = portPowerups.findIndex((s) => s.hasBow);
+    const capeFrame = portPowerups.findIndex((s) => s.hasCape);
+    expect(bowFrame).toBeGreaterThanOrEqual(0);
+    expect(capeFrame).toBeGreaterThan(bowFrame);
+
+    // Charges arrive with the bow and nothing in this window spends them. The number
+    // comes off the difficulty record (3 at normal, 8 at super_easy, 2 at hard) — a
+    // distinction no trace can show, since every trace runs at normal.
+    expect(portPowerups[bowFrame].bowCharges).toBe(world.dc.bowCharges);
+    expect(portPowerups[FRAMES - 1].bowCharges).toBe(world.dc.bowCharges);
+
+    // Neither pickup is worth points. Stars, stomps, arrow kills, the cat and the
+    // rescue score; picking up the bow or the cape does not.
+    expect(live.every((s) => s.score === 0)).toBe(true);
   });
 });

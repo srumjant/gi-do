@@ -240,6 +240,7 @@ describe('wall collision', () => {
           type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
           frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
         })),
+        score: world.score,
       });
     }
 
