@@ -608,7 +608,16 @@ function silhouette(src,color){
 // Sprite cache for performance — pre-renders sprites to offscreen canvases.
 // The felt pass bakes in here too, so it costs nothing per frame.
 const spriteCache=new Map();
-function getSpriteKey(d,p,sc,fl){return d.length+'_'+d[0].length+'_'+sc+'_'+(fl?1:0)+'_'+(STYLE_FELT?'f':'x')+'_'+Object.values(p).join(',')+'_'+d.map(r=>r.join('')).join('');}
+// The bitmap and palette halves of the key depend only on the sprite data, and that
+// data is a module-level constant for every sprite but the big-head slices. Memoising
+// them per array identity keeps the key byte-identical while taking a full
+// re-serialisation of the sprite off every drawSprite call — it ran on all 69 call
+// sites, several times a frame, even when the cache then hit. Fresh arrays miss and
+// pay exactly what they always paid, and their WeakMap entry dies with them.
+const spriteBitsCache=new WeakMap(),paletteBitsCache=new WeakMap();
+function spriteBits(d){let s=spriteBitsCache.get(d);if(s===undefined){s=d.map(r=>r.join('')).join('');spriteBitsCache.set(d,s);}return s;}
+function paletteBits(p){let s=paletteBitsCache.get(p);if(s===undefined){s=Object.values(p).join(',');paletteBitsCache.set(p,s);}return s;}
+function getSpriteKey(d,p,sc,fl){return d.length+'_'+d[0].length+'_'+sc+'_'+(fl?1:0)+'_'+(STYLE_FELT?'f':'x')+'_'+paletteBits(p)+'_'+spriteBits(d);}
 function getCachedSprite(d,p,sc,fl){
   const key=getSpriteKey(d,p,sc,fl);
   let cached=spriteCache.get(key);
@@ -3359,6 +3368,36 @@ function testSprites(){
   });
 }
 
+function testSpriteKey(){
+  // The reference is the key exactly as it was built before memoisation. If the
+  // memoised version ever drifts from it, every cached sprite silently misses and
+  // the game re-rasterises the whole cast every frame — slower than doing nothing.
+  const refKey=(d,p,sc,fl)=>d.length+'_'+d[0].length+'_'+sc+'_'+(fl?1:0)+'_'+
+    (STYLE_FELT?'f':'x')+'_'+Object.values(p).join(',')+'_'+d.map(r=>r.join('')).join('');
+  [[GIGI_STAND,GIGI_P,2,false],[GIGI_RUN,GIGI_P,2,true],[DODO_STAND,DODO_P,3,false],
+   [BOSS_IDLE,BOSS_P,4,true],[CAT_S,CAT_P,ENEMY_SCALE,false]].forEach(c=>{
+    const d=c[0],p=c[1],sc=c[2],fl=c[3];
+    tAssert('sprite key matches reference: '+d.length+'x'+d[0].length+'@'+sc,
+            getSpriteKey(d,p,sc,fl)===refKey(d,p,sc,fl));
+  });
+  tAssert('sprite key is stable across calls',
+          getSpriteKey(GIGI_STAND,GIGI_P,2,false)===getSpriteKey(GIGI_STAND,GIGI_P,2,false));
+  // The big-head power-up slices the sprite fresh every frame, so two distinct arrays
+  // holding the same rows must share one cache entry. Keying on identity instead of
+  // content would hand each frame its own canvas, and spriteCache never evicts.
+  const a=GIGI_STAND.slice(0,7),b=GIGI_STAND.slice(0,7);
+  tAssert('equal-content slices share a key',
+          a!==b&&getSpriteKey(a,GIGI_P,5,false)===getSpriteKey(b,GIGI_P,5,false));
+  // Anything that changes the rasterised pixels must change the key.
+  const base=getSpriteKey(GIGI_STAND,GIGI_P,2,false);
+  tAssert('scale changes the key',getSpriteKey(GIGI_STAND,GIGI_P,3,false)!==base);
+  tAssert('flip changes the key',getSpriteKey(GIGI_STAND,GIGI_P,2,true)!==base);
+  tAssert('sprite changes the key',getSpriteKey(GIGI_RUN,GIGI_P,2,false)!==base);
+  tAssert('palette changes the key',getSpriteKey(GIGI_STAND,GIGI_TRUCK_P,2,false)!==base);
+  const wasFelt=STYLE_FELT;STYLE_FELT=!STYLE_FELT;
+  tAssert('felt style changes the key',getSpriteKey(GIGI_STAND,GIGI_P,2,false)!==base);
+  STYLE_FELT=wasFelt;
+}
 function runSelfTests(){
   TEST_RESULTS.pass=0;TEST_RESULTS.fail=0;
   console.log('[TEST] ===== start =====');
@@ -3367,6 +3406,7 @@ function runSelfTests(){
   testPadDetect();
   testRumbleScale();
   testSprites();
+  testSpriteKey();
   console.log('[TEST] ===== '+TEST_RESULTS.pass+' passed, '+TEST_RESULTS.fail+' failed =====');
 }
 if(location.search.indexOf('test=1')>=0)window.addEventListener('load',runSelfTests);
