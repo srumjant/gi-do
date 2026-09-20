@@ -3,10 +3,11 @@
 // element-by-element against the live game in tests/sprites.test.ts.
 //
 // getEnemySpriteInfo, getPlayerSprites, getRescueSprites and getKidnapper lived in this
-// section too but are not ported: they are behaviour, not data, and this module holds
-// only data. Three of them also read mutable game state (selectedChar, gigiSkin,
-// dodoSkin) that does not exist here; getKidnapper is pure and is left out for the
-// first reason alone. All four belong with the run state in a later plan.
+// section too but are not data, so they don't live here: this module holds only data.
+// getEnemySpriteInfo, getPlayerSprites and getRescueSprites read mutable game state
+// (selectedChar, gigiSkin, dodoSkin) besides, and have since been ported to
+// game/run.ts, alongside that state. getKidnapper is pure and was left out for the
+// "not data" reason alone; it has no home yet.
 
 /** A sprite is a grid of palette indices. 0 is transparent. */
 export type SpriteData = number[][];
