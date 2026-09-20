@@ -1,19 +1,12 @@
 import Phaser from 'phaser';
-import { BASE_H, BASE_W, STEP_MS, TILE, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
-import { TILE_BRICK, TILE_GROUND, TILE_QUESTION, TILE_RAINBOW } from '../data/levels';
+import { BASE_H, BASE_W, STEP_MS, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
 import { getDodoSkin, getGigiSkin, getSelectedChar } from '../game/run';
 import { createWorld, stepWorld } from '../game/world';
 import type { EnemyState, World } from '../game/types';
+import { createRainbowBlocks, drawStaticTiles, updateRainbowBlocks, type RainbowBlock } from '../gfx/tiles';
 import { enemyTextureKey, playerTextureKey, registerTextures } from '../gfx/textures';
 import type { InputState } from '../input/actions';
 import { createKeyboardInput, type KeyboardInput } from '../input/keyboard';
-
-/**
- * Question and rainbow blocks (tiles 3 and 5) have no level-specific colour in the
- * level data, unlike ground and brick — these are fixed, readable placeholders.
- */
-const QUESTION_COLOR = 0xffcc00;
-const RAINBOW_COLOR = 0xff33cc;
 
 /**
  * Half the difference between the canvas and the zoomed view. See setScroll below —
@@ -37,10 +30,10 @@ const PLAYER_POSES = ['stand', 'run', 'jump'] as const;
 /**
  * The vertical slice: the first Phaser-facing code in this port, and the validation
  * gate for the whole migration. Driven by the pure simulation in src/game/ and drawn
- * with the kids' actual pixel art now that Plan 3 has a texture pipeline — still no
- * felt shading (deferred), no parallax yet, no HUD, no sound. It exists to answer one
- * question (does the port feel the same as the live game?), so every hour spent
- * making it prettier is an hour not spent on that.
+ * with the kids' actual pixel art and the real tile grid now that Plan 3 has a
+ * texture pipeline — still no felt shading (deferred), no parallax yet, no HUD, no
+ * sound. It exists to answer one question (does the port feel the same as the live
+ * game?), so every hour spent making it prettier is an hour not spent on that.
  *
  * The scene is deliberately thin: build the tile map and the player image once in
  * `create()`, advance the simulation at a fixed rate in `update()`, and copy
@@ -53,6 +46,8 @@ export class SliceScene extends Phaser.Scene {
   private controls!: KeyboardInput;
   private playerImage!: Phaser.GameObjects.Image;
   private readonly enemyImages: Phaser.GameObjects.Image[] = [];
+  private rainbowBlocks: RainbowBlock[] = [];
+  private rainbowGraphics!: Phaser.GameObjects.Graphics;
   private accumulator = 0;
 
   constructor() {
@@ -64,7 +59,10 @@ export class SliceScene extends Phaser.Scene {
 
     registerTextures(this);
 
-    this.drawTileMap(this.world);
+    drawStaticTiles(this, this.world);
+    const rainbow = createRainbowBlocks(this, this.world);
+    this.rainbowBlocks = rainbow.blocks;
+    this.rainbowGraphics = rainbow.graphics;
 
     const { player } = this.world;
     this.playerImage = this.add
@@ -127,6 +125,10 @@ export class SliceScene extends Phaser.Scene {
       this.enemyImages[i] = image;
       this.syncEnemyImage(image, enemy, animFrame);
     }
+
+    // The only tile that animates — see gfx/tiles.ts. Everything else the tile grid
+    // draws was drawn once, in create(), and is left alone.
+    updateRainbowBlocks(this.rainbowGraphics, this.rainbowBlocks, animFrame);
 
     // Phaser zooms about the camera's CENTRE; the live game zooms about the top-left
     // (`ctx.scale(ZOOM); ctx.translate(-camera.x, -camera.y)`, index.html:1686). Same
@@ -191,37 +193,6 @@ export class SliceScene extends Phaser.Scene {
     image.setScale(1, 1);
     image.setAlpha(1);
     image.setPosition(enemy.x, enemy.y + wobble);
-  }
-
-  /**
-   * Draws the level's tile grid once as filled rectangles into a single Graphics
-   * object. Ground and brick use the level's own colours; question and rainbow blocks
-   * have no level-specific colour in the data, so they get the fixed placeholders
-   * above instead. Empty (0) and the unused code 4 draw nothing.
-   */
-  private drawTileMap(world: World): void {
-    const graphics = this.add.graphics();
-    const groundColor = Phaser.Display.Color.HexStringToColor(world.level.groundColor).color;
-    const brickColor = Phaser.Display.Color.HexStringToColor(world.level.brickColor).color;
-
-    for (let ty = 0; ty < world.map.length; ty++) {
-      const row = world.map[ty];
-      for (let tx = 0; tx < row.length; tx++) {
-        const color = tileColor(row[tx], groundColor, brickColor);
-        if (color === undefined) continue;
-        graphics.fillStyle(color).fillRect(tx * TILE, ty * TILE, TILE, TILE);
-      }
-    }
-  }
-}
-
-function tileColor(tile: number, groundColor: number, brickColor: number): number | undefined {
-  switch (tile) {
-    case TILE_GROUND: return groundColor;
-    case TILE_BRICK: return brickColor;
-    case TILE_QUESTION: return QUESTION_COLOR;
-    case TILE_RAINBOW: return RAINBOW_COLOR;
-    default: return undefined;
   }
 }
 
