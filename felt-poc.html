@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Felt Stitch POC</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#17171c; color:#e8e8ea; font-family:ui-monospace,Menlo,monospace; padding:18px; }
+h1 { font-size:15px; letter-spacing:.14em; text-transform:uppercase; color:#ffdd00; margin-bottom:4px; }
+.sub { font-size:11px; color:#83838f; margin-bottom:16px; line-height:1.6; max-width:760px; }
+.wrap { display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
+.panel { background:#1f1f26; border:1px solid #33333d; border-radius:10px; padding:14px; }
+.controls { width:280px; max-height:88vh; overflow-y:auto; }
+canvas { display:block; border-radius:10px; }
+.label { font-size:10px; letter-spacing:.12em; color:#83838f; text-transform:uppercase; margin-bottom:6px; }
+.card { margin-bottom:14px; }
+fieldset { border:none; border-top:1px solid #33333d; padding:12px 0 4px; }
+fieldset:first-of-type { border-top:none; padding-top:0; }
+legend { font-size:10px; letter-spacing:.12em; color:#ffdd00; text-transform:uppercase; padding-right:8px; }
+label { font-size:11px; color:#b6b6c0; margin:9px 0 3px; display:flex; justify-content:space-between; }
+label .val { color:#fff; font-variant-numeric:tabular-nums; }
+input[type=range] { width:100%; accent-color:#ffdd00; }
+button { font-family:inherit; font-size:11px; background:#2b2b34; color:#e8e8ea;
+  border:1px solid #44444f; border-radius:6px; padding:6px 10px; cursor:pointer; }
+button:hover { border-color:#ffdd00; }
+button.primary { background:#ffdd00; color:#000; border-color:#ffdd00; font-weight:bold; }
+.btns { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.chk { display:flex; align-items:center; gap:7px; font-size:11px; color:#b6b6c0; margin-top:9px; }
+.chk label { margin:0; }
+pre { background:#121217; border:1px solid #33333d; border-radius:8px; padding:10px;
+  font-size:10px; line-height:1.5; color:#8fd98f; overflow-x:auto; margin-top:12px; white-space:pre-wrap; }
+.note { font-size:10.5px; color:#83838f; line-height:1.6; margin-top:10px; max-width:640px; }
+</style>
+</head>
+<body>
+
+<h1>Felt Stitch POC</h1>
+<div class="sub">Two changes tested together: characters redrawn at 20&times;26 instead of 10&times;14, and a
+stitch renderer that draws each cell as a jittered rounded blob instead of a square. The right-hand panel is the
+same grid through the current square <code>fillRect</code> path, for comparison.</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="card">
+      <div class="label">Stitched — proposed</div>
+      <canvas id="out" width="660" height="430"></canvas>
+    </div>
+    <div class="card">
+      <div class="label">Square cells — what we render today</div>
+      <canvas id="flat" width="660" height="430"></canvas>
+    </div>
+    <div class="note">Same pixel data in both. The difference is entirely in how a cell is drawn:
+      rounded corners, per-cell position and size jitter so the silhouette goes bumpy, per-cell colour
+      variation, a top-left highlight per stitch, and fibre grain over everything.</div>
+  </div>
+
+  <div class="panel controls">
+    <fieldset>
+      <legend>Stitch</legend>
+      <div id="stitch-ctl"></div>
+      <div class="chk"><input type="checkbox" id="highlight" checked><label for="highlight">Per-stitch highlight</label></div>
+      <div class="chk"><input type="checkbox" id="thread" checked><label for="thread">Thread direction</label></div>
+    </fieldset>
+    <fieldset>
+      <legend>Material</legend>
+      <div id="mat-ctl"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Shadow</legend>
+      <div id="sh-ctl"></div>
+    </fieldset>
+    <div class="btns">
+      <button class="primary" id="copy">Copy params</button>
+      <button id="reset">Reset</button>
+      <button id="reseed">Re-seed</button>
+    </div>
+    <pre id="out-params"></pre>
+  </div>
+</div>
+
+<script>
+// ==========================================
+//  CHARACTERS — 20x26, written as text so they stay editable by hand
+//  h/H hair dark/highlight · s skin · e eye · m mouth · b blush
+//  r/R top · t/T lower · w collar · k bow · y/Y blonde
+// ==========================================
+const BOY = [
+  '......hhhhhhhh......',
+  '....hhHhhhhhhHhh....',
+  '...hhHhhhhhhhhHhh...',
+  '..hhhhhHhhhhHhhhhh..',
+  '..hhHhhhhhhhhhhHhh..',
+  '..hhhhhHhhhhHhhhhh..',
+  '..hhhhsssssssshhhh..',
+  '..hhhsssssssssshhh..',
+  '..hhsssssssssssshh..',
+  '..hhsssessssessshh..',
+  '..hhsssssssssssshh..',
+  '..hsbssssmmssssbsh..',
+  '...ssssssssssssss...',
+  '....ssssssssssss....',
+  '.....rrrrrrrrrr.....',
+  '...rrrrrrrrrrrrrr...',
+  '..rrrrrrrrrrrrrrrr..',
+  '..rrrrrrrrrrrrrrrr..',
+  '...rrrrrrrrrrrrrr...',
+  '....RRRRRRRRRRRR....',
+  '....tttttttttttt....',
+  '....ttttt..ttttt....',
+  '....ttttt..ttttt....',
+  '....ttttt..ttttt....',
+  '....TTTTT..TTTTT....',
+  '....TTTTT..TTTTT....',
+];
+const BOY_P = {
+  h:'#8a5a34', H:'#b98a52', s:'#f6ddc0', e:'#4a3526', m:'#bd6f60',
+  b:'#f0a894', r:'#d4483c', R:'#b03a30', t:'#d9b98c', T:'#bc9a70'
+};
+const GIRL = [
+  '......yyyyyyyy......',
+  '....yyyyyyyyyyyy....',
+  '..kkyyyyyyyyyyyykk..',
+  '..kkyyyyyyyyyyyykk..',
+  '..yyyyyyyyyyyyyyyy..',
+  '..yyyyssssssssyyyy..',
+  '..yyyssssssssssyyy..',
+  '..yyssssssssssssyy..',
+  '..yyssssssssssssyy..',
+  '..yysssessssesssyy..',
+  '..yyssssssssssssyy..',
+  '..ysbssssmmssssbsy..',
+  '...ssssssssssssss...',
+  '....ssssssssssss....',
+  '.....wwwwwwwwww.....',
+  '...pppppppppppppp...',
+  '..pppppppppppppppp..',
+  '...pppppppppppppp...',
+  '....pppppppppppp....',
+  '...pppppppppppppp...',
+  '..pppppppppppppppp..',
+  '.PPPPPPPPPPPPPPPPPP.',
+  '...tttt......tttt...',
+  '...tttt......tttt...',
+  '..TTTTT......TTTTT..',
+  '..TTTTT......TTTTT..',
+];
+const GIRL_P = {
+  y:'#e8c84a', Y:'#f4dd82', s:'#f6ddc0', e:'#4a3526', m:'#bd6f60',
+  b:'#f0a894', k:'#e86a9c', w:'#f7e8d8', p:'#f2809f', P:'#dd6a8a',
+  t:'#d9b98c', T:'#bc9a70'
+};
+
+// every row must be the declared width, or the figure shears
+[['BOY',BOY],['GIRL',GIRL]].forEach(([n,g])=>
+  g.forEach((r,i)=>{ if(r.length!==20) console.error(n+' row '+i+' is '+r.length+' wide, expected 20'); }));
+
+// ==========================================
+//  HELPERS
+// ==========================================
+let SEED = 7;
+function hash2(x,y,s){
+  let h=(x*374761393 + y*668265263 + (s+SEED)*1013904223)|0;
+  h=Math.imul(h^(h>>>13),1274126177);
+  return ((h^(h>>>16))>>>0)/4294967296;
+}
+function hexToRgb(h){const n=parseInt(h.slice(1),16);return[n>>16&255,n>>8&255,n&255];}
+function rgbToHex(r,g,b){const c=v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0');
+  return '#'+c(r)+c(g)+c(b);}
+function shift(hex,amt){
+  const [r,g,b]=hexToRgb(hex);
+  return rgbToHex(r+amt*255,g+amt*255,b+amt*255);
+}
+function roundRect(x,c,y,w,h,r){
+  x.beginPath();
+  if(x.roundRect) x.roundRect(c,y,w,h,r);
+  else { x.moveTo(c+r,y); x.arcTo(c+w,y,c+w,y+h,r); x.arcTo(c+w,y+h,c,y+h,r);
+         x.arcTo(c,y+h,c,y,r); x.arcTo(c,y,c+w,y,r); x.closePath(); }
+}
+
+// ==========================================
+//  FIBRE TEXTURE
+// ==========================================
+let grainTile=null,grainKey='';
+function getGrain(P){
+  const key=[P.grain,P.fibre,SEED].join('|');
+  if(grainTile&&grainKey===key)return grainTile;
+  const S=180;
+  const c=document.createElement('canvas');c.width=c.height=S;
+  const x=c.getContext('2d');
+  const img=x.createImageData(S,S),d=img.data;
+  for(let i=0;i<d.length;i+=4){
+    const v=128+(Math.random()-0.5)*255*P.grain;
+    d[i]=d[i+1]=d[i+2]=v; d[i+3]=255;
+  }
+  x.putImageData(img,0,0);
+  const n=Math.floor(S*S*0.006*P.fibre);
+  x.lineWidth=1;
+  for(let i=0;i<n;i++){
+    const px=Math.random()*S,py=Math.random()*S,a=Math.random()*Math.PI,len=2+Math.random()*6;
+    x.strokeStyle=Math.random()<0.5?'rgba(255,255,255,0.22)':'rgba(0,0,0,0.18)';
+    x.beginPath();x.moveTo(px,py);x.lineTo(px+Math.cos(a)*len,py+Math.sin(a)*len);x.stroke();
+  }
+  grainTile=c;grainKey=key;return c;
+}
+
+// ==========================================
+//  THE STITCH RENDERER — one cell is a jittered rounded blob, not a square
+// ==========================================
+function renderFigure(grid,pal,cell,P,stitched){
+  const w=grid[0].length*cell, h=grid.length*cell;
+  const pad=Math.ceil(cell*1.2);
+  const cv=document.createElement('canvas');
+  cv.width=w+pad*2; cv.height=h+pad*2;
+  const x=cv.getContext('2d');
+
+  for(let r=0;r<grid.length;r++) for(let c=0;c<grid[r].length;c++){
+    const ch=grid[r][c];
+    if(ch==='.'||!pal[ch])continue;
+    const base=pal[ch];
+    let px=pad+c*cell, py=pad+r*cell, size=cell;
+
+    if(!stitched){                                  // today's path: a flat square
+      x.fillStyle=base; x.fillRect(px,py,cell,cell);
+      continue;
+    }
+    // Cells grow past their grid slot and wobble, so neighbours overlap and the
+    // outline stops being a staircase. This is what reads as cut-and-sewn felt.
+    const j1=hash2(c,r,1), j2=hash2(c,r,2), j3=hash2(c,r,3), j4=hash2(c,r,4);
+    size = cell*(P.overlap + (j3-0.5)*P.sizeVar);
+    px  += (j1-0.5)*cell*P.jitter - (size-cell)/2;
+    py  += (j2-0.5)*cell*P.jitter - (size-cell)/2;
+    const col = shift(base,(j4-0.5)*P.colorVar);
+
+    x.fillStyle=col;
+    roundRect(x,px,py,size,size,size*P.radius);
+    x.fill();
+
+    if(P.highlight){                                 // light catching the pile
+      x.save();
+      roundRect(x,px,py,size,size,size*P.radius);
+      x.clip();
+      x.fillStyle=shift(base,P.highlightAmt);
+      roundRect(x,px,py,size*0.62,size*0.62,size*P.radius);
+      x.fill();
+      x.restore();
+    }
+    if(P.thread){                                    // a single visible stitch
+      x.save();
+      roundRect(x,px,py,size,size,size*P.radius);
+      x.clip();
+      x.strokeStyle=shift(base,-P.threadAmt);
+      x.lineWidth=Math.max(1,size*0.08);
+      const a=(j1*Math.PI);
+      const cx=px+size/2, cy=py+size/2, L=size*0.34;
+      x.beginPath();
+      x.moveTo(cx-Math.cos(a)*L,cy-Math.sin(a)*L);
+      x.lineTo(cx+Math.cos(a)*L,cy+Math.sin(a)*L);
+      x.stroke();
+      x.restore();
+    }
+  }
+
+  if(stitched&&P.grainOpacity>0){
+    const mask=document.createElement('canvas');
+    mask.width=cv.width;mask.height=cv.height;
+    mask.getContext('2d').drawImage(cv,0,0);
+    x.save();
+    x.globalCompositeOperation='overlay';
+    x.globalAlpha=P.grainOpacity;
+    x.fillStyle=x.createPattern(getGrain(P),'repeat');
+    x.fillRect(0,0,cv.width,cv.height);
+    x.restore();
+    x.save();
+    x.globalCompositeOperation='destination-in';
+    x.drawImage(mask,0,0);
+    x.restore();
+  }
+  return cv;
+}
+
+function silhouette(src,color,blur){
+  const cv=document.createElement('canvas');cv.width=src.width;cv.height=src.height;
+  const x=cv.getContext('2d');
+  if(blur>0)x.filter='blur('+blur+'px)';
+  x.drawImage(src,0,0);
+  x.filter='none';
+  x.globalCompositeOperation='source-in';
+  x.fillStyle=color;x.fillRect(0,0,cv.width,cv.height);
+  return cv;
+}
+
+// ==========================================
+//  SCENE
+// ==========================================
+function drawBoard(ctx,W,H,P,stitched){
+  ctx.clearRect(0,0,W,H);
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,P.bgTop); g.addColorStop(1,P.bgBottom);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  if(stitched&&P.grainOpacity>0){
+    ctx.save();
+    ctx.globalCompositeOperation='overlay';
+    ctx.globalAlpha=P.grainOpacity*1.15;
+    ctx.fillStyle=ctx.createPattern(getGrain(P),'repeat');
+    ctx.fillRect(0,0,W,H);
+    ctx.restore();
+  }
+  const figs=[[BOY,BOY_P],[GIRL,GIRL_P]];
+  // Shrink the cell until both figures fit the board with a margin, so the
+  // slider can never push them off the edge.
+  const gapCells=3, margin=cell=>cell*1.4;
+  let cell=P.cell;
+  while(cell>2 && (figs.length*20*cell + gapCells*cell + margin(cell)*2 > W
+                   || 26*cell + margin(cell)*2 > H)) cell--;
+  const pad=Math.ceil(cell*1.2);   // renderFigure's own bleed around the grid
+  const totalW=figs.length*20*cell + (figs.length-1)*gapCells*cell;
+  let fx=(W-totalW)/2;
+  const fy=(H-26*cell)/2;
+  figs.forEach(([grid,pal])=>{
+    const fig=renderFigure(grid,pal,cell,P,stitched);
+    if(stitched&&P.shadowAlpha>0){
+      const sh=silhouette(fig,'rgba(60,35,20,'+P.shadowAlpha+')',P.shadowBlur);
+      ctx.drawImage(sh,fx-pad+P.shadowX*cell,fy-pad+P.shadowY*cell);
+    }
+    ctx.drawImage(fig,fx-pad,fy-pad);
+    fx+=20*cell+gapCells*cell;
+  });
+}
+
+// ==========================================
+//  PARAMS
+// ==========================================
+const DEFAULTS={
+  cell:13,
+  overlap:1.18, jitter:0.16, sizeVar:0.22, radius:0.34, colorVar:0.07,
+  highlight:true, highlightAmt:0.055, thread:true, threadAmt:0.05,
+  grain:0.42, fibre:1.6, grainOpacity:0.5,
+  shadowAlpha:0.3, shadowBlur:3, shadowX:0.22, shadowY:0.3,
+  bgTop:'#57a08a', bgBottom:'#3f8570'
+};
+let P={...DEFAULTS};
+
+const SLIDERS=[
+  ['stitch-ctl','cell','Cell size (px)',6,22,1],
+  ['stitch-ctl','overlap','Cell overlap',1,1.5,0.01],
+  ['stitch-ctl','jitter','Position jitter',0,0.5,0.01],
+  ['stitch-ctl','sizeVar','Size variation',0,0.6,0.01],
+  ['stitch-ctl','radius','Corner rounding',0,0.5,0.01],
+  ['stitch-ctl','colorVar','Colour variation',0,0.25,0.005],
+  ['stitch-ctl','highlightAmt','Highlight strength',0,0.2,0.005],
+  ['stitch-ctl','threadAmt','Thread strength',0,0.2,0.005],
+  ['mat-ctl','grain','Speckle',0,1,0.01],
+  ['mat-ctl','fibre','Fibre density',0,4,0.05],
+  ['mat-ctl','grainOpacity','Grain opacity',0,1,0.01],
+  ['sh-ctl','shadowAlpha','Shadow opacity',0,0.6,0.01],
+  ['sh-ctl','shadowBlur','Shadow blur',0,10,0.5],
+  ['sh-ctl','shadowX','Shadow offset X',0,1,0.02],
+  ['sh-ctl','shadowY','Shadow offset Y',0,1,0.02],
+];
+const inputs={};
+SLIDERS.forEach(([host,key,text,min,max,step])=>{
+  const l=document.createElement('label');
+  l.innerHTML='<span>'+text+'</span><span class="val" id="v-'+key+'"></span>';
+  const i=document.createElement('input');
+  i.type='range';i.min=min;i.max=max;i.step=step;
+  i.addEventListener('input',()=>{P[key]=parseFloat(i.value);grainKey='';sync();});
+  document.getElementById(host).append(l,i);
+  inputs[key]=i;
+});
+document.getElementById('highlight').addEventListener('change',e=>{P.highlight=e.target.checked;sync();});
+document.getElementById('thread').addEventListener('change',e=>{P.thread=e.target.checked;sync();});
+document.getElementById('reset').addEventListener('click',()=>{P={...DEFAULTS};grainKey='';sync(true);});
+document.getElementById('reseed').addEventListener('click',()=>{SEED=(SEED*7+13)%9973;grainTile=null;grainKey='';sync();});
+document.getElementById('copy').addEventListener('click',()=>{
+  navigator.clipboard.writeText(document.getElementById('out-params').textContent);
+  const b=document.getElementById('copy');b.textContent='Copied';
+  setTimeout(()=>b.textContent='Copy params',1200);
+});
+
+const co=document.getElementById('out').getContext('2d');
+const cf=document.getElementById('flat').getContext('2d');
+
+function sync(push){
+  if(push){
+    for(const k in inputs) if(P[k]!==undefined) inputs[k].value=P[k];
+    document.getElementById('highlight').checked=P.highlight;
+    document.getElementById('thread').checked=P.thread;
+  }
+  for(const k in inputs){
+    const el=document.getElementById('v-'+k);
+    if(el) el.textContent=(+P[k]).toFixed(k==='cell'?0:3);
+  }
+  document.getElementById('out-params').textContent='const STITCH = '+JSON.stringify({
+    overlap:P.overlap,jitter:P.jitter,sizeVar:P.sizeVar,radius:P.radius,colorVar:P.colorVar,
+    highlight:P.highlight,highlightAmt:P.highlightAmt,thread:P.thread,threadAmt:P.threadAmt,
+    grain:P.grain,fibre:P.fibre,grainOpacity:P.grainOpacity,
+    shadowAlpha:P.shadowAlpha,shadowBlur:P.shadowBlur,shadowX:P.shadowX,shadowY:P.shadowY
+  },null,1)+';';
+  drawBoard(co,660,430,P,true);
+  drawBoard(cf,660,430,P,false);
+}
+sync(true);
+</script>
+</body>
+</html>
