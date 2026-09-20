@@ -39,9 +39,9 @@ interface LevelSpawnState {
  * bow at 35. Both are collected on the same frame and both set the same charge count,
  * so the duplicate changes nothing in play; it is drawn twice, and it is the live
  * game's, so it stays.
- * Every trace in this suite runs at `normal`, which has no `enemySkipChance` at all,
- * so nothing here goes red if this branch is wrong — it is correct by reading the live
- * source, not by going green.
+ * Every frame trace in this suite runs at `normal`, which has no `enemySkipChance` at
+ * all, so no trace can reach this branch; world.test.ts compares these tables against
+ * the live game's own directly instead, across every difficulty and level.
  *
  * The live source's `lvl.bowPositions||[]` guard is dropped: this port's `Level` type
  * requires both arrays, and all six records define them, so the fallback is dead code
@@ -55,6 +55,8 @@ interface LevelSpawnState {
 function buildLevelState(level: Level, dc: DifficultyRecord, map: TileMap): LevelSpawnState {
   let bowPos = level.bowPositions;
   let superPos = level.superPositions;
+  // Covered by world.test.ts's "builds identical pickup, star and block tables for
+  // every difficulty and level" — no frame trace reaches this branch.
   if (dc.enemySkipChance) {
     const extra: number[] = [];
     for (let i = 10; i < level.width - 10; i += 20) extra.push(i);

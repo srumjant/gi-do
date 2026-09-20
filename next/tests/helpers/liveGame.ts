@@ -165,6 +165,25 @@ export interface Driver {
   getAnimFrame: () => number;
   /** The live game's own top-level `score` (index.html:988). */
   getScore: () => number;
+  /**
+   * Live references to the six collections `initLevel` derives from the level record
+   * and the freshly generated map (index.html:1180-1191) — the pickup tables, the
+   * empty star list, and the question/rainbow block scans.
+   *
+   * Exists for world.test.ts's spawn-parity check, which is the only cover the
+   * `dc.enemySkipChance` extra-pickup branch has: that branch fires on super_easy
+   * alone, and every frame trace in this suite runs at `normal`, so no trace reaches
+   * it. Reading the tables directly is the only way to compare it against the real
+   * index.html. Test-helper surface only — nothing in src/ has or needs an equivalent.
+   */
+  getLevelSpawn: () => {
+    bowPickups: unknown[];
+    superPickups: unknown[];
+    catPickup: unknown;
+    stars: unknown[];
+    questionBlocks: unknown[];
+    rainbowBlocks: unknown[];
+  };
   /** The live game's own `gameState` string (e.g. 'playing', 'dead', 'levelcomplete'). */
   getGameState: () => string;
   /**
@@ -251,6 +270,7 @@ function bootLiveGame(): Driver {
   getCamera: () => camera,
   getAnimFrame: () => animFrame,
   getScore: () => score,
+  getLevelSpawn: () => ({ bowPickups, superPickups, catPickup, stars, questionBlocks, rainbowBlocks }),
   getGameState: () => gameState,
   resetAnimFrame: () => { animFrame = 0; },
   getEnemies: () => enemies,

@@ -10,6 +10,8 @@ import { checkRescue, createWorld, stepCamera, stepWorld } from '../src/game/wor
 import { findGroundY } from '../src/game/tiles';
 import { getRescueSprites, setSelectedChar } from '../src/game/run';
 import { emptyInput, type InputState } from '../src/input/actions';
+import { DIFF_KEYS } from '../src/config/difficulty';
+import { LEVELS } from '../src/data/levels';
 import { TILE, VIEW_H, VIEW_W } from '../src/config/constants';
 import type { World } from '../src/game/types';
 
@@ -432,5 +434,54 @@ describe('the rescue vs. the live game', () => {
     // and exactly once, since `won` freezes the world from the next frame on.
     expect(world.score).toBe(live[FRAMES - 1].score);
     expect(world.score).toBe(500);
+  });
+});
+
+describe('the level spawn tables vs. the live game', () => {
+  // `dc.enemySkipChance` does not only make enemies spawn less often — it also injects
+  // a pickup every 20 tiles (world.ts's buildLevelState). It is truthy on super_easy
+  // alone, and every frame trace in this suite runs at `normal`, so no trace can reach
+  // that branch at all; without this, it would be covered by nothing. It is not a
+  // theoretical corner either, since super_easy and easy are the difficulties this
+  // game is actually played on.
+  //
+  // One assertion over the whole grid rather than a case per cell. It costs nothing to
+  // widen from the one branch that needs covering to all four difficulties and all six
+  // levels, and doing so also pins the parts that move WITH difficulty for other
+  // reasons: gapWidth reshapes the map, which moves every pickup's `y` (findGroundY)
+  // and can change which columns carry a question or rainbow block at all.
+  it('builds identical pickup, star and block tables for every difficulty and level', () => {
+    // Through JSON deliberately: the live tables are objects from the VM's own realm,
+    // and what is being compared is the data, not the identity or the prototype.
+    const snapshot = <T>(v: T): T => JSON.parse(JSON.stringify(v));
+
+    const live: unknown[] = [];
+    const port: unknown[] = [];
+    for (const difficulty of DIFF_KEYS) {
+      for (let level = 0; level < LEVELS.length; level++) {
+        // frames: 0 — initLevel has already run by the time beforeRun fires, and no
+        // frame needs stepping to read what it built.
+        driveLiveGame({
+          level, difficulty, character: 'gigi', frames: 0,
+          input: () => ({ left: false, right: false, jump: false }),
+          beforeRun: (d) => {
+            live.push({ difficulty, level, ...snapshot(d.getLevelSpawn()) });
+          },
+        });
+        const w = createWorld(level, difficulty, 'gigi');
+        port.push({
+          difficulty,
+          level,
+          ...snapshot({
+            bowPickups: w.bowPickups, superPickups: w.superPickups, catPickup: w.catPickup,
+            stars: w.stars, questionBlocks: w.questionBlocks, rainbowBlocks: w.rainbowBlocks,
+          }),
+        });
+      }
+    }
+
+    // Each entry carries its own difficulty and level, so a mismatch names the cell
+    // rather than leaving 24 anonymous ones to be counted through by hand.
+    expect(port).toEqual(live);
   });
 });
