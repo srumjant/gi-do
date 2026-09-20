@@ -2,7 +2,7 @@ import { ENEMY_SCALE, GRAVITY, TILE } from '../config/constants';
 import type { DifficultyRecord } from '../config/difficulty';
 import type { EnemyDef, TileMap } from '../data/levels';
 import {
-  BAT_S, CAR_S, DINO_S, DOLL_S, ICEBAT_S, PENGUIN_S, type SpriteData,
+  BAT_S, BOUNCER_S, CAR_S, DINO_S, DOLL_S, ICEBAT_S, PENGUIN_S, type SpriteData,
 } from '../data/sprites';
 import { playerHit } from './player';
 import { findGroundY, getTile, isSolid, rectOverlap } from './tiles';
@@ -10,8 +10,8 @@ import type { EnemyState, World } from './types';
 
 /**
  * Ground patrollers (index.html:1212-1222, 1524-1547) — doll, car, dino, penguin —
- * plus bat/icebat (sine-wave flight), the first of level 1's non-patrolling types.
- * Ghost (homes on the player), cannon (shoots) and bouncer (hops) are still streamed
+ * plus the two other types level 1 actually spawns: bat/icebat (sine-wave flight) and
+ * bouncer (hops). Ghost (homes on the player) and cannon (shoots) remain streamed
  * types this slice does not implement. Their pending defs are still consumed by the
  * spawn window in world.ts exactly where the live game would spawn them (so later
  * defs still line up frame-for-frame) — this map is just how `spawnEnemy` recognises
@@ -31,6 +31,7 @@ const ENEMY_SPRITES: Partial<Record<string, SpriteData>> = {
   penguin: PENGUIN_S,
   bat: BAT_S,
   icebat: ICEBAT_S,
+  bouncer: BOUNCER_S,
 };
 
 /**
@@ -50,9 +51,10 @@ export function setRandom(fn: () => number): void {
 }
 
 /**
- * Port of index.html:1212-1222, now also covering bat/icebat alongside the ground
- * patrollers. Returns undefined for every other streamed type (ghost, cannon,
- * bouncer) so the caller (`spawnEnemiesInView` in world.ts) can skip it.
+ * Port of index.html:1212-1222, now covering every type level 1 spawns (doll, car,
+ * dino, bat, bouncer — penguin/icebat besides, for levels this slice does not reach
+ * yet). Returns undefined for every other streamed type (ghost, cannon) so the caller
+ * (`spawnEnemiesInView` in world.ts) can skip it.
  */
 export function spawnEnemy(
   map: TileMap,
@@ -67,15 +69,15 @@ export function spawnEnemy(
   const gy = findGroundY(map, def.x);
   // Every type here defaults to -0.8*enemySpeed (index.html:1215); penguin is the one
   // override baked into the default rather than applied after, since nothing else
-  // about the base object changes for it. bat/icebat below still reads like the live
-  // game's own POST-construction override (index.html:1217), because it changes more
-  // than just vx.
+  // about the base object changes for it. bat/icebat/bouncer below still read like the
+  // live game's own POST-construction overrides (index.html:1217, 1219), because each
+  // changes more than just vx.
   const vx = def.type === 'penguin' ? -0.6 * dc.enemySpeed : -0.8 * dc.enemySpeed;
 
   const e: EnemyState = {
     type: def.type, x: def.x * TILE, y: gy - h, vx, vy: 0, w, h, alive: true,
     frame: 0, frameTimer: 0, squashTimer: 0,
-    noGravity: false, originY: 0, sineOffset: 0,
+    noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0,
   };
 
   // index.html:1217 — a fixed-height flyer, not a physics body: no gravity, and its y
@@ -91,6 +93,12 @@ export function spawnEnemy(
     e.vx = -1.2 * dc.enemySpeed;
     e.noGravity = true;
     e.sineOffset = randomSource() * Math.PI * 2;
+  } else if (def.type === 'bouncer') {
+    // index.html:1219 — starts at rest (vy stays 0, the base object's default, until
+    // gravity below first touches it) with the hop countdown at zero; stepEnemy fires
+    // the first hop once it clears 40.
+    e.vx = -1.0 * dc.enemySpeed;
+    e.bounceTimer = 0;
   }
 
   return e;
@@ -100,8 +108,8 @@ export function spawnEnemy(
  * Port of the per-enemy step at index.html:1524-1547: gravity + floor snap (skipped
  * for a noGravity flyer), the per-type movement branch, the frame flip, the stomp, and
  * side/rising contact (playerHit — death, since there is no cape in this slice).
- * ghost, cannon and bouncer still never reach the per-type branch below — `spawnEnemy`
- * above never creates any of them — so, as before, there is no branch for them here.
+ * ghost and cannon still never reach the per-type branch below — `spawnEnemy` above
+ * never creates either — so, as before, there is no branch for them here at all.
  *
  * Mutates `enemy` in place, `world.player.vy` on a kill, and `world` itself (`dead`,
  * `lives`, `stateTimer`, via playerHit) on a hit — exactly like `stepPlayer` mutates
@@ -149,6 +157,24 @@ export function stepEnemy(world: World, e: EnemyState): void {
     e.x += e.vx;
     e.y = e.originY + Math.sin(world.animFrame * 0.06 + e.sineOffset) * 30;
     if (e.x < 0 || e.x > world.level.width * TILE) e.vx *= -1;
+  } else if (e.type === 'bouncer') {
+    // index.html:1537 — hops rather than walks. Sits until `bounceTimer` clears 40
+    // while resting (vy===0 — the gravity block above already resolved that for this
+    // frame), then fires a new hop: a fixed vertical kick (dc.bouncerJumpForce) and a
+    // fresh horizontal aim at whichever side the PLAYER is currently on, re-decided on
+    // every hop rather than fixed at spawn. Uses gravity like the ground patrollers
+    // (no noGravity here), and turns at a wall but — unlike the ground patrol below —
+    // never at a ledge, so it can hop straight into a pit. That is live behaviour, not
+    // a bug this port should guard against.
+    e.bounceTimer++;
+    if (e.bounceTimer > 40 && e.vy === 0) {
+      e.vy = dc.bouncerJumpForce;
+      e.bounceTimer = 0;
+      e.vx = (p.x > e.x ? 1.5 : -1.5) * dc.enemySpeed;
+    }
+    e.x += e.vx;
+    const ef = e.vx > 0 ? e.x + e.w : e.x;
+    if (isSolid(getTile(map, ef, e.y + e.h / 2))) e.vx *= -1;
   } else {
     // Ground patrol (index.html:1546-1547): doll, car, dino, penguin. No horizontal
     // tile resolution at all, only a direction flip. `ef`/`ef2` are computed once,
@@ -168,7 +194,7 @@ export function stepEnemy(world: World, e: EnemyState): void {
 
   // Frame flip (index.html:1540), after the movement branches above — the live
   // source's flip runs after ALL of its per-type branches, patroller or not, so this
-  // is placed the same way relative to the two this port has.
+  // is placed the same way relative to the three this port has.
   e.frameTimer++;
   if (e.frameTimer > 15) {
     e.frame = 1 - e.frame;

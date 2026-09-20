@@ -63,6 +63,12 @@ export interface EnemyState {
    * — see that module's own comment for why. Inert (0) for every other type.
    */
   sineOffset: number;
+  /**
+   * Frames since a bouncer's last hop (or since it spawned, for the first one);
+   * stepEnemy fires a new hop once this clears 40 while the bouncer is resting
+   * (index.html:1219, 1537). Inert (0) for every other type.
+   */
+  bounceTimer: number;
 }
 
 export interface World {

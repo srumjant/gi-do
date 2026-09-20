@@ -77,12 +77,13 @@ export interface DriveOptions {
   /**
    * Optional hook run once, after initLevel/mutateMap and before the frame loop
    * starts — for setup none of the other hooks cover, such as forcing the camera
-   * straight to a specific position so a streamed-in enemy far from spawn (a bat,
-   * say) does not need a script that actually walks the player there. Receives the
-   * same driver the loop itself drives, so anything `getCamera`/`getPlayer` expose
-   * can be mutated in place, exactly like `mutateMap` already does for the tile grid
-   * — `camera` is a live reference to the script's own top-level binding, not a copy
-   * (see `getCamera`'s own comment on the Driver interface below).
+   * straight to a specific position so a streamed-in enemy far from spawn (a bat or
+   * a bouncer, say) does not need a script that actually walks the player there.
+   * Receives the same driver the loop itself drives, so anything
+   * `getCamera`/`getPlayer` expose can be mutated in place, exactly like `mutateMap`
+   * already does for the tile grid — `camera` is a live reference to the script's
+   * own top-level binding, not a copy (see `getCamera`'s own comment on the Driver
+   * interface below).
    */
   beforeRun?: (d: Driver) => void;
 }
@@ -165,12 +166,12 @@ export interface Driver {
    */
   resetAnimFrame: () => void;
   // The live enemy objects carry extra fields depending on type (originY, sineOffset,
-  // shootTimer, ...) that this port does not carry over into this comparison shape —
-  // hence the same `& Record<string, unknown>` widening getPlayer uses, and the
-  // explicit field-by-field projection down to EnemySample in driveLiveGame below.
-  // See the note on `vy` in enemy.test.ts's own bat trace comparison for why
-  // originY/sineOffset specifically stay out of EnemySample even though this port
-  // now has them on its own EnemyState.
+  // bounceTimer, shootTimer, ...) that this port does not carry over into this
+  // comparison shape — hence the same `& Record<string, unknown>` widening getPlayer
+  // uses, and the explicit field-by-field projection down to EnemySample in
+  // driveLiveGame below. See the note on `vy` in enemy.test.ts's own bat/bouncer
+  // trace comparison for why originY/sineOffset/bounceTimer specifically stay out of
+  // EnemySample even though this port now has them on its own EnemyState.
   getEnemies: () => Array<EnemySample & Record<string, unknown>>;
   setDifficulty: (d: string) => void;
   setChar: (c: string) => void;
