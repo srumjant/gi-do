@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gigi &amp; Dodo — Felt Style Lab</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#17171c; color:#e8e8ea; font-family:ui-monospace,Menlo,monospace; padding:18px; }
+h1 { font-size:16px; letter-spacing:.14em; text-transform:uppercase; color:#ffdd00; margin-bottom:4px; }
+.sub { font-size:11px; color:#83838f; margin-bottom:16px; }
+.wrap { display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
+.panel { background:#1f1f26; border:1px solid #33333d; border-radius:10px; padding:14px; }
+.stage { flex:1; min-width:520px; }
+.controls { width:290px; max-height:86vh; overflow-y:auto; }
+.row { display:flex; gap:14px; flex-wrap:wrap; }
+canvas { display:block; image-rendering:pixelated; border-radius:12px; }
+.card .label { font-size:10px; letter-spacing:.12em; color:#83838f; text-transform:uppercase; margin-bottom:6px; }
+.card { margin-bottom:14px; }
+fieldset { border:none; border-top:1px solid #33333d; padding:12px 0 4px; }
+fieldset:first-of-type { border-top:none; padding-top:0; }
+legend { font-size:10px; letter-spacing:.12em; color:#ffdd00; text-transform:uppercase; padding-right:8px; }
+label { font-size:11px; color:#b6b6c0; margin:9px 0 3px; display:flex; justify-content:space-between; }
+label .val { color:#fff; font-variant-numeric:tabular-nums; }
+input[type=range] { width:100%; accent-color:#ffdd00; }
+select, button { font-family:inherit; font-size:11px; background:#2b2b34; color:#e8e8ea;
+  border:1px solid #44444f; border-radius:6px; padding:6px 10px; cursor:pointer; }
+select { width:100%; }
+button:hover, select:hover { border-color:#ffdd00; }
+button.primary { background:#ffdd00; color:#000; border-color:#ffdd00; font-weight:bold; }
+.btns { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.swatches { display:flex; gap:3px; margin-top:8px; }
+.sw { width:26px; height:26px; border-radius:4px; border:1px solid #00000055; }
+pre { background:#121217; border:1px solid #33333d; border-radius:8px; padding:12px;
+  font-size:10.5px; line-height:1.55; color:#8fd98f; overflow-x:auto; margin-top:12px; white-space:pre-wrap; }
+.note { font-size:10.5px; color:#83838f; line-height:1.6; margin-top:8px; }
+.chk { display:flex; align-items:center; gap:7px; font-size:11px; color:#b6b6c0; margin-top:9px; }
+.chk label { margin:0; }
+</style>
+</head>
+<body>
+
+<h1>Felt Style Lab — Gigi</h1>
+<div class="sub">One character, render-time only. Tune until it feels right, then we lock the numbers into the game.</div>
+
+<div class="wrap">
+  <div class="panel stage">
+    <div class="row">
+      <div class="card">
+        <div class="label">Before — as shipped</div>
+        <canvas id="before" width="300" height="330"></canvas>
+      </div>
+      <div class="card">
+        <div class="label">After — felt</div>
+        <canvas id="after" width="300" height="330"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="label">Actual in-game size — readability check</div>
+      <canvas id="actual" width="620" height="96"></canvas>
+    </div>
+    <div class="note">The right canvas is the same 10&times;14 pixel array as the left. Nothing was redrawn —
+      only palette, bevel, grain and shadow differ.</div>
+  </div>
+
+  <div class="panel controls">
+    <fieldset>
+      <legend>Preset</legend>
+      <select id="preset">
+        <option value="felt">Felt / craft (reference)</option>
+        <option value="bead">Perler bead</option>
+        <option value="wool">Soft wool</option>
+        <option value="off">Off (original)</option>
+      </select>
+      <div class="chk"><input type="checkbox" id="animate" checked><label for="animate">Animate stand / run / jump</label></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Palette</legend>
+      <div id="palette-ctl"></div>
+      <div class="swatches" id="sw-before"></div>
+      <div class="swatches" id="sw-after"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Bevel — the &ldquo;cut felt&rdquo; edge</legend>
+      <select id="bevelMode">
+        <option value="region">Region — colour area is one piece</option>
+        <option value="pixel">Pixel — every block beveled</option>
+        <option value="none">None</option>
+      </select>
+      <div id="bevel-ctl"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Fibre grain</legend>
+      <div id="grain-ctl"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Shadow</legend>
+      <div id="shadow-ctl"></div>
+    </fieldset>
+
+    <div class="btns">
+      <button class="primary" id="copy">Copy locked params</button>
+      <button id="reset">Reset</button>
+    </div>
+    <pre id="out"></pre>
+  </div>
+</div>
+
+<script>
+// ==========================================
+//  GIGI — copied verbatim from index.html
+// ==========================================
+const GIGI_STAND=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,0,2,2,0,2,2,0,0],[0,0,0,6,6,0,6,6,0,0]];
+const GIGI_RUN=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
+const GIGI_JUMP=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,1,0,1,1,1,1,0,1,0],[0,0,1,1,1,1,1,1,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,0,0,0,0,2,0,0],[0,6,0,0,0,0,0,0,6,0]];
+const GIGI_P={1:'#e03030',2:'#3050d0',3:'#ffffff',4:'#ffcc99',5:'#e8c845',6:'#aa6633',7:'#dd5555',8:'#ffaa88'};
+const FRAMES=[GIGI_STAND,GIGI_RUN,GIGI_STAND,GIGI_JUMP];
+
+// ==========================================
+//  COLOUR HELPERS
+// ==========================================
+function hexToRgb(h){const n=parseInt(h.slice(1),16);return[n>>16&255,n>>8&255,n&255];}
+function rgbToHex(r,g,b){const c=v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0');
+  return '#'+c(r)+c(g)+c(b);}
+function rgbToHsl(r,g,b){
+  r/=255;g/=255;b/=255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;
+  let h=0;const l=(mx+mn)/2;const s=d===0?0:d/(1-Math.abs(2*l-1));
+  if(d){ if(mx===r)h=60*(((g-b)/d)%6); else if(mx===g)h=60*((b-r)/d+2); else h=60*((r-g)/d+4); }
+  return [(h+360)%360,s,l];
+}
+function hslToRgb(h,s,l){
+  const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2;
+  let r,g,b;
+  if(h<60)[r,g,b]=[c,x,0]; else if(h<120)[r,g,b]=[x,c,0]; else if(h<180)[r,g,b]=[0,c,x];
+  else if(h<240)[r,g,b]=[0,x,c]; else if(h<300)[r,g,b]=[x,0,c]; else [r,g,b]=[c,0,x];
+  return [(r+m)*255,(g+m)*255,(b+m)*255];
+}
+// Warmth as a white-balance shift, not a hue rotation. Rotating every hue toward
+// yellow turns sky teal and denim purple; scaling the channels keeps blue blue.
+function warmBalance(r,g,b,w){
+  return [r*(1+w*0.35), g*(1+w*0.08), b*(1-w*0.30)];
+}
+function shade(hex,amount){ // +lighten / -darken, in luminance
+  const [r,g,b]=hexToRgb(hex); let [h,s,l]=rgbToHsl(r,g,b);
+  l=Math.max(0,Math.min(1,l+amount));
+  if(amount>0) s*=0.92; // fabric highlights lose a little saturation
+  return rgbToHex(...hslToRgb(h,s,l));
+}
+
+// The palette transform. This is the single function that would move into index.html.
+function feltify(hex,P){
+  const [r0,g0,b0]=hexToRgb(hex);
+  const [h,s0,l0]=rgbToHsl(r0,g0,b0);
+  const s=Math.max(0,Math.min(1,s0*(1-P.desat)));
+  const l=Math.max(0,Math.min(1,P.lumCenter+(l0-P.lumCenter)*P.lumRange));
+  const [r,g,b]=hslToRgb(h,s,l);
+  return rgbToHex(...warmBalance(r,g,b,P.warm));
+}
+function feltPalette(pal,P){
+  const out={};
+  for(const k in pal) out[k]=P.enabled?feltify(pal[k],P):pal[k];
+  return out;
+}
+
+// ==========================================
+//  FIBRE GRAIN — one tiling noise tile, rebuilt only when settings change
+// ==========================================
+let grainTile=null,grainKey='';
+function getGrain(P){
+  const key=[P.grainAmt,P.grainScale,P.fibre].join('|');
+  if(grainTile&&grainKey===key)return grainTile;
+  const S=128*P.grainScale;
+  const c=document.createElement('canvas');c.width=c.height=S;
+  const x=c.getContext('2d');
+  // base speckle — grey 128 is neutral under 'overlay'
+  const img=x.createImageData(S,S),d=img.data;
+  for(let i=0;i<d.length;i+=4){
+    const v=128+(Math.random()-0.5)*255*P.grainAmt;
+    d[i]=d[i+1]=d[i+2]=v; d[i+3]=255;
+  }
+  x.putImageData(img,0,0);
+  // short fibres — this is what reads as textile rather than TV static
+  const n=Math.floor(S*S*0.004*P.fibre);
+  for(let i=0;i<n;i++){
+    const px=Math.random()*S,py=Math.random()*S;
+    const a=Math.random()*Math.PI, len=1.5+Math.random()*4.5;
+    x.strokeStyle=Math.random()<0.5?'rgba(255,255,255,0.20)':'rgba(0,0,0,0.20)';
+    x.lineWidth=1;
+    x.beginPath();
+    x.moveTo(px,py);
+    x.lineTo(px+Math.cos(a)*len,py+Math.sin(a)*len);
+    x.stroke();
+  }
+  grainTile=c;grainKey=key;return c;
+}
+// Apply grain to a canvas, then restore the original alpha so transparent stays transparent.
+function applyGrain(cv,P){
+  if(!P.enabled||P.grainOpacity<=0||(P.grainAmt<=0&&P.fibre<=0))return;
+  const x=cv.getContext('2d');
+  const mask=document.createElement('canvas');
+  mask.width=cv.width;mask.height=cv.height;
+  mask.getContext('2d').drawImage(cv,0,0);
+  x.save();
+  x.globalCompositeOperation='overlay';
+  x.globalAlpha=P.grainOpacity;
+  x.fillStyle=x.createPattern(getGrain(P),'repeat');
+  x.fillRect(0,0,cv.width,cv.height);
+  x.restore();
+  x.save();
+  x.globalCompositeOperation='destination-in';
+  x.drawImage(mask,0,0);
+  x.restore();
+}
+
+// ==========================================
+//  SPRITE RENDER — bevel bakes in at cache time, so runtime cost stays zero
+// ==========================================
+function renderSprite(data,pal,sc,P){
+  const w=data[0].length*sc,h=data.length*sc;
+  const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+  const x=cv.getContext('2d');
+  const fp=feltPalette(pal,P);
+  const at=(r,c)=>(data[r]&&data[r][c]!==undefined)?data[r][c]:0;
+  // bevel width in device pixels — clamped so it survives small scales like ENEMY_SCALE 1.8
+  const bw=(P.enabled&&P.bevelMode!=='none')
+    ? Math.max(P.bevelMin,Math.round(sc*P.bevelW)) : 0;
+
+  for(let r=0;r<data.length;r++) for(let c=0;c<data[r].length;c++){
+    const v=data[r][c]; if(!v)continue;
+    const base=fp[v], X=c*sc, Y=r*sc;
+    x.fillStyle=base; x.fillRect(X,Y,sc,sc);
+    if(!bw)continue;
+    // Region mode bevels only the outline of a colour area, so a shirt reads as
+    // one cut piece. Pixel mode bevels every block — the bead look.
+    const edge=(rr,cc)=>P.bevelMode==='pixel'||at(rr,cc)!==v;
+    x.fillStyle=shade(base,P.bevelLight);
+    if(edge(r-1,c)) x.fillRect(X,Y,sc,bw);
+    if(edge(r,c-1)) x.fillRect(X,Y,bw,sc);
+    x.fillStyle=shade(base,-P.bevelDark);
+    if(edge(r+1,c)) x.fillRect(X,Y+sc-bw,sc,bw);
+    if(edge(r,c+1)) x.fillRect(X+sc-bw,Y,bw,sc);
+  }
+  applyGrain(cv,P);
+  return cv;
+}
+function silhouette(src,color){
+  const cv=document.createElement('canvas');cv.width=src.width;cv.height=src.height;
+  const x=cv.getContext('2d');
+  x.drawImage(src,0,0);
+  x.globalCompositeOperation='source-in';
+  x.fillStyle=color;x.fillRect(0,0,cv.width,cv.height);
+  return cv;
+}
+function drawSprite(ctx,data,pal,sc,P,dx,dy){
+  const s=renderSprite(data,pal,sc,P);
+  if(P.enabled&&P.shadowAlpha>0){
+    const sh=silhouette(s,'rgba(0,0,0,'+P.shadowAlpha+')');
+    ctx.drawImage(sh,Math.round(dx+P.shadowX*sc),Math.round(dy+P.shadowY*sc));
+  }
+  ctx.drawImage(s,Math.round(dx),Math.round(dy));
+}
+
+// ==========================================
+//  SCENE
+// ==========================================
+const SCENE={sky:'#6FC2E0',skyLow:'#A9DCEC',grass:'#4E9B45',grassTop:'#6BB85C'};
+function drawScene(ctx,w,h,P,groundY){
+  const g=ctx.createLinearGradient(0,0,0,groundY);
+  g.addColorStop(0,P.enabled?feltify(SCENE.sky,P):'#5c94fc');
+  g.addColorStop(1,P.enabled?feltify(SCENE.skyLow,P):'#9ad0ff');
+  ctx.fillStyle=g;ctx.fillRect(0,0,w,groundY);
+  ctx.fillStyle=P.enabled?feltify(SCENE.grass,P):'#2d8a2d';
+  ctx.fillRect(0,groundY,w,h-groundY);
+  ctx.fillStyle=P.enabled?feltify(SCENE.grassTop,P):'#3fa83f';
+  ctx.fillRect(0,groundY,w,4);
+}
+// Blocky cloud, drawn through the same pipeline so it picks up the felt treatment.
+const CLOUD=[[0,0,1,1,1,0,0,0],[0,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1],[0,1,1,1,1,1,0,0]];
+const CLOUD_P={1:'#ffffff'};
+
+// ==========================================
+//  PARAMS
+// ==========================================
+const PRESETS={
+  felt:{enabled:true,desat:0.24,lumCenter:0.55,lumRange:0.82,warm:0.12,
+        bevelMode:'region',bevelW:0.16,bevelMin:1,bevelLight:0.07,bevelDark:0.10,
+        grainAmt:0.32,grainScale:1,fibre:1.0,grainOpacity:0.45,
+        shadowAlpha:0.16,shadowX:0.22,shadowY:0.30},
+  bead:{enabled:true,desat:0.10,lumCenter:0.55,lumRange:0.92,warm:0.04,
+        bevelMode:'pixel',bevelW:0.22,bevelMin:1,bevelLight:0.16,bevelDark:0.18,
+        grainAmt:0.10,grainScale:1,fibre:0.2,grainOpacity:0.35,
+        shadowAlpha:0.20,shadowX:0.18,shadowY:0.22},
+  wool:{enabled:true,desat:0.36,lumCenter:0.58,lumRange:0.70,warm:0.20,
+        bevelMode:'region',bevelW:0.26,bevelMin:1,bevelLight:0.05,bevelDark:0.07,
+        grainAmt:0.50,grainScale:2,fibre:1.8,grainOpacity:0.62,
+        shadowAlpha:0.13,shadowX:0.25,shadowY:0.35},
+  off:{enabled:false,desat:0,lumCenter:0.55,lumRange:1,warm:0,
+        bevelMode:'none',bevelW:0,bevelMin:0,bevelLight:0,bevelDark:0,
+        grainAmt:0,grainScale:1,fibre:0,grainOpacity:0,
+        shadowAlpha:0,shadowX:0,shadowY:0}
+};
+const OFF=PRESETS.off;
+let P={...PRESETS.felt};
+
+const SLIDERS=[
+  ['palette-ctl','desat','Desaturate',0,1,0.01],
+  ['palette-ctl','lumCenter','Luminance centre',0.3,0.8,0.01],
+  ['palette-ctl','lumRange','Luminance range (lower = flatter)',0.4,1,0.01],
+  ['palette-ctl','warm','Warm light',0,0.5,0.01],
+  ['bevel-ctl','bevelW','Bevel width (share of a block)',0,0.45,0.01],
+  ['bevel-ctl','bevelLight','Highlight strength',0,0.35,0.01],
+  ['bevel-ctl','bevelDark','Shadow strength',0,0.35,0.01],
+  ['grain-ctl','grainAmt','Speckle amount',0,1,0.01],
+  ['grain-ctl','fibre','Fibre density',0,3,0.05],
+  ['grain-ctl','grainOpacity','Grain opacity',0,1,0.01],
+  ['grain-ctl','grainScale','Grain tile scale',1,3,1],
+  ['shadow-ctl','shadowAlpha','Drop shadow opacity',0,0.5,0.01],
+  ['shadow-ctl','shadowX','Shadow offset X (blocks)',0,0.8,0.02],
+  ['shadow-ctl','shadowY','Shadow offset Y (blocks)',0,0.8,0.02],
+];
+const inputs={};
+SLIDERS.forEach(([host,key,text,min,max,step])=>{
+  const l=document.createElement('label');
+  l.innerHTML='<span>'+text+'</span><span class="val" id="v-'+key+'"></span>';
+  const i=document.createElement('input');
+  i.type='range';i.min=min;i.max=max;i.step=step;
+  i.addEventListener('input',()=>{P[key]=parseFloat(i.value);sync();});
+  document.getElementById(host).append(l,i);
+  inputs[key]=i;
+});
+document.getElementById('bevelMode').addEventListener('change',e=>{P.bevelMode=e.target.value;sync();});
+document.getElementById('preset').addEventListener('change',e=>{P={...PRESETS[e.target.value]};sync(true);});
+document.getElementById('reset').addEventListener('click',()=>{
+  P={...PRESETS.felt};document.getElementById('preset').value='felt';sync(true);});
+document.getElementById('copy').addEventListener('click',()=>{
+  navigator.clipboard.writeText(document.getElementById('out').textContent);
+  const b=document.getElementById('copy');
+  b.textContent='Copied';setTimeout(()=>b.textContent='Copy locked params',1200);
+});
+
+function sync(pushToInputs){
+  if(pushToInputs){
+    for(const k in inputs) if(P[k]!==undefined) inputs[k].value=P[k];
+    document.getElementById('bevelMode').value=P.bevelMode;
+  }
+  for(const k in inputs){
+    const el=document.getElementById('v-'+k);
+    if(el) el.textContent=(+P[k]).toFixed(k==='grainScale'?0:2);
+  }
+  const sb=document.getElementById('sw-before'),sa=document.getElementById('sw-after');
+  sb.innerHTML='';sa.innerHTML='';
+  for(const k in GIGI_P){
+    const a=document.createElement('div');
+    a.className='sw';a.style.background=GIGI_P[k];a.title='before '+GIGI_P[k];sb.append(a);
+    const f=feltify(GIGI_P[k],P);
+    const b=document.createElement('div');
+    b.className='sw';b.style.background=P.enabled?f:GIGI_P[k];b.title='after '+f;sa.append(b);
+  }
+  document.getElementById('out').textContent=
+    'const FELT = '+JSON.stringify({
+      desat:P.desat,lumCenter:P.lumCenter,lumRange:P.lumRange,warm:P.warm,
+      bevelMode:P.bevelMode,bevelW:P.bevelW,bevelMin:P.bevelMin,
+      bevelLight:P.bevelLight,bevelDark:P.bevelDark,
+      grainAmt:P.grainAmt,grainScale:P.grainScale,fibre:P.fibre,grainOpacity:P.grainOpacity,
+      shadowAlpha:P.shadowAlpha,shadowX:P.shadowX,shadowY:P.shadowY
+    },null,2)+';';
+  draw();
+}
+
+// ==========================================
+//  DRAW
+// ==========================================
+const cvB=document.getElementById('before'),ctxB=cvB.getContext('2d');
+const cvA=document.getElementById('after'),ctxA=cvA.getContext('2d');
+const cvS=document.getElementById('actual'),ctxS=cvS.getContext('2d');
+[ctxB,ctxA,ctxS].forEach(c=>c.imageSmoothingEnabled=false);
+let frame=0;
+
+function panel(ctx,w,h,params,data){
+  const groundY=h-52;
+  drawScene(ctx,w,h,params,groundY);
+  drawSprite(ctx,CLOUD,CLOUD_P,7,params,26,34);
+  drawSprite(ctx,CLOUD,CLOUD_P,5,params,190,62);
+  const sc=13, sw=data[0].length*sc, sh=data.length*sc;
+  if(params.enabled&&params.shadowAlpha>0){
+    ctx.save();ctx.fillStyle='rgba(0,0,0,'+(params.shadowAlpha*0.9)+')';
+    ctx.beginPath();ctx.ellipse(w/2,groundY+5,sw*0.36,5,0,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
+  drawSprite(ctx,data,GIGI_P,sc,params,(w-sw)/2,groundY-sh+2);
+}
+
+function strip(ctx,w,h){
+  const groundY=h-22;
+  drawScene(ctx,w,h,P,groundY);
+  const labels=['scale 2 — before','scale 2 — after','scale 1.8 (ENEMY_SCALE) — after'];
+  [[2,OFF],[2,P],[1.8,P]].forEach(([sc,pp],i)=>{
+    const x0=40+i*200;
+    for(let k=0;k<3;k++){
+      const d=FRAMES[(frame+k)%FRAMES.length];
+      drawSprite(ctx,d,GIGI_P,sc,pp,x0+k*34,groundY-d.length*sc);
+    }
+    ctx.save();
+    ctx.fillStyle='rgba(0,0,0,0.5)';ctx.font='9px ui-monospace,monospace';
+    ctx.fillText(labels[i],x0,h-7);
+    ctx.restore();
+  });
+}
+
+function draw(){
+  const d=FRAMES[frame%FRAMES.length];
+  panel(ctxB,cvB.width,cvB.height,OFF,d);
+  panel(ctxA,cvA.width,cvA.height,P,d);
+  strip(ctxS,cvS.width,cvS.height);
+}
+setInterval(()=>{ if(document.getElementById('animate').checked){frame++;draw();} },380);
+
+sync(true);
+</script>
+</body>
+</html>

@@ -63,6 +63,16 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; border: 3px s
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const BASE_W = 640, BASE_H = 400;
+// Internal render multiplier. The game still thinks in 640x400 — same tiles on
+// screen, same physics — but every art pixel gets RENDER device pixels under it,
+// which is the room the felt grain and bevel need to sit beneath the art instead
+// of on top of it. 1 = the old look.
+const RENDER = 3;
+// World zoom. 1 shows 40 tiles across, which is very wide for a platformer —
+// Super Mario Bros showed 16. Higher = bigger characters, less level visible.
+// Only affects the world; the HUD is drawn outside it.
+const ZOOM = 1.5;
+const VIEW_W = BASE_W/ZOOM, VIEW_H = BASE_H/ZOOM;
 function resizeCanvas() {
   const isFS=!!(document.fullscreenElement||document.webkitFullscreenElement);
   const maxScale=isFS?999:2;
@@ -70,7 +80,8 @@ function resizeCanvas() {
   const isMobile='ontouchstart' in window;
   const availH=isMobile&&!isFS?window.innerHeight*0.65:window.innerHeight;
   const s = Math.min(window.innerWidth/BASE_W, availH/BASE_H, maxScale);
-  canvas.width=BASE_W; canvas.height=BASE_H;
+  canvas.width=BASE_W*RENDER; canvas.height=BASE_H*RENDER;
+  ctx.imageSmoothingEnabled=false;
   canvas.style.width=Math.floor(BASE_W*s)+'px'; canvas.style.height=Math.floor(BASE_H*s)+'px';
 }
 resizeCanvas(); window.addEventListener('resize', resizeCanvas);
@@ -171,6 +182,9 @@ const TRANSLATIONS = {
   pause_hint:         {et:'◀ ▶ vali  •  Space / OK kinnita',  en:'◀ ▶ choose  •  Space / OK confirm'},
   // Language selector
   lang_hint:          {et:'L = English',              en:'L = Eesti keel'},
+  // Art style selector
+  style_flat:         {et:'F = kangas',               en:'F = felt'},
+  style_felt:         {et:'F = tavaline',             en:'F = normal'},
   // Difficulty
   select_diff:        {et:'VALI RASKUSASTE',          en:'SELECT DIFFICULTY'},
   super_easy:         {et:'Ülikerge',                 en:'Super Easy'},
@@ -479,9 +493,115 @@ function stopBGM(){if(bgmScheduleTimer){clearTimeout(bgmScheduleTimer);bgmSchedu
 //  CONSTANTS & HELPERS
 // ==========================================
 const TILE = 16, GRAVITY = 0.4, ENEMY_SCALE = 1.8;
-// Sprite cache for performance — pre-renders sprites to offscreen canvases
+
+// ==========================================
+//  FELT STYLE
+//  A material pass applied at render time — no sprite was redrawn for it.
+//  Numbers were tuned by eye in felt-lab.html. Set STYLE_FELT=false for the
+//  original flat look, or toggle it live from the console.
+// ==========================================
+// Default is the original flat look; felt is opt-in and remembered per browser.
+let STYLE_FELT = false;
+try { STYLE_FELT = localStorage.getItem('gd_style') === 'felt'; } catch(e) {}
+function toggleFeltStyle(){
+  STYLE_FELT=!STYLE_FELT;
+  // Every cached sprite was baked with the old style, so throw them all away.
+  spriteCache.clear(); feltColorCache.clear(); grainPattern=null;
+  try { localStorage.setItem('gd_style',STYLE_FELT?'felt':'flat'); } catch(e) {}
+}
+const FELT = {
+  desat:0.15, lumCenter:0.33, lumRange:0.66, warm:0.05,
+  bevelMode:'region', bevelW:0.03, bevelMin:1, bevelLight:0.05, bevelDark:0.06,
+  grainAmt:0.39, grainScale:1, fibre:2.3, grainOpacity:0.44,
+  sceneGrainOpacity:0.30, // grain over the whole frame, so sky and hills are felt too
+  shadowAlpha:0.19, shadowX:0.22, shadowY:0.32
+};
+function hexToRgb(h){const n=parseInt(h.slice(1),16);return[n>>16&255,n>>8&255,n&255];}
+function rgbToHex(r,g,b){const c=v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0');return '#'+c(r)+c(g)+c(b);}
+function rgbToHsl(r,g,b){
+  r/=255;g/=255;b/=255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;
+  let h=0;const l=(mx+mn)/2;const s=d===0?0:d/(1-Math.abs(2*l-1));
+  if(d){if(mx===r)h=60*(((g-b)/d)%6);else if(mx===g)h=60*((b-r)/d+2);else h=60*((r-g)/d+4);}
+  return [(h+360)%360,s,l];
+}
+function hslToRgb(h,s,l){
+  const c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs((h/60)%2-1)),m=l-c/2;
+  let r,g,b;
+  if(h<60)[r,g,b]=[c,x,0];else if(h<120)[r,g,b]=[x,c,0];else if(h<180)[r,g,b]=[0,c,x];
+  else if(h<240)[r,g,b]=[0,x,c];else if(h<300)[r,g,b]=[x,0,c];else [r,g,b]=[c,0,x];
+  return [(r+m)*255,(g+m)*255,(b+m)*255];
+}
+// Warmth has to be a white-balance shift. Rotating every hue toward yellow
+// turns the sky teal and Gigi's jeans purple.
+function warmBalance(r,g,b,w){return [r*(1+w*0.35),g*(1+w*0.08),b*(1-w*0.30)];}
+function shade(hex,amount){
+  const [r,g,b]=hexToRgb(hex);let [h,s,l]=rgbToHsl(r,g,b);
+  l=Math.max(0,Math.min(1,l+amount));
+  if(amount>0)s*=0.92; // fabric highlights lose a little saturation
+  return rgbToHex(...hslToRgb(h,s,l));
+}
+// Felt colour, memoised — every scenery and sprite colour goes through here.
+const feltColorCache=new Map();
+function FC(hex){
+  if(!STYLE_FELT||typeof hex!=='string'||hex[0]!=='#'||hex.length!==7)return hex;
+  let v=feltColorCache.get(hex);
+  if(v)return v;
+  const [r0,g0,b0]=hexToRgb(hex);
+  const [h,s0,l0]=rgbToHsl(r0,g0,b0);
+  const s=Math.max(0,Math.min(1,s0*(1-FELT.desat)));
+  const l=Math.max(0,Math.min(1,FELT.lumCenter+(l0-FELT.lumCenter)*FELT.lumRange));
+  v=rgbToHex(...warmBalance(...hslToRgb(h,s,l),FELT.warm));
+  feltColorCache.set(hex,v);
+  return v;
+}
+// One tiling fibre texture, built on first use. The short strokes are what make
+// it read as textile rather than TV static.
+let grainTile=null;
+function getGrain(){
+  if(grainTile)return grainTile;
+  const S=128*FELT.grainScale;
+  const c=document.createElement('canvas');c.width=c.height=S;
+  const x=c.getContext('2d');
+  const img=x.createImageData(S,S),d=img.data;
+  for(let i=0;i<d.length;i+=4){const v=128+(Math.random()-0.5)*255*FELT.grainAmt;d[i]=d[i+1]=d[i+2]=v;d[i+3]=255;}
+  x.putImageData(img,0,0);
+  const n=Math.floor(S*S*0.004*FELT.fibre);
+  x.lineWidth=1;
+  for(let i=0;i<n;i++){
+    const px=Math.random()*S,py=Math.random()*S,a=Math.random()*Math.PI,len=1.5+Math.random()*4.5;
+    x.strokeStyle=Math.random()<0.5?'rgba(255,255,255,0.20)':'rgba(0,0,0,0.20)';
+    x.beginPath();x.moveTo(px,py);x.lineTo(px+Math.cos(a)*len,py+Math.sin(a)*len);x.stroke();
+  }
+  grainTile=c;return c;
+}
+// Overlay the grain, then restore the original alpha so transparent stays transparent.
+function applyGrain(cv){
+  if(FELT.grainOpacity<=0)return;
+  const x=cv.getContext('2d');
+  const mask=document.createElement('canvas');mask.width=cv.width;mask.height=cv.height;
+  mask.getContext('2d').drawImage(cv,0,0);
+  x.save();
+  x.globalCompositeOperation='overlay';x.globalAlpha=FELT.grainOpacity;
+  x.fillStyle=x.createPattern(getGrain(),'repeat');x.fillRect(0,0,cv.width,cv.height);
+  x.restore();
+  x.save();
+  x.globalCompositeOperation='destination-in';x.drawImage(mask,0,0);
+  x.restore();
+}
+function silhouette(src,color){
+  const cv=document.createElement('canvas');cv.width=src.width;cv.height=src.height;
+  const x=cv.getContext('2d');
+  x.drawImage(src,0,0);
+  x.globalCompositeOperation='source-in';
+  x.fillStyle=color;x.fillRect(0,0,cv.width,cv.height);
+  return cv;
+}
+
+// Sprite cache for performance — pre-renders sprites to offscreen canvases.
+// The felt pass bakes in here too, so it costs nothing per frame.
 const spriteCache=new Map();
-function getSpriteKey(d,p,sc,fl){return d.length+'_'+d[0].length+'_'+sc+'_'+(fl?1:0)+'_'+Object.values(p).join(',')+'_'+d.map(r=>r.join('')).join('');}
+function getSpriteKey(d,p,sc,fl){return d.length+'_'+d[0].length+'_'+sc+'_'+(fl?1:0)+'_'+(STYLE_FELT?'f':'x')+'_'+Object.values(p).join(',')+'_'+d.map(r=>r.join('')).join('');}
 function getCachedSprite(d,p,sc,fl){
   const key=getSpriteKey(d,p,sc,fl);
   let cached=spriteCache.get(key);
@@ -489,45 +609,81 @@ function getCachedSprite(d,p,sc,fl){
   const w=d[0].length*sc,h=d.length*sc;
   const oc=document.createElement('canvas');oc.width=w;oc.height=h;
   const ox=oc.getContext('2d');
+  // Bevel width in device pixels, clamped so it survives small scales like ENEMY_SCALE 1.8
+  const bw=STYLE_FELT&&FELT.bevelMode!=='none'?Math.max(FELT.bevelMin,Math.round(sc*FELT.bevelW)):0;
+  const at=(r,c)=>(d[r]&&d[r][c]!==undefined)?d[r][c]:0;
+  ox.save();
   if(fl){ox.translate(w,0);ox.scale(-1,1);}
-  for(let r=0;r<d.length;r++) for(let c=0;c<d[r].length;c++){const v=d[r][c];if(!v)continue;ox.fillStyle=p[v];ox.fillRect(c*sc,r*sc,sc,sc);}
-  spriteCache.set(key,oc);
-  return oc;
+  for(let r=0;r<d.length;r++) for(let c=0;c<d[r].length;c++){
+    const v=d[r][c];if(!v)continue;
+    const base=FC(p[v]),X=c*sc,Y=r*sc;
+    ox.fillStyle=base;ox.fillRect(X,Y,sc,sc);
+    if(!bw)continue;
+    // Region mode bevels only the outline of a colour area, so a shirt reads as
+    // one cut piece of felt rather than a grid of beads.
+    const edge=(rr,cc)=>FELT.bevelMode==='pixel'||at(rr,cc)!==v;
+    // The canvas is mirrored when flipped, so the lit side swaps to keep the
+    // light source fixed on screen.
+    ox.fillStyle=shade(base,FELT.bevelLight);
+    if(edge(r-1,c))ox.fillRect(X,Y,sc,bw);
+    if(fl){if(edge(r,c+1))ox.fillRect(X+sc-bw,Y,bw,sc);}
+    else {if(edge(r,c-1))ox.fillRect(X,Y,bw,sc);}
+    ox.fillStyle=shade(base,-FELT.bevelDark);
+    if(edge(r+1,c))ox.fillRect(X,Y+sc-bw,sc,bw);
+    if(fl){if(edge(r,c-1))ox.fillRect(X,Y,bw,sc);}
+    else {if(edge(r,c+1))ox.fillRect(X+sc-bw,Y,bw,sc);}
+  }
+  ox.restore();
+  let shadow=null;
+  if(STYLE_FELT){
+    applyGrain(oc);
+    if(FELT.shadowAlpha>0)shadow=silhouette(oc,'rgba(0,0,0,'+FELT.shadowAlpha+')');
+  }
+  const entry={s:oc,shadow};
+  spriteCache.set(key,entry);
+  return entry;
 }
 function drawSprite(d,x,y,p,sc,fl) {
-  const cached=getCachedSprite(d,p,sc,fl);
-  ctx.drawImage(cached,Math.round(x),Math.round(y));
+  // Rasterise at full device resolution, then hand drawImage the logical size so
+  // the frame transform lands it 1:1 on the backing store.
+  const e=getCachedSprite(d,p,sc*RENDER,fl);
+  const w=d[0].length*sc,h=d.length*sc;
+  if(e.shadow)ctx.drawImage(e.shadow,Math.round(x+FELT.shadowX*sc),Math.round(y+FELT.shadowY*sc),w,h);
+  ctx.drawImage(e.s,Math.round(x),Math.round(y),w,h);
 }
 function spriteH(s,sc){return s.length*sc} function spriteW(s,sc){return s[0].length*sc}
 
 // ==========================================
 //  SPRITES
 // ==========================================
-const GIGI_STAND=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,0,2,2,0,2,2,0,0],[0,0,0,6,6,0,6,6,0,0]];
-const GIGI_RUN=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
-const GIGI_JUMP=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,1,0,1,1,1,1,0,1,0],[0,0,1,1,1,1,1,1,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,0,0,0,0,2,0,0],[0,6,0,0,0,0,0,0,6,0]];
-const GIGI_P={1:'#e03030',2:'#3050d0',3:'#ffffff',4:'#ffcc99',5:'#9b7653',6:'#aa6633',7:'#dd5555',8:'#ffaa88'};
+// Clouds go through the sprite pipeline so they pick up the felt treatment too.
+const CLOUD_S=[[0,0,1,1,1,1,0,0],[0,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1],[0,1,1,1,1,1,0,0]];
+const CLOUD_P={1:'#ffffff'};
+const GIGI_STAND=[[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,4,4,4,4,5,0],[0,0,5,4,3,4,3,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,0,8,4,7,4,8,0,0],[0,0,0,0,4,4,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,0,2,2,2,2,2,0,0],[0,0,0,2,2,0,2,2,0,0],[0,0,0,6,6,0,6,6,0,0]];
+const GIGI_RUN=[[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,4,4,4,4,5,0],[0,0,5,4,3,4,3,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,0,8,4,7,4,8,0,0],[0,0,0,0,4,4,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,0,2,2,2,2,2,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
+const GIGI_JUMP=[[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,4,4,4,4,5,0],[0,0,5,4,3,4,3,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,0,8,4,7,4,8,0,0],[0,0,0,0,4,4,4,0,0,0],[0,1,0,1,1,1,1,1,0,1],[0,0,0,1,1,1,1,1,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,0,2,2,2,2,2,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
+const GIGI_P={1:'#e03030',2:'#3050d0',3:'#4f7942',4:'#ffcc99',5:'#9b7653',6:'#aa6633',7:'#b5504a',8:'#ffaa88'};
 // Gigi monster truck skin - blue shirt with truck graphic, darker jeans
-const GIGI_TRUCK_STAND=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,9,9,9,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,0,2,2,0,2,2,0,0],[0,0,0,6,6,0,6,6,0,0]];
-const GIGI_TRUCK_RUN=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,9,9,9,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
-const GIGI_TRUCK_JUMP=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,1,0,1,1,1,1,0,1,0],[0,0,1,1,9,9,9,1,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,0,0,0,0,2,0,0],[0,6,0,0,0,0,0,0,6,0]];
-const GIGI_TRUCK_P={1:'#2266cc',2:'#223355',3:'#ffffff',4:'#ffcc99',5:'#9b7653',6:'#554433',7:'#dd5555',8:'#ffaa88',9:'#44aaff'};
+const GIGI_TRUCK_STAND=[[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,4,4,4,4,5,0],[0,0,5,4,3,4,3,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,0,8,4,7,4,8,0,0],[0,0,0,0,4,4,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,9,9,9,1,0,0],[0,0,0,2,2,2,2,2,0,0],[0,0,0,2,2,0,2,2,0,0],[0,0,0,6,6,0,6,6,0,0]];
+const GIGI_TRUCK_RUN=[[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,4,4,4,4,5,0],[0,0,5,4,3,4,3,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,0,8,4,7,4,8,0,0],[0,0,0,0,4,4,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,9,9,9,1,0,0],[0,0,0,2,2,2,2,2,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
+const GIGI_TRUCK_JUMP=[[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,4,4,4,4,5,0],[0,0,5,4,3,4,3,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,0,8,4,7,4,8,0,0],[0,0,0,0,4,4,4,0,0,0],[0,1,0,1,1,1,1,1,0,1],[0,0,0,1,1,1,1,1,0,0],[0,0,0,1,9,9,9,1,0,0],[0,0,0,2,2,2,2,2,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
+const GIGI_TRUCK_P={1:'#2266cc',2:'#223355',3:'#4f7942',4:'#ffcc99',5:'#9b7653',6:'#554433',7:'#b5504a',8:'#ffaa88',9:'#44aaff'};
 const GIGI_SKINS=[
   {name:'Classic',palette:GIGI_P,stand:GIGI_STAND,run:GIGI_RUN,jump:GIGI_JUMP},
   {name:'Monster Truck',palette:GIGI_TRUCK_P,stand:GIGI_TRUCK_STAND,run:GIGI_TRUCK_RUN,jump:GIGI_TRUCK_JUMP}
 ];
-const DODO_STAND=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,0,6,0,0,6,0,0,0]];
-const DODO_RUN=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,0,6,0,0,0,0,6,0,0],[0,0,0,0,0,0,0,0,0,0]];
-const DODO_JUMP=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,1,0,1,1,1,0,1,0,0],[0,0,1,1,1,1,1,0,0,0],[0,6,0,0,0,0,0,6,0,0],[0,0,0,0,0,0,0,0,0,0]];
-const DODO_P={1:'#ff69b4',3:'#ffffff',4:'#ffcc99',5:'#e8c845',6:'#cc6699',7:'#dd5555',8:'#ffaa88',9:'#ff9999'};
+const DODO_STAND=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,5,5,5,5,5,5,0],[0,9,5,5,5,5,5,5,9,0],[0,0,5,4,4,4,4,5,0,0],[0,0,4,3,4,4,3,4,0,0],[0,0,4,8,4,4,8,4,0,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,0,4,4,0,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,0,6,0,0,6,0,0,0]];
+const DODO_RUN=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,5,5,5,5,5,5,0],[0,9,5,5,5,5,5,5,9,0],[0,0,5,4,4,4,4,5,0,0],[0,0,4,3,4,4,3,4,0,0],[0,0,4,8,4,4,8,4,0,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,0,4,4,0,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,0,6,0,0,0,0,6,0,0],[0,0,0,0,0,0,0,0,0,0]];
+const DODO_JUMP=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,5,5,5,5,5,5,0],[0,9,5,5,5,5,5,5,9,0],[0,0,5,4,4,4,4,5,0,0],[0,0,4,3,4,4,3,4,0,0],[0,0,4,8,4,4,8,4,0,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,0,4,4,0,0,0,0],[0,1,0,1,1,1,1,0,1,0],[0,0,1,1,1,1,1,1,0,0],[0,6,0,0,0,0,0,0,6,0],[0,0,0,0,0,0,0,0,0,0]];
+const DODO_P={1:'#ff69b4',3:'#3f6d96',4:'#ffcc99',5:'#e8c845',6:'#cc6699',7:'#b5504a',8:'#ffaa88',9:'#ff9999'};
 // Dodo Elsa skin - ice-blue flared gown replaces legs, platinum hair
-const DODO_ELSA_STAND=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,1,2,2,2,2,2,2,1,0],[0,0,6,6,0,0,6,6,0,0]];
-const DODO_ELSA_RUN=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,1,2,2,2,2,2,2,1,0],[0,6,6,0,0,0,0,6,6,0]];
-const DODO_ELSA_JUMP=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,1,0,1,1,1,1,0,1,0],[0,0,1,1,1,1,1,1,0,0],[0,0,2,2,2,2,2,2,0,0],[0,0,6,6,0,0,6,6,0,0]];
+const DODO_ELSA_STAND=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,5,5,5,5,5,5,0],[0,9,5,5,5,5,5,5,9,0],[0,0,5,4,4,4,4,5,0,0],[0,0,4,3,4,4,3,4,0,0],[0,0,4,8,4,4,8,4,0,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,0,4,4,0,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,1,2,2,2,2,2,2,1,0],[0,0,6,6,0,0,6,6,0,0]];
+const DODO_ELSA_RUN=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,5,5,5,5,5,5,0],[0,9,5,5,5,5,5,5,9,0],[0,0,5,4,4,4,4,5,0,0],[0,0,4,3,4,4,3,4,0,0],[0,0,4,8,4,4,8,4,0,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,0,4,4,0,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,1,2,2,2,2,2,2,1,0],[0,6,6,0,0,0,0,6,6,0]];
+const DODO_ELSA_JUMP=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,5,5,5,5,5,5,0],[0,9,5,5,5,5,5,5,9,0],[0,0,5,4,4,4,4,5,0,0],[0,0,4,3,4,4,3,4,0,0],[0,0,4,8,4,4,8,4,0,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,0,4,4,0,0,0,0],[0,1,0,1,1,1,1,0,1,0],[0,0,1,1,1,1,1,1,0,0],[0,0,2,2,2,2,2,2,0,0],[0,0,6,6,0,0,6,6,0,0]];
 // Hair is icy blue-white and skin is warm: at 10px wide, platinum-on-pale read
-// as one undifferentiated blob and the pigtails looked like horns. Separating
-// them by temperature as well as value is what makes them read as hair.
-const DODO_ELSA_P={1:'#5fb4dc',2:'#bfe4f5',3:'#ffffff',4:'#ffd2b0',5:'#dbeaf7',6:'#2e6f99',7:'#cc4444',8:'#ffb096',9:'#ffbfa0'};
+// as one undifferentiated blob. Separating them by temperature as well as
+// value is what makes them read as hair.
+const DODO_ELSA_P={1:'#5fb4dc',2:'#bfe4f5',3:'#3f6d96',4:'#ffd2b0',5:'#dbeaf7',6:'#2e6f99',7:'#b5504a',8:'#ffb096',9:'#5fb4dc'};
 const DODO_SKINS=[
   {name:'Classic',palette:DODO_P,stand:DODO_STAND,run:DODO_RUN,jump:DODO_JUMP},
   {name:'Elsa',palette:DODO_ELSA_P,stand:DODO_ELSA_STAND,run:DODO_ELSA_RUN,jump:DODO_ELSA_JUMP}
@@ -874,14 +1030,14 @@ function drawParallax(lvlIdx){
   // Sky gradient: top is lighter, bottom blends to first layer
   const grad=ctx.createLinearGradient(0,0,0,BASE_H);
   const lvl=LEVELS[lvlIdx];
-  grad.addColorStop(0,lvl.bg);
-  grad.addColorStop(1,pd.bg2||lvl.bg);
+  grad.addColorStop(0,FC(lvl.bg));
+  grad.addColorStop(1,FC(pd.bg2||lvl.bg));
   ctx.fillStyle=grad;ctx.fillRect(0,0,BASE_W,BASE_H);
   // Draw each parallax layer as rolling hills
   pd.layers.forEach(layer=>{
     const scrollX=camera.x*layer.speed;
     const baseY=BASE_H*layer.y;
-    ctx.fillStyle=layer.color;
+    ctx.fillStyle=FC(layer.color);
     ctx.beginPath();ctx.moveTo(0,BASE_H);
     const hillW=BASE_W/(layer.hills.length-1);
     for(let i=0;i<=layer.hills.length;i++){
@@ -1104,6 +1260,9 @@ function update(){
   if(powerupPopup){powerupPopup.timer--;if(powerupPopup.timer<=0)powerupPopup=null;clearJP();return;}
   // Language toggle
   if(justPressed['KeyL']&&isMenuState()){lang=lang==='et'?'en':'et';justPressed['KeyL']=false;}
+  // Art style toggle - flat (default) or felt. Menu-only like the language
+  // key: switching rebuilds every cached sprite, so not mid-run.
+  if(justPressed['KeyF']&&isMenuState()){toggleFeltStyle();justPressed['KeyF']=false;}
   if(handleBack()){clearJP();return;}
   if(gameState==='paused'){
     if(justPressed['ArrowLeft']||justPressed['KeyA'])pauseIdx=Math.max(0,pauseIdx-1);
@@ -1456,8 +1615,8 @@ function update(){
   if(canRescue&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:rX,y:rY,w:16,h:rDH})){gameState='levelcomplete';stateTimer=200;score+=Math.round(500*dc.scoreMultiplier);spawnParticles(rX+6,rY,'#ff69b4',20);sfxWin();stopBGM();}
 
   // Smooth camera lerp for fluid scrolling
-  const targetCX=Math.max(0,Math.min(p.x-BASE_W/2+p.w/2,lvl.width*TILE-BASE_W));
-  const targetCY=Math.max(0,Math.min(p.y-BASE_H/2,lvl.height*TILE-BASE_H));
+  const targetCX=Math.max(0,Math.min(p.x-VIEW_W/2+p.w/2,lvl.width*TILE-VIEW_W));
+  const targetCY=Math.max(0,Math.min(p.y-VIEW_H/2,lvl.height*TILE-VIEW_H));
   camera.x+=(targetCX-camera.x)*0.12;
   camera.y+=(targetCY-camera.y)*0.12;
   // Snap if very close to avoid perpetual float
@@ -1501,18 +1660,19 @@ function drawWorldFrame(){
   // Parallax background (replaces flat bg fill)
   drawParallax(currentLevel);
 
-  // Clouds (float above parallax, gentle drift)
-  if(lvl.clouds){ctx.fillStyle='rgba(255,255,255,0.5)';lvl.clouds.forEach(([cx,cy])=>{const sx=cx*TILE-camera.x*.15+Math.sin(animFrame*0.003+cx)*10,sy=cy*TILE+Math.sin(animFrame*0.006+cy)*4;
-    ctx.beginPath();ctx.ellipse(sx+15,sy+8,22,12,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(sx,sy+12,14,9,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(sx+30,sy+12,14,9,0,0,Math.PI*2);ctx.fill();});}
+  // Clouds (float above parallax, gentle drift). Blocky rather than elliptical —
+  // anti-aliased blobs were the one thing that never matched the pixel grid.
+  if(lvl.clouds){ctx.save();ctx.globalAlpha=0.75;lvl.clouds.forEach(([cx,cy])=>{const sx=cx*TILE-camera.x*.15+Math.sin(animFrame*0.003+cx)*10,sy=cy*TILE+Math.sin(animFrame*0.006+cy)*4;
+    drawSprite(CLOUD_S,sx,sy,CLOUD_P,cx%3?6:5,false);});ctx.restore();}
 
   // Apply screen shake offset
   ctx.save();ctx.translate(Math.round(screenShake.x),Math.round(screenShake.y));
-  ctx.save();ctx.translate(-Math.round(camera.x),-Math.round(camera.y));
-  const sTX=Math.floor(camera.x/TILE),eTX=Math.ceil((camera.x+BASE_W)/TILE),sTY=Math.floor(camera.y/TILE),eTY=Math.ceil((camera.y+BASE_H)/TILE);
+  ctx.save();ctx.scale(ZOOM,ZOOM);ctx.translate(-Math.round(camera.x),-Math.round(camera.y));
+  const sTX=Math.floor(camera.x/TILE),eTX=Math.ceil((camera.x+VIEW_W)/TILE),sTY=Math.floor(camera.y/TILE),eTY=Math.ceil((camera.y+VIEW_H)/TILE);
   for(let ty=sTY;ty<=eTY;ty++) for(let tx=sTX;tx<=eTX;tx++){
     if(ty<0||ty>=lvl.height||tx<0||tx>=lvl.width)continue;const tile=map[ty][tx],dx=tx*TILE,dy=ty*TILE;
-    if(tile===1){ctx.fillStyle=lvl.groundColor;ctx.fillRect(dx,dy,TILE,TILE);if(ty>0&&!isSolid(map[ty-1][tx])){ctx.fillStyle=lvl.groundTop||'#2d8a2d';ctx.fillRect(dx,dy,TILE,3);}}
-    else if(tile===2){ctx.fillStyle=lvl.brickColor;ctx.fillRect(dx,dy,TILE,TILE);ctx.strokeStyle='#00000033';ctx.strokeRect(dx+.5,dy+.5,TILE-1,TILE-1);ctx.fillStyle='#00000022';ctx.fillRect(dx+7,dy,1,TILE);ctx.fillRect(dx,dy+7,TILE,1);}
+    if(tile===1){ctx.fillStyle=FC(lvl.groundColor);ctx.fillRect(dx,dy,TILE,TILE);if(ty>0&&!isSolid(map[ty-1][tx])){ctx.fillStyle=FC(lvl.groundTop||'#2d8a2d');ctx.fillRect(dx,dy,TILE,3);}}
+    else if(tile===2){ctx.fillStyle=FC(lvl.brickColor);ctx.fillRect(dx,dy,TILE,TILE);ctx.strokeStyle='#00000033';ctx.strokeRect(dx+.5,dy+.5,TILE-1,TILE-1);ctx.fillStyle='#00000022';ctx.fillRect(dx+7,dy,1,TILE);ctx.fillRect(dx,dy+7,TILE,1);}
     else if(tile===3){ctx.fillStyle='#ffcc00';ctx.fillRect(dx,dy,TILE,TILE);ctx.strokeStyle='#cc8800';ctx.strokeRect(dx+.5,dy+.5,TILE-1,TILE-1);ctx.fillStyle='#cc8800';ctx.font='10px monospace';ctx.fillText('?',dx+4,dy+12);}
     else if(tile===5){const rCol=`hsl(${(animFrame*3+tx*20)%360},100%,65%)`;ctx.fillStyle=rCol;ctx.fillRect(dx,dy,TILE,TILE);ctx.strokeStyle='#fff';ctx.strokeRect(dx+.5,dy+.5,TILE-1,TILE-1);ctx.fillStyle='#fff';ctx.font='bold 11px monospace';ctx.fillText('!',dx+6,dy+12);}
   }
@@ -1759,9 +1919,9 @@ function drawPauseOverlay(){
 //  SCREENS
 // ==========================================
 function drawTitle(){
-  ctx.fillStyle='#88ccff';ctx.fillRect(0,0,BASE_W,BASE_H);
-  ctx.fillStyle='#44aa44';ctx.fillRect(0,BASE_H-60,BASE_W,60);ctx.fillStyle='#2d8a2d';ctx.fillRect(0,BASE_H-60,BASE_W,4);
-  ctx.fillStyle='rgba(255,255,255,0.7)';[80,200,400,520].forEach(cx=>{ctx.beginPath();ctx.ellipse(cx,60,25,15,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(cx-15,68,15,10,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(cx+15,68,15,10,0,0,Math.PI*2);ctx.fill();});
+  ctx.fillStyle=FC('#88ccff');ctx.fillRect(0,0,BASE_W,BASE_H);
+  ctx.fillStyle=FC('#44aa44');ctx.fillRect(0,BASE_H-60,BASE_W,60);ctx.fillStyle=FC('#2d8a2d');ctx.fillRect(0,BASE_H-60,BASE_W,4);
+  ctx.save();ctx.globalAlpha=0.85;[80,200,400,520].forEach(cx=>{drawSprite(CLOUD_S,cx-24,52,CLOUD_P,6,false);});ctx.restore();
   ctx.fillStyle='#e03030';ctx.font='bold 36px monospace';ctx.textAlign='center';ctx.fillText(T('title'),BASE_W/2,120);
   ctx.fillStyle='#fff';ctx.font='14px monospace';ctx.fillText(T('subtitle'),BASE_W/2,150);
   ctx.fillStyle='#ddd';ctx.font='11px monospace';ctx.fillText(T('worlds'),BASE_W/2,172);
@@ -1778,7 +1938,7 @@ function drawTitle(){
   drawSprite(DINO_S,570,BASE_H-60-spriteH(DINO_S,2)+b,DINO_P,2,true);
   if(Math.floor(animFrame/30)%2===0){ctx.fillStyle='#ffdd00';ctx.font='bold 16px monospace';ctx.fillText(T('press_start'),BASE_W/2,BASE_H-15);}
   ctx.fillStyle='#333';ctx.font='10px monospace';ctx.fillText(T('controls'),BASE_W/2,195);
-  ctx.fillStyle='#aaa';ctx.font='10px monospace';ctx.fillText(T('lang_hint'),BASE_W/2,BASE_H-30);
+  ctx.fillStyle='#aaa';ctx.font='10px monospace';ctx.fillText(T('lang_hint')+'   '+T(STYLE_FELT?'style_felt':'style_flat'),BASE_W/2,BASE_H-30);
   // Both modes now live behind Start — no hidden hotkey
   const learnPulse=0.6+Math.sin(animFrame*0.06)*0.3;
   ctx.fillStyle='rgba(100,255,150,'+learnPulse+')';ctx.font='bold 12px monospace';
@@ -1852,15 +2012,16 @@ function drawIntro(){
   const sibJump=rs.jump;
 
   // Scene background - park
-  ctx.fillStyle='#88ccff';ctx.fillRect(0,0,BASE_W,BASE_H);
-  ctx.fillStyle='#44aa44';ctx.fillRect(0,BASE_H-80,BASE_W,80);ctx.fillStyle='#2d8a2d';ctx.fillRect(0,BASE_H-80,BASE_W,4);
+  ctx.fillStyle=FC('#88ccff');ctx.fillRect(0,0,BASE_W,BASE_H);
+  ctx.fillStyle=FC('#44aa44');ctx.fillRect(0,BASE_H-80,BASE_W,80);ctx.fillStyle=FC('#2d8a2d');ctx.fillRect(0,BASE_H-80,BASE_W,4);
   // Sun
-  ctx.fillStyle='#ffee55';ctx.beginPath();ctx.arc(BASE_W-70,60,30,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=FC('#ffee55');ctx.beginPath();ctx.arc(BASE_W-70,60,30,0,Math.PI*2);ctx.fill();
   // Clouds
-  ctx.fillStyle='rgba(255,255,255,0.7)';
-  [60,220,420].forEach((cx,i)=>{const cy=40+i*12;ctx.beginPath();ctx.ellipse(cx,cy,30,16,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(cx-18,cy+8,15,10,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(cx+18,cy+8,15,10,0,0,Math.PI*2);ctx.fill();});
+  ctx.save();ctx.globalAlpha=0.85;
+  [60,220,420].forEach((cx,i)=>{drawSprite(CLOUD_S,cx-24,40+i*12,CLOUD_P,6,false);});
+  ctx.restore();
   // Flowers
-  for(let i=0;i<8;i++){const fx=40+i*75,fy=BASE_H-65;ctx.fillStyle='#33aa33';ctx.fillRect(fx,fy,2,12);ctx.fillStyle=['#ff6688','#ffaa33','#ff55aa','#ffff44'][i%4];ctx.beginPath();ctx.arc(fx+1,fy-2,4,0,Math.PI*2);ctx.fill();}
+  for(let i=0;i<8;i++){const fx=40+i*75,fy=BASE_H-65;ctx.fillStyle=FC('#33aa33');ctx.fillRect(fx,fy,2,12);ctx.fillStyle=['#ff6688','#ffaa33','#ff55aa','#ffff44'][i%4];ctx.beginPath();ctx.arc(fx+1,fy-2,4,0,Math.PI*2);ctx.fill();}
 
   const heroX=180,heroY=BASE_H-80-spriteH(heroStand,3);
   const sibX=260,sibY=BASE_H-80-spriteH(sibStand,3);
@@ -1967,7 +2128,7 @@ function drawDifficulty(){
   });
 
   ctx.fillStyle='#aaaacc';ctx.font='12px monospace';ctx.fillText(T('lr_choose'),BASE_W/2,370);
-  ctx.fillStyle='#aaa';ctx.font='10px monospace';ctx.fillText(T('lang_hint'),BASE_W/2,390);
+  ctx.fillStyle='#aaa';ctx.font='10px monospace';ctx.fillText(T('lang_hint')+'   '+T(STYLE_FELT?'style_felt':'style_flat'),BASE_W/2,390);
   ctx.textAlign='left';ctx.lineWidth=1;
 }
 
@@ -2013,7 +2174,7 @@ function drawBetween(){
     ctx.fillStyle='#'+Math.floor(0x33-0x22*skyDark).toString(16).padStart(2,'0')+Math.floor(0x22-0x11*skyDark).toString(16).padStart(2,'0')+Math.floor(0x44-0x22*skyDark).toString(16).padStart(2,'0');
     ctx.fillRect(0,0,BASE_W,BASE_H);
     // Ground
-    ctx.fillStyle=nextLvl?nextLvl.groundColor:'#553322';ctx.fillRect(0,BASE_H-70,BASE_W,70);
+    ctx.fillStyle=FC(nextLvl?nextLvl.groundColor:'#553322');ctx.fillRect(0,BASE_H-70,BASE_W,70);
 
     // Lightning flashes
     if(t>60&&t<200&&t%40<3){ctx.fillStyle='rgba(255,255,200,0.3)';ctx.fillRect(0,0,BASE_W,BASE_H);}
@@ -2122,8 +2283,8 @@ function drawBetween(){
     ctx.restore();
   } else {
     // === NORMAL BETWEEN-LEVEL CUTSCENE ===
-    ctx.fillStyle=nextLvl?nextLvl.bg:'#88ccff';ctx.fillRect(0,0,BASE_W,BASE_H);
-    ctx.fillStyle=nextLvl?nextLvl.groundColor:'#44aa44';ctx.fillRect(0,BASE_H-70,BASE_W,70);
+    ctx.fillStyle=FC(nextLvl?nextLvl.bg:'#88ccff');ctx.fillRect(0,0,BASE_W,BASE_H);
+    ctx.fillStyle=FC(nextLvl?nextLvl.groundColor:'#44aa44');ctx.fillRect(0,BASE_H-70,BASE_W,70);
 
     const heroX=120, heroY=BASE_H-70-spriteH(heroStand,3);
 
@@ -2608,18 +2769,17 @@ function drawLearn(){
   const L=learn;
   // Sky gradient
   const grad=ctx.createLinearGradient(0,0,0,BASE_H);
-  grad.addColorStop(0,'#4488cc');grad.addColorStop(1,'#aaddff');
+  grad.addColorStop(0,FC('#4488cc'));grad.addColorStop(1,FC('#aaddff'));
   ctx.fillStyle=grad;ctx.fillRect(0,0,BASE_W,BASE_H);
 
   // Floating clouds (parallax on camY)
-  ctx.fillStyle='rgba(255,255,255,0.5)';
+  ctx.save();ctx.globalAlpha=0.75;
   for(let i=0;i<6;i++){
     const cx=(i*130+40+Math.sin(animFrame*0.003+i)*20)%BASE_W;
     const cy=60+i*60-(L.camY*0.1)%BASE_H;
-    ctx.beginPath();ctx.ellipse(cx,cy,25,12,0,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.ellipse(cx-15,cy+5,15,8,0,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.ellipse(cx+15,cy+5,15,8,0,0,Math.PI*2);ctx.fill();
+    drawSprite(CLOUD_S,cx-20,cy-6,CLOUD_P,5,false);
   }
+  ctx.restore();
 
   ctx.save();ctx.translate(0,-Math.round(L.camY));
 
@@ -2914,6 +3074,7 @@ function pollGamepad(){
   if(gp.id!==padLastId){padLastId=gp.id;padKind=detectPadKind(gp.id);}
   // Button mapping (standard gamepad):
   // 0=A(jump), 1=B(shoot in play / cancel in menus), 2=X(shoot), 3=Y(lang, menu-only)
+  // 5=R1/RB(art style, menu-only)
   // 9=Start(confirm in menus / pause in play), 8=Select(escape)
   // 12=DpadUp, 13=DpadDown, 14=DpadLeft, 15=DpadRight
   // Button 1 (○ / Ⓑ) is cancel in menus and shoot in play — the universal
@@ -2926,6 +3087,8 @@ function pollGamepad(){
     2:'KeyX',
     3:menu?'KeyL':null,   // language toggle is menu-only: this is △ on a
                           // DualSense and kids hit it constantly mid-run
+    5:menu?'KeyF':null,   // art style toggle, R1/RB — a shoulder button rather
+                          // than a face button, and menu-only for the same reason
     9:menu?'Enter':'Escape',
     8:'Escape',
     12:'ArrowUp',13:'ArrowDown',14:'ArrowLeft',15:'ArrowRight'
@@ -3201,7 +3364,27 @@ function runSelfTests(){
 }
 if(location.search.indexOf('test=1')>=0)window.addEventListener('load',runSelfTests);
 
-function gameLoop(){pollGamepad();update();draw();drawPowerupPopup();requestAnimationFrame(gameLoop);}
+// Grain over the finished frame. Without this the sky and hills stay plastic-smooth
+// and the felt sprites look pasted onto them.
+let grainPattern=null;
+function drawSceneGrain(){
+  if(!STYLE_FELT||FELT.sceneGrainOpacity<=0)return;
+  if(!grainPattern)grainPattern=ctx.createPattern(getGrain(),'repeat');
+  ctx.save();
+  ctx.globalCompositeOperation='overlay';
+  ctx.globalAlpha=FELT.sceneGrainOpacity;
+  ctx.fillStyle=grainPattern;
+  // Drawn in device space so the fibre stays one real pixel however high RENDER is.
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillRect(0,0,BASE_W*RENDER,BASE_H*RENDER);
+  ctx.restore();
+}
+function gameLoop(){
+  // Everything below draws in 640x400 logical coordinates.
+  ctx.setTransform(RENDER,0,0,RENDER,0,0);
+  pollGamepad();update();draw();drawSceneGrain();drawPowerupPopup();
+  requestAnimationFrame(gameLoop);
+}
 gameLoop();
 </script>
 </body>
