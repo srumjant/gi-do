@@ -51,6 +51,16 @@ export interface DriveOptions {
    * rows, so nothing stacks.
    */
   mutateMap?: (map: number[][]) => void;
+  /**
+   * Empties `enemies` and `pendingEnemies` right after `initLevel`, so no enemy ever
+   * spawns for the rest of the run. Contact damage (`playerHit`) is deliberately out
+   * of the slice, so without this, level 0's doll@15 kills the player by contact —
+   * running right at the speed cap collides at frame 59, and even standing perfectly
+   * still it still reaches the player by frame 240 — well inside any player-focused
+   * trace window. Every player-focused script drives with this on; enemies are
+   * compared separately, with this left off.
+   */
+  suppressEnemies?: boolean;
 }
 
 const noop = (): void => {};
@@ -115,6 +125,16 @@ interface Driver {
   getEnemies: () => Array<EnemySample & Record<string, unknown>>;
   setDifficulty: (d: string) => void;
   setChar: (c: string) => void;
+  /**
+   * Empties `pendingEnemies` and `enemies` IN PLACE. `initLevel` has already bound
+   * those two arrays by the time this runs (it reassigns them itself: `enemies=[];
+   * pendingEnemies=lvl.enemyDefs.map(...)`), so truncating with `.length = 0` clears
+   * the very arrays every closure in the live script — `update`'s spawn window and
+   * its enemy step — already holds, rather than handing them a new array under a
+   * reassignment that (being a top-level `let`) could sever from what those other
+   * closures still reference.
+   */
+  clearEnemies: () => void;
 }
 
 let cachedSource: string | null = null;
@@ -162,6 +182,7 @@ function bootLiveGame(): Driver {
   getPlayer: () => player,
   getCamera: () => camera,
   getEnemies: () => enemies,
+  clearEnemies: () => { pendingEnemies.length = 0; enemies.length = 0; },
   setDifficulty: (d) => { selectedDifficulty = d; },
   setChar: (c) => { selectedChar = c; },
   setLevel: (i) => { currentLevel = i; },
@@ -198,6 +219,9 @@ export function driveLiveGame(opts: DriveOptions): Sample[] {
   // against another level's dimensions. Invisible at level 0; wrong everywhere else.
   d.setLevel(opts.level);
   d.initLevel(opts.level);
+  // After initLevel: initLevel is what (re)builds enemies/pendingEnemies in the first
+  // place, so clearing any earlier would just be overwritten.
+  if (opts.suppressEnemies) d.clearEnemies();
   // After initLevel, because initLevel is what builds the map.
   opts.mutateMap?.(d.getMap());
 
