@@ -154,7 +154,7 @@ const TRANSLATIONS = {
   title:              {et:'GIGI & DODO',             en:'GIGI & DODO'},
   subtitle:           {et:'Julge päästmisseiklus!',  en:'A brave rescue adventure!'},
   worlds:             {et:'6 maailma avastamiseks!',  en:'6 worlds to explore!'},
-  press_start:        {et:'VAJUTA SPACE v\u00f5i \u24b6 ALUSTAMISEKS!', en:'PRESS SPACE OR \u24b6 TO START!'},
+  press_start:        {et:'VAJUTA SPACE v\u00f5i {A} ALUSTAMISEKS!', en:'PRESS SPACE OR {A} TO START!'},
   controls:           {et:'Nooled/WASD: liigu | Space: hüppa | X: tulista | 🎮 Pult töötab!', en:'Arrows/WASD: move | Space: jump | X: shoot | 🎮 Gamepad works!'},
   // Mode selector
   choose_mode:        {et:'MIDA TEEME?',              en:'WHAT SHALL WE DO?'},
@@ -162,7 +162,13 @@ const TRANSLATIONS = {
   mode_adventure_d:   {et:'Päästa oma õde-venda!',    en:'Rescue your sibling!'},
   mode_learn:         {et:'ÕPIME!',                   en:'LET\'S LEARN!'},
   mode_learn_d:       {et:'Tähed, silbid ja sõnad',   en:'Letters, syllables, words'},
-  mode_hint:          {et:'◀ ▶ vali  •  Space / OK / \u24b6 kinnita', en:'◀ ▶ choose  •  Space / OK / \u24b6 confirm'},
+  mode_hint:          {et:'◀ ▶ vali  •  Space / OK / {A} kinnita', en:'◀ ▶ choose  •  Space / OK / {A} confirm'},
+  // Pause menu
+  pause_title:        {et:'PAUS',                     en:'PAUSED'},
+  pause_continue:     {et:'JÄTKA',                    en:'CONTINUE'},
+  pause_switch:       {et:'VAHETA MÄNGU',             en:'SWITCH MODE'},
+  pause_menu:         {et:'PEAMENÜÜ',                 en:'MAIN MENU'},
+  pause_hint:         {et:'◀ ▶ vali  •  Space / OK kinnita',  en:'◀ ▶ choose  •  Space / OK confirm'},
   // Language selector
   lang_hint:          {et:'L = English',              en:'L = Eesti keel'},
   // Difficulty
@@ -243,7 +249,22 @@ const TRANSLATIONS = {
   level_5:            {et:'Talvine imedemaa',           en:'Winter Wonderland'},
   level_6:            {et:'Mängulossi',                en:'Toy Castle'},
 };
-function T(key){return TRANSLATIONS[key]?TRANSLATIONS[key][lang]||TRANSLATIONS[key]['en']:key;}
+function T(key){
+  const e=TRANSLATIONS[key];
+  if(!e)return key;
+  const s=e[lang]||e['en'];
+  // Some keys hold arrays of phrases rather than one string, and they must come
+  // back untouched. Checking the type rather than only indexOf('{') matters:
+  // on an array indexOf compares whole elements, so a phrase that happened to
+  // be exactly "{" would pass the guard and then call .replace on an array,
+  // which does not have it. Safe by construction now, not by luck of the data.
+  if(typeof s!=='string')return s;
+  return s.indexOf('{')<0?s:s
+    .replace(/\{A\}/g,padGlyph('confirm'))
+    .replace(/\{B\}/g,padGlyph('back'))
+    .replace(/\{X\}/g,padGlyph('shoot'))
+    .replace(/\{P\}/g,padGlyph('pause'));
+}
 function TDiff(key){
   const map={super_easy:'super_easy',easy:'easy',normal:'normal',hard:'hard'};
   return T(map[key]||key);
@@ -485,12 +506,12 @@ function spriteH(s,sc){return s.length*sc} function spriteW(s,sc){return s[0].le
 const GIGI_STAND=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,0,2,2,0,2,2,0,0],[0,0,0,6,6,0,6,6,0,0]];
 const GIGI_RUN=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
 const GIGI_JUMP=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,1,0,1,1,1,1,0,1,0],[0,0,1,1,1,1,1,1,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,0,0,0,0,2,0,0],[0,6,0,0,0,0,0,0,6,0]];
-const GIGI_P={1:'#e03030',2:'#3050d0',3:'#ffffff',4:'#ffcc99',5:'#e8c845',6:'#aa6633',7:'#dd5555',8:'#ffaa88'};
+const GIGI_P={1:'#e03030',2:'#3050d0',3:'#ffffff',4:'#ffcc99',5:'#9b7653',6:'#aa6633',7:'#dd5555',8:'#ffaa88'};
 // Gigi monster truck skin - blue shirt with truck graphic, darker jeans
 const GIGI_TRUCK_STAND=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,9,9,9,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,0,2,2,0,2,2,0,0],[0,0,0,6,6,0,6,6,0,0]];
 const GIGI_TRUCK_RUN=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,9,9,9,1,1,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
 const GIGI_TRUCK_JUMP=[[0,0,0,0,5,5,5,0,0,0],[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,5,4,5,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,4,3,4,4,4,3,4,0],[0,0,4,4,4,8,4,4,4,0],[0,0,0,4,4,4,4,4,0,0],[0,0,0,0,4,7,4,0,0,0],[0,1,0,1,1,1,1,0,1,0],[0,0,1,1,9,9,9,1,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,2,0,0,0,0,2,0,0],[0,6,0,0,0,0,0,0,6,0]];
-const GIGI_TRUCK_P={1:'#2266cc',2:'#223355',3:'#ffffff',4:'#ffcc99',5:'#e8c845',6:'#554433',7:'#dd5555',8:'#ffaa88',9:'#44aaff'};
+const GIGI_TRUCK_P={1:'#2266cc',2:'#223355',3:'#ffffff',4:'#ffcc99',5:'#9b7653',6:'#554433',7:'#dd5555',8:'#ffaa88',9:'#44aaff'};
 const GIGI_SKINS=[
   {name:'Classic',palette:GIGI_P,stand:GIGI_STAND,run:GIGI_RUN,jump:GIGI_JUMP},
   {name:'Monster Truck',palette:GIGI_TRUCK_P,stand:GIGI_TRUCK_STAND,run:GIGI_TRUCK_RUN,jump:GIGI_TRUCK_JUMP}
@@ -499,6 +520,18 @@ const DODO_STAND=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0
 const DODO_RUN=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,0,6,0,0,0,0,6,0,0],[0,0,0,0,0,0,0,0,0,0]];
 const DODO_JUMP=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,1,0,1,1,1,0,1,0,0],[0,0,1,1,1,1,1,0,0,0],[0,6,0,0,0,0,0,6,0,0],[0,0,0,0,0,0,0,0,0,0]];
 const DODO_P={1:'#ff69b4',3:'#ffffff',4:'#ffcc99',5:'#e8c845',6:'#cc6699',7:'#dd5555',8:'#ffaa88',9:'#ff9999'};
+// Dodo Elsa skin - ice-blue flared gown replaces legs, platinum hair
+const DODO_ELSA_STAND=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,1,2,2,2,2,2,2,1,0],[0,0,6,6,0,0,6,6,0,0]];
+const DODO_ELSA_RUN=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,1,2,2,2,2,2,2,1,0],[0,6,6,0,0,0,0,6,6,0]];
+const DODO_ELSA_JUMP=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,0,0,0,0,5,5,0],[0,0,5,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,0,0],[0,0,4,4,4,4,4,4,0,0],[0,0,4,3,4,4,3,4,0,0],[0,9,4,4,8,8,4,4,9,0],[0,0,0,4,7,7,4,0,0,0],[0,1,0,1,1,1,1,0,1,0],[0,0,1,1,1,1,1,1,0,0],[0,0,2,2,2,2,2,2,0,0],[0,0,6,6,0,0,6,6,0,0]];
+// Hair is icy blue-white and skin is warm: at 10px wide, platinum-on-pale read
+// as one undifferentiated blob and the pigtails looked like horns. Separating
+// them by temperature as well as value is what makes them read as hair.
+const DODO_ELSA_P={1:'#5fb4dc',2:'#bfe4f5',3:'#ffffff',4:'#ffd2b0',5:'#dbeaf7',6:'#2e6f99',7:'#cc4444',8:'#ffb096',9:'#ffbfa0'};
+const DODO_SKINS=[
+  {name:'Classic',palette:DODO_P,stand:DODO_STAND,run:DODO_RUN,jump:DODO_JUMP},
+  {name:'Elsa',palette:DODO_ELSA_P,stand:DODO_ELSA_STAND,run:DODO_ELSA_RUN,jump:DODO_ELSA_JUMP}
+];
 
 // Enemies
 const DOLL_S=[[0,0,7,7,7,7,0,0],[0,7,7,7,7,7,7,0],[0,7,1,7,7,1,7,0],[0,7,7,3,3,7,7,0],[0,0,7,7,7,7,0,0],[0,0,2,2,2,2,0,0],[0,0,2,2,2,2,0,0],[0,0,2,2,2,2,0,0],[0,0,4,0,0,4,0,0]];
@@ -651,13 +684,14 @@ function getEnemySpriteInfo(t){
   }
 }
 function getPlayerSprites(){
-  if(selectedChar==='dodo')return{stand:DODO_STAND,run:DODO_RUN,jump:DODO_JUMP,palette:DODO_P};
+  if(selectedChar==='dodo'){const sk=DODO_SKINS[dodoSkin]||DODO_SKINS[0];return{stand:sk.stand,run:sk.run,jump:sk.jump,palette:sk.palette};}
   const sk=GIGI_SKINS[gigiSkin]||GIGI_SKINS[0];
   return{stand:sk.stand,run:sk.run,jump:sk.jump,palette:sk.palette};
 }
 function getRescueSprites(){
-  if(selectedChar==='dodo'){const sk=GIGI_SKINS[gigiSkin]||GIGI_SKINS[0];return{sprite:sk.stand,palette:sk.palette,name:'Gigi'};}
-  return{sprite:DODO_STAND,palette:DODO_P,name:'Dodo'};
+  if(selectedChar==='dodo'){const sk=GIGI_SKINS[gigiSkin]||GIGI_SKINS[0];return{sprite:sk.stand,jump:sk.jump,palette:sk.palette,name:'Gigi'};}
+  const sk=DODO_SKINS[dodoSkin]||DODO_SKINS[0];
+  return{sprite:sk.stand,jump:sk.jump,palette:sk.palette,name:'Dodo'};
 }
 
 // ==========================================
@@ -779,7 +813,7 @@ const LEVELS = [
 // ==========================================
 //  GAME STATE
 // ==========================================
-let selectedChar='gigi', gigiSkin=0, currentLevel=0, lives=3, score=0;
+let selectedChar='gigi', gigiSkin=0, dodoSkin=0, currentLevel=0, lives=3, score=0;
 let gameState='title', stateTimer=0, selectIndex=0, diffIndex=0, modeIndex=0; // default super_easy
 let introTimer=0, introPhase=0, betweenTimer=0;
 let boss=null, bossDefeated=false;
@@ -792,7 +826,11 @@ let bowPickups=[], superPickups=[], catPickup=null, cat=null, animFrame=0;
 //  SCREEN SHAKE
 // ==========================================
 let screenShake={x:0,y:0,intensity:0,duration:0};
-function triggerShake(intensity,duration){screenShake.intensity=intensity;screenShake.duration=duration;}
+function triggerShake(intensity,duration){
+  screenShake.intensity=intensity;screenShake.duration=duration;
+  const r=shakeToRumble(intensity,duration);
+  padRumble(r.strong,r.weak,r.dur);
+}
 function updateShake(){if(screenShake.duration>0){screenShake.duration--;const d=screenShake.intensity*(screenShake.duration/10);screenShake.x=(Math.random()-0.5)*d*2;screenShake.y=(Math.random()-0.5)*d*2;}else{screenShake.x=0;screenShake.y=0;}}
 
 // ==========================================
@@ -942,7 +980,7 @@ function giveRandomSillyPowerup(){
   else if(type==='bighead'){player.bigHeadTimer=1200;}
   else{player.chickenRayCharges=8;player.hasBow=true;}
   powerupPopup={type:type,timer:120,maxTimer:120};
-  sfxPickup();sfxWin();
+  sfxPickup();sfxWin();padRumble(0,0.35,80);
 }
 function spawnParticles(x,y,c,n){for(let i=0;i<n;i++){const angle=Math.random()*Math.PI*2,speed=1+Math.random()*3;particles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed-2,life:30+Math.random()*25,maxLife:30+Math.random()*25,color:c,size:2+Math.random()*2});}}
 function clearJP(){Object.keys(justPressed).forEach(k=>justPressed[k]=false);}
@@ -1014,11 +1052,70 @@ function spawnEnemy(def){
 // ==========================================
 //  UPDATE
 // ==========================================
+// ==========================================
+//  BACK NAVIGATION
+// ==========================================
+// Every state must have a way out. Before this existed, Escape was handled in
+// 7 of 15 states, so picking a character locked the player into the adventure
+// with no exit at all on a controller.
+const BACK_TARGET={
+  modeselect:'title', difficulty:'modeselect', select:'difficulty',
+  intro:'select', gameover:'modeselect', win:'modeselect', debug:'title',
+  learnmenu:'modeselect', learnletters:'learnmenu', learnresult:'learnmenu'
+};
+// Mid-run states open the pause menu instead of quitting outright: Select is
+// easy to hit by accident and binning a run for it would be its own clunk.
+const PAUSABLE=['playing','dead','between','levelcomplete'];
+const LEARN_STATES=['learnmenu','learnletters','learnsyllables','learnresult'];
+
+// Both are meaningful only while paused, and openPause() refreshes them every
+// time, so they can never be read stale.
+let pausePrev='playing', pauseIdx=0;
+function openPause(){pausePrev=gameState;gameState='paused';pauseIdx=0;sfxPickup();}
+function resumeFromPause(){gameState=pausePrev;sfxPickup();}
+
+// "Is the player in a menu rather than mid-run?" Drives two things: which
+// gamepad buttons mean cancel/confirm, and whether the language toggle works
+// at all. That toggle sits on button 3 — triangle on a DualSense, right where
+// a small child's thumb lands — so leaving it live during play let them flip
+// the whole game between Estonian and English mid-level by accident.
+function isMenuState(){
+  return ['title','modeselect','difficulty','select','learnmenu','learnresult',
+          'gameover','win','debug','paused'].indexOf(gameState)>=0;
+}
+
+function handleBack(){
+  if(!justPressed['Escape'])return false;
+  justPressed['Escape']=false;
+  if(gameState==='paused'){resumeFromPause();return true;}
+  if(PAUSABLE.indexOf(gameState)>=0){openPause();return true;}
+  const target=BACK_TARGET[gameState];
+  // Escape is consumed either way. Returning false here means "pressed, but
+  // this state has nowhere to go" — only `title`, the root — not "not pressed".
+  if(!target)return false;
+  if(target==='modeselect')modeIndex=LEARN_STATES.indexOf(gameState)>=0?1:0;
+  sfxPickup();
+  gameState=target;
+  return true;
+}
+
 function update(){
   animFrame++;
   if(powerupPopup){powerupPopup.timer--;if(powerupPopup.timer<=0)powerupPopup=null;clearJP();return;}
   // Language toggle
-  if(justPressed['KeyL']){lang=lang==='et'?'en':'et';justPressed['KeyL']=false;}
+  if(justPressed['KeyL']&&isMenuState()){lang=lang==='et'?'en':'et';justPressed['KeyL']=false;}
+  if(handleBack()){clearJP();return;}
+  if(gameState==='paused'){
+    if(justPressed['ArrowLeft']||justPressed['KeyA'])pauseIdx=Math.max(0,pauseIdx-1);
+    if(justPressed['ArrowRight']||justPressed['KeyD'])pauseIdx=Math.min(2,pauseIdx+1);
+    if(justPressed['Space']||justPressed['Enter']){
+      sfxPickup();
+      if(pauseIdx===0)resumeFromPause();
+      else if(pauseIdx===1){gameState='modeselect';modeIndex=0;}
+      else gameState='title';
+    }
+    clearJP();return;
+  }
   // Debug level selector — hold B for 3 seconds
   if(debugHoldStart>0&&keys['KeyB']&&gameState!=='debug'&&Date.now()-debugHoldStart>=3000){
     gameState='debug';debugLevelIndex=0;debugHoldStart=0;
@@ -1035,7 +1132,6 @@ function update(){
       ensureAudio();currentLevel=debugLevelIndex;lives=DC().lives;score=0;initLevel(currentLevel);
       justPressed['Space']=false;justPressed['Enter']=false;
     }
-    if(justPressed['Escape']){gameState='title';justPressed['Escape']=false;}
     clearJP();return;
   }
   if(gameState==='title'){
@@ -1054,15 +1150,13 @@ function update(){
       else{gameState='learnmenu';learnMenuIdx=0;}
       justPressed['Space']=false;justPressed['Enter']=false;
     }
-    if(justPressed['Escape']){gameState='title';justPressed['Escape']=false;}
     clearJP();return;
   }
-  if(gameState==='learnmenu'||gameState==='learnletters'||gameState==='learnsyllables'||gameState==='learnresult'){updateLearn();return;}
+  if(LEARN_STATES.indexOf(gameState)>=0){updateLearn();return;}
   if(gameState==='difficulty'){
     if(justPressed['ArrowLeft']||justPressed['KeyA']){diffIndex=Math.max(0,diffIndex-1);}
     if(justPressed['ArrowRight']||justPressed['KeyD']){diffIndex=Math.min(DIFF_KEYS.length-1,diffIndex+1);}
     if(justPressed['Space']||justPressed['Enter']){selectedDifficulty=DIFF_KEYS[diffIndex];gameState='select';selectIndex=0;justPressed['Space']=false;justPressed['Enter']=false;}
-    if(justPressed['Escape']){gameState='modeselect';modeIndex=0;justPressed['Escape']=false;}
     clearJP();return;
   }
   if(gameState==='select'){
@@ -1070,6 +1164,8 @@ function update(){
     if(justPressed['ArrowRight']||justPressed['KeyD'])selectIndex=1;
     if(selectIndex===0&&(justPressed['ArrowUp']||justPressed['KeyW'])){gigiSkin=(gigiSkin-1+GIGI_SKINS.length)%GIGI_SKINS.length;}
     if(selectIndex===0&&(justPressed['ArrowDown']||justPressed['KeyS'])){gigiSkin=(gigiSkin+1)%GIGI_SKINS.length;}
+    if(selectIndex===1&&(justPressed['ArrowUp']||justPressed['KeyW'])){dodoSkin=(dodoSkin-1+DODO_SKINS.length)%DODO_SKINS.length;}
+    if(selectIndex===1&&(justPressed['ArrowDown']||justPressed['KeyS'])){dodoSkin=(dodoSkin+1)%DODO_SKINS.length;}
     if(justPressed['Space']||justPressed['Enter']){selectedChar=selectIndex===0?'gigi':'dodo';gameState='intro';introTimer=0;startBGM(BGM_INTRO);justPressed['Space']=false;justPressed['Enter']=false;}
     clearJP();return;
   }
@@ -1173,13 +1269,13 @@ function update(){
   }
 
   // Pickups
-  bowPickups.forEach(b=>{if(!b.collected&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:b.x,y:b.y,w:16,h:16})){b.collected=true;p.hasBow=true;p.bowCharges=dc.bowCharges;sfxPickup();spawnParticles(b.x+8,b.y+8,'#aa6633',6);}});
-  superPickups.forEach(s=>{if(!s.collected&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:s.x,y:s.y,w:16,h:16})){s.collected=true;p.hasCape=true;sfxPickup();spawnParticles(s.x+8,s.y+8,'#ff4400',10);}});
+  bowPickups.forEach(b=>{if(!b.collected&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:b.x,y:b.y,w:16,h:16})){b.collected=true;p.hasBow=true;p.bowCharges=dc.bowCharges;sfxPickup();spawnParticles(b.x+8,b.y+8,'#aa6633',6);padRumble(0,0.35,80);}});
+  superPickups.forEach(s=>{if(!s.collected&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:s.x,y:s.y,w:16,h:16})){s.collected=true;p.hasCape=true;sfxPickup();spawnParticles(s.x+8,s.y+8,'#ff4400',10);padRumble(0,0.35,80);}});
   // Cat pickup
   if(catPickup&&!catPickup.collected&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:catPickup.x,y:catPickup.y,w:16,h:22})){
     catPickup.collected=true;
     cat={x:p.x-20,y:p.y,vx:0,vy:0,facing:1,frame:0,frameTimer:0,scratchTimer:0,scratchTarget:null,hitsLeft:3,bounceDir:1,baseY:0,onGround:true};
-    sfxPickup();spawnParticles(catPickup.x+8,catPickup.y+8,'#8888aa',12);
+    sfxPickup();spawnParticles(catPickup.x+8,catPickup.y+8,'#8888aa',12);padRumble(0,0.35,80);
     playTone(600,.15,'sine',.06);setTimeout(()=>playTone(800,.15,'sine',.06),100);setTimeout(()=>playTone(1000,.1,'sine',.05),200);
   }
   // Cat companion AI — bounces side to side, max 3 enemy scratches
@@ -1247,7 +1343,7 @@ function update(){
 
   // Stars
   stars.forEach(s=>{if(s.collected)return;if(s.vy){s.vy+=.1;s.y+=s.vy;if(s.vy>0)s.vy=0;}
-    if(rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:s.x,y:s.y,w:10,h:10})){s.collected=true;score+=Math.round(100*dc.scoreMultiplier);spawnParticles(s.x+5,s.y+5,'#ffdd00',8);sfxCoin();}});
+    if(rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:s.x,y:s.y,w:10,h:10})){s.collected=true;score+=Math.round(100*dc.scoreMultiplier);spawnParticles(s.x+5,s.y+5,'#ffdd00',8);sfxCoin();padRumble(0,0.35,80);}});
 
   // Enemies AI
   enemies.forEach(e=>{
@@ -1379,11 +1475,22 @@ function playerDie(){lives--;gameState='dead';stateTimer=90;spawnParticles(playe
 //  DRAW
 // ==========================================
 function draw(){
+  if(gameState==='paused'){
+    // Render the frozen scene using the state we paused from, then overlay.
+    const real=gameState;
+    gameState=pausePrev;
+    try{drawWorldFrame();}finally{gameState=real;}
+    drawPauseOverlay();clearJP();return;
+  }
+  drawWorldFrame();
+}
+
+function drawWorldFrame(){
   const lvl=LEVELS[currentLevel];
   if(gameState==='debug'){ctx.fillStyle='#1a1a3a';ctx.fillRect(0,0,BASE_W,BASE_H);drawDebug();clearJP();return;}
   if(gameState==='title'){drawTitle();clearJP();return;}
   if(gameState==='modeselect'){drawModeSelect();clearJP();return;}
-  if(gameState==='learnmenu'||gameState==='learnletters'||gameState==='learnsyllables'||gameState==='learnresult'){drawLearn();clearJP();return;}
+  if(LEARN_STATES.indexOf(gameState)>=0){drawLearn();clearJP();return;}
   if(gameState==='intro'){drawIntro();clearJP();return;}
   if(gameState==='difficulty'){drawDifficulty();clearJP();return;}
   if(gameState==='select'){drawSelect();clearJP();return;}
@@ -1616,6 +1723,38 @@ function draw(){
   if(gameState==='dead'){ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fillRect(0,0,BASE_W,BASE_H);ctx.fillStyle='#ff3333';ctx.font='bold 20px monospace';ctx.textAlign='center';ctx.fillText(T('oops'),BASE_W/2,BASE_H/2);ctx.textAlign='left';}
 }
 
+function drawPauseOverlay(){
+  ctx.fillStyle='rgba(0,0,0,0.72)';ctx.fillRect(0,0,BASE_W,BASE_H);
+  ctx.textAlign='center';
+  ctx.fillStyle='#ffdd00';ctx.font='bold 26px monospace';
+  ctx.fillText(T('pause_title'),BASE_W/2,90);
+
+  const opts=[T('pause_continue'),T('pause_switch'),T('pause_menu')];
+  const bw=176,bh=54,gap=16;
+  const totalW=opts.length*bw+(opts.length-1)*gap;
+  const sx=(BASE_W-totalW)/2, y=170;
+  opts.forEach((label,i)=>{
+    const x=sx+i*(bw+gap);
+    if(i===pauseIdx){
+      ctx.fillStyle='rgba(136,255,136,0.16)';ctx.fillRect(x,y,bw,bh);
+      ctx.strokeStyle='#88ff88';ctx.lineWidth=3;ctx.strokeRect(x-2,y-2,bw+4,bh+4);
+      ctx.fillStyle='#88ff88';
+    } else {
+      ctx.fillStyle='rgba(255,255,255,0.06)';ctx.fillRect(x,y,bw,bh);
+      ctx.fillStyle='#ccc';
+    }
+    ctx.font='bold 15px monospace';
+    ctx.fillText(label,x+bw/2,y+33);
+  });
+
+  ctx.fillStyle='#aaddcc';ctx.font='12px monospace';
+  ctx.fillText(T('pause_hint'),BASE_W/2,BASE_H-40);
+  // lineWidth must go back to 1: the tile loop strokes bricks, question blocks
+  // and rainbow blocks without setting its own width, so leaving it at 3 draws
+  // every block border fat for the rest of the level after a single pause.
+  ctx.textAlign='left';ctx.lineWidth=1;
+}
+
 // ==========================================
 //  SCREENS
 // ==========================================
@@ -1627,7 +1766,8 @@ function drawTitle(){
   ctx.fillStyle='#fff';ctx.font='14px monospace';ctx.fillText(T('subtitle'),BASE_W/2,150);
   ctx.fillStyle='#ddd';ctx.font='11px monospace';ctx.fillText(T('worlds'),BASE_W/2,172);
   drawSprite(GIGI_STAND,BASE_W/2-50,BASE_H-60-spriteH(GIGI_STAND,3),GIGI_P,3,false);
-  drawSprite(DODO_STAND,BASE_W/2+15,BASE_H-60-spriteH(DODO_STAND,3),DODO_P,3,false);
+  const dskTitle=DODO_SKINS[dodoSkin]||DODO_SKINS[0];
+  drawSprite(dskTitle.stand,BASE_W/2+15,BASE_H-60-spriteH(dskTitle.stand,3),dskTitle.palette,3,false);
   const b=Math.sin(animFrame*.05)*3;
   drawSprite(DOLL_S,40,BASE_H-60-spriteH(DOLL_S,2)+b,DOLL_P,2,false);
   drawSprite(BOUNCER_S,90,BASE_H-60-spriteH(BOUNCER_S,2)+Math.abs(b),BOUNCER_P,2,false);
@@ -1690,7 +1830,8 @@ function drawModeSelect(){
     }
   });
 
-  const hero=modeIndex===0?GIGI_STAND:DODO_STAND, heroP=modeIndex===0?GIGI_P:DODO_P;
+  const dskMode=DODO_SKINS[dodoSkin]||DODO_SKINS[0];
+  const hero=modeIndex===0?GIGI_STAND:dskMode.stand, heroP=modeIndex===0?GIGI_P:dskMode.palette;
   drawSprite(hero,BASE_W/2-15,BASE_H-60-spriteH(hero,2),heroP,2,false);
 
   if(Math.floor(animFrame/30)%2===0){
@@ -1708,7 +1849,7 @@ function drawIntro(){
   const sibName=rs.name.toUpperCase();
   const heroStand=ps.stand, heroRun=ps.run, heroPal=ps.palette;
   const sibStand=rs.sprite, sibPal=rs.palette;
-  const sibJump=selectedChar==='gigi'?DODO_JUMP:GIGI_JUMP;
+  const sibJump=rs.jump;
 
   // Scene background - park
   ctx.fillStyle='#88ccff';ctx.fillRect(0,0,BASE_W,BASE_H);
@@ -1841,7 +1982,9 @@ function drawSelect(){
   if(selectIndex===0){ctx.fillStyle='#aaa';ctx.font='9px monospace';ctx.fillText('↑↓ '+gsk.name,gx+40,gy+192);}
   const dx=BASE_W/2+20,dy=120;
   if(selectIndex===1){ctx.strokeStyle='#ff69b4';ctx.lineWidth=3;ctx.strokeRect(dx-15,dy-10,110,190);ctx.fillStyle='rgba(255,105,180,0.1)';ctx.fillRect(dx-15,dy-10,110,190);}
-  drawSprite(DODO_STAND,dx+15,dy+15,DODO_P,4,false);ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.fillText('DODO',dx+40,dy+175);
+  const dsk=DODO_SKINS[dodoSkin];
+  drawSprite(dsk.stand,dx+15,dy+15,dsk.palette,4,false);ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.fillText('DODO',dx+40,dy+175);
+  if(selectIndex===1){ctx.fillStyle='#aaa';ctx.font='9px monospace';ctx.fillText('↑↓ '+dsk.name,dx+40,dy+192);}
   ctx.fillStyle='#aaaacc';ctx.font='12px monospace';ctx.fillText(T('lr_choose'),BASE_W/2,350);
   ctx.fillStyle='#ffaacc';ctx.font='12px monospace';ctx.fillText(T('rescue')+' '+(selectIndex===0?'Dodo':'Gigi')+'!',BASE_W/2,375);
   ctx.textAlign='left';ctx.lineWidth=1;
@@ -1853,7 +1996,7 @@ function drawBetween(){
   const sibName=rs.name.toUpperCase();
   const heroStand=ps.stand, heroRun=ps.run, heroPal=ps.palette;
   const sibStand=rs.sprite, sibPal=rs.palette;
-  const sibJump=selectedChar==='gigi'?DODO_JUMP:GIGI_JUMP;
+  const sibJump=rs.jump;
   const isBossLevel=(currentLevel===LEVELS.length-1);
 
   // Background - next level preview colors
@@ -2146,10 +2289,24 @@ let learnMenuIdx=0;
 const LEARN_LETTERS=['A','E','I','O','U','M','N','S','K','T','L','P','R','J','V','H','Ä','Ö','Ü','Õ'];
 const LEARN_SYLLABLES=['MA','PA','SA','KA','TA','LA','NA','ME','SE','KE','TE','LE','MI','SI','KI','TI','MO','KO','TO','MU','KU','TU','LU'];
 const LEARN_WORDS=['KASS','KOER','MAJA','PALL','KALA','LUMI','AUTO','MUNA','PAAT','SUUR'];
+
+// Tower tuning. GATE_GAP must sit strictly between a normal jump's rise and a
+// rocket's rise — the self-tests below assert exactly that.
+// GATES_PER_TOWER, GATE_RISE and GATE_GAP are consumed by the tower builder,
+// and LEARN_ROCKET by the correct-answer launch. Until those land, the
+// self-tests are their only reader — they are scaffolding, not dead code.
+const GATES_PER_TOWER=4;
+const STEP_RISE=45;      // vertical gap between stepping platforms
+const GATE_RISE=50;      // last step up to the gate floor
+const GATE_GAP=132;      // gate floor up to the landing floor above it
+const LEARN_JUMP=-9.0;   // normal jump impulse
+const LEARN_ROCKET=-11.0;// correct-answer launch impulse
+
 let learn={
   mode:'letters', // 'letters','syllables','words'
   platforms:[],gates:[],
   px:0,py:0,pvx:0,pvy:0,pFacing:1,pFrame:0,pFrameTimer:0,pOnGround:false,
+  rocketing:false,
   pCoyote:0,pJumpBuf:0,
   camY:0,
   score:0,round:0,totalRounds:8,
@@ -2286,9 +2443,27 @@ function initLearnRound(){
   L.camY=L.py-BASE_H*0.45;
 }
 
+// One frame of vertical motion for the learn-mode player. Shared with the
+// self-tests so the asserted jump heights describe real behaviour.
+// `rocketing` suppresses the variable-height jump-cut: without it a child who
+// taps rather than holds jump rises 19px instead of 158px and is trapped below
+// a gate they answered correctly.
+// When a rocket launch stops being exempt from the jump-cut: at the apex.
+// Shared with the self-tests for the same reason learnVertStep is — if the
+// game and the harness disagreed about when the exemption ends, the asserted
+// rocket heights would stop describing what the player actually gets.
+function rocketSpent(vy,rocketing){return rocketing&&vy>=0;}
+
+function learnVertStep(vy,holdJump,rocketing,onGround){
+  if(!holdJump&&!rocketing&&vy<-3.6)vy=-3.6;
+  const apex=Math.abs(vy)<2.0&&!onGround;
+  const gm=vy>0?1.1:(apex?0.5:1.0);
+  vy+=0.38*gm;
+  return vy>7?7:vy;
+}
+
 function updateLearn(){
   animFrame++;
-  if(justPressed['KeyL']){lang=lang==='et'?'en':'et';justPressed['KeyL']=false;}
 
   if(gameState==='learnmenu'){
     if(justPressed['ArrowLeft']||justPressed['KeyA'])learnMenuIdx=Math.max(0,learnMenuIdx-1);
@@ -2300,7 +2475,6 @@ function updateLearn(){
       gameState='learnletters';
       justPressed['Space']=false;justPressed['Enter']=false;
     }
-    if(justPressed['Escape']){gameState='modeselect';modeIndex=1;justPressed['Escape']=false;}
     clearJP();return;
   }
 
@@ -2316,7 +2490,6 @@ function updateLearn(){
         justPressed['Space']=false;justPressed['Enter']=false;
       }
     }
-    if(justPressed['Escape']){gameState='learnmenu';justPressed['Escape']=false;}
     clearJP();return;
   }
 
@@ -2340,13 +2513,10 @@ function updateLearn(){
   const jj=justPressed['Space']||justPressed['ArrowUp']||justPressed['KeyW'];
   if(jj)L.pJumpBuf=12;
   if(L.pJumpBuf>0)L.pJumpBuf--;
-  if((L.pOnGround||L.pCoyote>0)&&L.pJumpBuf>0){L.pvy=-9.0;L.pOnGround=false;L.pCoyote=0;L.pJumpBuf=0;sfxJump();}
-  if(!jk&&L.pvy<-3.6)L.pvy=-3.6;
+  if((L.pOnGround||L.pCoyote>0)&&L.pJumpBuf>0){L.pvy=LEARN_JUMP;L.pOnGround=false;L.pCoyote=0;L.pJumpBuf=0;sfxJump();}
 
-  // Gravity with apex hang — floatier for kids
-  const apex=Math.abs(L.pvy)<2.0&&!L.pOnGround;
-  const gm=L.pvy>0?1.1:(apex?0.5:1.0);
-  L.pvy+=0.38*gm;if(L.pvy>7)L.pvy=7;
+  L.pvy=learnVertStep(L.pvy,jk,L.rocketing,L.pOnGround);
+  if(rocketSpent(L.pvy,L.rocketing))L.rocketing=false;
 
   L.px+=L.pvx;
   // Wrap horizontally
@@ -2428,7 +2598,6 @@ function updateLearn(){
   else if(Math.abs(L.pvx)>0.3){L.pFrameTimer++;if(L.pFrameTimer>6){L.pFrame=L.pFrame===0?1:0;L.pFrameTimer=0;}}
   else L.pFrame=0;
 
-  if(justPressed['Escape']){gameState='learnmenu';justPressed['Escape']=false;}
   clearJP();
 }
 
@@ -2631,7 +2800,8 @@ function drawLearnMenu(){
   // Characters
   const bob=Math.sin(animFrame*0.06)*3;
   drawSprite(GIGI_STAND,60,BASE_H-100+bob,GIGI_P,3,false);
-  drawSprite(DODO_STAND,BASE_W-90,BASE_H-100+bob,DODO_P,3,true);
+  const dskLearn=DODO_SKINS[dodoSkin]||DODO_SKINS[0];
+  drawSprite(dskLearn.stand,BASE_W-90,BASE_H-100+bob,dskLearn.palette,3,true);
 
   ctx.fillStyle='#aaddcc';ctx.font='12px monospace';
   ctx.fillText('← →  Vali  |  SPACE  Alusta',BASE_W/2,340);
@@ -2677,6 +2847,62 @@ function drawLearnResult(){
 }
 
 // ==========================================
+//  CONTROLLER IDENTITY
+// ==========================================
+// There is no official controller-type API. gamepad.id carries USB vendor and
+// product IDs, but the format differs per browser:
+//   Chrome/Edge  "DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)"
+//   Firefox      "054c-0ce6-DualSense Wireless Controller"
+//   Safari       "DualSense Wireless Controller"   (no IDs at all)
+// So: parse either ID format, fall back to keywords, then default to Xbox —
+// the "standard gamepad" layout is Xbox-shaped, so that is the safest guess.
+const PAD_VENDORS={'054c':'ps','045e':'xbox','057e':'nintendo'};
+const PAD_GLYPHS={
+  xbox:     {confirm:'Ⓐ',back:'Ⓑ',shoot:'Ⓧ',pause:'☰'},
+  ps:       {confirm:'✕',back:'○',shoot:'□',pause:'OPTIONS'},
+  nintendo: {confirm:'Ⓑ',back:'Ⓐ',shoot:'Ⓨ',pause:'+'}
+};
+let padKind='xbox', padLastId='';
+
+function detectPadKind(id){
+  const s=(id||'').toLowerCase();
+  let m=s.match(/vendor:\s*([0-9a-f]{4})/);
+  if(!m)m=s.match(/^([0-9a-f]{4})-[0-9a-f]{4}/);
+  if(m&&PAD_VENDORS[m[1]])return PAD_VENDORS[m[1]];
+  if(/dualsense|dualshock|playstation|sony/.test(s))return 'ps';
+  if(/nintendo|switch|joy-?con|pro controller/.test(s))return 'nintendo';
+  if(/xbox|xinput|microsoft/.test(s))return 'xbox';
+  return 'xbox';
+}
+
+function padGlyph(slot){return (PAD_GLYPHS[padKind]||PAD_GLYPHS.xbox)[slot]||'';}
+
+// Converts a triggerShake() call into a haptic pulse. Pure arithmetic so it is
+// unit-testable without a gamepad: intensity (3-8 in practice) maps to
+// strong-motor magnitude, duration (in frames @60fps) becomes milliseconds.
+function shakeToRumble(intensity,duration){
+  const clamp01=v=>Math.max(0,Math.min(1,v));
+  return {
+    strong: clamp01(intensity/10),
+    weak:   clamp01(intensity/16),
+    dur:    duration*1000/60
+  };
+}
+
+// No-ops on pads without haptics, and on browsers that reject the effect.
+function padRumble(strong,weak,dur){
+  const pads=navigator.getGamepads?navigator.getGamepads():[];
+  for(let i=0;i<pads.length;i++){
+    const gp=pads[i];
+    if(gp&&gp.connected&&gp.vibrationActuator){
+      try{gp.vibrationActuator.playEffect('dual-rumble',
+        {duration:dur,strongMagnitude:strong,weakMagnitude:weak});}catch(e){}
+      return;
+    }
+  }
+}
+
+// ==========================================
 //  GAMEPAD SUPPORT
 // ==========================================
 const gpPrev={};
@@ -2685,22 +2911,36 @@ function pollGamepad(){
   let gp=null;
   for(let i=0;i<gamepads.length;i++){if(gamepads[i]&&gamepads[i].connected){gp=gamepads[i];break;}}
   if(!gp)return;
+  if(gp.id!==padLastId){padLastId=gp.id;padKind=detectPadKind(gp.id);}
   // Button mapping (standard gamepad):
-  // 0=A(jump), 1=B(shoot), 2=X(shoot), 3=Y(lang), 9=Start(enter), 8=Select(escape)
+  // 0=A(jump), 1=B(shoot in play / cancel in menus), 2=X(shoot), 3=Y(lang, menu-only)
+  // 9=Start(confirm in menus / pause in play), 8=Select(escape)
   // 12=DpadUp, 13=DpadDown, 14=DpadLeft, 15=DpadRight
+  // Button 1 (○ / Ⓑ) is cancel in menus and shoot in play — the universal
+  // console convention. Button 9 (OPTIONS / ☰) is confirm in menus and pause
+  // during a run, since Start is where a thumb looks for pause.
+  const menu=isMenuState();
   const btnMap={
-    0:'Space',1:'KeyX',2:'KeyX',3:'KeyL',
-    9:'Enter',8:'Escape',
+    0:'Space',
+    1:menu?'Escape':'KeyX',
+    2:'KeyX',
+    3:menu?'KeyL':null,   // language toggle is menu-only: this is △ on a
+                          // DualSense and kids hit it constantly mid-run
+    9:menu?'Enter':'Escape',
+    8:'Escape',
     12:'ArrowUp',13:'ArrowDown',14:'ArrowLeft',15:'ArrowRight'
   };
-  Object.entries(btnMap).forEach(([bi,code])=>{
-    const idx=parseInt(bi);
+  Object.keys(btnMap).forEach(bi=>{
+    const idx=parseInt(bi), code=btnMap[bi];
     if(idx>=gp.buttons.length)return;
     const pressed=gp.buttons[idx].pressed;
-    const wasPressed=!!gpPrev[idx];
-    if(pressed&&!wasPressed){justPressed[code]=true;keys[code]=true;}
-    else if(!pressed&&wasPressed){keys[code]=false;}
-    gpPrev[idx]=pressed;
+    const prevCode=gpPrev[idx]||null;   // the code that was actually pressed,
+                                        // not the code that maps right now
+    if(pressed&&!prevCode){
+      if(code){justPressed[code]=true;keys[code]=true;gpPrev[idx]=code;}
+    } else if(!pressed&&prevCode){
+      keys[prevCode]=false;gpPrev[idx]=null;
+    }
   });
   // Left stick (axes 0=horizontal, 1=vertical) with deadzone
   const dz=0.4;
@@ -2763,6 +3003,203 @@ function drawPowerupPopup(){
   }
   ctx.restore();
 }
+
+// ==========================================
+//  SELF TESTS — open index.html?test=1, or run scripts/run-tests.js
+// ==========================================
+// `var`, not `const`: top-level const/let in a vm script never attach to the
+// context object, so scripts/run-tests.js could not read the results and every
+// run reported failure however many assertions passed.
+var TEST_RESULTS={pass:0,fail:0};
+function tAssert(name,cond,detail){
+  if(cond){TEST_RESULTS.pass++;console.log('[TEST] PASS  '+name);}
+  else{TEST_RESULTS.fail++;console.error('[TEST] FAIL  '+name+(detail?'  — '+detail:''));}
+}
+function tNear(name,actual,expected,tol){
+  tAssert(name,Math.abs(actual-expected)<=tol,'expected '+expected+' ±'+tol+', got '+actual.toFixed(2));
+}
+
+// Replays the real integrator to find how high an impulse carries the player.
+function simulateRise(impulse,holdJump,startRocketing){
+  let vy=impulse,y=0,maxRise=0,rocketing=startRocketing;
+  for(let f=0;f<1000;f++){
+    vy=learnVertStep(vy,holdJump,rocketing,false);
+    if(rocketSpent(vy,rocketing))rocketing=false;
+    y+=vy;
+    if(y<maxRise)maxRise=y;
+    if(y>0&&f>2)break;
+  }
+  return -maxRise;
+}
+
+function testPhysics(){
+  const normalHeld=simulateRise(LEARN_JUMP,true,false);
+  const rocketHeld=simulateRise(LEARN_ROCKET,true,true);
+  const rocketTap=simulateRise(LEARN_ROCKET,false,true);
+  tNear('normal jump, held',            normalHeld,                          106.3,1);
+  tNear('normal jump, tapped',          simulateRise(LEARN_JUMP,false,false),  19.1,1);
+  tNear('rocket, held',                 rocketHeld,                          158.4,1);
+  tNear('rocket, tapped + exemption',   rocketTap,                           158.4,1);
+  tNear('rocket, tapped, NO exemption', simulateRise(LEARN_ROCKET,false,false),19.1,1);
+  // Invariants that must hold even if the physics is retuned later:
+  tAssert('gate cannot be skipped by a normal jump', normalHeld<GATE_GAP,
+          normalHeld.toFixed(1)+' >= '+GATE_GAP);
+  tAssert('rocket clears the gate even when tapped', rocketTap>GATE_GAP,
+          rocketTap.toFixed(1)+' <= '+GATE_GAP);
+  tAssert('rocket cannot overshoot onto the next step', rocketHeld<GATE_GAP+STEP_RISE,
+          rocketHeld.toFixed(1)+' >= '+(GATE_GAP+STEP_RISE));
+}
+
+function testBackNav(){
+  const ALL=['title','modeselect','difficulty','select','intro','playing','dead',
+             'between','levelcomplete','gameover','win','debug','learnmenu',
+             'learnletters','learnresult','paused'];
+  ALL.forEach(s=>{
+    const covered = s==='title' || s==='paused' ||
+                    !!BACK_TARGET[s] || PAUSABLE.indexOf(s)>=0;
+    tAssert('back works from state: '+s,covered,'no BACK_TARGET and not PAUSABLE');
+  });
+  tAssert('no back target is itself',
+          Object.keys(BACK_TARGET).every(k=>BACK_TARGET[k]!==k));
+  tAssert('every back target is a real state',
+          Object.values(BACK_TARGET).every(v=>ALL.indexOf(v)>=0));
+  tAssert('pausable states are not also in BACK_TARGET',
+          PAUSABLE.every(s=>!BACK_TARGET[s]));
+
+  // isMenuState() decides gamepad cancel/confirm AND whether the language
+  // toggle is live. A state drifting into or out of it silently changes what
+  // the buttons do, so pin the two halves that must never blur together.
+  const wasState=gameState;
+  const menuOf=s=>{gameState=s;const m=isMenuState();gameState=wasState;return m;};
+  tAssert('no live-run state counts as a menu',
+          PAUSABLE.every(s=>!menuOf(s)),
+          'a PAUSABLE state is being treated as a menu');
+  tAssert('title and paused count as menus',
+          menuOf('title')&&menuOf('paused'));
+  tAssert('the learn climb is not a menu',!menuOf('learnletters'),
+          'language toggle would be live mid-climb');
+  tAssert('the learn menu is a menu',menuOf('learnmenu'));
+  tAssert('isMenuState left gameState untouched',gameState===wasState);
+}
+
+function testPadDetect(){
+  // Chrome/Edge format
+  tAssert('chrome dualsense → ps',
+    detectPadKind('DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)')==='ps');
+  tAssert('chrome xbox → xbox',
+    detectPadKind('Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b12)')==='xbox');
+  tAssert('chrome switch pro → nintendo',
+    detectPadKind('Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)')==='nintendo');
+  // Firefox format
+  tAssert('firefox dualsense → ps',
+    detectPadKind('054c-0ce6-DualSense Wireless Controller')==='ps');
+  tAssert('firefox xbox → xbox',
+    detectPadKind('045e-0b12-Xbox Wireless Controller')==='xbox');
+  // Safari / name-only fallback
+  tAssert('name-only dualsense → ps',
+    detectPadKind('DualSense Wireless Controller')==='ps');
+  tAssert('name-only dualshock → ps',
+    detectPadKind('Wireless Controller DualShock 4')==='ps');
+  tAssert('name-only switch → nintendo',
+    detectPadKind('Nintendo Switch Pro Controller')==='nintendo');
+  // Unknown defaults to xbox, because "standard gamepad" is Xbox-shaped
+  tAssert('unknown → xbox', detectPadKind('Some Generic Pad')==='xbox');
+  tAssert('empty → xbox', detectPadKind('')==='xbox');
+  tAssert('null → xbox', detectPadKind(null)==='xbox');
+  // Glyphs
+  tAssert('ps confirm glyph is cross', PAD_GLYPHS.ps.confirm==='✕');
+  tAssert('xbox confirm glyph is A', PAD_GLYPHS.xbox.confirm==='Ⓐ');
+  tAssert('nintendo swaps A/B vs xbox',
+    PAD_GLYPHS.nintendo.confirm==='Ⓑ'&&PAD_GLYPHS.nintendo.back==='Ⓐ');
+  tAssert('every kind defines every glyph',
+    ['xbox','ps','nintendo'].every(k=>
+      ['confirm','back','shoot','pause'].every(g=>!!PAD_GLYPHS[k][g])));
+  // Placeholder expansion
+  const saved=padKind; padKind='ps';
+  tAssert('T() expands {A} to the pad glyph', T('press_start').indexOf('✕')>=0);
+  tAssert('T() leaves no placeholder behind', T('press_start').indexOf('{A}')<0);
+
+  // Phrase-array keys must survive T() as arrays. Callers do .length and index
+  // into them, so a stringified return would break rendering rather than error.
+  ['dino_phrases','boss_taunt','boss_intro_phrases','dino_between'].forEach(k=>{
+    const v=T(k);
+    tAssert('T() returns '+k+' as an array',Array.isArray(v),'got '+typeof v);
+    tAssert('T() returns '+k+' non-empty',Array.isArray(v)&&v.length>0);
+  });
+  // The guard must hold on type, not on the data happening to avoid '{'.
+  TRANSLATIONS.__probe={et:['{'],en:['{']};
+  tAssert('an array phrase of exactly "{" does not throw',(()=>{
+    try{return Array.isArray(T('__probe'));}catch(e){return false;}
+  })(),'T() tried to string-replace an array');
+  delete TRANSLATIONS.__probe;
+  padKind=saved;
+}
+
+function testRumbleScale(){
+  // Matches the six existing triggerShake() call sites, so the felt haptics
+  // stay proportional to the six intensities already in play.
+  const stomp=shakeToRumble(3,8);
+  tNear('enemy stomp strong magnitude',stomp.strong,0.3,0.001);
+  tNear('enemy stomp duration ms',stomp.dur,133.33,0.1);
+  const death=shakeToRumble(5,12);
+  tNear('player death strong magnitude',death.strong,0.5,0.001);
+  tNear('player death duration ms',death.dur,200,0.1);
+  const bossDefeat=shakeToRumble(8,20);
+  tNear('boss defeated strong magnitude',bossDefeat.strong,0.8,0.001);
+  tNear('boss defeated duration ms',bossDefeat.dur,333.33,0.1);
+  // Magnitudes must never leave the WebVibrationActuator's valid [0,1] range,
+  // however large a future call site's intensity/duration might be.
+  tAssert('strong magnitude clamps at 1', shakeToRumble(999,1).strong===1);
+  tAssert('weak magnitude clamps at 1', shakeToRumble(999,1).weak===1);
+  tAssert('magnitudes never negative',
+    shakeToRumble(-5,-5).strong===0&&shakeToRumble(-5,-5).weak===0);
+  // With no gamepad attached (true in this headless run, and true for most
+  // of the game's real playtime) padRumble must no-op rather than throw —
+  // it is called from triggerShake(), which runs during ordinary keyboard play.
+  tAssert('padRumble no-ops safely with no gamepad attached', (()=>{
+    try{padRumble(1,1,100);return true;}catch(e){return false;}
+  })());
+  tAssert('triggerShake still drives screenShake and never throws', (()=>{
+    try{
+      triggerShake(5,10);
+      return screenShake.intensity===5&&screenShake.duration===10;
+    }catch(e){return false;}
+  })());
+}
+
+// Every non-zero palette index a skin's sprites use must exist as a key in
+// that skin's palette, or drawSprite paints undefined and pixels silently
+// vanish. Ragged rows (a row shorter/longer than its sprite's others) are a
+// silent art bug too, so row widths must all match within one sprite.
+function testSprites(){
+  [['GIGI',GIGI_SKINS],['DODO',DODO_SKINS]].forEach(([label,skins])=>{
+    skins.forEach(skin=>{
+      ['stand','run','jump'].forEach(part=>{
+        const sprite=skin[part];
+        const w=sprite[0].length;
+        tAssert(label+' '+skin.name+' '+part+' rows same width',
+                sprite.every(row=>row.length===w),
+                'widths: '+sprite.map(row=>row.length).join(','));
+        const badIdx=[...new Set(sprite.flat())].filter(v=>v!==0&&!(v in skin.palette));
+        tAssert(label+' '+skin.name+' '+part+' indices exist in palette',
+                badIdx.length===0,
+                'missing palette entries for: '+badIdx.join(','));
+      });
+    });
+  });
+}
+
+function runSelfTests(){
+  TEST_RESULTS.pass=0;TEST_RESULTS.fail=0;
+  console.log('[TEST] ===== start =====');
+  testPhysics();
+  testBackNav();
+  testPadDetect();
+  testRumbleScale();
+  testSprites();
+  console.log('[TEST] ===== '+TEST_RESULTS.pass+' passed, '+TEST_RESULTS.fail+' failed =====');
+}
+if(location.search.indexOf('test=1')>=0)window.addEventListener('load',runSelfTests);
 
 function gameLoop(){pollGamepad();update();draw();drawPowerupPopup();requestAnimationFrame(gameLoop);}
 gameLoop();
