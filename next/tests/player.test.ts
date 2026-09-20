@@ -7,8 +7,8 @@
 import { describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
 import { createPlayer, stepPlayer, GRND_DECEL } from '../src/game/player';
+import { createWorld, stepCamera } from '../src/game/world';
 import { emptyInput, type InputState } from '../src/input/actions';
-import { DIFFICULTY_CONFIG } from '../src/config/difficulty';
 import { LEVELS, TILE_GROUND } from '../src/data/levels';
 import { GIGI_SKINS, DODO_SKINS } from '../src/data/sprites';
 import { TILE, GRAVITY } from '../src/config/constants';
@@ -19,17 +19,7 @@ function held(overrides: Partial<InputState>): InputState {
 }
 
 function makeWorld(character: 'gigi' | 'dodo' = 'gigi'): World {
-  const level = LEVELS[0];
-  const dc = DIFFICULTY_CONFIG.normal;
-  return {
-    level,
-    map: level.generate(dc),
-    dc,
-    player: createPlayer(level, character),
-    enemies: [],
-    frame: 0,
-    dead: false,
-  };
+  return createWorld(0, 'normal', character);
 }
 
 describe('createPlayer', () => {
@@ -234,8 +224,15 @@ describe('wall collision', () => {
     const port = [];
     for (let i = 0; i < FRAMES; i++) {
       stepPlayer(world, held({ right: true }));
+      // The live update() lerps the camera every frame regardless of what the player
+      // is doing, and driveLiveGame's Sample now carries that camera position — so the
+      // port side must run the same camera step to stay comparable frame by frame.
+      stepCamera(world);
       const p = world.player;
-      port.push({ x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround });
+      port.push({
+        x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
+        camera: { x: world.camera.x, y: world.camera.y },
+      });
     }
 
     expect(port).toEqual(live);

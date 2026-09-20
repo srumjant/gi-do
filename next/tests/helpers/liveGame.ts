@@ -22,6 +22,7 @@ export interface Sample {
   vx: number;
   vy: number;
   onGround: boolean;
+  camera: { x: number; y: number };
 }
 
 export interface DriveOptions {
@@ -95,6 +96,7 @@ interface Driver {
   keys: Record<string, boolean>;
   justPressed: Record<string, boolean>;
   getPlayer: () => Sample & Record<string, unknown>;
+  getCamera: () => { x: number; y: number };
   setDifficulty: (d: string) => void;
   setChar: (c: string) => void;
 }
@@ -142,6 +144,7 @@ function bootLiveGame(): Driver {
 ;this.__drive = {
   initLevel, update, keys, justPressed,
   getPlayer: () => player,
+  getCamera: () => camera,
   setDifficulty: (d) => { selectedDifficulty = d; },
   setChar: (c) => { selectedChar = c; },
   setLevel: (i) => { currentLevel = i; },
@@ -198,7 +201,11 @@ export function driveLiveGame(opts: DriveOptions): Sample[] {
     prev = held;
 
     const p = d.getPlayer();
-    trace.push({ x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: !!p.onGround });
+    const cam = d.getCamera();
+    trace.push({
+      x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: !!p.onGround,
+      camera: { x: cam.x, y: cam.y },
+    });
   }
   return trace;
 }

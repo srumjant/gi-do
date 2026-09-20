@@ -44,6 +44,22 @@ export interface World {
    * run. `stepPlayer` reproduces that by returning immediately when this is set.
    */
   dead: boolean;
+  /**
+   * Simulation state, not presentation state. Enemies do not exist until the camera
+   * reaches them (index.html:1358), so where the camera is decides when an enemy spawns
+   * and therefore what an enemy trace looks like. The scene reads this to scroll; it
+   * does not own it.
+   */
+  camera: { x: number; y: number };
+  /** Enemy definitions not yet streamed in. Drained by the spawn window each step. */
+  pending: PendingEnemy[];
+}
+
+export interface PendingEnemy {
+  type: string;
+  /** Tile column, from the level's enemyDefs. */
+  x: number;
+  spawned: boolean;
 }
 
 /** An axis-aligned box, as the live game's rectOverlap takes them. */
