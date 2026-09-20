@@ -1034,12 +1034,29 @@ This is the only Phaser-aware input code. `src/game/` never sees a key.
 
 1. `create()` — build the world, draw the tile map **once** into a `Phaser.GameObjects.Graphics`
    as filled rectangles using the level's `groundColor` and `brickColor`, create a
-   rectangle for the player and one for the enemy, set the camera bounds to the level size
-   and make it follow the player.
+   rectangle for the player and **one per enemy** (there are three at frame 0, and more
+   stream in as the camera advances, so build them lazily), and set the camera zoom to
+   `ZOOM`.
+
+   **Do NOT call `startFollow`.** `world.camera` is simulation state — enemy spawning
+   reads it, and it is compared against the live game frame by frame — so Phaser's camera
+   must be told where the simulation's camera already is:
+
+   ```ts
+   this.cameras.main.setScroll(Math.round(world.camera.x), Math.round(world.camera.y));
+   ```
+
+   Two cameras with different following behaviour would silently disagree, and the one the
+   tests check would not be the one on screen. The rounding matches the live game, which
+   rounds only at draw time (`index.html:1686`) and keeps the camera sub-pixel in logic.
 2. `update(time, delta)` — accumulate `delta` and call `stepWorld` exactly once per
    `STEP_MS`, capped at a handful of catch-up steps so a background tab does not spiral.
-3. Copy `world.player.x/y` onto the player rectangle, same for the enemy, and hide the
-   enemy rectangle when it is not `alive`.
+3. Copy `world.player.x/y` onto the player rectangle, the same for each enemy, hide any
+   enemy rectangle whose `alive` is false, and set the camera scroll from `world.camera`.
+
+   Phaser rectangles are positioned by their **centre** by default. Either `setOrigin(0, 0)`
+   or offset by half the size — getting this wrong puts everything half a body off and
+   reads as a physics bug rather than a rendering one.
 4. Nothing else. No sprites, no parallax, no HUD, no text beyond a small frame counter if
    it helps debugging.
 
