@@ -1,12 +1,24 @@
 export interface ParallaxLayer {
-  /** Top of the layer, as a fraction of view height. */
+  /**
+   * Baseline of the ridge, as a fraction of BASE_H (400) — NOT of VIEW_H. The live
+   * renderer computes `baseY = BASE_H * y` (index.html:1055), outside the world zoom.
+   */
   y: number;
-  /** Layer height, as a fraction of view height. */
+  /**
+   * Declared on every layer and read by nothing. `drawParallax` fills from the ridge
+   * down to the bottom of the screen and never consults this. Kept because the port
+   * is byte-identical to the live data; do not start honouring it without deciding
+   * what it should mean.
+   */
   h: number;
   color: string;
-  /** Fraction of camera.x this layer scrolls by. Smaller is further away. */
+  /**
+   * Scroll factor, smaller being further away. Note the live renderer applies a
+   * further 0.5 (`scrollX * 0.5`, index.html:1060), so the on-screen offset is
+   * `camera.x * speed * 0.5`.
+   */
   speed: number;
-  /** Ridge heights sampled across the layer's width, as fractions of view height. */
+  /** Ridge heights across the layer, also as fractions of BASE_H (index.html:1062). */
   hills: number[];
 }
 

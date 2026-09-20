@@ -2,8 +2,11 @@ import type { DifficultyRecord } from '../config/difficulty';
 
 /**
  * Tile codes. 0 empty, 1 ground, 2 brick/platform, 3 question block,
- * 5 rainbow block. 4 is unused. Everything non-zero is solid — there are no
- * one-way platforms and no slopes in this game.
+ * 5 rainbow block. 4 is never written by any level.
+ *
+ * Solidity is whatever `isSolid` says — an explicit list of four codes, not
+ * "non-zero". They coincide today only because 4 is unused; write a tile 4 or 6 and
+ * `tile !== 0` would collide where the live game does not.
  */
 export type TileMap = number[][];
 

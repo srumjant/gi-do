@@ -7,16 +7,16 @@ import { LEVELS } from '../data/levels';
 import { TStr, setGlyphResolver, type GlyphAction } from '../config/i18n';
 
 /**
- * Placeholders like {A} in the translations resolve through this. The real
- * resolver arrives with the gamepad code in a later plan and picks glyphs per
- * controller; until then an Xbox-style labelling is the sensible default, which
- * is also what the live game falls back to when it cannot identify a pad.
+ * Placeholders like {A} in the translations resolve through this. The real resolver
+ * arrives with the gamepad code in a later plan and picks glyphs per controller.
+ * These are the live game's Xbox set verbatim (index.html:3037), which is also its
+ * fallback when a pad cannot be identified — `padKind` initialises to 'xbox'.
  */
 const DEFAULT_GLYPHS: Record<GlyphAction, string> = {
-  confirm: 'A',
-  back: 'B',
-  shoot: 'X',
-  pause: 'START',
+  confirm: '\u24B6',
+  back: '\u24B7',
+  shoot: '\u24CD',
+  pause: '\u2630',
 };
 
 export class BootScene extends Phaser.Scene {

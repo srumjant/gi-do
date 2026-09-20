@@ -22,8 +22,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
+  # The port's comparison tests assert that next/ still matches index.html. That makes
+  # them fail whenever the live game is legitimately retuned — change GRAVITY and two
+  # tests go red by design. They must therefore NOT gate the deploy, or a one-character
+  # tuning change to the game the kids play would stop that game from shipping. This
+  # job reports red on the commit; it is deliberately not a dependency of `deploy`.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: next/package-lock.json
+
+      - name: Run the port's test suite
+        working-directory: next
+        run: |
+          npm ci
+          npm test
+
   deploy:
+    # No `needs: test` — see the comment above. The build below still gates the deploy,
+    # because `npm run build` runs `tsc --noEmit` first and a port that does not compile
+    # should not be published.
+    
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -42,11 +69,10 @@ jobs:
           cache: 'npm'
           cache-dependency-path: next/package-lock.json
 
-      - name: Test and build the Phaser version
+      - name: Build the Phaser version
         working-directory: next
         run: |
           npm ci
-          npm test
           npm run build
 
       # The live game keeps the root. The Phaser build is published under /next/ so the
@@ -54,7 +80,7 @@ jobs:
       - name: Stage both games
         run: |
           mkdir -p _site
-          rsync -a --exclude '_site' --exclude 'next' --exclude '.git' ./ _site/
+          rsync -a --exclude '/_site' --exclude '/next' --exclude '/.git' ./ _site/
           mkdir -p _site/next
           cp -R next/dist/. _site/next/
 
