@@ -6,6 +6,12 @@ on:
   push:
     branches: ["main"]
 
+  # Pull requests run the `test` job ONLY — see the `if:` on `deploy` below. Without
+  # this trigger the port's tests never ran before a merge, only after one, so a broken
+  # port was only discovered once it was already on main.
+  pull_request:
+    branches: ["main"]
+
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -17,8 +23,11 @@ permissions:
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+# Keyed by ref so a pull request's `test` run cannot occupy the slot a production
+# deploy is waiting for. Every push to main shares one ref, so main's deploys still
+# serialise against each other, which is the guarantee this group exists for.
 concurrency:
-  group: "pages"
+  group: "pages-${{ github.ref }}"
   cancel-in-progress: false
 
 jobs:
@@ -50,7 +59,12 @@ jobs:
     # No `needs: test` — see the comment above. The build below still gates the deploy,
     # because `npm run build` runs `tsc --noEmit` first and a port that does not compile
     # should not be published.
-    
+    #
+    # NEVER deploy from a pull request. This workflow publishes to the live site the
+    # kids play, and the `pull_request:` trigger above exists purely so `test` reports
+    # on the PR. Without this guard, opening a PR would push that branch to production.
+    if: github.event_name != 'pull_request'
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
