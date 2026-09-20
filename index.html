@@ -253,6 +253,12 @@ function T(key){
   const e=TRANSLATIONS[key];
   if(!e)return key;
   const s=e[lang]||e['en'];
+  // Some keys hold arrays of phrases rather than one string, and they must come
+  // back untouched. Checking the type rather than only indexOf('{') matters:
+  // on an array indexOf compares whole elements, so a phrase that happened to
+  // be exactly "{" would pass the guard and then call .replace on an array,
+  // which does not have it. Safe by construction now, not by luck of the data.
+  if(typeof s!=='string')return s;
   return s.indexOf('{')<0?s:s
     .replace(/\{A\}/g,padGlyph('confirm'))
     .replace(/\{B\}/g,padGlyph('back'))
@@ -3112,6 +3118,20 @@ function testPadDetect(){
   const saved=padKind; padKind='ps';
   tAssert('T() expands {A} to the pad glyph', T('press_start').indexOf('✕')>=0);
   tAssert('T() leaves no placeholder behind', T('press_start').indexOf('{A}')<0);
+
+  // Phrase-array keys must survive T() as arrays. Callers do .length and index
+  // into them, so a stringified return would break rendering rather than error.
+  ['dino_phrases','boss_taunt','boss_intro_phrases','dino_between'].forEach(k=>{
+    const v=T(k);
+    tAssert('T() returns '+k+' as an array',Array.isArray(v),'got '+typeof v);
+    tAssert('T() returns '+k+' non-empty',Array.isArray(v)&&v.length>0);
+  });
+  // The guard must hold on type, not on the data happening to avoid '{'.
+  TRANSLATIONS.__probe={et:['{'],en:['{']};
+  tAssert('an array phrase of exactly "{" does not throw',(()=>{
+    try{return Array.isArray(T('__probe'));}catch(e){return false;}
+  })(),'T() tried to string-replace an array');
+  delete TRANSLATIONS.__probe;
   padKind=saved;
 }
 
