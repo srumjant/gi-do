@@ -200,8 +200,9 @@ export function stepWorld(world: World, input: InputState): void {
   // every early return, whereas this port is handed `jumpPressed` as a rising edge the
   // caller computes per step. Nothing carries over to scrub.
   //
-  // Unreachable today — `giveRandomSillyPowerup` (player.ts) is the only writer and
-  // nothing calls it until the rainbow block lands.
+  // Reached by taking a rainbow block from underneath, and by nothing else:
+  // `giveRandomSillyPowerup` (player.ts) is the only writer of `powerupPopup`, and
+  // `bumpBlocksAbove` is its only caller.
   if (world.powerupPopup) {
     world.powerupPopup.timer--;
     if (world.powerupPopup.timer <= 0) world.powerupPopup = null;
@@ -319,9 +320,9 @@ export function collectPickups(world: World): void {
  *     check — so once that clamp writes exactly 0, every later frame skips the block
  *     entirely and the star is frozen in the air for the rest of the level.
  *
- * Nothing creates a star yet: that is the question block, a later task. The logic
- * lives here because this is where the live game runs it, and because `stars` is
- * already built (empty) by the spawn above.
+ * Stars are created by bumping a question block from below (player.ts's
+ * bumpBlocksAbove), one tile above the block that paid out; the list itself starts
+ * empty at every level build.
  */
 export function stepStars(world: World): void {
   const p = world.player;

@@ -24,12 +24,13 @@
 // and the coyote window stopped being pinned by any trace at all. So the geometry
 // scripts run with enemies off, everything else runs with them on, and dieAndRespawn
 // covers the death-and-respawn path deliberately.
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
 import { SCRIPTS, STOMP_SCRIPT } from './helpers/inputScript';
-import { createWorld, stepWorld } from '../src/game/world';
+import { createWorld, respawnLevel, stepWorld } from '../src/game/world';
 import { findGroundY } from '../src/game/tiles';
-import { LEVELS } from '../src/data/levels';
+import { setRandom } from '../src/game/random';
+import { LEVELS, TILE_BRICK, TILE_QUESTION, TILE_RAINBOW } from '../src/data/levels';
 import { GRAVITY, TILE } from '../src/config/constants';
 
 /**
@@ -389,14 +390,15 @@ describe('the bow and super pickups vs. the live game', () => {
 // ---------------------------------------------------------------------------
 // The three silly power-ups (Plan 5, Task 2).
 //
-// `giveRandomSillyPowerup` itself has no caller until the rainbow block lands, so no
-// trace can grant one. What a trace CAN do is seed the timers on both sides — the
-// driver's `beforeRun` writes the live game's own `player` object, and the port's is
-// just a field — and then compare what the live game does with a fart or a big head
-// against what the port does. That is where these three live: the effects are the
-// interesting part, and they are all reachable this way. The GRANT (which branch sets
-// which field) is unit-tested in player.test.ts, because 0.5 * 3 floors to 1 and the
-// live game would only ever pick `bighead` here.
+// The only thing that grants one is a rainbow block taken from below, and both sides'
+// `Math.random` resolves to a constant 0.5 here, so the ONLY branch a trace can ever
+// reach through the real trigger is `bighead` (the rainbow-block trace at the bottom of
+// this file does exactly that). What a trace can do for the other two is seed the timers
+// on both sides — the driver's `beforeRun` writes the live game's own `player` object,
+// and the port's is just a field — and then compare what the live game does with a fart
+// or a big head against what the port does. That is where these three live: the effects
+// are the interesting part, and they are all reachable this way. The GRANT itself (which
+// branch sets which field) is unit-tested in player.test.ts for the same reason.
 // ---------------------------------------------------------------------------
 
 /** Standard Sample projection off the port's World — the same shape every trace pushes. */
@@ -639,5 +641,373 @@ describe('the big head vs. the live game', () => {
       if (plainKill < 0 && plain.enemies.some((e) => !e.alive)) plainKill = f;
     }
     expect(plainKill).toBe(killFrame + 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Blocks taken from below (Plan 5, Task 3) — index.html:1417-1421, inside the head-hit
+// branch of the Y sweep.
+//
+// Both scripts plant the player on the platform directly under a block and hold jump.
+// `?` and rainbow are two lists swept separately off the same collision, so they get a
+// trace each: one for the star a question block pays out, one for the silly power-up a
+// rainbow block pays out — and, far more disruptive, the 120-frame full-world freeze
+// that comes with it.
+// ---------------------------------------------------------------------------
+
+/** Just the four fields a live `stars` entry carries (index.html:1419). */
+interface StarSample { x: number; y: number; vy: number; collected: boolean }
+
+/**
+ * The standard Sample with every ENEMY's `vy` dropped — the player's is kept.
+ *
+ * A noGravity flyer (bat/icebat) never has its `vy` assigned on the live side: the
+ * gravity block that is the only thing which ever writes it is skipped entirely for
+ * one, so the field stays `undefined` there forever, while this port's uniformly
+ * shaped EnemyState always carries a real 0. A representational difference between an
+ * ad-hoc live object and a uniform one, not a physics difference — enemy.test.ts's own
+ * bat/bouncer trace and the STOMP_SCRIPT comparison above both omit enemy `vy` for
+ * exactly this reason. The rainbow-block trace below is the first `toEqual`-style
+ * comparison with bat@48 inside its window, so it needs the same treatment; the shape
+ * is projected rather than the fields compared one at a time so the single blanket
+ * assertion still covers everything else.
+ */
+function stripEnemyVy<S extends { enemies: Array<{ vy: number }> }>(s: S) {
+  return {
+    ...s,
+    enemies: s.enemies.map((e) => {
+      const { vy: _vy, ...rest } = e;
+      return rest;
+    }),
+  };
+}
+
+describe('the question block vs. the live game', () => {
+  // Level 1's question blocks are at tiles [12,16] [32,13] [55,15] [72,14] [90,15] and
+  // [102,16] (index.html:891). This one is the block at column 12, which sits three rows
+  // above the platform `addPlats` writes at [10,19,5] (columns 10-14) — a plain standing
+  // jump from that platform reaches its underside on the second frame of the rise.
+  //
+  // buildLevelState scans the map row by row, so `questionBlocks[0]` is [32,13], NOT the
+  // first entry of the level record's own list. Looked up by column, not by index.
+  const REF = createWorld(0, 'normal', 'gigi');
+  const QB = REF.questionBlocks.find((b) => b.x === 12)!;
+  /**
+   * The platform's top. Deliberately NOT `findGroundY` of the block's OWN column:
+   * findGroundY scans DOWNWARD from row 0 and stops at the first solid tile, which in
+   * column 12 is the question block itself — 48px above the floor the player actually
+   * stands on. Column 11 is the same platform with nothing above it.
+   */
+  const PLATFORM_TOP = findGroundY(REF.map, QB.x - 1);
+  /**
+   * Standing exactly on the block's own column boundary. The Y sweep probes at `x+3`
+   * and `x+w-3`, which for a 16px-wide player is x+3 and x+13 — both inside this one
+   * tile, so `h1 === h2` here and the second pass over each list finds nothing (the
+   * `!hit` guard has already been flipped by the first). The straddle where the two
+   * probes DO name different columns is common enough, but level 1 has no two blocks
+   * adjacent in a row, so nothing here can pop two off one jump.
+   */
+  const START_X = QB.x * TILE;
+  const START_Y = PLATFORM_TOP - REF.player.h;
+  const JUMP_FRAME = 5;
+  /**
+   * The star's whole life: it leaves the block at -2, decelerates by 0.1 a frame for
+   * about twenty frames, and then hangs there forever. 60 frames covers the bump, the
+   * entire ramp, and a long tail with the star provably parked.
+   */
+  const FRAMES = 60;
+  const script = (f: number) => ({ left: false, right: false, jump: f >= JUMP_FRAME });
+
+  // Enemies suppressed on both sides: doll@15 and car@40 are both inside the spawn
+  // window from the first frame (the camera clamps to 0 at this x), and what they do
+  // walking along the floor three tiles below the platform is not what this trace is
+  // about. The rainbow-block trace below runs with them live, where they earn their keep.
+  it('pops the block into a brick and spawns a star one tile above it', () => {
+    const liveStars: StarSample[][] = [];
+    const liveTile: number[] = [];
+    const live = driveLiveGame({
+      level: 0, difficulty: 'normal', character: 'gigi',
+      frames: FRAMES, input: script,
+      suppressEnemies: true,
+      beforeRun: (d) => {
+        const p = d.getPlayer();
+        p.x = START_X; p.y = START_Y; p.vx = 0; p.vy = 0; p.onGround = true;
+      },
+      onFrame: (d) => {
+        const stars = d.getLevelSpawn().stars as StarSample[];
+        liveStars.push(stars.map((s) => ({
+          x: s.x, y: s.y, vy: s.vy, collected: s.collected,
+        })));
+        liveTile.push(d.getMap()[QB.y][QB.x]);
+      },
+    });
+
+    const world = createWorld(0, 'normal', 'gigi');
+    world.pending.length = 0;
+    world.enemies.length = 0;
+    world.player.x = START_X;
+    world.player.y = START_Y;
+    world.player.onGround = true;
+    expect(world.map[QB.y][QB.x]).toBe(TILE_QUESTION); // sanity: aiming at a real one
+
+    const port: typeof live = [];
+    const portStars: StarSample[][] = [];
+    const portTile: number[] = [];
+    let prevJump = false;
+    for (let f = 0; f < FRAMES; f++) {
+      const h = script(f);
+      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump });
+      prevJump = h.jump;
+      port.push(sampleWorld(world));
+      portStars.push(world.stars.map((s) => ({
+        x: s.x, y: s.y, vy: s.vy, collected: s.collected,
+      })));
+      portTile.push(world.map[QB.y][QB.x]);
+    }
+
+    // Player, camera, animFrame and score frame for frame, as every trace does...
+    expect(port).toEqual(live);
+    // ...and the two things this one is actually about: the star's whole flight, and
+    // the map cell underneath it, on the same frames.
+    expect(portStars).toEqual(liveStars);
+    expect(portTile).toEqual(liveTile);
+
+    // The bump must actually happen, or everything below compares two empty runs.
+    const bump = portStars.findIndex((s) => s.length > 0);
+    expect(bump).toBeGreaterThan(JUMP_FRAME); // on the rise, not on the standing frames
+    expect(portStars[bump - 1]).toEqual([]);
+
+    // Tile 3 becomes tile 2 (index.html:1419). Both are solid — `isSolid` takes 1, 2, 3
+    // and 5 — so this changes nothing about collision and everything about what it is.
+    expect(portTile.slice(0, bump)).toEqual(Array(bump).fill(TILE_QUESTION));
+    expect(portTile.slice(bump)).toEqual(Array(FRAMES - bump).fill(TILE_BRICK));
+    // ...and exactly one block was bumped: the one aimed at, not its five siblings.
+    expect(world.questionBlocks.filter((b) => b.hit)).toEqual([{ ...QB, hit: true }]);
+
+    // One star, one tile ABOVE the block (`qb.y*TILE - TILE`), at the block's own
+    // column, moving at -2. world.ts's stepStars runs later in the SAME step as the
+    // bump, so the earliest state any trace can observe is already one ramp step along
+    // — hence the `+ 0.1` and the y that has already moved by the stepped vy.
+    const SPAWN_Y = QB.y * TILE - TILE;
+    expect(portStars[bump]).toEqual([
+      { x: QB.x * TILE, y: SPAWN_Y + (-2 + 0.1), vy: -2 + 0.1, collected: false },
+    ]);
+    expect(portStars[FRAMES - 1]).toHaveLength(1); // never a second one
+
+    // The ramp is ONE-WAY (world.ts's stepStars): the star rises, decelerates, and
+    // stops dead the frame vy would go positive. It never falls back, and once vy is
+    // exactly 0 the `if (s.vy)` truthiness guard freezes it for the rest of the level.
+    const ys = portStars.slice(bump).map((s) => s[0].y);
+    const vys = portStars.slice(bump).map((s) => s[0].vy);
+    expect(Math.max(...ys)).toBe(ys[0]); // highest y is the first — it only ever rose
+    expect(ys.every((y, i) => i === 0 || y <= ys[i - 1])).toBe(true);
+    expect(vys.every((v) => v <= 0)).toBe(true); // clamped, never positive
+    const stopped = vys.indexOf(0);
+    expect(stopped).toBeGreaterThan(0); // it really does come to rest inside the window
+    expect(vys.slice(stopped).every((v) => v === 0)).toBe(true);
+    expect(ys.slice(stopped).every((y) => y === ys[stopped])).toBe(true);
+    // It went somewhere before it stopped — a whole tile's worth of rise, not a twitch.
+    expect(ys[stopped]).toBeLessThan(SPAWN_Y - TILE);
+
+    // Uncollected throughout, and therefore unscored: the star hangs in the tile
+    // directly above a block the player is standing UNDER, and that block is solid, so
+    // there is no way up to it from here. Stars are worth 100 * dc.scoreMultiplier when
+    // they ARE caught (world.ts's stepStars); nothing in this window catches one.
+    expect(portStars.every((s) => s.every((v) => !v.collected))).toBe(true);
+    expect(port[FRAMES - 1].score).toBe(0);
+    expect(world.dead).toBe(false);
+  });
+
+  // A bump mutates the map and both block lists, and `respawnLevel` (world.ts) is what
+  // undoes it: index.html:1163's initLevel opens with `map=lvl.generate(dc)` and
+  // re-derives every table from that fresh map, so dying restores every block bumped
+  // before the death and takes the stars back with it.
+  //
+  // Port-side only, and deliberately: WHAT a respawn rebuilds is already compared
+  // against the live game's own initLevel by world.test.ts's spawn-table parity check
+  // (all four difficulties, all six levels) and the whole death-and-respawn cycle is
+  // compared frame for frame by the dieAndRespawn script above. What neither of those
+  // can show is a block that was bumped FIRST, because until now nothing could bump one.
+  it('gives the block back on a respawn', () => {
+    const world = createWorld(0, 'normal', 'gigi');
+    world.pending.length = 0;
+    world.enemies.length = 0;
+    world.player.x = START_X;
+    world.player.y = START_Y;
+    world.player.onGround = true;
+
+    let prevJump = false;
+    for (let f = 0; f < FRAMES; f++) {
+      const h = script(f);
+      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump });
+      prevJump = h.jump;
+    }
+    // Sanity: there is something to undo.
+    expect(world.map[QB.y][QB.x]).toBe(TILE_BRICK);
+    expect(world.questionBlocks.some((b) => b.hit)).toBe(true);
+    expect(world.stars).toHaveLength(1);
+
+    respawnLevel(world);
+
+    expect(world.map[QB.y][QB.x]).toBe(TILE_QUESTION);
+    expect(world.questionBlocks.some((b) => b.hit)).toBe(false);
+    expect(world.stars).toEqual([]);
+  });
+});
+
+describe('the rainbow block vs. the live game', () => {
+  // Level 1's single rainbow block is at tile [43,12] (index.html:892), three rows above
+  // the platform at [42,15,3] (columns 42-44) — the same standing-jump geometry as the
+  // question block above. Enemies run LIVE on both sides here, unlike that trace,
+  // because the freeze this block causes is a claim about them too: index.html:1276
+  // returns out of update() before the enemy step, so a rainbow block stops the dolls
+  // and the bat mid-stride along with the player and the camera.
+  //
+  // Six of level 1's enemy defs stream in inside this window (doll@15, doll@28, car@40,
+  // bat@48, dino@55, doll@65) and the port implements all six types, so the two sides'
+  // `enemies` arrays line up index for index and the standard sample comparison covers
+  // them with no keying. bat@48 draws its sineOffset from random.ts's seam at spawn,
+  // which is why this pins the port's draw to the same 0.5 the live driver's sandboxed
+  // Math.random already returns.
+  afterEach(() => setRandom(Math.random));
+
+  const REF = createWorld(0, 'normal', 'gigi');
+  const RB = REF.rainbowBlocks[0]; // the level's only one
+  /** Column 42: the same platform, without the rainbow block sitting above it. */
+  const PLATFORM_TOP = findGroundY(REF.map, RB.x - 1);
+  const START_X = RB.x * TILE;
+  const START_Y = PLATFORM_TOP - REF.player.h;
+  const JUMP_FRAME = 5;
+  /**
+   * Long enough to matter: the bump lands on frame 6, the world is then frozen for 120
+   * frames, and 200 leaves ~70 frames on the far side — the player falls back to the
+   * platform and lands, the camera finishes its lerp and settles, the enemies walk on
+   * and two more stream in. A window that stopped inside the freeze would prove almost
+   * nothing, since a frozen world matching a frozen world is trivially true.
+   */
+  const FRAMES = 200;
+  const script = (f: number) => ({ left: false, right: false, jump: f >= JUMP_FRAME });
+
+  interface Powerups {
+    fartTimer: number; bigHeadTimer: number; chickenRayCharges: number; hasBow: boolean;
+  }
+
+  it('grants a big head, freezes the whole world for 120 frames, and lets it go again', () => {
+    const livePowerups: Powerups[] = [];
+    const liveTile: number[] = [];
+    const live = driveLiveGame({
+      level: 0, difficulty: 'normal', character: 'gigi',
+      frames: FRAMES, input: script,
+      beforeRun: (d) => {
+        const p = d.getPlayer();
+        p.x = START_X; p.y = START_Y; p.vx = 0; p.vy = 0; p.onGround = true;
+      },
+      onFrame: (d) => {
+        const p = d.getPlayer();
+        livePowerups.push({
+          fartTimer: p.fartTimer as number,
+          bigHeadTimer: p.bigHeadTimer as number,
+          chickenRayCharges: p.chickenRayCharges as number,
+          hasBow: p.hasBow as boolean,
+        });
+        liveTile.push(d.getMap()[RB.y][RB.x]);
+      },
+    });
+
+    setRandom(() => 0.5); // the live driver's own stubbed Math.random
+    const world = createWorld(0, 'normal', 'gigi');
+    world.player.x = START_X;
+    world.player.y = START_Y;
+    world.player.onGround = true;
+    expect(world.map[RB.y][RB.x]).toBe(TILE_RAINBOW); // sanity: aiming at a real one
+
+    const port: typeof live = [];
+    const portPowerups: Powerups[] = [];
+    const portTile: number[] = [];
+    const portPopup: Array<{ type: string; timer: number; maxTimer: number } | null> = [];
+    let prevJump = false;
+    for (let f = 0; f < FRAMES; f++) {
+      const h = script(f);
+      stepWorld(world, { ...h, jumpPressed: h.jump && !prevJump });
+      prevJump = h.jump;
+      const p = world.player;
+      port.push(sampleWorld(world));
+      portPowerups.push({
+        fartTimer: p.fartTimer, bigHeadTimer: p.bigHeadTimer,
+        chickenRayCharges: p.chickenRayCharges, hasBow: p.hasBow,
+      });
+      portTile.push(world.map[RB.y][RB.x]);
+      portPopup.push(world.powerupPopup === null ? null : { ...world.powerupPopup });
+    }
+
+    // Player, camera, animFrame, score AND every enemy, frame for frame — through the
+    // freeze and out the other side. Enemy `vy` alone is projected away; see
+    // stripEnemyVy above for why bat@48 makes that necessary here.
+    expect(port.map(stripEnemyVy)).toEqual(live.map(stripEnemyVy));
+    expect(portPowerups).toEqual(livePowerups);
+    expect(portTile).toEqual(liveTile);
+
+    // The bump must actually happen, or everything below compares two idle runs.
+    const bump = portPopup.findIndex((p) => p !== null);
+    expect(bump).toBeGreaterThan(JUMP_FRAME); // on the rise, not on the standing frames
+    // Tile 5 becomes tile 2, exactly like the question block's 3 does, and the block is
+    // marked hit so a second bump pays nothing.
+    expect(portTile.slice(0, bump)).toEqual(Array(bump).fill(TILE_RAINBOW));
+    expect(portTile.slice(bump)).toEqual(Array(FRAMES - bump).fill(TILE_BRICK));
+    expect(world.rainbowBlocks).toEqual([{ ...RB, hit: true }]);
+
+    // `bighead` SPECIFICALLY. Both sides' Math.random is a constant 0.5 and
+    // Math.floor(0.5 * 3) is 1, which indexes ['fart','bighead','chicken'] — so the one
+    // branch the real trigger can reach is the middle one, on both sides. The other two
+    // are pinned by injection in player.test.ts.
+    expect(portPopup[bump]).toEqual({ type: 'bighead', timer: 120, maxTimer: 120 });
+    // 1199, not 1200: the grant happens inside the Y sweep, and the same frame's own
+    // power-up countdown (index.html:1433) runs further down the SAME player block and
+    // immediately spends one. The live side agrees — that is the `toEqual` above.
+    expect(portPowerups[bump].bigHeadTimer).toBe(1199);
+    expect(portPowerups[bump - 1].bigHeadTimer).toBe(0);
+    // ...and nothing else was granted. A fart or a chicken ray here would mean the draw
+    // landed on the wrong branch.
+    expect(portPowerups.every((s) => s.fartTimer === 0)).toBe(true);
+    expect(portPowerups.every((s) => s.chickenRayCharges === 0)).toBe(true);
+    expect(portPowerups.every((s) => !s.hasBow)).toBe(true);
+
+    // The freeze (index.html:1276). It starts on the frame AFTER the bump — the bump
+    // happens mid-update, below that gate — and runs for exactly 120 frames, the last of
+    // which is also the one that clears the popup.
+    const FREEZE = 120;
+    const frozen = port[bump];
+    expect(frozen.enemies.length).toBeGreaterThan(0); // "nothing moves" needs movers
+    for (let f = bump + 1; f <= bump + FREEZE; f++) {
+      expect(port[f].x).toBe(frozen.x);
+      expect(port[f].y).toBe(frozen.y);
+      expect(port[f].vy).toBe(frozen.vy);
+      expect(port[f].camera).toEqual(frozen.camera);
+      expect(port[f].enemies).toEqual(frozen.enemies);
+      // The timers do not burn while the world is stopped either: the gate returns
+      // above the player block that decrements them.
+      expect(portPowerups[f].bigHeadTimer).toBe(1199);
+      // ...but animFrame does keep counting, which is why the drawn scene behind the
+      // popup still animates. It is incremented ABOVE the gate.
+      expect(port[f].animFrame).toBe(frozen.animFrame + (f - bump));
+    }
+    expect(portPopup[bump + FREEZE - 1]).toEqual({ type: 'bighead', timer: 1, maxTimer: 120 });
+    expect(portPopup[bump + FREEZE]).toBeNull();
+
+    // ...and the world starts again on the very next frame. Not "eventually": the
+    // player resumes falling, the camera resumes lerping and the big head resumes
+    // burning down, all on frame bump+121.
+    const after = port[bump + FREEZE + 1];
+    expect(after.y).toBeGreaterThan(frozen.y);
+    expect(after.camera.x).toBeGreaterThan(frozen.camera.x);
+    expect(portPowerups[bump + FREEZE + 1].bigHeadTimer).toBe(1198);
+    // It keeps going for the whole tail, rather than ticking once and stopping: every
+    // frame after the freeze is one more off the timer.
+    expect(portPowerups[FRAMES - 1].bigHeadTimer)
+      .toBe(1199 - (FRAMES - 1 - (bump + FREEZE)));
+    // And the player really does land back on the platform it jumped from.
+    expect(port.slice(bump + FREEZE + 1).some((s) => s.onGround)).toBe(true);
+    expect(port[FRAMES - 1].y).toBe(START_Y);
+    expect(world.dead).toBe(false);
   });
 });

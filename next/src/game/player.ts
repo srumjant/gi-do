@@ -1,5 +1,5 @@
 import { GRAVITY, TILE } from '../config/constants';
-import type { Level } from '../data/levels';
+import { TILE_BRICK, type Level } from '../data/levels';
 import { GIGI_SKINS, DODO_SKINS } from '../data/sprites';
 import type { InputState } from '../input/actions';
 import { random } from './random';
@@ -68,8 +68,8 @@ export function createPlayer(level: Level, character: Character): PlayerState {
  * picked uniformly at random, plus the announcement that freezes the whole game while
  * it shows.
  *
- * NOTHING CALLS THIS YET. The rainbow block bump that does is the next task; this is
- * the payout on its own, built and covered so that task only has to wire the trigger.
+ * Its one caller is `bumpBlocksAbove` below — a rainbow block (tile 5) taken from
+ * underneath. Nothing else grants a silly power-up.
  *
  * Three things about the draw and the branches are worth stating out loud:
  *
@@ -103,16 +103,79 @@ export function giveRandomSillyPowerup(world: World): void {
 }
 
 /**
+ * Port of index.html:1418-1420 — what a head-first collision does to the two blocks it
+ * could have landed on. Called from the head-hit branch of the Y sweep below, AFTER
+ * that branch has already snapped `p.y` and zeroed `p.vy`.
+ *
+ * `hY` is the head's position BEFORE that snap, and it is what `hy` is floored from.
+ * The snap moves the player down to the bottom edge of the tile that was hit, so
+ * flooring the snapped `p.y` instead would name the tile row BELOW the block and the
+ * lookup would miss. Same for `pL2`/`pR2`: the live source computes them once for the
+ * whole Y sweep and reuses them here, and they are unaffected by the snap (which only
+ * touches `y`), so passing them in rather than recomputing from `p.x` is the same
+ * thing, just explicit.
+ *
+ * Two columns and two lists, four sweeps in total, in exactly this order:
+ *
+ *   - BOTH columns are probed, not just one. `h1` and `h2` are the tile columns of the
+ *     player's two Y-sweep probes — 10px apart for a 16px hitbox, so they name two
+ *     different columns whenever the player straddles a tile boundary, which is most of
+ *     the time. Two blocks side by side in the same row would therefore BOTH pop off
+ *     one jump. When `h1 === h2` the second pass finds nothing anyway, because `!q.hit`
+ *     was already flipped by the first. (Level 1 has no two blocks adjacent in a row,
+ *     so nothing there can actually show the double pop.)
+ *   - The two LISTS are swept separately, question blocks first. A `?` and a rainbow in
+ *     adjacent columns both fire, and the star is created before the power-up freezes
+ *     the world. Collapsing them into a single pass over both lists would reverse that
+ *     for the column-2 rainbow / column-1 question case.
+ *
+ * Both tile codes are replaced with 2 (brick). 3 and 5 are already solid — so is 2 —
+ * which makes the map edit invisible to collision and total to the block lists: the
+ * `hit` flag is what stops a second bump, and the tile code is what stops it LOOKING
+ * like a prize. Both are rebuilt from a freshly generated map by `respawnLevel`
+ * (world.ts), so dying restores every block bumped before the death.
+ *
+ * The live source's `spawnParticles(...)` and `sfxBlock()` are presentation and sound,
+ * which src/game/ does not own.
+ */
+function bumpBlocksAbove(world: World, pL2: number, pR2: number, hY: number): void {
+  const h1 = Math.floor(pL2 / TILE);
+  const h2 = Math.floor(pR2 / TILE);
+  const hy = Math.floor(hY / TILE);
+
+  for (const hx of [h1, h2]) {
+    const qb = world.questionBlocks.find((q) => q.x === hx && q.y === hy && !q.hit);
+    if (qb) {
+      qb.hit = true;
+      world.map[qb.y][qb.x] = TILE_BRICK;
+      // One tile ABOVE the block, not at it — `qb.y*TILE - TILE` — and rising at -2,
+      // which world.ts's stepStars then ramps toward zero and leaves hanging there.
+      world.stars.push({ x: qb.x * TILE, y: qb.y * TILE - TILE, vy: -2, collected: false });
+    }
+  }
+  for (const hx of [h1, h2]) {
+    const rb = world.rainbowBlocks.find((q) => q.x === hx && q.y === hy && !q.hit);
+    if (rb) {
+      rb.hit = true;
+      world.map[rb.y][rb.x] = TILE_BRICK;
+      // Not a quiet state change: this freezes the entire game for 120 frames. See
+      // giveRandomSillyPowerup above and the gate at the top of stepWorld.
+      giveRandomSillyPowerup(world);
+    }
+  }
+}
+
+/**
  * Port of index.html:1361-1423. Mutates `world.player` (and `world.dead`) in place, in
  * exactly the source's order — every step here is load-bearing; see the comments below
  * and the task notes on the jump buffer, apex hang, and the two collision insets.
  *
  * Out of scope, and simply absent below: shooting, landing dust particles, the fart
- * trail's own particles, question/rainbow block bumps, the cape branch of pit death,
- * sound, and score. Enemy collision is simulated (enemy.ts's stepEnemy), but calls into
- * this file's `playerHit` rather than living here — there is no enemy-collision branch in
- * THIS function because the live game's own equivalent isn't in `update`'s player
- * block either; it is in the enemies loop, ported alongside the enemies themselves.
+ * trail's own particles, the cape branch of pit death, sound, and score. Enemy collision
+ * is simulated (enemy.ts's stepEnemy), but calls into this file's `playerHit` rather
+ * than living here — there is no enemy-collision branch in THIS function because the
+ * live game's own equivalent isn't in `update`'s player block either; it is in the
+ * enemies loop, ported alongside the enemies themselves.
  */
 export function stepPlayer(world: World, input: InputState): void {
   // index.html:1348 — the live update() checks its dead-state branch, and returns,
@@ -226,6 +289,9 @@ export function stepPlayer(world: World, input: InputState): void {
     if (isSolid(getTile(world.map, pL2, hY)) || isSolid(getTile(world.map, pR2, hY))) {
       p.y = Math.floor(hY / TILE) * TILE + TILE;
       p.vy = 0;
+      // index.html:1418-1420, inside this same branch and after this same snap — the
+      // pre-snap `hY` is passed on deliberately; see bumpBlocksAbove.
+      bumpBlocksAbove(world, pL2, pR2, hY);
     }
   }
 

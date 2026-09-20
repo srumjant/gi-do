@@ -116,8 +116,10 @@ export interface PowerupPopup {
 /**
  * A question (tile 3) or rainbow (tile 5) block, in TILE coordinates — NOT pixels.
  * Both lists are re-derived from the map by scanning it at level build (index.html:1189),
- * which is what makes a respawn restore every block that was bumped. Bumping them is a
- * later task in this plan; this slice only builds the lists.
+ * which is what makes a respawn restore every block that was bumped. `hit` is what stops
+ * a second bump paying out (player.ts's bumpBlocksAbove); the map cell itself is
+ * rewritten to 2 at the same time, which is a cosmetic change only — 2, 3 and 5 are all
+ * solid, so collision never notices.
  */
 export interface BlockState {
   x: number;
@@ -292,10 +294,9 @@ export interface World {
    */
   catPickup: Pickup | null;
   /**
-   * index.html:1188. Empty at level build and stays empty in this slice: stars are
-   * created by bumping a question block from below, which is a later task. The
-   * movement and collection of one are ported here (world.ts's stepStars) because
-   * that is where the live game runs them.
+   * index.html:1188. Empty at level build; filled by bumping a question block from
+   * below (player.ts's bumpBlocksAbove), one star per block, one tile ABOVE the block
+   * that paid out. Stepped and collected by world.ts's stepStars.
    */
   stars: Star[];
   /** index.html:1189-1190. Scanned off the freshly generated map, in tile coordinates. */
@@ -308,9 +309,9 @@ export interface World {
    * PowerupPopup above, and the gate at the top of stepWorld. Cleared by `initLevel`
    * (index.html:1188), so respawnLevel clears it too.
    *
-   * Nothing sets it yet: `giveRandomSillyPowerup` is the only writer and the rainbow
-   * block that calls it is the next task. The freeze is therefore unreachable in play
-   * today and cannot affect any existing trace.
+   * `giveRandomSillyPowerup` (player.ts) is its only writer, and a rainbow block taken
+   * from underneath is that function's only caller — so this is the one and only thing
+   * in the game that can stop the world.
    */
   powerupPopup: PowerupPopup | null;
 }
