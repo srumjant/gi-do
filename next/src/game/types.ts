@@ -61,10 +61,14 @@ export interface World {
    */
   animFrame: number;
   /**
-   * Set once the player has fallen into a pit (index.html's `playerDie` -> `gameState
-   * = 'dead'`). The live `update()` checks its own dead-state branch before it ever
-   * reaches player movement, so once true, nothing about the player moves again this
-   * run. `stepPlayer` reproduces that by returning immediately when this is set.
+   * Set by `playerDie` on any death — a pit fall or, now, enemy contact
+   * (index.html's `playerDie` -> `gameState = 'dead'`). The live `update()` checks
+   * its own dead-state branch before it ever reaches player movement, so once true,
+   * nothing about the player, the enemies or the camera moves again THAT FRAME
+   * (mid-frame contact deaths are the one exception — see enemy.ts's stepEnemy).
+   * `stepPlayer` reproduces the freeze by returning immediately when this is set.
+   * Not permanent: `stepWorld`'s dead branch counts `stateTimer` down and, with
+   * `lives` left, clears this back to `false` via `respawnLevel`.
    */
   dead: boolean;
   /**
@@ -76,6 +80,37 @@ export interface World {
   camera: { x: number; y: number };
   /** Enemy definitions not yet streamed in. Drained by the spawn window each step. */
   pending: PendingEnemy[];
+  /**
+   * Remaining lives, seeded from `dc.lives` (createWorld) and decremented by
+   * `playerDie` on every death — pit or contact alike (index.html:1647's `lives--`).
+   * A plain `number`, not an integer count: `dc.lives` is `Infinity` on super_easy
+   * (difficulty.ts), and `Infinity - 1 === Infinity` in IEEE-754, so infinite lives
+   * really do stay infinite under repeated decrement. That is the live game's own
+   * untyped behaviour, reproduced deliberately, not a bug to fix.
+   */
+  lives: number;
+  /**
+   * Counts down from 90 while `dead` (index.html:1348's `stateTimer--`), independent
+   * of `frame`/`animFrame`. Only meaningful while `dead` is true; `stepWorld`'s dead
+   * branch is the sole reader.
+   */
+  stateTimer: number;
+  /**
+   * Set once `stateTimer` runs out with no lives left (index.html:1348's
+   * `else{gameState='gameover';...}`). This slice has no game-over SCREEN — no title
+   * transition, no further countdown, nothing a child would ever see — so this is
+   * simply a terminal marker: once true, `stepWorld`'s dead branch returns
+   * immediately every frame after, freezing the world forever, same as a bare `dead`
+   * alone did before respawn existed.
+   */
+  gameOver: boolean;
+  /**
+   * Which character's sprite sizes the player (createPlayer's `character` argument),
+   * kept so a respawn can rebuild an equivalent player without the caller supplying
+   * it again — the live game reads the same thing off its own `selectedChar` global,
+   * which a respawn's `initLevel` call never touches either.
+   */
+  character: 'gigi' | 'dodo';
 }
 
 export interface PendingEnemy {

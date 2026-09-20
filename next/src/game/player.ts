@@ -50,8 +50,10 @@ export function createPlayer(level: Level, character: Character): PlayerState {
  *
  * Out of scope, and simply absent below: shooting, fart/big-head power-ups, landing
  * dust particles, question/rainbow block bumps, the cape branch of pit death, sound,
- * and score. Enemies are not simulated at all (no enemy stepping exists yet), so there
- * is no enemy-collision branch to reproduce here either.
+ * and score. Enemy collision is simulated (enemy.ts's stepEnemy), but calls into this
+ * file's `playerHit` rather than living here — there is no enemy-collision branch in
+ * THIS function because the live game's own equivalent isn't in `update`'s player
+ * block either; it is in the enemies loop, ported alongside the enemies themselves.
  */
 export function stepPlayer(world: World, input: InputState): void {
   // index.html:1348 — the live update() checks its dead-state branch, and returns,
@@ -169,14 +171,15 @@ export function stepPlayer(world: World, input: InputState): void {
   // Left clamp only — there is no right-hand bound (index.html:1412).
   if (p.x < 0) p.x = 0;
 
-  // Pit death (index.html:1413). The cape-saves-the-pit branch is out of scope, so
-  // every pit fall here is fatal. Setting world.dead is what makes the next call (and
-  // every call after that) return at the top, freezing the player where it fell. The
-  // live source's own `return` right after this (index.html:1413) skips its walk-cycle
-  // block below on the death frame itself — reproduced here the same way, rather than
-  // letting the animation update once more on the frame the player dies.
+  // Pit death (index.html:1413, 1423). The cape-saves-the-pit branch is out of scope,
+  // so every pit fall here takes the live `else{playerDie();}` path. Setting
+  // world.dead (inside playerDie) is what makes the next call (and every call after
+  // that, until a respawn clears it) return at the top, freezing the player where it
+  // fell. The live source's own `return` right after this (index.html:1423) skips its
+  // walk-cycle block below on the death frame itself — reproduced here the same way,
+  // rather than letting the animation update once more on the frame the player dies.
   if (p.y > level.height * TILE + 32) {
-    world.dead = true;
+    playerDie(world);
     return;
   }
 
@@ -195,4 +198,29 @@ export function stepPlayer(world: World, input: InputState): void {
   } else {
     p.frame = 0;
   }
+}
+
+/**
+ * Port of index.html:1646. The live function's first branch spends the cape for a
+ * bounce plus temporary invincibility; there is no cape in this slice (`PlayerState`
+ * has no `hasCape`/`invincible` field, and none is added here — invincibility frames
+ * arrive with the cape, in a later plan), so every call here falls straight through
+ * to the live function's only remaining path. When the cape does arrive, its branch
+ * belongs in front of the call below, exactly where the live function has it.
+ */
+export function playerHit(world: World): void {
+  playerDie(world);
+}
+
+/**
+ * Port of index.html:1647. Decrements `lives` — an ordinary `number` field that is
+ * `Infinity` on super_easy (difficulty.ts), so this can leave it `Infinity`, exactly
+ * like the live game's own untyped `lives--`; that is not a bug to fix. Freezes the
+ * world (`dead`) and opens the 90-frame respawn countdown that `stepWorld`'s dead
+ * branch counts down and, eventually, acts on.
+ */
+export function playerDie(world: World): void {
+  world.lives--;
+  world.dead = true;
+  world.stateTimer = 90;
 }

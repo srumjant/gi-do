@@ -63,12 +63,15 @@ export interface DriveOptions {
   mutateMap?: (map: number[][]) => void;
   /**
    * Empties `enemies` and `pendingEnemies` right after `initLevel`, so no enemy ever
-   * spawns for the rest of the run. Contact damage (`playerHit`) is deliberately out
-   * of the slice, so without this, level 0's doll@15 kills the player by contact —
-   * running right at the speed cap collides at frame 59, and even standing perfectly
-   * still it still reaches the player by frame 240 — well inside any player-focused
-   * trace window. Every player-focused script drives with this on; enemies are
-   * compared separately, with this left off.
+   * spawns for the rest of the run. Needed while contact damage (`playerHit`) was out
+   * of the slice — without it, level 0's doll@15 killed the player by contact (frame
+   * 60 running right, frame ~240 standing still — both measured), well inside any
+   * player-focused trace window. Contact damage is implemented now (player.ts,
+   * enemy.ts), and trace.test.ts's player-focused scripts have moved on to driving
+   * WITH enemies live — dying there deliberately, in several cases — rather than
+   * suppressing them, so nothing currently passes `true` here. Left in place as a
+   * still-functional escape hatch for a future test that wants a player-only trace
+   * genuinely isolated from enemy interference, not as a sign anything still needs it.
    */
   suppressEnemies?: boolean;
 }

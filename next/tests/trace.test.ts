@@ -6,13 +6,20 @@
 // same order; if they ever differ, the arithmetic differs, and that is a finding to
 // fix or explain, not to paper over with a tolerance.
 //
-// Every script here is player-focused and runs with enemies suppressed on both
-// sides (see the note on Level 0's doll@15 in inputScript.ts and in liveGame.ts's
-// `suppressEnemies` option) — contact damage is deliberately out of the slice, so an
-// enemy touching the player would make the two sides diverge for a reason that has
-// nothing to do with the physics under test. The enemy trace at the bottom of this
-// file is the deliberate exception: enemies enabled, comparing enemy state instead of
-// (or alongside) the player's.
+// Every script here is player-focused and runs with enemies LIVE on both sides — see
+// the note on Level 0's doll@15 in inputScript.ts and in liveGame.ts's
+// `suppressEnemies` option for why that used to not be true: contact damage was out
+// of scope, so an enemy touching the player would make the two sides diverge for a
+// reason that had nothing to do with the physics under test. Now that contact damage
+// is implemented (player.ts's playerHit/playerDie, enemy.ts's stepEnemy), running with
+// enemies live is the point — several of these scripts now walk right into doll@15 and
+// die, and matching through that death (and, for three of them, all the way through
+// the 90-frame respawn) is exactly what this suite exists to prove. No frame count
+// below was shortened to dodge the doll: every script that still never dies (see
+// EXPECT_DEATH) already stayed clear on its own existing budget; every one that now
+// dies was simply left at its original length rather than trimmed, since either it
+// stays frozen well short of respawn or it crosses respawn and still matches — see
+// each affected script's own comment in inputScript.ts for which, and why.
 import { describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
 import { SCRIPTS, STOMP_SCRIPT } from './helpers/inputScript';
@@ -20,25 +27,26 @@ import { createWorld, stepWorld } from '../src/game/world';
 import { LEVELS } from '../src/data/levels';
 
 /**
- * Scripts whose player is expected to die (a real pit death, per inputScript.ts's
- * comments) within their own frame window. Every other script must never die — if
- * one does, that is either a bug or a script whose frame count silently grew past a
- * hazard, and either way `toEqual` below would already have caught the actual
- * divergence; this just makes the expectation explicit instead of implicit.
+ * Scripts whose player is expected to die within their own frame window — a pit fall
+ * or, now that contact damage exists, doll@15 catching up with a script that runs (or
+ * stays) too close to it for too long. See each script's own comment in
+ * inputScript.ts for which and why. Every other script must never die — if one does,
+ * that is either a bug or a script whose frame count silently grew past a hazard, and
+ * either way `toEqual` below would already have caught the actual divergence; this
+ * just makes the expectation explicit instead of implicit.
  */
-const EXPECT_DEATH = new Set(['walkOffLedge']);
+const EXPECT_DEATH = new Set([
+  'walkOffLedge', 'runningJump', 'coyoteJump', 'coyoteJumpLatest', 'walkCycle',
+]);
 
 describe.each(Object.entries(SCRIPTS))('%s matches the live game', (name, script) => {
   it('agrees with the live game on every frame — player, camera, and enemies', () => {
     const live = driveLiveGame({
       level: 0, difficulty: 'normal', character: 'gigi',
       frames: script.frames, input: script.input,
-      suppressEnemies: true,
     });
 
     const world = createWorld(0, 'normal');
-    world.pending.length = 0;
-    world.enemies.length = 0;
 
     const port: typeof live = [];
     const deadEachFrame: boolean[] = [];
@@ -65,17 +73,27 @@ describe.each(Object.entries(SCRIPTS))('%s matches the live game', (name, script
 
     expect(port).toEqual(live);
 
-    // "Bound the pit, don't hope it stays clear": a script that dies runs the risk of
-    // the live game respawning (90 frames after death) while the port stays frozen —
-    // a scope boundary (respawn is a later plan), not a physics bug. The equality
-    // check above would already fail if that boundary were crossed, but asserting it
-    // directly means a future change that shifts the death frame fails LOUDLY on
-    // this line, pointing straight at the bound, rather than as a generic mismatch
-    // deep in a 100+ line diff.
+    // Death is now either bounded (the script's window ends while still frozen,
+    // never reaching the 90-frame respawn) or it deliberately crosses the respawn —
+    // and in both cases this asserts the shape directly rather than trusting the
+    // blanket `toEqual` above to have caught a boundary drifting: a future change
+    // that shifts the death or respawn frame fails LOUDLY on the line below, pointing
+    // straight at the bound, instead of as a generic mismatch deep in a 100+ line diff.
     const deathFrame = deadEachFrame.indexOf(true);
     if (EXPECT_DEATH.has(name)) {
-      expect(deathFrame).toBeGreaterThanOrEqual(0); // must actually die, or the bound below proves nothing
-      expect(script.frames - deathFrame).toBeLessThan(90);
+      expect(deathFrame).toBeGreaterThanOrEqual(0); // must actually die, or the checks below prove nothing
+      const respawnFrame = deadEachFrame.indexOf(false, deathFrame + 1);
+      if (respawnFrame === -1) {
+        // "Bound the pit, don't hope it stays clear": never reaches its own respawn,
+        // so it must stay frozen (dead) for the rest of its window.
+        expect(script.frames - deathFrame).toBeLessThan(90);
+      } else {
+        // Crosses the full respawn cycle — the `toEqual` above already proved this
+        // matches the live game frame for frame, through the freeze AND the rebuild;
+        // this pins the exact mechanic (a respawn is exactly 90 frames after death,
+        // no more, no less) so THAT claim fails loudly on its own if it ever drifts.
+        expect(respawnFrame).toBe(deathFrame + 90);
+      }
     } else {
       expect(deathFrame).toBe(-1);
     }

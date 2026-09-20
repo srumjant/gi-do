@@ -171,9 +171,11 @@ describe('stepEnemy', () => {
       stepEnemy(world, enemy);
 
       expect(enemy.alive).toBe(true);
-      // Side/rising contact does nothing yet (no playerHit in this slice) — vy is
-      // simply untouched by stepEnemy.
+      // Side/rising contact now calls playerHit (death, no cape in this slice) — but
+      // playerDie only touches world.dead/lives/stateTimer, never player.vy, so vy
+      // stays exactly what it was going in.
       expect(world.player.vy).toBe(-3);
+      expect(world.dead).toBe(true);
       expect(enemy.squashTimer).toBe(0); // never stomped, so never started counting down
     });
 

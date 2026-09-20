@@ -2,6 +2,7 @@ import { ENEMY_SCALE, GRAVITY, TILE } from '../config/constants';
 import type { DifficultyRecord } from '../config/difficulty';
 import type { EnemyDef, TileMap } from '../data/levels';
 import { CAR_S, DINO_S, DOLL_S, PENGUIN_S, type SpriteData } from '../data/sprites';
+import { playerHit } from './player';
 import { findGroundY, getTile, isSolid, rectOverlap } from './tiles';
 import type { EnemyState, World } from './types';
 
@@ -55,13 +56,15 @@ export function spawnEnemy(
 
 /**
  * Port of the per-enemy step at index.html:1524-1547, restricted to what "In scope"
- * covers: gravity + floor snap, ground patrol (wall turn, ledge turn), and the stomp.
- * No per-type AI branch is needed here — doll/car/dino/penguin all fall through to the
+ * covers: gravity + floor snap, ground patrol (wall turn, ledge turn), the stomp, and
+ * side/rising contact (playerHit — death, since there is no cape in this slice). No
+ * per-type AI branch is needed here — doll/car/dino/penguin all fall through to the
  * source's trailing `else` (the plain ground-patrol case); ghost/bat/cannon/bouncer
  * never reach this function because `spawnEnemy` above never creates them.
  *
- * Mutates `enemy` in place, and `world.player.vy` on a kill — exactly like `stepPlayer`
- * mutates `world.player`.
+ * Mutates `enemy` in place, `world.player.vy` on a kill, and `world` itself (`dead`,
+ * `lives`, `stateTimer`, via playerHit) on a hit — exactly like `stepPlayer` mutates
+ * `world.player` and `world.dead`.
  */
 export function stepEnemy(world: World, e: EnemyState): void {
   // index.html:1525 — the squash countdown runs even for a dead enemy (set to 30, or
@@ -130,9 +133,18 @@ export function stepEnemy(world: World, e: EnemyState): void {
       e.alive = false;
       e.squashTimer = 30; // index.html:1545. Big-head's 45 (:1546) is out of scope.
       p.vy = -5;
+    } else {
+      // Side or rising contact (index.html:1547's `else{playerHit();return;}`). No
+      // cape in this slice, so this goes straight to death — see player.ts's
+      // playerHit/playerDie. The live `return` only exits THIS enemy's own
+      // `enemies.forEach` callback (there is nothing left in it anyway); it does not
+      // stop the live forEach from stepping the rest of `enemies`, nor the camera
+      // lerp after it, on the same frame — both already happen unconditionally here
+      // too, since neither stepEnemies' loop nor stepCamera's call in world.ts checks
+      // world.dead mid-frame. Only the NEXT frame's top-of-stepWorld check freezes
+      // everything. Mirrored exactly: no early return is added to stepEnemies below.
+      playerHit(world);
+      return;
     }
-    // else: side or rising contact. playerHit() (damage/death) is out of scope for this
-    // task — a half-implemented player death would be worse than none — so contact
-    // that is not a stomp does nothing yet.
   }
 }

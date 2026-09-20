@@ -3,16 +3,28 @@
 // 'normal' difficulty, 'gigi' — the same combination trace.test.ts drives against the
 // live game.
 //
-// Every script here is a PLAYER-focused trace and is meant to be run with enemies
-// suppressed (`suppressEnemies: true` on the live side, `world.pending`/`world.enemies`
-// cleared on the port side — see trace.test.ts). Level 0's doll@15 only turns around at
-// a wall or a ledge, and there is neither between the map's left edge and the first gap
+// Every script here is a PLAYER-focused trace, and trace.test.ts now drives every one
+// of them with enemies LIVE on both sides. Level 0's doll@15 only turns around at a
+// wall or a ledge, and there is neither between the map's left edge and the first gap
 // at tile 20, so it patrols that ENTIRE stretch — it is not avoidable by picking a
-// script that "stays clear" of it. Contact damage (`playerHit`) is deliberately out of
-// the slice, so without suppression the live game dies there (frame 59 running right,
-// frame 240 standing still — both inside any of these windows) while the port walks
-// through it untouched, and every frame after that would be comparing a scope boundary
-// instead of the physics under test.
+// script that "stays clear" of it: any script that runs right for long enough, or
+// idles long enough for the doll to wander back, dies by contact (frame 60 running
+// right, frame ~240 standing still — both measured). That used to be a scope problem
+// (contact damage did not exist) and every script below suppressed enemies to dodge
+// it; now that player.ts's playerHit/playerDie and enemy.ts's stepEnemy implement it,
+// dying there is real, correct behaviour, not a boundary to avoid — see trace.test.ts's
+// EXPECT_DEATH and each affected script's own comment below for how each one now
+// either stays clear, dies and stays frozen, or dies and matches through a full
+// respawn.
+//
+// referenceWorld() just below, in contrast, DOES still suppress enemies — deliberately
+// and permanently, not a leftover: its only job is deriving pure-physics frame timings
+// (when a jump lands, when a ledge disappears underfoot), and it would beg its own
+// question if a script's derived timing could shift depending on where a doll happens
+// to be standing. Enemy contact killing the player before a derivation even finishes
+// is exactly the kind of interference that has nothing to do with what these helpers
+// measure, so it stays isolated from enemies regardless of what the scripts built from
+// it go on to face against the live game.
 //
 // Two kinds of geometry are derived here rather than hardcoded, once, at module load:
 //  - TILE POSITIONS, by scanning the actual generated map (none needed direct scanning
@@ -42,7 +54,11 @@ function hold(overrides: Partial<FrameInput>): FrameInput {
   return { left: false, right: false, jump: false, ...overrides };
 }
 
-/** A fresh world, enemies suppressed exactly as trace.test.ts sets one up for a player-focused run. */
+/**
+ * A fresh world with enemies suppressed — deliberately, for THIS helper's own
+ * derivation purposes only (see the module comment above). trace.test.ts no longer
+ * suppresses enemies for the scripts these derivations feed.
+ */
 function referenceWorld(): World {
   const world = createWorld(LEVEL, DIFFICULTY, CHARACTER);
   world.pending.length = 0;
@@ -223,20 +239,34 @@ export const SCRIPTS: Record<string, InputScript> = {
 
   /** Horizontal carry through a jump arc: waits for vx to actually reach the speed
    * cap while grounded, then jumps holding right, landing back on the base ground
-   * (not a platform — that is landOnPlatform's job) well before any gap. */
+   * (not a platform — that is landOnPlatform's job) well before any gap. The arc
+   * itself is long done (lands well under frame 60) by the time doll@15 — patrolling
+   * into the oncoming player now that contact damage exists — catches up and kills it
+   * at frame 60 (measured); left long rather than bounded, since 70 frames leaves it
+   * frozen for only 10 (comfortably inside the 90-frame respawn window) and the death
+   * arrives strictly after the behaviour this script exists to test. */
   runningJump: {
     input: (f) => hold({ right: true, jump: f >= SPEED_CAP_FRAME + 1 }),
     frames: 70,
   },
 
   /**
-   * Falling off the real gap at tile 20, running right the whole way, through to a
-   * real pit death and its freeze. Bounded, not hoped: dies at frame 136 (measured),
-   * so 160 frames leaves it frozen for 24 frames — comfortably inside the live game's
-   * 90-frame respawn window (which would otherwise reset the live player back to the
-   * level start while the port stays frozen, diverging for a reason that has nothing
-   * to do with the physics under test). trace.test.ts asserts this bound directly
-   * from the trace rather than trusting this comment.
+   * Originally: falling off the real gap at tile 20, running right the whole way,
+   * through to a real pit death and its freeze. That gap is 320px from spawn — far
+   * past where doll@15, patrolling into the oncoming player now that contact damage
+   * exists, kills it by contact at frame 60 (measured) instead, well short of the
+   * pit. There is no frame count that reaches the real gap without meeting the doll
+   * first: it patrols the entire stretch (see the module comment above), so a real
+   * pit death against this level's unmodified map is no longer reachable by any
+   * "hold right" script once enemies are live (world.test.ts's carved-gap tests cover
+   * pit death in isolation instead, right next to spawn, well short of the doll).
+   *
+   * Left long rather than bounded, on purpose: 160 frames runs 100 past the death,
+   * which crosses the live game's 90-frame respawn — and matches the live game
+   * exactly through the freeze AND the rebuild (trace.test.ts asserts the respawn
+   * lands at exactly deathFrame+90). That is the strongest evidence the respawn work
+   * is correct, so this script keeps its name and its frame count despite no longer
+   * reaching a pit.
    */
   walkOffLedge: {
     input: () => hold({ right: true }),
@@ -244,13 +274,21 @@ export const SCRIPTS: Record<string, InputScript> = {
   },
 
   /**
-   * Jump 3 frames after leaving the ledge at tile 20 — inside the 6-frame coyote
-   * window (coyoteTime reads 4 the instant this fires: comfortably not a boundary
-   * case, which is what player.test.ts's synthetic-map unit tests already cover in
-   * isolation). Clears the real 3-tile gap and lands on the real platform at columns
-   * 25-27 — so this doubles as a second, differently-timed downward-Y-onto-a-platform
-   * case alongside landOnPlatform, purely because that is what real level 0 geometry
-   * does here, not because it was arranged to.
+   * Originally: jump 3 frames after leaving the ledge at tile 20 — inside the
+   * 6-frame coyote window (coyoteTime reads 4 the instant this fires: comfortably
+   * not a boundary case, which is what player.test.ts's synthetic-map unit tests
+   * already cover in isolation) — clearing the real 3-tile gap to land on the real
+   * platform at columns 25-27.
+   *
+   * That ledge is at tile 20 (LEAVE_LEDGE_1_FRAME is ~116), far past where doll@15
+   * now kills the player by contact at frame 60 (measured), so this script no longer
+   * reaches the ledge, the gap, or the platform — the coyote-time behaviour it names
+   * is exercised only in isolation now (player.test.ts's coyote unit tests, against
+   * the port alone), not against the live game over real level-0 geometry. Left long
+   * anyway, at its original 170 frames: it dies at 60 and matches the live game
+   * exactly through the freeze AND the full 90-frame respawn (trace.test.ts asserts
+   * the respawn lands at exactly deathFrame+90) — real evidence, just of a different
+   * mechanic than the one this script was built to name.
    */
   coyoteJump: {
     input: (f) => hold({ right: true, jump: f >= LEAVE_LEDGE_1_FRAME + 3 }),
@@ -258,21 +296,22 @@ export const SCRIPTS: Record<string, InputScript> = {
   },
 
   /**
-   * The same jump on the LAST frame the coyote window still allows, which makes this
-   * the script that pins the window's width rather than merely using it.
+   * Originally: the same jump as coyoteJump, on the LAST frame the coyote window
+   * still allows (+5 instead of +3), pinning the window's width rather than merely
+   * using it.
    *
-   * The counter is set to 6 on each grounded frame and decremented once per airborne
-   * frame BEFORE the jump check reads it, so the first airborne frame sees 5 and the
-   * sixth sees 0 — meaning +5 is the last press that fires and +6 is the first that
-   * does not. coyoteJump above sits at +3, comfortably inside, so a window that
-   * silently narrowed by one frame would not change its outcome at all: mutating the 6
-   * to a 5 left the entire trace suite green. That is drift a child would feel as
-   * "jumping off edges got harder" while every comparison stayed passing, so the
-   * boundary gets its own script.
+   * Since doll@15 now kills the player by contact at frame 60 — long before either
+   * script's jump input (+3 or +5 frames after LEAVE_LEDGE_1_FRAME, ~116) is ever
+   * read — the one input difference between this script and coyoteJump falls
+   * entirely inside the window where both are already dead and frozen. The two are
+   * behaviourally identical once enemies are live: same death frame, same respawn at
+   * deathFrame+90, same final position. Kept at its original 170 frames anyway,
+   * as a second, independent confirmation that the respawn is exact and
+   * deterministic — not a coincidence of one particular script's timing.
    *
    * Note this is a different guarantee from player.test.ts's coyote unit tests, which
-   * compare the port against itself. This one compares it against the live game, so it
-   * also catches the window being retuned there.
+   * compare the port against itself. This one still compares against the live game —
+   * just no longer over the coyote-time boundary itself, for the reason above.
    */
   coyoteJumpLatest: {
     input: (f) => hold({ right: true, jump: f >= LEAVE_LEDGE_1_FRAME + 5 }),
@@ -293,8 +332,11 @@ export const SCRIPTS: Record<string, InputScript> = {
   /**
    * Downward Y resolution onto a raised tile: the real platform at columns 10-14, row
    * 19 (see PLATFORM_LANDING above for how the jump-start frame is found rather than
-   * assumed). Distinct from coyoteJump's platform landing — this one never leaves the
-   * ground on the near side of any gap.
+   * assumed). Originally distinct from coyoteJump's platform landing at columns
+   * 25-27 — this one never leaves the ground on the near side of any gap, which is
+   * exactly why it still reaches its platform: it sits well clear of doll@15's own
+   * patrol, unlike coyoteJump's landing beyond the gap, which the doll now preempts
+   * (see coyoteJump's comment above).
    */
   landOnPlatform: {
     input: (f) => hold({ right: true, jump: f >= PLATFORM_LANDING.jumpStartFrame }),
@@ -309,14 +351,25 @@ export const SCRIPTS: Record<string, InputScript> = {
    * enough for several walk-cycle toggles at the fastest rate, then releases and
    * decelerates all the way through the |vx|>0.3 threshold to a dead stop.
    *
-   * Confirmed empirically: walkSpeed — `max(4, round(12-|vx|*3))` — takes six distinct
-   * values across the run (10, 8, 7, 5 while accelerating up to and holding the cap;
-   * 7, 8, 9, 10, 11 again while decelerating back down — two of those, 9 and 11,
-   * appear ONLY during deceleration), and `frame` itself toggles 14 separate times.
-   * Never approaches the first gap (x tops out at 209, against a gap at 320) and never
-   * dies. Also confirmed to earn its place rather than just look busy: mutating the
-   * 0.3 threshold to 0.4, and separately the walk-cycle formula's 12 to 11, each turns
-   * this script (among others) red in trace.test.ts.
+   * Confirmed empirically (before enemies were live): walkSpeed —
+   * `max(4, round(12-|vx|*3))` — takes six distinct values across the full run (10, 8,
+   * 7, 5 while accelerating up to and holding the cap; 7, 8, 9, 10, 11 again while
+   * decelerating back down — two of those, 9 and 11, appear ONLY during deceleration),
+   * and `frame` itself toggles 14 separate times. Never approaches the first gap (x
+   * tops out at 209, against a gap at 320).
+   *
+   * That "never dies" no longer holds now that contact damage exists: doll@15 kills
+   * the player by contact at frame 67 (measured) — mid-ramp, while still holding
+   * right, well before WALK_CYCLE_RELEASE — so only the acceleration-phase walkSpeed
+   * values are demonstrated by this trace once enemies are live; the deceleration
+   * ones above never run. Left long anyway (150 frames dies at 67 and stays frozen
+   * for 83, comfortably inside the 90-frame respawn) rather than bounded, since the
+   * acceleration ramp and several walk-cycle toggles still play out first, and the
+   * death itself — interrupting an unrelated behaviour mid-frame — is exactly the
+   * kind of case this suite exists to catch if it ever stopped matching. Also
+   * confirmed to earn its place rather than just look busy: mutating the 0.3
+   * threshold to 0.4, and separately the walk-cycle formula's 12 to 11, each still
+   * turns this script (among others) red in trace.test.ts.
    */
   walkCycle: {
     input: (f) => hold({
