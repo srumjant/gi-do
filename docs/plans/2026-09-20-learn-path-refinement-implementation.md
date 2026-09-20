@@ -94,7 +94,9 @@ Insert immediately before `function gameLoop()` (~line 2767):
 // ==========================================
 //  SELF TESTS — open index.html?test=1
 // ==========================================
-const TEST_RESULTS={pass:0,fail:0};
+// `var`, not `const`: top-level const/let in a vm script never attach to the
+// context object, so scripts/run-tests.js could not read the results.
+var TEST_RESULTS={pass:0,fail:0};
 function tAssert(name,cond,detail){
   if(cond){TEST_RESULTS.pass++;console.log('[TEST] PASS  '+name);}
   else{TEST_RESULTS.fail++;console.error('[TEST] FAIL  '+name+(detail?'  — '+detail:''));}
@@ -250,8 +252,25 @@ if (typeof context.runSelfTests !== 'function') {
   console.error('Loaded OK, but runSelfTests() is not defined.');
   process.exit(3);
 }
-context.runSelfTests();
-const r = context.TEST_RESULTS || { pass: 0, fail: 1 };
+try {
+  context.runSelfTests();
+} catch (e) {
+  // A ReferenceError here means a test called a function that does not exist
+  // yet — the expected state midway through TDD. Report it cleanly instead of
+  // letting node dump its own stack trace and pick its own exit code.
+  console.error('Tests threw: ' + (e && e.message || e));
+  process.exit(2);
+}
+
+const r = context.TEST_RESULTS;
+if (!r) {
+  // Top-level `const`/`let` in a vm script never attach to the context object;
+  // only `var` and function declarations do. Without this check a `const`
+  // TEST_RESULTS reads back as undefined and every run looks like a failure,
+  // however many assertions passed.
+  console.error('TEST_RESULTS is not visible on the context — declare it with `var`, not `const`.');
+  process.exit(3);
+}
 process.exit(r.fail > 0 ? 1 : 0);
 ```
 
@@ -261,8 +280,7 @@ process.exit(r.fail > 0 ? 1 : 0);
 node scripts/run-tests.js; echo "exit=$?"
 ```
 
-Expected: `Script failed to load: ReferenceError: learnVertStep is not defined`
-and `exit=2`.
+Expected: `Tests threw: learnVertStep is not defined` and `exit=2`.
 
 - [ ] **Step 5: Extract the shared vertical step**
 
@@ -694,7 +712,7 @@ function testPadDetect(){
 node scripts/run-tests.js; echo "exit=$?"
 ```
 
-Expected: `Script failed to load: ReferenceError: detectPadKind is not defined`, `exit=2`.
+Expected: `Tests threw: detectPadKind is not defined` and `exit=2`.
 
 - [ ] **Step 3: Implement detection**
 
@@ -930,7 +948,7 @@ function testVoicePick(){
 node scripts/run-tests.js; echo "exit=$?"
 ```
 
-Expected: `Script failed to load: ReferenceError: pickVoiceFrom is not defined`, `exit=2`.
+Expected: `Tests threw: pickVoiceFrom is not defined` and `exit=2`.
 
 - [ ] **Step 3: Implement the voice module**
 
@@ -1072,7 +1090,7 @@ function testZones(){
 node scripts/run-tests.js; echo "exit=$?"
 ```
 
-Expected: `Script failed to load: ReferenceError: zoneAt is not defined`, `exit=2`.
+Expected: `Tests threw: zoneAt is not defined` and `exit=2`.
 
 - [ ] **Step 3: Implement zone mapping**
 

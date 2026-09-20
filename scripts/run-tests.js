@@ -98,6 +98,23 @@ if (typeof context.runSelfTests !== 'function') {
   console.error('Loaded OK, but runSelfTests() is not defined.');
   process.exit(3);
 }
-context.runSelfTests();
-const r = context.TEST_RESULTS || { pass: 0, fail: 1 };
+try {
+  context.runSelfTests();
+} catch (e) {
+  // A ReferenceError here means a test called a function that does not exist
+  // yet — the expected state midway through TDD. Report it cleanly instead of
+  // letting node dump its own stack trace and pick its own exit code.
+  console.error('Tests threw: ' + (e && e.message || e));
+  process.exit(2);
+}
+
+const r = context.TEST_RESULTS;
+if (!r) {
+  // Top-level `const`/`let` in a vm script never attach to the context object;
+  // only `var` and function declarations do. Without this check a `const`
+  // TEST_RESULTS reads back as undefined and every run looks like a failure,
+  // however many assertions passed.
+  console.error('TEST_RESULTS is not visible on the context — declare it with `var`, not `const`.');
+  process.exit(3);
+}
 process.exit(r.fail > 0 ? 1 : 0);
