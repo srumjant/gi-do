@@ -163,6 +163,12 @@ const TRANSLATIONS = {
   mode_learn:         {et:'ÕPIME!',                   en:'LET\'S LEARN!'},
   mode_learn_d:       {et:'Tähed, silbid ja sõnad',   en:'Letters, syllables, words'},
   mode_hint:          {et:'◀ ▶ vali  •  Space / OK / \u24b6 kinnita', en:'◀ ▶ choose  •  Space / OK / \u24b6 confirm'},
+  // Pause menu
+  pause_title:        {et:'PAUS',                     en:'PAUSED'},
+  pause_continue:     {et:'JÄTKA',                    en:'CONTINUE'},
+  pause_switch:       {et:'VAHETA MÄNGU',             en:'SWITCH MODE'},
+  pause_menu:         {et:'PEAMENÜÜ',                 en:'MAIN MENU'},
+  pause_hint:         {et:'◀ ▶ vali  •  Space / OK kinnita',  en:'◀ ▶ choose  •  Space / OK confirm'},
   // Language selector
   lang_hint:          {et:'L = English',              en:'L = Eesti keel'},
   // Difficulty
@@ -1014,11 +1020,61 @@ function spawnEnemy(def){
 // ==========================================
 //  UPDATE
 // ==========================================
+// ==========================================
+//  BACK NAVIGATION
+// ==========================================
+// Every state must have a way out. Before this existed, Escape was handled in
+// 7 of 15 states, so picking a character locked the player into the adventure
+// with no exit at all on a controller.
+const BACK_TARGET={
+  modeselect:'title', difficulty:'modeselect', select:'difficulty',
+  intro:'select', gameover:'modeselect', win:'modeselect', debug:'title',
+  learnmenu:'modeselect', learnletters:'learnmenu', learnresult:'learnmenu'
+};
+// Mid-run states open the pause menu instead of quitting outright: Select is
+// easy to hit by accident and binning a run for it would be its own clunk.
+const PAUSABLE=['playing','dead','between','levelcomplete'];
+const LEARN_STATES=['learnmenu','learnletters','learnsyllables','learnresult'];
+
+let pausePrev='playing', pauseIdx=0;
+function openPause(){pausePrev=gameState;gameState='paused';pauseIdx=0;sfxPickup();}
+function resumeFromPause(){gameState=pausePrev;}
+
+function isMenuState(){
+  return ['title','modeselect','difficulty','select','learnmenu','learnresult',
+          'gameover','win','debug','paused'].indexOf(gameState)>=0;
+}
+
+function handleBack(){
+  if(!justPressed['Escape'])return false;
+  justPressed['Escape']=false;
+  if(gameState==='paused'){resumeFromPause();return true;}
+  if(PAUSABLE.indexOf(gameState)>=0){openPause();return true;}
+  const target=BACK_TARGET[gameState];
+  if(!target)return false;
+  if(target==='modeselect')modeIndex=LEARN_STATES.indexOf(gameState)>=0?1:0;
+  sfxPickup();
+  gameState=target;
+  return true;
+}
+
 function update(){
   animFrame++;
   if(powerupPopup){powerupPopup.timer--;if(powerupPopup.timer<=0)powerupPopup=null;clearJP();return;}
   // Language toggle
-  if(justPressed['KeyL']){lang=lang==='et'?'en':'et';justPressed['KeyL']=false;}
+  if(justPressed['KeyL']&&isMenuState()){lang=lang==='et'?'en':'et';justPressed['KeyL']=false;}
+  if(handleBack()){clearJP();return;}
+  if(gameState==='paused'){
+    if(justPressed['ArrowLeft']||justPressed['KeyA'])pauseIdx=Math.max(0,pauseIdx-1);
+    if(justPressed['ArrowRight']||justPressed['KeyD'])pauseIdx=Math.min(2,pauseIdx+1);
+    if(justPressed['Space']||justPressed['Enter']){
+      sfxPickup();
+      if(pauseIdx===0)resumeFromPause();
+      else if(pauseIdx===1){gameState='modeselect';modeIndex=0;}
+      else gameState='title';
+    }
+    clearJP();return;
+  }
   // Debug level selector — hold B for 3 seconds
   if(debugHoldStart>0&&keys['KeyB']&&gameState!=='debug'&&Date.now()-debugHoldStart>=3000){
     gameState='debug';debugLevelIndex=0;debugHoldStart=0;
@@ -1035,7 +1091,6 @@ function update(){
       ensureAudio();currentLevel=debugLevelIndex;lives=DC().lives;score=0;initLevel(currentLevel);
       justPressed['Space']=false;justPressed['Enter']=false;
     }
-    if(justPressed['Escape']){gameState='title';justPressed['Escape']=false;}
     clearJP();return;
   }
   if(gameState==='title'){
@@ -1054,7 +1109,6 @@ function update(){
       else{gameState='learnmenu';learnMenuIdx=0;}
       justPressed['Space']=false;justPressed['Enter']=false;
     }
-    if(justPressed['Escape']){gameState='title';justPressed['Escape']=false;}
     clearJP();return;
   }
   if(gameState==='learnmenu'||gameState==='learnletters'||gameState==='learnsyllables'||gameState==='learnresult'){updateLearn();return;}
@@ -1062,7 +1116,6 @@ function update(){
     if(justPressed['ArrowLeft']||justPressed['KeyA']){diffIndex=Math.max(0,diffIndex-1);}
     if(justPressed['ArrowRight']||justPressed['KeyD']){diffIndex=Math.min(DIFF_KEYS.length-1,diffIndex+1);}
     if(justPressed['Space']||justPressed['Enter']){selectedDifficulty=DIFF_KEYS[diffIndex];gameState='select';selectIndex=0;justPressed['Space']=false;justPressed['Enter']=false;}
-    if(justPressed['Escape']){gameState='modeselect';modeIndex=0;justPressed['Escape']=false;}
     clearJP();return;
   }
   if(gameState==='select'){
@@ -1379,6 +1432,17 @@ function playerDie(){lives--;gameState='dead';stateTimer=90;spawnParticles(playe
 //  DRAW
 // ==========================================
 function draw(){
+  if(gameState==='paused'){
+    // Render the frozen scene using the state we paused from, then overlay.
+    const real=gameState;
+    gameState=pausePrev;
+    try{drawWorldFrame();}finally{gameState=real;}
+    drawPauseOverlay();clearJP();return;
+  }
+  drawWorldFrame();
+}
+
+function drawWorldFrame(){
   const lvl=LEVELS[currentLevel];
   if(gameState==='debug'){ctx.fillStyle='#1a1a3a';ctx.fillRect(0,0,BASE_W,BASE_H);drawDebug();clearJP();return;}
   if(gameState==='title'){drawTitle();clearJP();return;}
@@ -1614,6 +1678,35 @@ function draw(){
 
   if(gameState==='levelcomplete'){ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(0,0,BASE_W,BASE_H);ctx.fillStyle='#ff69b4';ctx.font='bold 24px monospace';ctx.textAlign='center';ctx.fillText(getRescueSprites().name.toUpperCase()+T('is_safe'),BASE_W/2,BASE_H/2-10);ctx.fillStyle='#fff';ctx.font='14px monospace';ctx.fillText(currentLevel<LEVELS.length-1?T('next_world'):T('you_did_it'),BASE_W/2,BASE_H/2+20);ctx.textAlign='left';}
   if(gameState==='dead'){ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fillRect(0,0,BASE_W,BASE_H);ctx.fillStyle='#ff3333';ctx.font='bold 20px monospace';ctx.textAlign='center';ctx.fillText(T('oops'),BASE_W/2,BASE_H/2);ctx.textAlign='left';}
+}
+
+function drawPauseOverlay(){
+  ctx.fillStyle='rgba(0,0,0,0.72)';ctx.fillRect(0,0,BASE_W,BASE_H);
+  ctx.textAlign='center';
+  ctx.fillStyle='#ffdd00';ctx.font='bold 26px monospace';
+  ctx.fillText(T('pause_title'),BASE_W/2,90);
+
+  const opts=[T('pause_continue'),T('pause_switch'),T('pause_menu')];
+  const bw=176,bh=54,gap=16;
+  const totalW=opts.length*bw+(opts.length-1)*gap;
+  const sx=(BASE_W-totalW)/2, y=170;
+  opts.forEach((label,i)=>{
+    const x=sx+i*(bw+gap);
+    if(i===pauseIdx){
+      ctx.fillStyle='rgba(136,255,136,0.16)';ctx.fillRect(x,y,bw,bh);
+      ctx.strokeStyle='#88ff88';ctx.lineWidth=3;ctx.strokeRect(x-2,y-2,bw+4,bh+4);
+      ctx.fillStyle='#88ff88';
+    } else {
+      ctx.fillStyle='rgba(255,255,255,0.06)';ctx.fillRect(x,y,bw,bh);
+      ctx.fillStyle='#ccc';
+    }
+    ctx.font='bold 15px monospace';
+    ctx.fillText(label,x+bw/2,y+33);
+  });
+
+  ctx.fillStyle='#aaddcc';ctx.font='12px monospace';
+  ctx.fillText(T('pause_hint'),BASE_W/2,BASE_H-40);
+  ctx.textAlign='left';
 }
 
 // ==========================================
@@ -2321,7 +2414,6 @@ function learnVertStep(vy,holdJump,rocketing,onGround){
 
 function updateLearn(){
   animFrame++;
-  if(justPressed['KeyL']){lang=lang==='et'?'en':'et';justPressed['KeyL']=false;}
 
   if(gameState==='learnmenu'){
     if(justPressed['ArrowLeft']||justPressed['KeyA'])learnMenuIdx=Math.max(0,learnMenuIdx-1);
@@ -2333,7 +2425,6 @@ function updateLearn(){
       gameState='learnletters';
       justPressed['Space']=false;justPressed['Enter']=false;
     }
-    if(justPressed['Escape']){gameState='modeselect';modeIndex=1;justPressed['Escape']=false;}
     clearJP();return;
   }
 
@@ -2349,7 +2440,6 @@ function updateLearn(){
         justPressed['Space']=false;justPressed['Enter']=false;
       }
     }
-    if(justPressed['Escape']){gameState='learnmenu';justPressed['Escape']=false;}
     clearJP();return;
   }
 
@@ -2458,7 +2548,6 @@ function updateLearn(){
   else if(Math.abs(L.pvx)>0.3){L.pFrameTimer++;if(L.pFrameTimer>6){L.pFrame=L.pFrame===0?1:0;L.pFrameTimer=0;}}
   else L.pFrame=0;
 
-  if(justPressed['Escape']){gameState='learnmenu';justPressed['Escape']=false;}
   clearJP();
 }
 
@@ -2840,10 +2929,28 @@ function testPhysics(){
           rocketHeld.toFixed(1)+' >= '+(GATE_GAP+STEP_RISE));
 }
 
+function testBackNav(){
+  const ALL=['title','modeselect','difficulty','select','intro','playing','dead',
+             'between','levelcomplete','gameover','win','debug','learnmenu',
+             'learnletters','learnresult','paused'];
+  ALL.forEach(s=>{
+    const covered = s==='title' || s==='paused' ||
+                    !!BACK_TARGET[s] || PAUSABLE.indexOf(s)>=0;
+    tAssert('back works from state: '+s,covered,'no BACK_TARGET and not PAUSABLE');
+  });
+  tAssert('no back target is itself',
+          Object.keys(BACK_TARGET).every(k=>BACK_TARGET[k]!==k));
+  tAssert('every back target is a real state',
+          Object.values(BACK_TARGET).every(v=>ALL.indexOf(v)>=0));
+  tAssert('pausable states are not also in BACK_TARGET',
+          PAUSABLE.every(s=>!BACK_TARGET[s]));
+}
+
 function runSelfTests(){
   TEST_RESULTS.pass=0;TEST_RESULTS.fail=0;
   console.log('[TEST] ===== start =====');
   testPhysics();
+  testBackNav();
   console.log('[TEST] ===== '+TEST_RESULTS.pass+' passed, '+TEST_RESULTS.fail+' failed =====');
 }
 if(location.search.indexOf('test=1')>=0)window.addEventListener('load',runSelfTests);
