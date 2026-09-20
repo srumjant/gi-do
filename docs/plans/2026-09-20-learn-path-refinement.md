@@ -84,17 +84,30 @@ There is no gap to miss and no precision requirement.
 
 ### The gate cannot be skipped — by physics, not geometry
 
-The platform above a gate floor sits **135px** up. Derived from the existing
-learn-mode constants (`jump = -9.0`, `g = 0.38`, apex hang halves g to 0.19
-while `|pvy| < 2.0`):
+The platform above a gate floor sits **132px** up.
 
-| | Phase 1 (v → 2) | Phase 2 (2 → 0) | Total |
-|---|---|---|---|
-| Normal jump (`-9.0`) | (81-4)/(2·0.38) = 101.3px | 4/(2·0.19) = 10.5px | **111.8px** |
-| Rocket (`-11.0`) | (121-4)/(2·0.38) = 153.9px | 10.5px | **164.4px** |
+These heights were *measured* by replaying the game's own integrator frame by
+frame, not derived with calculus. The distinction matters: the loop applies
+gravity **before** position each frame, so a continuous approximation
+overstates the rise by about 5px. Measured against the real constants
+(`jump = -9.0`, `rocket = -11.0`, `g = 0.38`, apex hang halving g while
+`|pvy| < 2.0`, jump-cut at `-3.6`):
 
-135px is 23px above normal reach and 29px below rocket reach. Comfortable
-margin both ways, and no invisible ceiling geometry is needed.
+| Case | Rise |
+|---|---|
+| Normal jump, held | **106.3px** |
+| Normal jump, tapped | 19.1px |
+| Rocket, held | **158.4px** |
+| Rocket, tapped, with jump-cut exemption | 158.4px |
+| Rocket, tapped, *without* exemption | 19.1px |
+
+132px sits centrally in the 106.3 → 158.4 window: 25.7px above normal reach,
+26.4px below rocket reach. No invisible ceiling geometry is needed.
+
+Rocket overshoot is 26.4px past the landing platform, and the next stepping
+platform is 45px above that (177px from the gate floor), so a rocket cannot
+accidentally skip ahead. The player rises past the landing platform and settles
+onto it on the way down, since platforms are one-way.
 
 ### Two implementation traps
 
@@ -102,15 +115,29 @@ margin both ways, and no invisible ceiling geometry is needed.
    frames; landing with a buffered jump would instantly fire an unintended
    answer. Set `pJumpBuf = 0` when landing on a gate floor.
 2. **The rocket must be exempt from the jump-cut.** The existing
-   `if(!jk && pvy < -3.6) pvy = -3.6` would cap the rocket to a normal hop for
-   any child who taps rather than holds jump, silently breaking the feature and
-   trapping them under the gate. Set a `rocketing` flag on launch, skip the cut
-   while it is set, clear it once `pvy >= 0`.
+   `if(!jk && pvy < -3.6) pvy = -3.6` caps a tapped rocket to **19.1px instead
+   of 158.4px** (measured). A child who taps rather than holds would answer
+   correctly, watch the arch open, and still be unable to leave the gate floor.
+   Set a `rocketing` flag on launch, skip the cut while it is set, clear it
+   once `pvy >= 0`.
 
-### Solved gates stay usable
+### The platform above a gate is also full width, making gates checkpoints
 
-A solved arch remains open and still launches. Otherwise a player who falls
-back down onto a solved gate floor would be permanently stuck beneath it.
+A rocket launches straight up from whichever zone the player chose, so they
+come down at that same x. A narrow, centred landing platform would be missed
+entirely by anyone answering from zone 0 or zone 2, dropping them back onto the
+gate floor after a *correct* answer. The landing platform therefore spans the
+full width as well.
+
+This yields a checkpoint structure for free. Both full-width floors are one-way
+(collision only while `pvy >= 0`), so once through a gate the player physically
+cannot fall back below it — there are no edges to walk off, and the wrap handles
+the sides. Every gate is a permanent checkpoint.
+
+The tower alternates: `start → 3 steps → gate floor → landing floor → 3 steps →
+gate floor → …`. The only place a fall is possible is among the three stepping
+platforms of a section, and such a fall lands harmlessly on the full-width floor
+below. Nothing is ever lost.
 
 ---
 
@@ -191,10 +218,10 @@ shape as 4 letters or 4 syllables.
 - 3 stepping platforms, 45px apart, horizontal positions constrained by the
   existing `MAX_HOP = 100` reachability rule
 - gate floor, 50px above the last step, full width
-- next landing platform, 135px above the gate floor
+- landing floor, 132px above the gate floor, full width
 
-≈320px per section, ≈1280px per tower. Above the 4th gate sits the finish
-platform and the star.
+≈317px per section, ≈1270px per tower. The landing floor above the 4th gate is
+the finish, carrying the star.
 
 ---
 
@@ -203,8 +230,10 @@ platform and the star.
 - **Progress readout:** four stars showing gates solved, replacing
   `Punktid: 350`. A number is meaningless to a pre-reader. Score is still kept
   internally and shown on the result screen.
-- **Soft respawn:** falling more than 200px below the last solved gate floor
-  fades the player back onto it, rather than the current instant teleport-snap.
+- **Soft respawn:** the full-width floors make real falls impossible, so the
+  existing teleport-snap becomes a safety net only. It stays, with a generous
+  threshold and a short fade, in case a future layout change reintroduces a
+  gap.
 - **i18n:** `LEIA TÄHT:`, `KIRJUTA SÕNA:`, `Punktid:`, `ESC = tagasi`, the menu
   strings and the cheer list are hardcoded Estonian today and ignore the `L`
   toggle entirely. All move into `TRANSLATIONS`.
@@ -336,14 +365,18 @@ Then §1-2 (the gate), §3 (voice), §4 (pacing), §5 (polish).
 
 ## Verification
 
-Physics margins (111.8px normal vs 135px gap vs 164.4px rocket) are derived
-from constants, so they must be confirmed in play, not assumed:
+Physics margins (106.3px normal vs 132px gap vs 158.4px rocket) are measured by
+replaying the integrator. An in-game self-test asserts them against the real
+constants so the numbers cannot silently drift if the physics is ever retuned.
+They must also be confirmed in play:
 
 - A held jump from a gate floor cannot reach the platform above.
 - A **tapped** jump on a correct arch still clears it — this is the jump-cut
   trap and the single most likely silent failure.
 - Landing on a gate floor with jump held does not auto-submit an answer.
-- Falling back onto a solved gate floor can re-launch through the open arch.
+- A rocket from **zone 0 and zone 2**, not just the centre, lands on the floor
+  above — this is the case a narrow landing platform would have broken.
+- Once above a gate, the player cannot fall back below it.
 - All three zones are reachable by walking, including via the wrap.
 - Back works from all 15 states, on keyboard, DualSense and touch.
 - With no Estonian voice installed, the game is silent but fully playable.
