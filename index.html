@@ -2146,10 +2146,21 @@ let learnMenuIdx=0;
 const LEARN_LETTERS=['A','E','I','O','U','M','N','S','K','T','L','P','R','J','V','H','Ä','Ö','Ü','Õ'];
 const LEARN_SYLLABLES=['MA','PA','SA','KA','TA','LA','NA','ME','SE','KE','TE','LE','MI','SI','KI','TI','MO','KO','TO','MU','KU','TU','LU'];
 const LEARN_WORDS=['KASS','KOER','MAJA','PALL','KALA','LUMI','AUTO','MUNA','PAAT','SUUR'];
+
+// Tower tuning. GATE_GAP must sit strictly between a normal jump's rise and a
+// rocket's rise — the self-tests below assert exactly that.
+const GATES_PER_TOWER=4;
+const STEP_RISE=45;      // vertical gap between stepping platforms
+const GATE_RISE=50;      // last step up to the gate floor
+const GATE_GAP=132;      // gate floor up to the landing floor above it
+const LEARN_JUMP=-9.0;   // normal jump impulse
+const LEARN_ROCKET=-11.0;// correct-answer launch impulse
+
 let learn={
   mode:'letters', // 'letters','syllables','words'
   platforms:[],gates:[],
   px:0,py:0,pvx:0,pvy:0,pFacing:1,pFrame:0,pFrameTimer:0,pOnGround:false,
+  rocketing:false,
   pCoyote:0,pJumpBuf:0,
   camY:0,
   score:0,round:0,totalRounds:8,
@@ -2286,6 +2297,19 @@ function initLearnRound(){
   L.camY=L.py-BASE_H*0.45;
 }
 
+// One frame of vertical motion for the learn-mode player. Shared with the
+// self-tests so the asserted jump heights describe real behaviour.
+// `rocketing` suppresses the variable-height jump-cut: without it a child who
+// taps rather than holds jump rises 19px instead of 158px and is trapped below
+// a gate they answered correctly.
+function learnVertStep(vy,holdJump,rocketing,onGround){
+  if(!holdJump&&!rocketing&&vy<-3.6)vy=-3.6;
+  const apex=Math.abs(vy)<2.0&&!onGround;
+  const gm=vy>0?1.1:(apex?0.5:1.0);
+  vy+=0.38*gm;
+  return vy>7?7:vy;
+}
+
 function updateLearn(){
   animFrame++;
   if(justPressed['KeyL']){lang=lang==='et'?'en':'et';justPressed['KeyL']=false;}
@@ -2340,13 +2364,10 @@ function updateLearn(){
   const jj=justPressed['Space']||justPressed['ArrowUp']||justPressed['KeyW'];
   if(jj)L.pJumpBuf=12;
   if(L.pJumpBuf>0)L.pJumpBuf--;
-  if((L.pOnGround||L.pCoyote>0)&&L.pJumpBuf>0){L.pvy=-9.0;L.pOnGround=false;L.pCoyote=0;L.pJumpBuf=0;sfxJump();}
-  if(!jk&&L.pvy<-3.6)L.pvy=-3.6;
+  if((L.pOnGround||L.pCoyote>0)&&L.pJumpBuf>0){L.pvy=LEARN_JUMP;L.pOnGround=false;L.pCoyote=0;L.pJumpBuf=0;sfxJump();}
 
-  // Gravity with apex hang — floatier for kids
-  const apex=Math.abs(L.pvy)<2.0&&!L.pOnGround;
-  const gm=L.pvy>0?1.1:(apex?0.5:1.0);
-  L.pvy+=0.38*gm;if(L.pvy>7)L.pvy=7;
+  L.pvy=learnVertStep(L.pvy,jk,L.rocketing,L.pOnGround);
+  if(L.rocketing&&L.pvy>=0)L.rocketing=false;
 
   L.px+=L.pvx;
   // Wrap horizontally
@@ -2763,6 +2784,57 @@ function drawPowerupPopup(){
   }
   ctx.restore();
 }
+
+// ==========================================
+//  SELF TESTS — open index.html?test=1
+// ==========================================
+var TEST_RESULTS={pass:0,fail:0};
+function tAssert(name,cond,detail){
+  if(cond){TEST_RESULTS.pass++;console.log('[TEST] PASS  '+name);}
+  else{TEST_RESULTS.fail++;console.error('[TEST] FAIL  '+name+(detail?'  — '+detail:''));}
+}
+function tNear(name,actual,expected,tol){
+  tAssert(name,Math.abs(actual-expected)<=tol,'expected '+expected+' ±'+tol+', got '+actual.toFixed(2));
+}
+
+// Replays the real integrator to find how high an impulse carries the player.
+function simulateRise(impulse,holdJump,rocketExempt){
+  let vy=impulse,y=0,maxRise=0,rocketing=rocketExempt;
+  for(let f=0;f<1000;f++){
+    vy=learnVertStep(vy,holdJump,rocketing,false);
+    if(rocketing&&vy>=0)rocketing=false;
+    y+=vy;
+    if(y<maxRise)maxRise=y;
+    if(y>0&&f>2)break;
+  }
+  return -maxRise;
+}
+
+function testPhysics(){
+  const normalHeld=simulateRise(LEARN_JUMP,true,false);
+  const rocketHeld=simulateRise(LEARN_ROCKET,true,true);
+  const rocketTap=simulateRise(LEARN_ROCKET,false,true);
+  tNear('normal jump, held',            normalHeld,                          106.3,1);
+  tNear('normal jump, tapped',          simulateRise(LEARN_JUMP,false,false),  19.1,1);
+  tNear('rocket, held',                 rocketHeld,                          158.4,1);
+  tNear('rocket, tapped + exemption',   rocketTap,                           158.4,1);
+  tNear('rocket, tapped, NO exemption', simulateRise(LEARN_ROCKET,false,false),19.1,1);
+  // Invariants that must hold even if the physics is retuned later:
+  tAssert('gate cannot be skipped by a normal jump', normalHeld<GATE_GAP,
+          normalHeld.toFixed(1)+' >= '+GATE_GAP);
+  tAssert('rocket clears the gate even when tapped', rocketTap>GATE_GAP,
+          rocketTap.toFixed(1)+' <= '+GATE_GAP);
+  tAssert('rocket cannot overshoot onto the next step', rocketHeld<GATE_GAP+STEP_RISE,
+          rocketHeld.toFixed(1)+' >= '+(GATE_GAP+STEP_RISE));
+}
+
+function runSelfTests(){
+  TEST_RESULTS.pass=0;TEST_RESULTS.fail=0;
+  console.log('[TEST] ===== start =====');
+  testPhysics();
+  console.log('[TEST] ===== '+TEST_RESULTS.pass+' passed, '+TEST_RESULTS.fail+' failed =====');
+}
+if(location.search.indexOf('test=1')>=0)window.addEventListener('load',runSelfTests);
 
 function gameLoop(){pollGamepad();update();draw();drawPowerupPopup();requestAnimationFrame(gameLoop);}
 gameLoop();
