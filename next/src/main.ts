@@ -1,8 +1,5 @@
 import Phaser from 'phaser';
-
-// Authoring resolution. The Scale manager upscales; nothing is authored in device pixels.
-export const BASE_W = 640;
-export const BASE_H = 400;
+import { BASE_W, BASE_H } from './config/constants';
 
 new Phaser.Game({
   type: Phaser.AUTO,
