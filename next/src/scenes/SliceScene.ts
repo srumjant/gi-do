@@ -29,36 +29,6 @@ const PLAYER_DRAW_INSET = 2;
 /** `player.frame`: 0 stand, 1 run, 2 jump (types.ts, index.html:1424-1429). */
 const PLAYER_POSES = ['stand', 'run', 'jump'] as const;
 
-/**
- * EXPERIMENT — an externally drawn car, on trial. Remove this block, `preload()`, and
- * the two `isCar` branches in createEnemyImage/syncEnemyImage to revert.
- *
- * The six "walking" frames from a supplied sheet, cut out and scaled down. Measured,
- * not guessed: in every frame the car body occupies x 25-78, y 2-30 of the 80x34 cell,
- * because the frames were right-aligned on the front bumper rather than on their
- * bounding box (the dust cloud varies in width and would have made the car jitter).
- *
- * The art faces RIGHT. Every other enemy sprite in this game faces LEFT, so this one
- * alone flips on moving left rather than right.
- *
- * Nothing here touches the simulation: the hitbox is still the one derived from the
- * original CAR_S grid, so the frame-by-frame comparison against the live game is
- * unaffected. Only the picture changed.
- */
-const CAR_SHEET = {
-  key: 'carWalk',
-  file: 'car-walk.png',
-  frameWidth: 80,
-  frameHeight: 34,
-  frames: 6,
-  /** Simulation frames per animation frame. The live car toggles 2 poses every 15. */
-  framesPerStep: 6,
-  /** Where the car body sits inside a cell, measured across all six frames. */
-  bodyX: 25,
-  bodyY: 2,
-  bodyW: 54,
-} as const;
-
 /** Cloud alpha (index.html:1676: `ctx.globalAlpha=0.75`). */
 const CLOUD_ALPHA = 0.75;
 
@@ -97,14 +67,6 @@ export class SliceScene extends Phaser.Scene {
 
   constructor() {
     super('Slice');
-  }
-
-  preload(): void {
-    // Vite serves next/public at the base path; Phaser needs the full URL.
-    this.load.spritesheet(CAR_SHEET.key, `${import.meta.env.BASE_URL}${CAR_SHEET.file}`, {
-      frameWidth: CAR_SHEET.frameWidth,
-      frameHeight: CAR_SHEET.frameHeight,
-    });
   }
 
   create(): void {
@@ -288,33 +250,7 @@ export class SliceScene extends Phaser.Scene {
    * immediately by `syncEnemyImage` right below, in the same pass.
    */
   private createEnemyImage(enemy: EnemyState): Phaser.GameObjects.Image {
-    if (enemy.type === 'car') {
-      // Sized so the CAR BODY matches the hitbox width; the rest of the cell is the
-      // dust trail, which is meant to spill outside it.
-      const scale = enemy.w / CAR_SHEET.bodyW;
-      return this.add
-        .image(enemy.x, enemy.y, CAR_SHEET.key, 0)
-        .setOrigin(0, 0)
-        .setDisplaySize(CAR_SHEET.frameWidth * scale, CAR_SHEET.frameHeight * scale);
-    }
     return this.add.image(enemy.x, enemy.y, enemyTextureKey(enemy.type)).setOrigin(0, 0);
-  }
-
-  /**
-   * Places the experimental car so its body lands on the hitbox rather than the cell
-   * corner. Flipping mirrors the cell, so the body's inset is measured from the other
-   * side when it faces left.
-   */
-  private syncCarImage(image: Phaser.GameObjects.Image, enemy: EnemyState, wobble: number): void {
-    const scale = enemy.w / CAR_SHEET.bodyW;
-    const facingLeft = enemy.vx < 0;
-    const insetLeft = facingLeft
-      ? CAR_SHEET.frameWidth - (CAR_SHEET.bodyX + CAR_SHEET.bodyW)
-      : CAR_SHEET.bodyX;
-
-    image.setFlipX(facingLeft);
-    image.setDisplaySize(CAR_SHEET.frameWidth * scale, CAR_SHEET.frameHeight * scale);
-    image.setPosition(enemy.x - insetLeft * scale, enemy.y + wobble - CAR_SHEET.bodyY * scale);
   }
 
   /**
@@ -326,12 +262,7 @@ export class SliceScene extends Phaser.Scene {
    * it to.
    */
   private syncEnemyImage(image: Phaser.GameObjects.Image, enemy: EnemyState, animFrame: number): void {
-    // EXPERIMENT: the car is on trial with externally drawn art. It faces right, unlike
-    // every other enemy sprite, and its cell is larger than its hitbox — so it gets its
-    // own placement and its own six-frame cycle, both handled below.
-    const isCar = enemy.type === 'car';
-
-    image.setFlipX(isCar ? enemy.vx < 0 : enemy.vx > 0);
+    image.setFlipX(enemy.vx > 0);
 
     if (!enemy.alive) {
       if (enemy.squashTimer <= 0) {
@@ -357,17 +288,8 @@ export class SliceScene extends Phaser.Scene {
     // simulation.
     const wobble = Math.sin(animFrame * 0.15 + enemy.x);
     image.setVisible(true);
-    image.setAlpha(1);
-
-    if (isCar) {
-      // Six frames off one shared clock. Richer than the live game's two-pose toggle —
-      // deliberately, since the point of the trial is to see the animation.
-      image.setFrame(Math.floor(animFrame / CAR_SHEET.framesPerStep) % CAR_SHEET.frames);
-      this.syncCarImage(image, enemy, wobble);
-      return;
-    }
-
     image.setScale(1, 1);
+    image.setAlpha(1);
     image.setPosition(enemy.x, enemy.y + wobble);
   }
 }
