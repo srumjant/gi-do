@@ -78,6 +78,9 @@ Immediately after the `LEARN_WORDS` declaration (~line 2148), add:
 ```js
 // Tower tuning. GATE_GAP must sit strictly between a normal jump's rise and a
 // rocket's rise — the self-tests below assert exactly that.
+// GATES_PER_TOWER, GATE_RISE and GATE_GAP are consumed by the tower builder,
+// and LEARN_ROCKET by the correct-answer launch. Until those land, the
+// self-tests are their only reader — they are scaffolding, not dead code.
 const GATES_PER_TOWER=4;
 const STEP_RISE=45;      // vertical gap between stepping platforms
 const GATE_RISE=50;      // last step up to the gate floor
@@ -106,11 +109,11 @@ function tNear(name,actual,expected,tol){
 }
 
 // Replays the real integrator to find how high an impulse carries the player.
-function simulateRise(impulse,holdJump,rocketExempt){
-  let vy=impulse,y=0,maxRise=0,rocketing=rocketExempt;
+function simulateRise(impulse,holdJump,startRocketing){
+  let vy=impulse,y=0,maxRise=0,rocketing=startRocketing;
   for(let f=0;f<1000;f++){
     vy=learnVertStep(vy,holdJump,rocketing,false);
-    if(rocketing&&vy>=0)rocketing=false;
+    if(rocketSpent(vy,rocketing))rocketing=false;
     y+=vy;
     if(y<maxRise)maxRise=y;
     if(y>0&&f>2)break;
@@ -299,7 +302,7 @@ with:
 
 ```js
   L.pvy=learnVertStep(L.pvy,jk,L.rocketing,L.pOnGround);
-  if(L.rocketing&&L.pvy>=0)L.rocketing=false;
+  if(rocketSpent(L.pvy,L.rocketing))L.rocketing=false;
 ```
 
 Then add, immediately above `function updateLearn()`:
@@ -310,6 +313,12 @@ Then add, immediately above `function updateLearn()`:
 // `rocketing` suppresses the variable-height jump-cut: without it a child who
 // taps rather than holds jump rises 19px instead of 158px and is trapped below
 // a gate they answered correctly.
+// When a rocket launch stops being exempt from the jump-cut: at the apex.
+// Shared with the self-tests for the same reason learnVertStep is — if the
+// game and the harness disagreed about when the exemption ends, the asserted
+// rocket heights would stop describing what the player actually gets.
+function rocketSpent(vy,rocketing){return rocketing&&vy>=0;}
+
 function learnVertStep(vy,holdJump,rocketing,onGround){
   if(!holdJump&&!rocketing&&vy<-3.6)vy=-3.6;
   const apex=Math.abs(vy)<2.0&&!onGround;

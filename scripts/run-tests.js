@@ -5,6 +5,20 @@
 // script in a VM with a minimal DOM shim, then call runSelfTests(). Because it
 // loads the real file, the tests exercise the real functions — nothing is
 // copied or reimplemented here, so the tests cannot drift from the game.
+//
+// Exit codes:
+//   0  all assertions passed
+//   1  assertions failed
+//   2  the script or the tests threw
+//   3  the harness is not wired up correctly (see the messages below)
+//
+// WHAT THIS SHIM CAN AND CANNOT PROVE. It models enough of the browser to load
+// and exercise pure logic. For any API it does not fully model — speech
+// synthesis, gamepads, real canvas output — it proves only that the game
+// DEGRADES GRACEFULLY when the API is missing. It cannot prove the feature
+// works when the API is present. A green run here is not evidence that voice
+// is spoken, that rumble fires, or that anything is drawn correctly; those
+// need a real browser and, for feel, a real child.
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
