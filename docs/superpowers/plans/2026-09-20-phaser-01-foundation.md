@@ -107,10 +107,12 @@ mkdir -p next/src
 cd next
 npm init -y
 npm install phaser@4.2.1
-npm install -D vite typescript vitest
+npm install -D vite typescript vitest @types/node
 ```
 
 Install rather than hand-writing versions, so the lockfile records what actually resolved.
+
+`@types/node` is required: `tests/helpers/legacy.ts` (Task 2) imports `node:fs`, `node:path`, `node:url` and `node:vm`, and without the types `tsc` fails with `TS2591` plus a misleading cascading `string | null` error in `legacyScript()`.
 
 - [ ] **Step 2: Edit the generated `next/package.json`**
 
@@ -453,7 +455,12 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Node 20 reached end-of-life on 2026-04-30. Vite 8 requires
+          # ^20.19.0 || >=22.12.0 and Vitest 4 requires ^20.0.0 || ^22.0.0 ||
+          # >=24.0.0, so 24 (current Active LTS) satisfies both without
+          # depending on an EOL runtime. Verify against the installed
+          # packages' `engines` fields before changing this.
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: next/package-lock.json
 
@@ -721,8 +728,17 @@ Expected: FAIL — `Cannot find module '../src/config/difficulty'`.
 Create `next/src/config/difficulty.ts`. Copy the body of `DIFFICULTY_CONFIG` and `DIFF_KEYS` from `index.html` lines 98–160 verbatim — do not retype the numbers — and wrap them as below:
 
 ```ts
+/**
+ * The four records are NOT uniform. Thirteen fields are on all of them; four exist
+ * only on `super_easy`. Every read site in the live game guards for that, and the
+ * fallbacks are load-bearing — carry them into later plans:
+ *   stompHitbox    -> `dc.stompHitbox || 1`      (index.html:1542, 1601)
+ *   invincibleTime -> `dc.invincibleTime || 60`  (index.html:1646)
+ *   enemySkipChance / capeSavesPit -> truthiness (index.html:1359, 1423)
+ */
 export interface DifficultyRecord {
   label: string;
+  color: string;
   lives: number;
   playerSpeed: number;
   jumpForce: number;
@@ -730,9 +746,16 @@ export interface DifficultyRecord {
   enemyShootInterval: number;
   ghostAggroRange: number;
   bouncerJumpForce: number;
-  stompHitbox: number;
+  bowCharges: number;
   gapWidth: number;
-  enemySkipChance: number;
+  scoreMultiplier: number;
+  startWithCape: boolean;
+
+  // super_easy only.
+  capeSavesPit?: boolean;
+  enemySkipChance?: number;
+  invincibleTime?: number;
+  stompHitbox?: number;
 }
 
 export const DIFFICULTY_CONFIG = {
@@ -763,7 +786,7 @@ export function DC(): DifficultyRecord {
 }
 ```
 
-If `tsc` rejects a field because the real records carry a key not in `DifficultyRecord`, add that key to the interface — the interface must describe the data, not the other way round.
+The interface must describe the data, not the other way round. If `tsc` reports a mismatch, fix the interface — never edit the copied data to fit it, and never edit `index.html`. Note `lives: Infinity` on `super_easy`: that is a `number` and is intentional (the HUD draws a heart plus an infinity glyph).
 
 - [ ] **Step 4: Run the test to confirm it passes**
 
