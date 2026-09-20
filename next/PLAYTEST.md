@@ -17,12 +17,14 @@ move, space to jump.
 
 Say this up front or the first thirty seconds are just them listing it:
 
-no pictures (everybody is a rectangle), no music, no sounds, one level, no hearts, no
-score, no menus, no cat, no bow, no power-ups, and **the enemies cannot hurt you** — you
-can jump on them, but walking into one does nothing.
+no music, no sounds, one level, no hearts, no score, no menus, no cat, no bow, no
+power-ups, and **the enemies cannot hurt you** — you can jump on them, but walking into
+one does nothing.
 
-The white rectangle is you. The red ones are enemies. Green is the ground, brown is a
-platform, gold is a `?` block.
+It does now look like the game: the real characters, the real enemies, the tile grid with
+its grass edge and brick mortar, the `?` and rainbow blocks, and the parallax sky. The
+felt style is not there — but that is off by default in the real game too, so unless
+someone has turned it on with `F`, both should look the same.
 
 ## What to ask
 
