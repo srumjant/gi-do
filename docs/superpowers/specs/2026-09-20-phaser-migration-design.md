@@ -62,6 +62,7 @@ Stated up front so the plan is not oversold:
 | Learn mode | Ported in the same push | Cutover is feature-complete; kids lose nothing on switchover day. |
 | Felt style | Shader, matching today's look | Palette, grain and shadow on GPU. Bevel baked at boot (see caveat). |
 | Tests | Grown step by step | Vitest, added per module as each lands, checked against the old build's output. |
+| Cutover | Coexist, then flip | The current game stays live and untouched for the whole rewrite. Nothing is deleted until the switch is confirmed. |
 
 ### Build-step consequence
 
@@ -69,32 +70,74 @@ Native ES modules do not work over `file://` — module scripts are fetched with
 `file://` origin is opaque. The README's "open `index.html` in a browser, no build step"
 and "modular, conventional code" cannot both hold. Vite was chosen, so:
 
-- Local play becomes `npm run dev`, not double-clicking a file.
-- `.github/workflows/static.yml` changes from `path: '.'` to building first and uploading
-  `dist/`.
-- The deployed GitHub Pages URL is unaffected — it is how the kids play, and it keeps working.
+- Local play *of the rewrite* becomes `npm run dev`. The current game keeps opening from
+  `file://` exactly as it does today, for as long as it exists.
+- `.github/workflows/static.yml` keeps `path: '.'` and gains a build step ahead of it, so
+  the uploaded artifact contains both games. It does not switch to uploading `dist/` alone
+  until cutover.
+- The deployed GitHub Pages URL is unaffected — it is how the kids play, and it keeps
+  working throughout.
+
+## Coexistence and cutover
+
+The rewrite is big-bang in *construction* but staged in *rollout*. The current game is not
+touched until the new one has earned the switch.
+
+- `/index.html` — the current game. Stays at the repo root, deployed, playable, and open to
+  small changes for the entire rewrite.
+- `/next/` — the Vite project. Served at the same Pages URL under `/next/`, so the kids can
+  try it whenever they like, on the device they already play on, without installing anything.
+- `scripts/run-tests.js` — keeps running against the untouched `index.html` the whole time.
+  The old safety net is not retired until the new one has replaced it.
+
+This is what makes the big-bang shape survivable. The usual objection — that a long rewrite
+freezes the feedback loop that drives the project — mostly goes away when the live game
+never stops working and the replacement is playable in progress.
+
+**Cutover** happens only after the kids have played `/next/` and agreed it is the better
+game. It is a promotion, not a demolition: the current game moves to `/classic/` rather than
+being deleted, so reverting is editing a link rather than a revert commit. `scripts/run-tests.js`
+is retired at that point, and the README is rewritten (see corrections below).
+
+The one real cost: while both exist, a new feature requested by the kids either lands only
+in the live game (and must be rebuilt in the port) or waits. That is a per-request decision,
+not a blanket freeze.
 
 ## Target architecture
 
 ### Repo layout
 
+Everything new lives under `next/`. The repo root keeps the current game exactly as it is
+until cutover.
+
 ```
-index.html              Vite entry, thin
-package.json / tsconfig.json / vite.config.ts
-src/
-  main.ts               Phaser.Game config, scene registry
-  config/               constants, difficulty, i18n
-  data/                 sprites/, levels, parallax, bgm themes
-  audio/                synth, sfx, bgm scheduler  (logic unchanged)
-  gfx/                  rasterise, texture registration, felt/, tilemap
-  entities/             Player, enemies/, Boss, Cat, projectiles
-  systems/              input, gamepad, powerups
-  scenes/               Boot, Title, ModeSelect, Difficulty, CharSelect,
+index.html              THE CURRENT GAME — untouched until cutover
+sprites.html            sprite review tool, keeps reading the old arrays
+felt-lab.html           felt tuning tool
+scripts/run-tests.js    old harness, keeps running against index.html
+next/
+  index.html            Vite entry, thin
+  package.json / tsconfig.json / vite.config.ts
+  src/
+    main.ts             Phaser.Game config, scene registry
+    config/             constants, difficulty, i18n
+    data/               sprites/, levels, parallax, bgm themes
+    audio/              synth, sfx, bgm scheduler  (logic unchanged)
+    gfx/                rasterise, texture registration, felt/, tilemap
+    entities/           Player, enemies/, Boss, Cat, projectiles
+    systems/            input, gamepad, powerups
+    scenes/             Boot, Title, ModeSelect, Difficulty, CharSelect,
                         Intro, Game, Hud, Pause, Between, GameOver, Win,
                         learn/
-  state/                run.ts — currentLevel, lives, score
-tests/                  Vitest, grown alongside
+    state/              run.ts — currentLevel, lives, score
+  tests/                Vitest, grown alongside
 ```
+
+The sprite arrays are duplicated into `next/src/data/sprites/` rather than shared, because
+the old game needs them as globals in one script and the new one needs them as ES module
+exports. They are static data the kids rarely change; if one does change during the rewrite,
+it changes in both. `sprites.html` and `felt-lab.html` keep pointing at the old copy until
+cutover.
 
 ### Scenes replace the `gameState` string
 
@@ -145,9 +188,10 @@ Two consequences:
 
 - **Flip is no longer baked.** Today it is part of the cache key (`:611`) and doubles the
   texture count. Phaser's `setFlipX` is free on GPU.
-- **`getSpriteKey` disappears.** It currently serialises the entire sprite bitmap into a
-  string on *every* `drawSprite` call — 69 call sites, many in loops, every frame, even on
-  cache hits. Textures are looked up by name once at spawn instead.
+- **`getSpriteKey` disappears entirely.** It was memoised in `27c5a21` (11.5× on key
+  construction, ~47 µs/frame on a 15-sprite scene — real, but 0.3% of the frame budget, so
+  not a lag fix). Under Phaser the concept goes away: textures are looked up by name once
+  at spawn rather than rebuilt per draw.
 
 ### Felt as a Filter — with one caveat
 
@@ -230,9 +274,10 @@ Items 8–10 are arguably features, not bugs. They are listed so the rewrite doe
 ## Test strategy
 
 The current harness (`scripts/run-tests.js`) regex-extracts the single `<script>` block and
-evals it in a Node VM behind a hand-rolled DOM shim. That dies with the single-file format.
-Phaser's `HEADLESS` renderer exists but still requires a real DOM (jsdom), and the repo has
-zero dependencies today.
+evals it in a Node VM behind a hand-rolled DOM shim. It cannot survive the modular format —
+but it does not have to die early: it keeps running against the untouched `index.html` for
+the whole rewrite, and is retired only at cutover. Phaser's `HEADLESS` renderer exists but
+still requires a real DOM (jsdom), and the repo has zero dependencies today.
 
 The replacement is **Vitest, grown one module at a time** rather than written up front.
 Because behaviour is bug-compatible, each module can be checked against the old build's
@@ -257,7 +302,8 @@ run proves graceful degradation for unmodelled APIs, not that anything is drawn 
 
 Feel-critical work goes early so nothing is built on a wrong foundation.
 
-1. **Scaffold** — Vite, TS, Vitest, tsconfig, CI change. Empty Phaser game boots.
+1. **Scaffold** — Vite, TS, Vitest, tsconfig under `next/`; CI builds it alongside the live
+   game. An empty Phaser game boots at `/next/`; `/` is untouched.
 2. **Data port** — sprites, levels, i18n, difficulty, BGM themes into typed modules.
    Mechanical, low risk. Test: level generation matches the old build exactly.
 3. **Audio port** — verbatim, behind a typed interface. Test: scheduler with a fake clock.
@@ -270,13 +316,17 @@ Feel-critical work goes early so nothing is built on a wrong foundation.
    win, plus HUD and pause.
 8. **Learn mode.**
 9. **Input and gamepad unification.**
-10. **Cutover** — delete the old `index.html`, rewrite the README, flip CI.
+10. **Cutover** — only once the kids have played `/next/` and agreed. Promote the build to
+    `/`, move the current game to `/classic/`, rewrite the README, retire
+    `scripts/run-tests.js`.
 
 ## Risks
 
-- **The kids' feedback loop stops for the duration.** This is the project's actual engine —
-  kids play, decide what is next, Claude implements. A big-bang rewrite freezes it. This was
-  raised and the owner chose the big-bang shape anyway; it is recorded here, not re-argued.
+- **The feedback loop slows, but no longer stops.** This is the project's actual engine —
+  kids play, decide what is next, Claude implements. A big-bang rewrite would normally
+  freeze it; coexistence means the live game keeps working and keeps accepting small
+  changes. What stops is *large* new features, since anything added to the old engine has
+  to be built twice.
 - **Feel drift.** Mitigated by the playtest gate at step 5 and golden traces for the player
   controller.
 - **Felt shader parity.** The bevel compromise (baked at boot) is the known unknown.
@@ -312,5 +362,5 @@ would produce the wrong result.
 Actual level names: Doll Garden, Dinosaur Canyon, Tallinn Old Town, Palermo Piazza,
 Winter Wonderland, Toy Castle.
 
-("No build step, no dependencies — it's a single HTML file" also stops being true, by
-design.)
+("No build step, no dependencies — it's a single HTML file" stays true of the current game
+right up to cutover, and stops being true of the project at that point, by design.)
