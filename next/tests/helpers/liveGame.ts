@@ -74,6 +74,17 @@ export interface DriveOptions {
    * genuinely isolated from enemy interference, not as a sign anything still needs it.
    */
   suppressEnemies?: boolean;
+  /**
+   * Optional hook run once, after initLevel/mutateMap and before the frame loop
+   * starts — for setup none of the other hooks cover, such as forcing the camera
+   * straight to a specific position so a streamed-in enemy far from spawn (a bat,
+   * say) does not need a script that actually walks the player there. Receives the
+   * same driver the loop itself drives, so anything `getCamera`/`getPlayer` expose
+   * can be mutated in place, exactly like `mutateMap` already does for the tile grid
+   * — `camera` is a live reference to the script's own top-level binding, not a copy
+   * (see `getCamera`'s own comment on the Driver interface below).
+   */
+  beforeRun?: (d: Driver) => void;
 }
 
 const noop = (): void => {};
@@ -121,7 +132,8 @@ function makeAudioCtx(): unknown {
   };
 }
 
-interface Driver {
+/** Exported so a DriveOptions.beforeRun hook can be typed against it. */
+export interface Driver {
   initLevel: (i: number) => void;
   setLevel: (i: number) => void;
   getLevelIndex: () => number;
@@ -129,7 +141,11 @@ interface Driver {
   update: () => void;
   keys: Record<string, boolean>;
   justPressed: Record<string, boolean>;
+  /** A live reference to the script's own top-level `player`, not a copy — mutating
+   * a field on the returned object (`d.getPlayer().x = ...`) moves the live player,
+   * exactly like `getCamera` below. */
   getPlayer: () => Sample & Record<string, unknown>;
+  /** A live reference to the script's own top-level `camera`, not a copy — see getPlayer's own comment. */
   getCamera: () => { x: number; y: number };
   getAnimFrame: () => number;
   /**
@@ -149,9 +165,12 @@ interface Driver {
    */
   resetAnimFrame: () => void;
   // The live enemy objects carry extra fields depending on type (originY, sineOffset,
-  // shootTimer, ...) that this port does not model — hence the same
-  // `& Record<string, unknown>` widening getPlayer uses, and the explicit field-by-field
-  // projection down to EnemySample in driveLiveGame below.
+  // shootTimer, ...) that this port does not carry over into this comparison shape —
+  // hence the same `& Record<string, unknown>` widening getPlayer uses, and the
+  // explicit field-by-field projection down to EnemySample in driveLiveGame below.
+  // See the note on `vy` in enemy.test.ts's own bat trace comparison for why
+  // originY/sineOffset specifically stay out of EnemySample even though this port
+  // now has them on its own EnemyState.
   getEnemies: () => Array<EnemySample & Record<string, unknown>>;
   setDifficulty: (d: string) => void;
   setChar: (c: string) => void;
@@ -261,6 +280,9 @@ export function driveLiveGame(opts: DriveOptions): Sample[] {
   if (opts.suppressEnemies) d.clearEnemies();
   // After initLevel, because initLevel is what builds the map.
   opts.mutateMap?.(d.getMap());
+  // After everything above: whatever setup this run needs beyond a map edit (forcing
+  // the camera or the player to a specific spot — see the option's own comment).
+  opts.beforeRun?.(d);
 
   const trace: Sample[] = [];
   let prev: FrameInput = { left: false, right: false, jump: false };

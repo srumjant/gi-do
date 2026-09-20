@@ -41,6 +41,28 @@ export interface EnemyState {
    * instant it dies (index.html:1215, 1525, 1545).
    */
   squashTimer: number;
+  /**
+   * True for a flyer that writes its own `y` every frame instead of falling — bat and
+   * icebat (ghost too, live, but this slice never spawns one). stepEnemy's
+   * gravity/floor-snap block is skipped entirely while this is true (index.html:1526's
+   * `if(!e.noGravity){...}`). False for every ground patroller, exactly like the live
+   * source, which only ever ADDS this field for the types that need it.
+   */
+  noGravity: boolean;
+  /**
+   * The fixed height a bat/icebat's sine flight is centred on — set once at spawn,
+   * 60px above where it would otherwise have stood on the ground (index.html:1217),
+   * and never touched again; stepEnemy reads it fresh every frame rather than
+   * integrating position, so nothing here ever drifts. Inert (0) for every other type.
+   */
+  originY: number;
+  /**
+   * A bat/icebat's per-instance phase on the shared sine clock (index.html:1217's
+   * `Math.random()*Math.PI*2`), so two bats on screen at once don't move in lockstep.
+   * Drawn once at spawn from enemy.ts's injectable random, not Math.random() directly
+   * — see that module's own comment for why. Inert (0) for every other type.
+   */
+  sineOffset: number;
 }
 
 export interface World {
