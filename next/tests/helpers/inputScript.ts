@@ -238,6 +238,28 @@ export const SCRIPTS: Record<string, InputScript> = {
   },
 
   /**
+   * The same jump on the LAST frame the coyote window still allows, which makes this
+   * the script that pins the window's width rather than merely using it.
+   *
+   * The counter is set to 6 on each grounded frame and decremented once per airborne
+   * frame BEFORE the jump check reads it, so the first airborne frame sees 5 and the
+   * sixth sees 0 — meaning +5 is the last press that fires and +6 is the first that
+   * does not. coyoteJump above sits at +3, comfortably inside, so a window that
+   * silently narrowed by one frame would not change its outcome at all: mutating the 6
+   * to a 5 left the entire trace suite green. That is drift a child would feel as
+   * "jumping off edges got harder" while every comparison stayed passing, so the
+   * boundary gets its own script.
+   *
+   * Note this is a different guarantee from player.test.ts's coyote unit tests, which
+   * compare the port against itself. This one compares it against the live game, so it
+   * also catches the window being retuned there.
+   */
+  coyoteJumpLatest: {
+    input: (f) => hold({ right: true, jump: f >= LEAVE_LEDGE_1_FRAME + 5 }),
+    frames: 170,
+  },
+
+  /**
    * Jump pressed while still falling from spawn, 5 frames before landing (the latest
    * press that still carries through the buffer — see player.test.ts's own jump
    * buffer tests for the boundary case), held continuously afterward so only the one
