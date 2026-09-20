@@ -412,10 +412,15 @@ describe('getTile matches the live game', () => {
     expect(getTile(map, 48, groundY)).toBe(1); // next tile
   });
 
-  it('returns a solid value outside the map so the player cannot leave sideways', () => {
-    // index.html:1137 — out of bounds reads as 1, not 0.
-    expect(getTile(map, -8, 0)).toBe(1);
-    expect(getTile(map, LEVELS[0].width * 16 + 8, 0)).toBe(1);
+  // index.html:1137 returns 0 outside the map, NOT a solid value. Nothing in the tile
+  // layer stops the player leaving sideways — an explicit `if (p.x < 0) p.x = 0` clamp
+  // does, on the left only. Walk off the right-hand end and you fall into the void and
+  // die to the pit check, which is the live behaviour and is preserved.
+  it('reads empty outside the map, on every side', () => {
+    expect(getTile(map, -8, 0)).toBe(0);
+    expect(getTile(map, LEVELS[0].width * 16 + 8, 0)).toBe(0);
+    expect(getTile(map, 32, -8)).toBe(0);
+    expect(getTile(map, 32, LEVELS[0].height * 16 + 8)).toBe(0);
   });
 
   it('agrees with the live implementation across a dense sample of the level', () => {
@@ -429,9 +434,9 @@ describe('getTile matches the live game', () => {
 });
 ```
 
-Before writing the module, **read `index.html`'s `getTile` and `isSolid`** (search for
-`function getTile`). If out-of-bounds does not return 1, fix the test to match the live
-behaviour — the live game is the specification.
+The live source for all three is quoted verbatim in Step 3 — it has been read and checked,
+so implement against it rather than re-deriving. If anything in the test disagrees with
+`index.html`, the live game is the specification and the test is wrong.
 
 - [ ] **Step 2: Run it, see it fail**
 
@@ -483,11 +488,32 @@ export interface World {
   enemies: EnemyState[];
   /** Frames since the level started. Everything here is frame-counted, not seconds. */
   frame: number;
+  /**
+   * Set when the player falls past the pit threshold. The live game switches to a 'dead'
+   * game state whose update branch does not touch the player, so position and velocity
+   * freeze at the death frame — that freeze is what this reproduces. It does NOT respawn;
+   * the live game does that 90 frames later and that is a later plan.
+   */
+  dead: boolean;
 }
 ```
 
-Create `next/src/game/tiles.ts` as a port of the live `getTile`/`isSolid` — read them
-first and reproduce them exactly, including the out-of-bounds behaviour.
+Create `next/src/game/tiles.ts` as a port of `index.html:1137-1139`:
+
+```js
+function getTile(px,py){const tx=Math.floor(px/TILE),ty=Math.floor(py/TILE),l=LEVELS[currentLevel];
+  if(tx<0||ty<0||ty>=l.height||tx>=l.width)return 0;return map[ty][tx];}
+function isSolid(t){return t===1||t===2||t===3||t===5;}
+function rectOverlap(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
+```
+
+The live versions read module globals (`map`, `currentLevel`); take the map as a parameter
+instead and derive the bounds from it — `map.length` is the height and `map[0].length` the
+width, which is exactly what the live level dimensions are. Port `rectOverlap` too; Task 5
+needs it for the stomp check.
+
+Note what `getTile` does NOT do: there is no solid-outside-the-world behaviour. Out of
+bounds is empty on all four sides.
 
 - [ ] **Step 4: Run the test** → PASS.
 
@@ -499,8 +525,9 @@ git add next/src/game/ next/tests/tiles.test.ts
 git commit -m "feat: port the tile queries
 
 isSolid is an explicit list of four codes, not 'non-zero' — they coincide
-only because tile 4 is never written. Out-of-bounds reads as solid, which
-is what stops the player walking off the side."
+only because tile 4 is never written. Out-of-bounds reads as empty on every
+side; what keeps the player in the world is a single x clamp on the left,
+and nothing at all on the right."
 ```
 
 ---
@@ -570,7 +597,11 @@ import type { World } from '../src/game/types';
 function world(): World {
   const level = LEVELS[0];
   const dc = DIFFICULTY_CONFIG.normal;
-  return { level, map: level.generate(dc), dc, player: createPlayer(level), enemies: [], frame: 0 };
+  return {
+    level, map: level.generate(dc), dc,
+    player: createPlayer(level, 'gigi'),
+    enemies: [], frame: 0,
+  };
 }
 
 describe('horizontal movement', () => {
@@ -706,13 +737,58 @@ is used, and the comment above it says why.
 - [ ] **Step 4: Write `next/src/game/player.ts`**
 
 Port lines 1361–1423, minus the parts that are out of scope for the slice: no shooting, no
-fart/bighead power-ups, no landing dust particles, no question/rainbow block bumps, no pit
-death yet (Task 5 adds the enemy; pit death is Task 6). Keep everything that moves the
-player.
+fart/bighead power-ups, no landing dust particles, no question/rainbow block bumps. Keep
+everything that moves the player.
 
-Export `createPlayer(level)` building the state the live `initLevel` builds
-(`index.html:1167` — `w = spriteW - 4`, `h = spriteH - 4`, positioned from
-`level.playerStart`), and `stepPlayer(world, input)` doing one tick.
+**Pit death IS in scope**, because a trace that walks off a ledge needs it. The live code
+at `index.html:1423` reads:
+
+```js
+if(p.y>lvl.height*TILE+32){ ...capeSavesPit branch... else{playerDie();} return; }
+```
+
+and `playerDie` (`:1647`) sets `gameState='dead'`, which makes the next `update()` take a
+branch that does not touch the player at all — so the player's position and velocity
+**freeze** at the values from the death frame.
+
+Reproduce exactly that much: add `dead: boolean` to `World`, set it when the pit threshold
+is crossed, and make `stepPlayer` return immediately when it is already set. The cape
+branch is out of scope (no cape in the slice) and `capeSavesPit` only exists on
+`super_easy` anyway, which the traces do not use.
+
+**Respawn is deliberately NOT in scope.** 90 frames after dying the live game calls
+`initLevel` again and the player reappears at the level start. Implementing lives,
+`stateTimer` and level reset is a later plan, so Task 7's scripts are bounded to stop well
+before that — see the note there.
+
+Export `createPlayer(level, character)` building exactly the state the live `initLevel`
+builds. The live source (`index.html:1166-1171`) reads:
+
+```js
+const ps=getPlayerSprites(), ph=spriteH(ps.stand,2), pw=spriteW(ps.stand,2);
+player={x:lvl.playerStart[0]*TILE, y:lvl.playerStart[1]*TILE, vx:0, vy:0, w:pw-4, h:ph-4,
+  onGround:false, facing:1, ...};
+```
+
+Three things there are easy to get wrong and every trace depends on all of them:
+
+- **The player starts airborne.** `onGround: false`, at `playerStart[1] * TILE`, and falls
+  to the ground over the first few frames. Frame 0 of a real trace is
+  `{x: 32.4, y: 320.24, vx: 0.4, vy: 0.24, onGround: false}` — it is already moving.
+- **`w` and `h` come from the character's sprite**, not from a constant.
+  `spriteW(s, 2) = s[0].length * 2` and `spriteH(s, 2) = s.length * 2`, each less 4. Gigi's
+  stand frame is 14 rows by 10 columns, giving `w = 16, h = 24`; Dodo's is 12 rows, giving
+  `h = 20`. So the player is a **different size per character** and `createPlayer` must
+  take the character rather than assume one. Derive it from the ported
+  `GIGI_SKINS[0].stand` / `DODO_SKINS[0].stand` in `src/data/sprites.ts` — do not hardcode
+  16 and 24.
+- **`facing` starts at 1**, and `coyoteTime` and `jumpBuffer` both start at 0.
+
+The slice drives Gigi, so only Gigi's dimensions are exercised by the traces; take the
+character anyway, because a hardcoded 24 would silently break the moment anyone selects
+Dodo and would look like a physics bug rather than a sizing one.
+
+Also export `stepPlayer(world, input)` doing one tick.
 
 **Do not reorder the operations.** Horizontal, then coyote, then buffer, then jump, then
 the variable cut, then gravity, then X move and resolve, then Y move and resolve.
@@ -752,16 +828,21 @@ import type { InputState } from '../input/actions';
 import { createPlayer, stepPlayer } from './player';
 import type { World } from './types';
 
-export function createWorld(levelIndex: number, difficulty: DifficultyKey): World {
+export function createWorld(
+  levelIndex: number,
+  difficulty: DifficultyKey,
+  character: Character = 'gigi',
+): World {
   const level = LEVELS[levelIndex];
   const dc = DIFFICULTY_CONFIG[difficulty];
   return {
     level,
     map: level.generate(dc),
     dc,
-    player: createPlayer(level),
+    player: createPlayer(level, character),
     enemies: [],
     frame: 0,
+    dead: false,
   };
 }
 
@@ -840,7 +921,10 @@ bounces the player to `-5`. Contact from the side does nothing yet — **do not 
 Note that clearly in a comment.
 
 Also read `spawnEnemy` (`index.html` ~line 1212) for `w`, `h` and the initial `vx`, and
-`findGroundY` for the spawn row.
+`findGroundY` (`index.html:1136`) for the spawn row. Note what `findGroundY` actually
+does: it scans **downward from the top** and returns the first solid tile, so an enemy
+whose column has a platform above the ground spawns on the platform, not on the ground.
+That is the live behaviour; reproduce it rather than "fixing" it to find the floor.
 
 - [ ] **Step 1: Write failing tests** covering: falls to the ground and stops; patrols;
   turns at a wall; turns at a ledge rather than walking off; is killed by a falling player
@@ -941,6 +1025,13 @@ This is what the plan exists for.
 | `bufferedJump` | jump pressed while falling, fires on landing |
 | `landOnPlatform` | downward Y resolution onto a raised tile |
 | `longRun` | 600 frames, to catch slow numerical drift |
+
+**Bound any script that can fall in a pit.** Dying freezes the player in both
+implementations, but 90 frames later the live game respawns at the level start and the
+port does not — respawn is a later plan. So `walkOffLedge` and anything else that can drop
+into a gap must end well inside that window. Assert it rather than hoping: a script that
+dies at frame 40 and runs to frame 200 will diverge at frame 130, and the diff will look
+like a physics bug rather than a scope boundary.
 
 **Do not hardcode geometry into these scripts beyond what is verified.** What is verified
 about level 1 (`Doll Garden`, 120×25, player starts at tile 2,20): the ground occupies the
