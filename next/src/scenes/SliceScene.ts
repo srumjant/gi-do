@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
 import { BASE_H, BASE_W, STEP_MS, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
+import { PARALLAX, type ParallaxLayer } from '../data/parallax';
 import { getDodoSkin, getGigiSkin, getSelectedChar } from '../game/run';
 import { createWorld, stepWorld } from '../game/world';
 import type { EnemyState, World } from '../game/types';
+import { cloudPosition, cloudScale, drawRidges, drawSky } from '../gfx/parallax';
 import { createRainbowBlocks, drawStaticTiles, updateRainbowBlocks, type RainbowBlock } from '../gfx/tiles';
-import { enemyTextureKey, playerTextureKey, registerTextures } from '../gfx/textures';
+import { cloudTextureKey, enemyTextureKey, playerTextureKey, registerTextures } from '../gfx/textures';
 import type { InputState } from '../input/actions';
 import { createKeyboardInput, type KeyboardInput } from '../input/keyboard';
 
@@ -27,19 +29,29 @@ const PLAYER_DRAW_INSET = 2;
 /** `player.frame`: 0 stand, 1 run, 2 jump (types.ts, index.html:1424-1429). */
 const PLAYER_POSES = ['stand', 'run', 'jump'] as const;
 
+/** Cloud alpha (index.html:1676: `ctx.globalAlpha=0.75`). */
+const CLOUD_ALPHA = 0.75;
+
+/** One cloud's fixed tile position plus the Image drawing it. */
+interface CloudView {
+  readonly tx: number;
+  readonly ty: number;
+  readonly image: Phaser.GameObjects.Image;
+}
+
 /**
  * The vertical slice: the first Phaser-facing code in this port, and the validation
  * gate for the whole migration. Driven by the pure simulation in src/game/ and drawn
- * with the kids' actual pixel art and the real tile grid now that Plan 3 has a
- * texture pipeline — still no felt shading (deferred), no parallax yet, no HUD, no
- * sound. It exists to answer one question (does the port feel the same as the live
- * game?), so every hour spent making it prettier is an hour not spent on that.
+ * with the kids' actual pixel art, the real tile grid, and a scrolling parallax sky
+ * now that Plan 3 has a texture pipeline — still no felt shading (deferred), no HUD,
+ * no sound. It exists to answer one question (does the port feel the same as the
+ * live game?), so every hour spent making it prettier is an hour not spent on that.
  *
- * The scene is deliberately thin: build the tile map and the player image once in
- * `create()`, advance the simulation at a fixed rate in `update()`, and copy
- * simulation state onto Phaser objects in `syncSprites()`. It never mutates `world`
- * except by calling `stepWorld`, and it never drives the camera itself — Phaser's
- * camera is only ever told where the simulation's camera already is.
+ * The scene is deliberately thin: build the background, the tile map and the player
+ * image once in `create()`, advance the simulation at a fixed rate in `update()`, and
+ * copy simulation state onto Phaser objects in `syncSprites()`. It never mutates
+ * `world` except by calling `stepWorld`, and it never drives the camera itself —
+ * Phaser's camera is only ever told where the simulation's camera already is.
  */
 export class SliceScene extends Phaser.Scene {
   private world!: World;
@@ -48,6 +60,9 @@ export class SliceScene extends Phaser.Scene {
   private readonly enemyImages: Phaser.GameObjects.Image[] = [];
   private rainbowBlocks: RainbowBlock[] = [];
   private rainbowGraphics!: Phaser.GameObjects.Graphics;
+  private hillsGraphics: Phaser.GameObjects.Graphics | undefined;
+  private parallaxLayers: readonly ParallaxLayer[] = [];
+  private clouds: CloudView[] = [];
   private accumulator = 0;
 
   constructor() {
@@ -55,9 +70,12 @@ export class SliceScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.world = createWorld(0, 'normal');
+    const levelIndex = 0;
+    this.world = createWorld(levelIndex, 'normal');
 
     registerTextures(this);
+
+    this.createParallax(levelIndex);
 
     drawStaticTiles(this, this.world);
     const rainbow = createRainbowBlocks(this, this.world);
@@ -76,6 +94,75 @@ export class SliceScene extends Phaser.Scene {
     this.cameras.main.setZoom(ZOOM);
 
     this.controls = createKeyboardInput(this);
+  }
+
+  /**
+   * Builds the sky, the parallax hill layers, and the clouds — everything
+   * `drawParallax` and the live game's cloud block draw BEFORE the world's own
+   * `ctx.scale(ZOOM)` (index.html:1044-1072, 1676), i.e. unzoomed and independent of
+   * camera scroll. `PARALLAX[levelIndex]` mirrors the live game's own guard
+   * (`if(!pd)return`, index.html:1045): the one level this slice runs (0) has an
+   * entry, but a level that did not would simply get no sky, hills or clouds rather
+   * than a crash — `hillsGraphics` stays undefined and `clouds` stays empty, both
+   * read defensively in `syncSprites` below.
+   */
+  private createParallax(levelIndex: number): void {
+    const parallax = PARALLAX[levelIndex];
+    if (!parallax) return;
+
+    const sky = this.add.graphics();
+    this.setupFixedLayer(sky);
+    drawSky(sky, this.world.level.bg, parallax.bg2);
+
+    const hills = this.add.graphics();
+    this.setupFixedLayer(hills);
+    this.hillsGraphics = hills;
+    this.parallaxLayers = parallax.layers;
+
+    this.clouds = this.world.level.clouds.map(([tx, ty]) => {
+      const image = this.add
+        .image(0, 0, cloudTextureKey(cloudScale(tx)))
+        .setOrigin(0, 0)
+        .setAlpha(CLOUD_ALPHA);
+      this.setupFixedLayer(image);
+      return { tx, ty, image };
+    });
+  }
+
+  /**
+   * Puts a Graphics or Image on the fixed background layer (sky, hills, clouds). All
+   * three render through the SAME shared main camera as the world (tiles, player,
+   * enemies) — there is no second camera — but must not scroll or zoom with it,
+   * matching the live game drawing them before its own `ctx.scale(ZOOM)`
+   * (index.html:1044-1072, 1676). `scrollFactor(0)` handles the scroll half. The
+   * other half is zoom: Phaser zooms every object about the camera's CENTRE —
+   * including scrollFactor(0) ones — while the live drawing is unzoomed and
+   * top-left-anchored, so positioning at (CAMERA_PIVOT_X, CAMERA_PIVOT_Y) and scaling
+   * by 1/ZOOM cancels the shared camera's zoom back out. After this,
+   * `positionFixedLayer(obj, 0, 0)` — its position immediately below — lands on the
+   * same screen pixel the live canvas's raw (0, 0) would.
+   */
+  private setupFixedLayer(obj: Phaser.GameObjects.Graphics | Phaser.GameObjects.Image): void {
+    obj.setScale(1 / ZOOM).setScrollFactor(0);
+    this.positionFixedLayer(obj, 0, 0);
+  }
+
+  /**
+   * Moves a fixed-background-layer object (`setupFixedLayer` above) so that the
+   * given RAW, unzoomed pixel coordinate — exactly the live formulas in
+   * gfx/parallax.ts, unchanged — lands on the same screen pixel the live canvas
+   * would put it on. The sky and hills Graphics only ever need this once, at (0, 0):
+   * their own drawn path already covers the full raw coordinate range on its own.
+   * Each cloud Image needs it called again every frame, with that cloud's current
+   * `cloudPosition`, since an Image — unlike a Graphics path — has only the one
+   * position to carry its drift.
+   */
+  private positionFixedLayer(
+    obj: Phaser.GameObjects.Graphics | Phaser.GameObjects.Image,
+    rawX: number,
+    rawY: number,
+  ): void {
+    obj.setPosition(rawX / ZOOM + CAMERA_PIVOT_X, rawY / ZOOM + CAMERA_PIVOT_Y);
   }
 
   update(_time: number, delta: number): void {
@@ -124,6 +211,17 @@ export class SliceScene extends Phaser.Scene {
       const image = this.enemyImages[i] ?? this.createEnemyImage(enemy);
       this.enemyImages[i] = image;
       this.syncEnemyImage(image, enemy, animFrame);
+    }
+
+    // Parallax: the ridge and clouds scroll at their own rate from world.camera.x,
+    // independent of the world's own camera (see the fixed-layer helpers above). The
+    // sky is static and was drawn once in create().
+    if (this.hillsGraphics) {
+      drawRidges(this.hillsGraphics, this.parallaxLayers, camera.x);
+    }
+    for (const cloud of this.clouds) {
+      const pos = cloudPosition(cloud.tx, cloud.ty, camera.x, animFrame);
+      this.positionFixedLayer(cloud.image, pos.x, pos.y);
     }
 
     // The only tile that animates — see gfx/tiles.ts. Everything else the tile grid
