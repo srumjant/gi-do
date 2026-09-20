@@ -76,16 +76,22 @@ export interface DriveOptions {
   suppressEnemies?: boolean;
   /**
    * Optional hook run once, after initLevel/mutateMap and before the frame loop
-   * starts — for setup none of the other hooks cover, such as forcing the camera
-   * straight to a specific position so a streamed-in enemy far from spawn (a bat or
-   * a bouncer, say) does not need a script that actually walks the player there.
-   * Receives the same driver the loop itself drives, so anything
-   * `getCamera`/`getPlayer` expose can be mutated in place, exactly like `mutateMap`
-   * already does for the tile grid — `camera` is a live reference to the script's
-   * own top-level binding, not a copy (see `getCamera`'s own comment on the Driver
-   * interface below).
+   * starts — for setup none of the other hooks cover, such as forcing the camera or
+   * the player straight to a specific spot so a scenario deep in the level (a bat or
+   * bouncer streamed in far from spawn, the rescue 113 tiles away) does not need a
+   * script that actually walks the player there. Receives the same driver the loop
+   * itself drives, so anything `getCamera`/`getPlayer` expose can be mutated in
+   * place, exactly like `mutateMap` already does for the tile grid — both `camera`
+   * and `player` are live references to the script's own top-level bindings, not
+   * copies (see `getCamera`'s own comment on the Driver interface below).
    */
   beforeRun?: (d: Driver) => void;
+  /**
+   * Optional hook run every frame, right after `update()` — for recording fields the
+   * standard `Sample` shape does not carry (e.g. gameState) into the caller's own
+   * side channel, without growing that shape for every trace that does not need them.
+   */
+  onFrame?: (d: Driver, frame: number) => void;
 }
 
 const noop = (): void => {};
@@ -133,7 +139,7 @@ function makeAudioCtx(): unknown {
   };
 }
 
-/** Exported so a DriveOptions.beforeRun hook can be typed against it. */
+/** Exported so a DriveOptions.beforeRun/onFrame hook can be typed against it. */
 export interface Driver {
   initLevel: (i: number) => void;
   setLevel: (i: number) => void;
@@ -149,6 +155,8 @@ export interface Driver {
   /** A live reference to the script's own top-level `camera`, not a copy — see getPlayer's own comment. */
   getCamera: () => { x: number; y: number };
   getAnimFrame: () => number;
+  /** The live game's own `gameState` string (e.g. 'playing', 'dead', 'levelcomplete'). */
+  getGameState: () => string;
   /**
    * Zeroes the live script's top-level `animFrame` IN PLACE. `initLevel` never resets
    * it (its one direct assignment in the whole file is the top-level declaration
@@ -232,6 +240,7 @@ function bootLiveGame(): Driver {
   getPlayer: () => player,
   getCamera: () => camera,
   getAnimFrame: () => animFrame,
+  getGameState: () => gameState,
   resetAnimFrame: () => { animFrame = 0; },
   getEnemies: () => enemies,
   clearEnemies: () => { pendingEnemies.length = 0; enemies.length = 0; },
@@ -300,6 +309,7 @@ export function driveLiveGame(opts: DriveOptions): Sample[] {
 
     d.update();
     prev = held;
+    opts.onFrame?.(d, f);
 
     const p = d.getPlayer();
     const cam = d.getCamera();

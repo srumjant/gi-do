@@ -119,8 +119,10 @@ export interface World {
   lives: number;
   /**
    * Counts down from 90 while `dead` (index.html:1348's `stateTimer--`), independent
-   * of `frame`/`animFrame`. Only meaningful while `dead` is true; `stepWorld`'s dead
-   * branch is the sole reader.
+   * of `frame`/`animFrame`. While `dead`, `stepWorld`'s dead branch is the sole reader.
+   * `checkRescue` also sets it to 200 on a win (index.html:1631), matching the live
+   * `stateTimer=200` a level-complete assigns — but nothing in this slice counts it
+   * down from THAT branch; see `won` below for why.
    */
   stateTimer: number;
   /**
@@ -132,6 +134,17 @@ export interface World {
    * alone did before respawn existed.
    */
   gameOver: boolean;
+  /**
+   * Set by `checkRescue` (world.ts) once the player overlaps the rescue box
+   * (index.html:1631's `gameState='levelcomplete'`). A terminal marker, same idea as
+   * `gameOver` above rather than a mirror of `dead`: the live `levelcomplete` state
+   * itself counts `stateTimer` down and then either advances to the next level or, on
+   * the last one, to a 'win' screen (index.html:1350) — level advancement is out of
+   * scope for this plan, so none of that is reproduced here. Once true, `stepWorld`
+   * returns immediately every frame after, freezing the world exactly like `dead`
+   * does, just with no respawn (or anything else) waiting on the other side of it.
+   */
+  won: boolean;
   /**
    * Which character's sprite sizes the player (createPlayer's `character` argument),
    * kept so a respawn can rebuild an equivalent player without the caller supplying

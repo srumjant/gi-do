@@ -4,6 +4,8 @@ import { LEVELS } from '../data/levels';
 import type { InputState } from '../input/actions';
 import { spawnEnemy, stepEnemy } from './enemy';
 import { createPlayer, stepPlayer, type Character } from './player';
+import { getRescueSprites } from './run';
+import { findGroundY, rectOverlap } from './tiles';
 import type { World } from './types';
 
 /**
@@ -41,6 +43,7 @@ export function createWorld(
     lives: dc.lives,
     stateTimer: 0,
     gameOver: false,
+    won: false,
     character,
   };
 }
@@ -102,28 +105,81 @@ export function stepWorld(world: World, input: InputState): void {
     return;
   }
 
+  // Already won: nothing plays, forever — index.html's 'levelcomplete' state counts
+  // its own stateTimer down and advances to the next level (or a 'win' screen on the
+  // last one), but level advancement is out of scope for this plan, so there is
+  // nothing on the other side of this to return to. A plain terminal marker, same
+  // idea as `gameOver` above.
+  if (world.won) {
+    world.frame++;
+    return;
+  }
+
   spawnEnemiesInView(world);
   stepPlayer(world, input);
 
   // A PIT death happens inside the player block, which returns right there
-  // (index.html:1423) — a direct return from update() itself — so enemies and the
-  // camera are skipped for the rest of that frame too. The spawn pass above has
-  // already run, which is also what the live game does.
+  // (index.html:1423) — a direct return from update() itself — so enemies, the
+  // rescue check and the camera are all skipped for the rest of that frame too. The
+  // spawn pass above has already run, which is also what the live game does.
   //
   // A CONTACT death is different, and this `if` is checked only ONCE, before
   // stepEnemies runs, deliberately: the live equivalent (index.html:1547's
   // `playerHit();return;`) sits inside `enemies.forEach`, so that `return` only ends
   // ITS OWN enemy's turn — the live forEach still steps every enemy after it, and
-  // `update()` still runs its camera lerp afterward, all on the very same frame the
-  // player died. Checking `world.dead` again between stepEnemies and stepCamera (or
-  // inside stepEnemies' loop) would freeze one frame earlier than the live game does
-  // and desync the trace. So: one check, both calls inside it, exactly like this.
+  // `update()` still runs its rescue check and camera lerp afterward, all on the very
+  // same frame the player died (index.html has no gameState guard in front of either).
+  // Checking `world.dead` again between stepEnemies and stepCamera (or inside
+  // stepEnemies' loop) would freeze one frame earlier than the live game does and
+  // desync the trace. So: one check, all three calls inside it, exactly like this.
   if (!world.dead) {
     stepEnemies(world);
+    checkRescue(world);
     stepCamera(world);
   }
 
   world.frame++;
+}
+
+/**
+ * Port of the rescue check at index.html:1629-1631, run after the enemies step and
+ * before the camera lerp — exactly where the live source has it (see stepWorld's own
+ * comment on why that placement, inside the same `!world.dead` guard, matters).
+ *
+ * The overlap box's HEIGHT comes from the RESCUED character's sprite, not the
+ * player's — the other character from whichever the player picked (Gigi is rescued
+ * playing as Dodo, and vice versa; `getRescueSprites`, ported in run.ts, already
+ * resolves that), at scale 2, same as the live `spriteH(rs.sprite,2)`. Gigi and Dodo
+ * are different heights (28 and 24 at that scale), so which one is being rescued
+ * genuinely changes this box, unlike its WIDTH, which is a flat, hardcoded 16
+ * (index.html:1631's literal `w:16`) independent of either character's actual sprite
+ * width — reproduced as a literal here too, not "fixed" to use the sprite.
+ *
+ * The player's own box here is the FULL hitbox `{x,y,w,h}` — NOT the +2/-4 inset box
+ * stepEnemy's stomp check uses. Two different boxes, deliberately, exactly as the
+ * live source calls rectOverlap with two different insets in the same update().
+ */
+export function checkRescue(world: World): void {
+  const { player: p, level: lvl, map } = world;
+  const rescue = getRescueSprites();
+  const rTX = lvl.rescuePos[0];
+  const rGY = findGroundY(map, rTX);
+  const rDH = rescue.sprite.length * 2;
+  const rX = rTX * TILE;
+  const rY = rGY - rDH;
+  // index.html:1630's `!boss||bossDefeated`. No boss exists in this slice's World (a
+  // boss fight is a later plan), which is exactly the live condition when there is no
+  // boss on the level at all — always true here, ported as a named constant rather
+  // than silently dropped, so that later plan has an obvious place to wire the real
+  // condition back in instead of having to rediscover this check from scratch.
+  const canRescue = true;
+  if (canRescue && rectOverlap(
+    { x: p.x, y: p.y, w: p.w, h: p.h },
+    { x: rX, y: rY, w: 16, h: rDH },
+  )) {
+    world.won = true;
+    world.stateTimer = 200; // index.html:1631. No level-advance in this slice — won is terminal.
+  }
 }
 
 /**
