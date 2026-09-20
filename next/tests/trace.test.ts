@@ -13,13 +13,17 @@
 // reason that had nothing to do with the physics under test. Now that contact damage
 // is implemented (player.ts's playerHit/playerDie, enemy.ts's stepEnemy), running with
 // enemies live is the point — several of these scripts now walk right into doll@15 and
-// die, and matching through that death (and, for three of them, all the way through
-// the 90-frame respawn) is exactly what this suite exists to prove. No frame count
-// below was shortened to dodge the doll: every script that still never dies (see
-// EXPECT_DEATH) already stayed clear on its own existing budget; every one that now
-// dies was simply left at its original length rather than trimmed, since either it
-// stays frozen well short of respawn or it crosses respawn and still matches — see
-// each affected script's own comment in inputScript.ts for which, and why.
+// die, and matching through that death — and through the 90-frame respawn — is exactly
+// what this suite exists to prove. No frame count was shortened to dodge the doll.
+//
+// Suppression is per-script rather than global. A handful of scripts exist to test the
+// player against real geometry (the gap at tile 20, the coyote window over it), and
+// doll@15 kills any hold-right script at frame 60 — well before it can get there. With
+// enemies on, those scripts silently become duplicates of every other frame-60 death:
+// coyoteJumpLatest in particular collapsed into a byte-identical copy of coyoteJump,
+// and the coyote window stopped being pinned by any trace at all. So the geometry
+// scripts run with enemies off, everything else runs with them on, and dieAndRespawn
+// covers the death-and-respawn path deliberately.
 import { describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
 import { SCRIPTS, STOMP_SCRIPT } from './helpers/inputScript';
@@ -36,7 +40,10 @@ import { LEVELS } from '../src/data/levels';
  * just makes the expectation explicit instead of implicit.
  */
 const EXPECT_DEATH = new Set([
-  'walkOffLedge', 'runningJump', 'coyoteJump', 'coyoteJumpLatest', 'walkCycle',
+  // Falls in the real pit at tile 20 — enemies suppressed so it can get there.
+  'walkOffLedge',
+  // Killed by doll@15 on contact, enemies live.
+  'runningJump', 'walkCycle', 'dieAndRespawn',
 ]);
 
 describe.each(Object.entries(SCRIPTS))('%s matches the live game', (name, script) => {
@@ -44,9 +51,14 @@ describe.each(Object.entries(SCRIPTS))('%s matches the live game', (name, script
     const live = driveLiveGame({
       level: 0, difficulty: 'normal', character: 'gigi',
       frames: script.frames, input: script.input,
+      suppressEnemies: script.suppressEnemies,
     });
 
     const world = createWorld(0, 'normal');
+    if (script.suppressEnemies) {
+      world.pending.length = 0;
+      world.enemies.length = 0;
+    }
 
     const port: typeof live = [];
     const deadEachFrame: boolean[] = [];

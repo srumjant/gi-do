@@ -44,6 +44,21 @@ import type { FrameInput } from './liveGame';
 export interface InputScript {
   input: (frame: number) => FrameInput;
   frames: number;
+  /**
+   * Run this script with no enemies at all.
+   *
+   * Enemies are live by default, which is the stronger comparison. But level 0's doll@15
+   * patrols the whole approach and kills any hold-right script at frame 60 — before it
+   * can reach the gap at tile 20. So a script whose whole purpose is player-versus-
+   * geometry (the real ledge, the real coyote window) can no longer reach its scenario
+   * with enemies on, and silently becomes a duplicate of every other script that dies at
+   * frame 60.
+   *
+   * That is not hypothetical: dropping suppression globally turned coyoteJumpLatest into
+   * a copy of coyoteJump and lost the only trace that pinned the coyote window's width.
+   * So suppression is per-script — on for the geometry scripts, off everywhere else.
+   */
+  suppressEnemies?: boolean;
 }
 
 const LEVEL = 0;
@@ -202,6 +217,16 @@ const WALK_CYCLE_RELEASE = WALK_CYCLE_HOLD_START + 70;
 // ---------------------------------------------------------------------------
 
 export const SCRIPTS: Record<string, InputScript> = {
+  /**
+   * Death by enemy contact, and the respawn 90 frames later. Enemies live, obviously.
+   * doll@15 kills a hold-right script at frame 60; 160 frames leaves a clear margin past
+   * the respawn at 150 without running so long that a second death muddies the trace.
+   */
+  dieAndRespawn: {
+    input: () => hold({ right: true }),
+    frames: 160,
+  },
+
   /** Gravity settle, nothing else: falls from spawn onto the ground and stays there. */
   standStill: {
     input: () => hold({}),
@@ -271,6 +296,9 @@ export const SCRIPTS: Record<string, InputScript> = {
   walkOffLedge: {
     input: () => hold({ right: true }),
     frames: 160,
+    // Enemies off: doll@15 kills a hold-right script at frame 60, long before the gap at
+    // tile 20. This script exists for the real pit, so it needs to reach it.
+    suppressEnemies: true,
   },
 
   /**
@@ -293,6 +321,8 @@ export const SCRIPTS: Record<string, InputScript> = {
   coyoteJump: {
     input: (f) => hold({ right: true, jump: f >= LEAVE_LEDGE_1_FRAME + 3 }),
     frames: 170,
+    // Enemies off — same reason as walkOffLedge. The coyote window is over the real gap.
+    suppressEnemies: true,
   },
 
   /**
@@ -316,6 +346,10 @@ export const SCRIPTS: Record<string, InputScript> = {
   coyoteJumpLatest: {
     input: (f) => hold({ right: true, jump: f >= LEAVE_LEDGE_1_FRAME + 5 }),
     frames: 170,
+    // Enemies off, and this one specifically: with them on it becomes a byte-identical
+    // copy of coyoteJump (both just die at frame 60) and the coyote window stops being
+    // pinned by any trace at all.
+    suppressEnemies: true,
   },
 
   /**
