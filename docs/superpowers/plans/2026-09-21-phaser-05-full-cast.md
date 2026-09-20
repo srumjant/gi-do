@@ -442,7 +442,26 @@ Then run it in a browser and play level 1 start to finish: collect both pickups,
 block, use all three power-ups, shoot something, convert something into a chicken, and
 watch the cat spend its three scratches.
 
+**Two things only a human can check here, both left deliberately untested upstream:**
+
+- **Collect a star, and watch the score go up.** Task 3 traced a `?` block being bumped
+  and the star's whole rise, but never its collection: the star hangs in the tile above
+  the block the player is standing under, out of reach from the bump position, and getting
+  one needs a jump from an adjacent column that has nothing to do with block bumping. So
+  `stepStars`' collection branch and its `100 * scoreMultiplier` award have **no coverage
+  at all**. Confirm by eye that a star can be caught and that it scores.
+- **The two adjacent-block cases.** Bumping a `?` and a rainbow side by side, or two of a
+  kind, is implemented but untraceable: level 1 has no two blocks adjacent in a row.
+
 No unit tests for any of this.
+
+**Two facts from earlier tasks that will save you time here:**
+
+- `findGroundY` on a block's own column returns **the block**, not the floor beneath it —
+  it scans down from row 0 and `?`/rainbow tiles are solid. Derive standing heights from a
+  neighbouring column.
+- `questionBlocks` is built row-major from the map, so its order is not the level record's.
+  Look blocks up by coordinate, never by index.
 
 ---
 
