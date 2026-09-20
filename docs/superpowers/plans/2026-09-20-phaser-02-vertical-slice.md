@@ -495,6 +495,22 @@ export interface World {
    * the live game does that 90 frames later and that is a later plan.
    */
   dead: boolean;
+  /**
+   * Simulation state, not presentation state. Enemies do not exist until the camera
+   * reaches them (index.html:1358), so where the camera is decides when an enemy spawns
+   * and therefore what an enemy trace looks like. The scene reads this to scroll; it
+   * does not own it.
+   */
+  camera: { x: number; y: number };
+  /** Enemy definitions not yet streamed in. Drained by the spawn window each step. */
+  pending: PendingEnemy[];
+}
+
+export interface PendingEnemy {
+  type: string;
+  /** Tile column, from the level's enemyDefs. */
+  x: number;
+  spawned: boolean;
 }
 ```
 
@@ -846,14 +862,45 @@ export function createWorld(
   };
 }
 
-/** One simulation tick. Called at exactly STEP_HZ regardless of display refresh. */
+/**
+ * One simulation tick, called at exactly STEP_HZ regardless of display refresh.
+ *
+ * The order is the live game's and it matters. The spawn window runs FIRST, against the
+ * camera as it was left by the previous frame (index.html:1358, near the top of the
+ * playing branch), and the camera lerps LAST (index.html:1634, near the bottom). Doing
+ * the camera first would shift every enemy's spawn frame by one and the enemy traces
+ * would drift apart for a reason that looks nothing like the cause.
+ */
 export function stepWorld(world: World, input: InputState): void {
+  spawnEnemiesInView(world); // Task 5
   stepPlayer(world, input);
+  stepEnemies(world); // Task 5
+  stepCamera(world);
   world.frame++;
+}
+
+/**
+ * Exponential lerp toward the player, clamped to the level, with a snap inside half a
+ * pixel so it does not creep forever. index.html:1634-1640.
+ */
+export function stepCamera(world: World): void {
+  const { player: p, level: lvl, camera } = world;
+  const targetX = Math.max(0, Math.min(p.x - VIEW_W / 2 + p.w / 2, lvl.width * TILE - VIEW_W));
+  const targetY = Math.max(0, Math.min(p.y - VIEW_H / 2, lvl.height * TILE - VIEW_H));
+  camera.x += (targetX - camera.x) * 0.12;
+  camera.y += (targetY - camera.y) * 0.12;
+  if (Math.abs(camera.x - targetX) < 0.5) camera.x = targetX;
+  if (Math.abs(camera.y - targetY) < 0.5) camera.y = targetY;
 }
 ```
 
-Enemies are added to `stepWorld` in Task 5.
+`createWorld` starts the camera at `{x: 0, y: 0}` — that is what `initLevel` does
+(`index.html:1193`) — and fills `pending` from `level.enemyDefs`. The enemy functions
+arrive in Task 5; stub them as no-ops here if you want Task 4 to stand alone, but keep
+the call order.
+
+Add camera tests: it starts at zero, it moves toward the player, it never goes negative,
+and it stops exactly on target rather than approaching forever.
 
 - [ ] **Step 2: Write a test that `src/game/` never imports Phaser**
 
@@ -933,8 +980,34 @@ That is the live behaviour; reproduce it rather than "fixing" it to find the flo
 
 - [ ] **Step 2: See them fail. Step 3: implement. Step 4: see them pass.**
 
-- [ ] **Step 5: Spawn one enemy in `createWorld`** — the first `enemyDefs` entry of level 1
-  whose type is a ground patroller (`doll`, `car`, `dino`, `penguin`).
+- [ ] **Step 5: Stream enemies in, do not spawn them up front.**
+
+This is the part that makes an enemy trace possible at all. The live game keeps every
+`enemyDefs` entry in a pending list and only creates the enemy when its tile column enters
+a window around the camera (`index.html:1358`):
+
+```js
+const crT=Math.floor((camera.x+BASE_W)/TILE)+1, clT=Math.floor(camera.x/TILE)-1;
+pendingEnemies.forEach(d=>{if(!d.spawned&&d.x>=clT&&d.x<=crT){d.spawned=true;
+  if(dc.enemySkipChance&&Math.random()<dc.enemySkipChance)return;enemies.push(spawnEnemy(d));}});
+```
+
+Three things to preserve:
+
+- **The window uses `BASE_W` (640), not `VIEW_W` (426).** The world is drawn at 1.5x zoom,
+  so the visible width is 426 — meaning enemies spawn a long way off-screen to the right.
+  That is what the live game does; do not "correct" it to the visible width.
+- **`spawned` is set before the skip check**, so an enemy skipped by `enemySkipChance`
+  never gets another chance. Irrelevant at `normal` (where `enemySkipChance` is undefined
+  and the branch never runs) but reproduce the ordering anyway.
+- **Spawn dimensions come from the sprite**, at `ENEMY_SCALE` 1.8, and are NOT integers.
+  A doll is 9 rows by 8 columns, giving `w = 14.4, h = 16.2`. `spawnEnemy`
+  (`index.html:1212-1222`) also sets `vx = -0.8 * dc.enemySpeed` for most types and
+  `-0.6 * dc.enemySpeed` for a penguin, and places the enemy at `findGroundY(def.x) - h`.
+
+For the slice, only ground patrollers (`doll`, `car`, `dino`, `penguin`) need handling.
+Skip any pending entry of another type rather than spawning something you have not
+implemented, and say so in a comment.
 
 - [ ] **Step 6: Build, test, commit.**
 
@@ -1110,7 +1183,22 @@ differs, and that is the finding.
   Report the actual output. A comparison that cannot fail is worse than no comparison.
 
 - [ ] **Step 5: Add an enemy trace** comparing enemy `x`, `y`, `vx` and `alive` across a
-  script that walks into the enemy and stomps it.
+  script that walks into an enemy and stomps it.
+
+**Match enemies by identity, not by array index.** Level 0's `enemyDefs` are, in order:
+doll@15, doll@28, car@40, bat@48, dino@55, doll@65, bouncer@73, car@80, dino@90, bat@95,
+doll@105, dino@110. Two facts follow that will otherwise waste an afternoon:
+
+- **Three enemies exist at frame 0.** The spawn window is `camera.x + 640`, and the camera
+  starts at 0, so doll@15, doll@28 and car@40 are all created before the first step. The
+  slice is not "one enemy on screen".
+- **The arrays will not line up.** The slice implements only ground patrollers, so it skips
+  bat@48 and bouncer@73 while the live game creates them. Comparing `world.enemies[3]`
+  against `live.enemies[3]` compares a dino to a bat.
+
+So key each enemy by its spawn definition — type plus tile column — and compare like with
+like. Assert the patrollers match and say in a comment that the others are deliberately
+absent, rather than loosening the comparison until it passes.
 
 - [ ] **Step 6: Commit.**
 
