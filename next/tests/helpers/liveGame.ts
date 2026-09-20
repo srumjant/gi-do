@@ -80,6 +80,8 @@ function makeAudioCtx(): unknown {
 
 interface Driver {
   initLevel: (i: number) => void;
+  setLevel: (i: number) => void;
+  getLevelIndex: () => number;
   update: () => void;
   keys: Record<string, boolean>;
   justPressed: Record<string, boolean>;
@@ -133,9 +135,26 @@ function bootLiveGame(): Driver {
   getPlayer: () => player,
   setDifficulty: (d) => { selectedDifficulty = d; },
   setChar: (c) => { selectedChar = c; },
+  setLevel: (i) => { currentLevel = i; },
+  getLevelIndex: () => currentLevel,
 };`;
   vm.runInContext(legacySource() + expose, sandbox, { filename: 'live-game' });
   return sandbox.__drive as Driver;
+}
+
+/**
+ * The level index the live game is actually collided against, after a drive is set up.
+ * Exists because `initLevel(idx)` builds the map from LEVELS[idx] but does not set
+ * `currentLevel` — the live game's own callers do that separately, and getTile,
+ * findGroundY and the pit check all read LEVELS[currentLevel].
+ */
+export function levelIndexAfterSetup(level: number): number {
+  const d = bootLiveGame();
+  d.setChar('gigi');
+  d.setDifficulty('normal');
+  d.setLevel(level);
+  d.initLevel(level);
+  return d.getLevelIndex();
 }
 
 /** Runs an input script against the live game and returns one sample per frame. */
@@ -143,6 +162,11 @@ export function driveLiveGame(opts: DriveOptions): Sample[] {
   const d = bootLiveGame();
   d.setChar(opts.character);
   d.setDifficulty(opts.difficulty);
+  // initLevel(idx) builds the map from LEVELS[idx] but does NOT set currentLevel — the
+  // live game's callers do that separately. getTile, findGroundY and the pit check all
+  // read LEVELS[currentLevel], so without this the driver would collide one level's map
+  // against another level's dimensions. Invisible at level 0; wrong everywhere else.
+  d.setLevel(opts.level);
   d.initLevel(opts.level);
 
   const trace: Sample[] = [];

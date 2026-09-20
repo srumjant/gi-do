@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { driveLiveGame } from './liveGame';
+import { driveLiveGame, levelIndexAfterSetup } from './liveGame';
 
 describe('live game driver', () => {
   it('runs a level and returns one sample per frame', () => {
@@ -30,6 +30,15 @@ describe('live game driver', () => {
       input: (f: number) => ({ left: false, right: true, jump: f >= 20 && f < 30 }),
     };
     expect(driveLiveGame(script)).toEqual(driveLiveGame(script));
+  });
+
+  // initLevel(idx) builds the map from LEVELS[idx] but does NOT set currentLevel — the
+  // live game's own callers do that separately, and getTile, findGroundY and the pit
+  // check all read LEVELS[currentLevel]. Asserted directly rather than through emergent
+  // behaviour: the first version of this test compared two traces from different levels,
+  // which differ because the MAPS differ and so passed with the bug still present.
+  it.each([0, 1, 2, 5])('collides against level %i, not whichever was last set', (level) => {
+    expect(levelIndexAfterSetup(level)).toBe(level);
   });
 
   it('jumps when told to, and comes back down', () => {
