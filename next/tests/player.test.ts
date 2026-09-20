@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
 import { createPlayer, stepPlayer, GRND_DECEL } from '../src/game/player';
-import { createWorld, stepCamera } from '../src/game/world';
+import { createWorld, stepWorld } from '../src/game/world';
 import { emptyInput, type InputState } from '../src/input/actions';
 import { LEVELS, TILE_GROUND } from '../src/data/levels';
 import { GIGI_SKINS, DODO_SKINS } from '../src/data/sprites';
@@ -223,15 +223,21 @@ describe('wall collision', () => {
 
     const port = [];
     for (let i = 0; i < FRAMES; i++) {
-      stepPlayer(world, held({ right: true }));
-      // The live update() lerps the camera every frame regardless of what the player
-      // is doing, and driveLiveGame's Sample now carries that camera position — so the
-      // port side must run the same camera step to stay comparable frame by frame.
-      stepCamera(world);
+      // The live update() does a whole frame every call — camera lerp and enemy
+      // spawn/step included, not just player movement — and driveLiveGame's Sample now
+      // carries camera and enemies too. stepWorld (rather than stepPlayer alone) is
+      // what keeps the port side comparable to that frame for frame: doll@15, doll@28
+      // and car@40 (level 0's enemyDefs) all spawn during this run, but stay far from
+      // the player, who never leaves the wall's neighbourhood near spawn, so they do
+      // not perturb the player physics this test is actually about.
+      stepWorld(world, held({ right: true }));
       const p = world.player;
       port.push({
         x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
         camera: { x: world.camera.x, y: world.camera.y },
+        enemies: world.enemies.map((e) => (
+          { type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive }
+        )),
       });
     }
 

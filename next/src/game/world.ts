@@ -1,7 +1,8 @@
-import { TILE, VIEW_H, VIEW_W } from '../config/constants';
+import { BASE_W, TILE, VIEW_H, VIEW_W } from '../config/constants';
 import { DIFFICULTY_CONFIG, type DifficultyKey } from '../config/difficulty';
 import { LEVELS } from '../data/levels';
 import type { InputState } from '../input/actions';
+import { spawnEnemy, stepEnemy } from './enemy';
 import { createPlayer, stepPlayer, type Character } from './player';
 import type { World } from './types';
 
@@ -42,9 +43,9 @@ export function createWorld(
  * would drift apart for a reason that looks nothing like the cause.
  */
 export function stepWorld(world: World, input: InputState): void {
-  spawnEnemiesInView(world); // Task 5 — stub as a no-op for Task 4
+  spawnEnemiesInView(world);
   stepPlayer(world, input);
-  stepEnemies(world); // Task 5 — stub as a no-op for Task 4
+  stepEnemies(world);
   stepCamera(world);
   world.frame++;
 }
@@ -64,16 +65,27 @@ export function stepCamera(world: World): void {
 }
 
 /**
- * Streaming enemy spawn (index.html:1358). Stubbed as a no-op for Task 4; kept as a
- * real, named, exported function (rather than left out entirely) so `stepWorld`'s call
- * order is already final and Task 5 does not need to touch this file's control flow,
- * only this function's body. Task 5 replaces this stub.
+ * Streaming enemy spawn (index.html:1358), run FIRST each step against the camera as
+ * the previous step left it. `spawned` is set before the skip check below — exactly
+ * the live order — so a def that rolls the skip (super_easy only; enemySkipChance is
+ * undefined everywhere else) never gets a second look, and so does a def whose type
+ * `spawnEnemy` does not implement (see enemy.ts): either way it is consumed from
+ * `pending` right where the live game would have spawned it, so later defs still land
+ * on the same frame in both.
  */
-export function spawnEnemiesInView(_world: World): void {}
+export function spawnEnemiesInView(world: World): void {
+  const crT = Math.floor((world.camera.x + BASE_W) / TILE) + 1;
+  const clT = Math.floor(world.camera.x / TILE) - 1;
+  for (const d of world.pending) {
+    if (d.spawned || d.x < clT || d.x > crT) continue;
+    d.spawned = true;
+    if (world.dc.enemySkipChance && Math.random() < world.dc.enemySkipChance) continue;
+    const enemy = spawnEnemy(world.map, world.dc, d);
+    if (enemy) world.enemies.push(enemy);
+  }
+}
 
-/**
- * Per-enemy AI step (index.html:1524-1547). Stubbed as a no-op for Task 4; see
- * `spawnEnemiesInView` above for why the stub is a real exported function rather than
- * an inline no-op at the call site. Task 5 replaces this stub.
- */
-export function stepEnemies(_world: World): void {}
+/** Per-enemy step (index.html:1524-1547). See enemy.ts for gravity, patrol and stomp. */
+export function stepEnemies(world: World): void {
+  for (const enemy of world.enemies) stepEnemy(world, enemy);
+}

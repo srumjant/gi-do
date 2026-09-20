@@ -16,6 +16,16 @@ export interface FrameInput {
   jump: boolean;
 }
 
+/** Just the fields this port's EnemyState tracks — see the note on Driver.getEnemies. */
+export interface EnemySample {
+  type: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  alive: boolean;
+}
+
 export interface Sample {
   x: number;
   y: number;
@@ -23,6 +33,7 @@ export interface Sample {
   vy: number;
   onGround: boolean;
   camera: { x: number; y: number };
+  enemies: EnemySample[];
 }
 
 export interface DriveOptions {
@@ -97,6 +108,11 @@ interface Driver {
   justPressed: Record<string, boolean>;
   getPlayer: () => Sample & Record<string, unknown>;
   getCamera: () => { x: number; y: number };
+  // The live enemy objects carry extra fields depending on type (originY, sineOffset,
+  // shootTimer, ...) that this port does not model — hence the same
+  // `& Record<string, unknown>` widening getPlayer uses, and the explicit field-by-field
+  // projection down to EnemySample in driveLiveGame below.
+  getEnemies: () => Array<EnemySample & Record<string, unknown>>;
   setDifficulty: (d: string) => void;
   setChar: (c: string) => void;
 }
@@ -145,6 +161,7 @@ function bootLiveGame(): Driver {
   initLevel, update, keys, justPressed,
   getPlayer: () => player,
   getCamera: () => camera,
+  getEnemies: () => enemies,
   setDifficulty: (d) => { selectedDifficulty = d; },
   setChar: (c) => { selectedChar = c; },
   setLevel: (i) => { currentLevel = i; },
@@ -202,9 +219,13 @@ export function driveLiveGame(opts: DriveOptions): Sample[] {
 
     const p = d.getPlayer();
     const cam = d.getCamera();
+    const enemies = d.getEnemies().map((e) => ({
+      type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: !!e.alive,
+    }));
     trace.push({
       x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: !!p.onGround,
       camera: { x: cam.x, y: cam.y },
+      enemies,
     });
   }
   return trace;
