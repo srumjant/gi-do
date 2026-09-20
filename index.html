@@ -154,7 +154,7 @@ const TRANSLATIONS = {
   title:              {et:'GIGI & DODO',             en:'GIGI & DODO'},
   subtitle:           {et:'Julge päästmisseiklus!',  en:'A brave rescue adventure!'},
   worlds:             {et:'6 maailma avastamiseks!',  en:'6 worlds to explore!'},
-  press_start:        {et:'VAJUTA SPACE v\u00f5i \u24b6 ALUSTAMISEKS!', en:'PRESS SPACE OR \u24b6 TO START!'},
+  press_start:        {et:'VAJUTA SPACE v\u00f5i {A} ALUSTAMISEKS!', en:'PRESS SPACE OR {A} TO START!'},
   controls:           {et:'Nooled/WASD: liigu | Space: hüppa | X: tulista | 🎮 Pult töötab!', en:'Arrows/WASD: move | Space: jump | X: shoot | 🎮 Gamepad works!'},
   // Mode selector
   choose_mode:        {et:'MIDA TEEME?',              en:'WHAT SHALL WE DO?'},
@@ -162,7 +162,7 @@ const TRANSLATIONS = {
   mode_adventure_d:   {et:'Päästa oma õde-venda!',    en:'Rescue your sibling!'},
   mode_learn:         {et:'ÕPIME!',                   en:'LET\'S LEARN!'},
   mode_learn_d:       {et:'Tähed, silbid ja sõnad',   en:'Letters, syllables, words'},
-  mode_hint:          {et:'◀ ▶ vali  •  Space / OK / \u24b6 kinnita', en:'◀ ▶ choose  •  Space / OK / \u24b6 confirm'},
+  mode_hint:          {et:'◀ ▶ vali  •  Space / OK / {A} kinnita', en:'◀ ▶ choose  •  Space / OK / {A} confirm'},
   // Pause menu
   pause_title:        {et:'PAUS',                     en:'PAUSED'},
   pause_continue:     {et:'JÄTKA',                    en:'CONTINUE'},
@@ -249,7 +249,16 @@ const TRANSLATIONS = {
   level_5:            {et:'Talvine imedemaa',           en:'Winter Wonderland'},
   level_6:            {et:'Mängulossi',                en:'Toy Castle'},
 };
-function T(key){return TRANSLATIONS[key]?TRANSLATIONS[key][lang]||TRANSLATIONS[key]['en']:key;}
+function T(key){
+  const e=TRANSLATIONS[key];
+  if(!e)return key;
+  const s=e[lang]||e['en'];
+  return s.indexOf('{')<0?s:s
+    .replace(/\{A\}/g,padGlyph('confirm'))
+    .replace(/\{B\}/g,padGlyph('back'))
+    .replace(/\{X\}/g,padGlyph('shoot'))
+    .replace(/\{P\}/g,padGlyph('pause'));
+}
 function TDiff(key){
   const map={super_easy:'super_easy',easy:'easy',normal:'normal',hard:'hard'};
   return T(map[key]||key);
@@ -798,7 +807,11 @@ let bowPickups=[], superPickups=[], catPickup=null, cat=null, animFrame=0;
 //  SCREEN SHAKE
 // ==========================================
 let screenShake={x:0,y:0,intensity:0,duration:0};
-function triggerShake(intensity,duration){screenShake.intensity=intensity;screenShake.duration=duration;}
+function triggerShake(intensity,duration){
+  screenShake.intensity=intensity;screenShake.duration=duration;
+  const r=shakeToRumble(intensity,duration);
+  padRumble(r.strong,r.weak,r.dur);
+}
 function updateShake(){if(screenShake.duration>0){screenShake.duration--;const d=screenShake.intensity*(screenShake.duration/10);screenShake.x=(Math.random()-0.5)*d*2;screenShake.y=(Math.random()-0.5)*d*2;}else{screenShake.x=0;screenShake.y=0;}}
 
 // ==========================================
@@ -948,7 +961,7 @@ function giveRandomSillyPowerup(){
   else if(type==='bighead'){player.bigHeadTimer=1200;}
   else{player.chickenRayCharges=8;player.hasBow=true;}
   powerupPopup={type:type,timer:120,maxTimer:120};
-  sfxPickup();sfxWin();
+  sfxPickup();sfxWin();padRumble(0,0.35,80);
 }
 function spawnParticles(x,y,c,n){for(let i=0;i<n;i++){const angle=Math.random()*Math.PI*2,speed=1+Math.random()*3;particles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed-2,life:30+Math.random()*25,maxLife:30+Math.random()*25,color:c,size:2+Math.random()*2});}}
 function clearJP(){Object.keys(justPressed).forEach(k=>justPressed[k]=false);}
@@ -1226,13 +1239,13 @@ function update(){
   }
 
   // Pickups
-  bowPickups.forEach(b=>{if(!b.collected&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:b.x,y:b.y,w:16,h:16})){b.collected=true;p.hasBow=true;p.bowCharges=dc.bowCharges;sfxPickup();spawnParticles(b.x+8,b.y+8,'#aa6633',6);}});
-  superPickups.forEach(s=>{if(!s.collected&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:s.x,y:s.y,w:16,h:16})){s.collected=true;p.hasCape=true;sfxPickup();spawnParticles(s.x+8,s.y+8,'#ff4400',10);}});
+  bowPickups.forEach(b=>{if(!b.collected&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:b.x,y:b.y,w:16,h:16})){b.collected=true;p.hasBow=true;p.bowCharges=dc.bowCharges;sfxPickup();spawnParticles(b.x+8,b.y+8,'#aa6633',6);padRumble(0,0.35,80);}});
+  superPickups.forEach(s=>{if(!s.collected&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:s.x,y:s.y,w:16,h:16})){s.collected=true;p.hasCape=true;sfxPickup();spawnParticles(s.x+8,s.y+8,'#ff4400',10);padRumble(0,0.35,80);}});
   // Cat pickup
   if(catPickup&&!catPickup.collected&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:catPickup.x,y:catPickup.y,w:16,h:22})){
     catPickup.collected=true;
     cat={x:p.x-20,y:p.y,vx:0,vy:0,facing:1,frame:0,frameTimer:0,scratchTimer:0,scratchTarget:null,hitsLeft:3,bounceDir:1,baseY:0,onGround:true};
-    sfxPickup();spawnParticles(catPickup.x+8,catPickup.y+8,'#8888aa',12);
+    sfxPickup();spawnParticles(catPickup.x+8,catPickup.y+8,'#8888aa',12);padRumble(0,0.35,80);
     playTone(600,.15,'sine',.06);setTimeout(()=>playTone(800,.15,'sine',.06),100);setTimeout(()=>playTone(1000,.1,'sine',.05),200);
   }
   // Cat companion AI — bounces side to side, max 3 enemy scratches
@@ -1300,7 +1313,7 @@ function update(){
 
   // Stars
   stars.forEach(s=>{if(s.collected)return;if(s.vy){s.vy+=.1;s.y+=s.vy;if(s.vy>0)s.vy=0;}
-    if(rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:s.x,y:s.y,w:10,h:10})){s.collected=true;score+=Math.round(100*dc.scoreMultiplier);spawnParticles(s.x+5,s.y+5,'#ffdd00',8);sfxCoin();}});
+    if(rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:s.x,y:s.y,w:10,h:10})){s.collected=true;score+=Math.round(100*dc.scoreMultiplier);spawnParticles(s.x+5,s.y+5,'#ffdd00',8);sfxCoin();padRumble(0,0.35,80);}});
 
   // Enemies AI
   enemies.forEach(e=>{
@@ -2796,6 +2809,62 @@ function drawLearnResult(){
 }
 
 // ==========================================
+//  CONTROLLER IDENTITY
+// ==========================================
+// There is no official controller-type API. gamepad.id carries USB vendor and
+// product IDs, but the format differs per browser:
+//   Chrome/Edge  "DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)"
+//   Firefox      "054c-0ce6-DualSense Wireless Controller"
+//   Safari       "DualSense Wireless Controller"   (no IDs at all)
+// So: parse either ID format, fall back to keywords, then default to Xbox —
+// the "standard gamepad" layout is Xbox-shaped, so that is the safest guess.
+const PAD_VENDORS={'054c':'ps','045e':'xbox','057e':'nintendo'};
+const PAD_GLYPHS={
+  xbox:     {confirm:'Ⓐ',back:'Ⓑ',shoot:'Ⓧ',pause:'☰'},
+  ps:       {confirm:'✕',back:'○',shoot:'□',pause:'OPTIONS'},
+  nintendo: {confirm:'Ⓑ',back:'Ⓐ',shoot:'Ⓨ',pause:'+'}
+};
+let padKind='xbox', padLastId='';
+
+function detectPadKind(id){
+  const s=(id||'').toLowerCase();
+  let m=s.match(/vendor:\s*([0-9a-f]{4})/);
+  if(!m)m=s.match(/^([0-9a-f]{4})-[0-9a-f]{4}/);
+  if(m&&PAD_VENDORS[m[1]])return PAD_VENDORS[m[1]];
+  if(/dualsense|dualshock|playstation|sony/.test(s))return 'ps';
+  if(/nintendo|switch|joy-?con|pro controller/.test(s))return 'nintendo';
+  if(/xbox|xinput|microsoft/.test(s))return 'xbox';
+  return 'xbox';
+}
+
+function padGlyph(slot){return (PAD_GLYPHS[padKind]||PAD_GLYPHS.xbox)[slot]||'';}
+
+// Converts a triggerShake() call into a haptic pulse. Pure arithmetic so it is
+// unit-testable without a gamepad: intensity (3-8 in practice) maps to
+// strong-motor magnitude, duration (in frames @60fps) becomes milliseconds.
+function shakeToRumble(intensity,duration){
+  const clamp01=v=>Math.max(0,Math.min(1,v));
+  return {
+    strong: clamp01(intensity/10),
+    weak:   clamp01(intensity/16),
+    dur:    duration*1000/60
+  };
+}
+
+// No-ops on pads without haptics, and on browsers that reject the effect.
+function padRumble(strong,weak,dur){
+  const pads=navigator.getGamepads?navigator.getGamepads():[];
+  for(let i=0;i<pads.length;i++){
+    const gp=pads[i];
+    if(gp&&gp.connected&&gp.vibrationActuator){
+      try{gp.vibrationActuator.playEffect('dual-rumble',
+        {duration:dur,strongMagnitude:strong,weakMagnitude:weak});}catch(e){}
+      return;
+    }
+  }
+}
+
+// ==========================================
 //  GAMEPAD SUPPORT
 // ==========================================
 const gpPrev={};
@@ -2804,22 +2873,36 @@ function pollGamepad(){
   let gp=null;
   for(let i=0;i<gamepads.length;i++){if(gamepads[i]&&gamepads[i].connected){gp=gamepads[i];break;}}
   if(!gp)return;
+  if(gp.id!==padLastId){padLastId=gp.id;padKind=detectPadKind(gp.id);}
   // Button mapping (standard gamepad):
-  // 0=A(jump), 1=B(shoot), 2=X(shoot), 3=Y(lang), 9=Start(enter), 8=Select(escape)
+  // 0=A(jump), 1=B(shoot in play / cancel in menus), 2=X(shoot), 3=Y(lang, menu-only)
+  // 9=Start(confirm in menus / pause in play), 8=Select(escape)
   // 12=DpadUp, 13=DpadDown, 14=DpadLeft, 15=DpadRight
+  // Button 1 (○ / Ⓑ) is cancel in menus and shoot in play — the universal
+  // console convention. Button 9 (OPTIONS / ☰) is confirm in menus and pause
+  // during a run, since Start is where a thumb looks for pause.
+  const menu=isMenuState();
   const btnMap={
-    0:'Space',1:'KeyX',2:'KeyX',3:'KeyL',
-    9:'Enter',8:'Escape',
+    0:'Space',
+    1:menu?'Escape':'KeyX',
+    2:'KeyX',
+    3:menu?'KeyL':null,   // language toggle is menu-only: this is △ on a
+                          // DualSense and kids hit it constantly mid-run
+    9:menu?'Enter':'Escape',
+    8:'Escape',
     12:'ArrowUp',13:'ArrowDown',14:'ArrowLeft',15:'ArrowRight'
   };
-  Object.entries(btnMap).forEach(([bi,code])=>{
-    const idx=parseInt(bi);
+  Object.keys(btnMap).forEach(bi=>{
+    const idx=parseInt(bi), code=btnMap[bi];
     if(idx>=gp.buttons.length)return;
     const pressed=gp.buttons[idx].pressed;
-    const wasPressed=!!gpPrev[idx];
-    if(pressed&&!wasPressed){justPressed[code]=true;keys[code]=true;}
-    else if(!pressed&&wasPressed){keys[code]=false;}
-    gpPrev[idx]=pressed;
+    const prevCode=gpPrev[idx]||null;   // the code that was actually pressed,
+                                        // not the code that maps right now
+    if(pressed&&!prevCode){
+      if(code){justPressed[code]=true;keys[code]=true;gpPrev[idx]=code;}
+    } else if(!pressed&&prevCode){
+      keys[prevCode]=false;gpPrev[idx]=null;
+    }
   });
   // Left stick (axes 0=horizontal, 1=vertical) with deadzone
   const dz=0.4;
@@ -2946,11 +3029,84 @@ function testBackNav(){
           PAUSABLE.every(s=>!BACK_TARGET[s]));
 }
 
+function testPadDetect(){
+  // Chrome/Edge format
+  tAssert('chrome dualsense → ps',
+    detectPadKind('DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)')==='ps');
+  tAssert('chrome xbox → xbox',
+    detectPadKind('Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b12)')==='xbox');
+  tAssert('chrome switch pro → nintendo',
+    detectPadKind('Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)')==='nintendo');
+  // Firefox format
+  tAssert('firefox dualsense → ps',
+    detectPadKind('054c-0ce6-DualSense Wireless Controller')==='ps');
+  tAssert('firefox xbox → xbox',
+    detectPadKind('045e-0b12-Xbox Wireless Controller')==='xbox');
+  // Safari / name-only fallback
+  tAssert('name-only dualsense → ps',
+    detectPadKind('DualSense Wireless Controller')==='ps');
+  tAssert('name-only dualshock → ps',
+    detectPadKind('Wireless Controller DualShock 4')==='ps');
+  tAssert('name-only switch → nintendo',
+    detectPadKind('Nintendo Switch Pro Controller')==='nintendo');
+  // Unknown defaults to xbox, because "standard gamepad" is Xbox-shaped
+  tAssert('unknown → xbox', detectPadKind('Some Generic Pad')==='xbox');
+  tAssert('empty → xbox', detectPadKind('')==='xbox');
+  tAssert('null → xbox', detectPadKind(null)==='xbox');
+  // Glyphs
+  tAssert('ps confirm glyph is cross', PAD_GLYPHS.ps.confirm==='✕');
+  tAssert('xbox confirm glyph is A', PAD_GLYPHS.xbox.confirm==='Ⓐ');
+  tAssert('nintendo swaps A/B vs xbox',
+    PAD_GLYPHS.nintendo.confirm==='Ⓑ'&&PAD_GLYPHS.nintendo.back==='Ⓐ');
+  tAssert('every kind defines every glyph',
+    ['xbox','ps','nintendo'].every(k=>
+      ['confirm','back','shoot','pause'].every(g=>!!PAD_GLYPHS[k][g])));
+  // Placeholder expansion
+  const saved=padKind; padKind='ps';
+  tAssert('T() expands {A} to the pad glyph', T('press_start').indexOf('✕')>=0);
+  tAssert('T() leaves no placeholder behind', T('press_start').indexOf('{A}')<0);
+  padKind=saved;
+}
+
+function testRumbleScale(){
+  // Matches the six existing triggerShake() call sites, so the felt haptics
+  // stay proportional to the six intensities already in play.
+  const stomp=shakeToRumble(3,8);
+  tNear('enemy stomp strong magnitude',stomp.strong,0.3,0.001);
+  tNear('enemy stomp duration ms',stomp.dur,133.33,0.1);
+  const death=shakeToRumble(5,12);
+  tNear('player death strong magnitude',death.strong,0.5,0.001);
+  tNear('player death duration ms',death.dur,200,0.1);
+  const bossDefeat=shakeToRumble(8,20);
+  tNear('boss defeated strong magnitude',bossDefeat.strong,0.8,0.001);
+  tNear('boss defeated duration ms',bossDefeat.dur,333.33,0.1);
+  // Magnitudes must never leave the WebVibrationActuator's valid [0,1] range,
+  // however large a future call site's intensity/duration might be.
+  tAssert('strong magnitude clamps at 1', shakeToRumble(999,1).strong===1);
+  tAssert('weak magnitude clamps at 1', shakeToRumble(999,1).weak===1);
+  tAssert('magnitudes never negative',
+    shakeToRumble(-5,-5).strong===0&&shakeToRumble(-5,-5).weak===0);
+  // With no gamepad attached (true in this headless run, and true for most
+  // of the game's real playtime) padRumble must no-op rather than throw —
+  // it is called from triggerShake(), which runs during ordinary keyboard play.
+  tAssert('padRumble no-ops safely with no gamepad attached', (()=>{
+    try{padRumble(1,1,100);return true;}catch(e){return false;}
+  })());
+  tAssert('triggerShake still drives screenShake and never throws', (()=>{
+    try{
+      triggerShake(5,10);
+      return screenShake.intensity===5&&screenShake.duration===10;
+    }catch(e){return false;}
+  })());
+}
+
 function runSelfTests(){
   TEST_RESULTS.pass=0;TEST_RESULTS.fail=0;
   console.log('[TEST] ===== start =====');
   testPhysics();
   testBackNav();
+  testPadDetect();
+  testRumbleScale();
   console.log('[TEST] ===== '+TEST_RESULTS.pass+' passed, '+TEST_RESULTS.fail+' failed =====');
 }
 if(location.search.indexOf('test=1')>=0)window.addEventListener('load',runSelfTests);
