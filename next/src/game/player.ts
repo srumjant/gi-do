@@ -9,7 +9,7 @@ import type { PlayerState, PowerupType, World } from './types';
 export type Character = 'gigi' | 'dodo';
 
 /**
- * Port of index.html:1363 — engine constants, not tunable per difficulty. Exported so
+ * Port of index.html:1362 — engine constants, not tunable per difficulty. Exported so
  * tests can check the deceleration rate without duplicating the literal.
  */
 export const GRND_ACCEL = 0.6;
@@ -47,7 +47,7 @@ export function createPlayer(level: Level, character: Character): PlayerState {
     // reset. See respawnLevel in world.ts.
     hasBow: false,
     bowCharges: 0,
-    // index.html:1160's `arrowCooldown:0`. Level state like the bow itself.
+    // index.html:1169's `arrowCooldown:0`. Level state like the bow itself.
     arrowCooldown: 0,
     // index.html:1169 is `hasCape:dc.startWithCape`, not a flat false — true on
     // super_easy, which is the only difficulty where the player spawns already wearing
@@ -168,7 +168,7 @@ function bumpBlocksAbove(world: World, pL2: number, pR2: number, hY: number): vo
 }
 
 /**
- * Port of index.html:1381-1389 — the bow, and the chicken ray that rides the same
+ * Port of index.html:1390-1398 — the bow, and the chicken ray that rides the same
  * trigger. Called from the middle of `stepPlayer`, exactly where the live source has
  * it; see the call site.
  *
@@ -251,14 +251,14 @@ export function stepPlayer(world: World, input: InputState): void {
     if (Math.abs(p.vx) < 0.12) p.vx = 0;
   }
 
-  // Coyote time — allows jumping a few frames after leaving a ledge (index.html:1372-1373).
+  // Coyote time — allows jumping a few frames after leaving a ledge (index.html:1373-1374).
   if (p.onGround) {
     p.coyoteTime = 6;
   } else if (p.coyoteTime > 0) {
     p.coyoteTime--;
   }
 
-  // Jump buffer — press jump slightly before landing (index.html:1374-1377). Set to 8,
+  // Jump buffer — press jump slightly before landing (index.html:1375-1379). Set to 8,
   // then decremented in this SAME step, so it already reads 7 by the time anything
   // checks it this frame. Do not reorder these two lines.
   const jumpKey = input.jump;
@@ -267,7 +267,7 @@ export function stepPlayer(world: World, input: InputState): void {
   if (p.jumpBuffer > 0) p.jumpBuffer--;
 
   // Execute jump: (coyote time OR on ground) AND (just pressed OR still buffered)
-  // (index.html:1378-1383). The fart multiplies the force IN PLACE — 1.5x a jumpForce
+  // (index.html:1380-1386). The fart multiplies the force IN PLACE — 1.5x a jumpForce
   // that is already negative, so -7.5 becomes -11.25 at normal. It is applied here, at
   // the assignment, and nowhere else: the variable-height clamp just below still
   // measures against the UNMULTIPLIED `dc.jumpForce * 0.4`, so releasing the key early
@@ -280,14 +280,14 @@ export function stepPlayer(world: World, input: InputState): void {
     p.jumpBuffer = 0;
   }
 
-  // Variable jump height — release early for a short hop (index.html:1384-1386). The
+  // Variable jump height — release early for a short hop (index.html:1387-1388). The
   // clamp target is negative (jumpForce is negative), and only applies while vy is
   // still below (more negative than) it.
   if (!jumpKey && p.vy < dc.jumpForce * 0.4) {
     p.vy = dc.jumpForce * 0.4;
   }
 
-  // Shooting (index.html:1381-1389), between the variable-height clamp above and
+  // Shooting (index.html:1390-1398), between the variable-height clamp above and
   // gravity below — where the live source has it, and it matters: the arrow's own `y`
   // is read off the player's position BEFORE this frame's gravity and movement, so an
   // arrow fired mid-jump leaves from where the player was at the top of the frame, not
@@ -295,14 +295,14 @@ export function stepPlayer(world: World, input: InputState): void {
   fireArrow(world, input);
 
   // Gravity: apex hang (reduced gravity near the jump peak) + faster fall
-  // (index.html:1393-1394). `vy > 0` is tested BEFORE `isApex` — apex hang applies only
+  // (index.html:1400-1403). `vy > 0` is tested BEFORE `isApex` — apex hang applies only
   // while RISING; a slow FALL takes the 1.2 branch even though |vy| < 1.5.
   const isApex = Math.abs(p.vy) < 1.5 && !p.onGround;
   const gMul = p.vy > 0 ? 1.2 : (isApex ? 0.6 : 1.0);
   p.vy += GRAVITY * gMul;
   if (p.vy > 8) p.vy = 8;
 
-  // X movement + resolution (index.html:1395-1398). Probes are inset by 2px and taken
+  // X movement + resolution (index.html:1404-1407). Probes are inset by 2px and taken
   // at three points: top, bottom, and the vertical midpoint.
   p.x += p.vx;
   const pL = p.x + 2;
@@ -325,7 +325,7 @@ export function stepPlayer(world: World, input: InputState): void {
     }
   }
 
-  // Y movement + resolution (index.html:1399-1411). `onGround` is reset to false
+  // Y movement + resolution (index.html:1408-1421). `onGround` is reset to false
   // immediately and unconditionally, before the floor check below — reproduced even
   // though it makes the live source's own `wasAirborne` always true (that variable
   // only gated dust particles, which are out of scope). Probes here are inset by 3px
@@ -352,10 +352,10 @@ export function stepPlayer(world: World, input: InputState): void {
     }
   }
 
-  // Left clamp only — there is no right-hand bound (index.html:1412).
+  // Left clamp only — there is no right-hand bound (index.html:1422).
   if (p.x < 0) p.x = 0;
 
-  // Pit death (index.html:1413, 1423). The cape-saves-the-pit branch is out of scope,
+  // Pit death (index.html:1423). The cape-saves-the-pit branch is out of scope,
   // so every pit fall here takes the live `else{playerDie();}` path. Setting
   // world.dead (inside playerDie) is what makes the next call (and every call after
   // that, until a respawn clears it) return at the top, freezing the player where it

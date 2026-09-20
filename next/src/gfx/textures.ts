@@ -31,7 +31,7 @@ export function registerTextures(scene: Phaser.Scene): void {
   registerCloudTextures(scene);
 }
 
-/** Player and rescue-NPC sprites draw at this scale (index.html:1838). */
+/** Player and rescue-NPC sprites draw at this scale (index.html:1848). */
 const PLAYER_SCALE = 2;
 
 const POSES = ['stand', 'run', 'jump'] as const;
@@ -86,7 +86,7 @@ function registerEnemyTextures(scene: Phaser.Scene): void {
 
 /**
  * Clouds draw at one of two scales, picked per-cloud by `cx % 3`
- * (index.html:1676: `cx%3?6:5`). Both are registered here; which one a given cloud
+ * (index.html:1682: `cx%3?6:5`). Both are registered here; which one a given cloud
  * uses is a rendering decision for later, not a reason to skip either texture now.
  */
 const CLOUD_SCALES = [5, 6];

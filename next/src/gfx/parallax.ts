@@ -41,7 +41,7 @@ export function drawSky(graphics: Phaser.GameObjects.Graphics, levelBg: string, 
 
 /**
  * Redraws every layer's ridge from the current camera position — port of
- * `drawParallax`'s layer loop (index.html:1058-1071). Called every frame: both the
+ * `drawParallax`'s layer loop (index.html:1053-1072). Called every frame: both the
  * ridge's scroll position and its per-point sine wobble depend on `cameraX`, which
  * moves every frame the player does, so unlike the sky above this cannot be drawn
  * once and left alone.
@@ -60,7 +60,7 @@ export function drawRidges(
 
 function drawRidge(graphics: Phaser.GameObjects.Graphics, layer: ParallaxLayer, cameraX: number): void {
   // The scroll offset carries a further 0.5 on top of the layer's own speed
-  // (index.html:1060: `(scrollX*0.5)%hillW`) — `layer.speed` alone is not the
+  // (index.html:1061: `(scrollX*0.5)%hillW`) — `layer.speed` alone is not the
   // on-screen scroll rate.
   const scrollX = cameraX * layer.speed;
   const baseY = BASE_H * layer.y;
@@ -78,7 +78,7 @@ function drawRidge(graphics: Phaser.GameObjects.Graphics, layer: ParallaxLayer, 
   graphics.fillStyle(Phaser.Display.Color.HexStringToColor(layer.color).color);
   graphics.beginPath();
   // The live path opens with `ctx.moveTo(0,BASE_H)` right after `beginPath()`
-  // (index.html:1059) — but the loop's very next step, i===0, immediately does
+  // (index.html:1057) — but the loop's very next step, i===0, immediately does
   // ANOTHER `moveTo`, which only relocates the pen. Two moveTo calls in a row draw
   // nothing, so that first one has no visual effect at all, and is skipped here.
   let prev = peakAt(0);
@@ -86,7 +86,7 @@ function drawRidge(graphics: Phaser.GameObjects.Graphics, layer: ParallaxLayer, 
   for (let i = 1; i <= hillCount; i++) {
     const cur = peakAt(i);
     // Control point: midway in x, 5px above (smaller y) whichever endpoint is
-    // higher on screen (index.html:1066-1067).
+    // higher on screen (index.html:1066-1068).
     const control: Point = { x: (prev.x + cur.x) / 2, y: Math.min(prev.y, cur.y) - 5 };
     for (let s = 1; s <= CURVE_SAMPLES; s++) {
       const pt = quadraticPoint(prev, control, cur, s / CURVE_SAMPLES);
@@ -103,7 +103,7 @@ function drawRidge(graphics: Phaser.GameObjects.Graphics, layer: ParallaxLayer, 
 }
 
 /**
- * Port of the live game's cloud drift (index.html:1676): a slow 0.15x parallax
+ * Port of the live game's cloud drift (index.html:1681): a slow 0.15x parallax
  * scroll plus independent sine drift on both axes, layered on top of the cloud's own
  * fixed tile position. Returned in the same raw, unzoomed pixel space `drawRidges`
  * above draws in — converting that into a Phaser position is SliceScene's job (see
@@ -116,7 +116,7 @@ export function cloudPosition(tx: number, ty: number, cameraX: number, animFrame
   };
 }
 
-/** `cx%3?6:5` (index.html:1676): two-thirds of clouds draw at scale 6, the rest at 5. */
+/** `cx%3?6:5` (index.html:1682): two-thirds of clouds draw at scale 6, the rest at 5. */
 export function cloudScale(tx: number): number {
   return tx % 3 ? 6 : 5;
 }

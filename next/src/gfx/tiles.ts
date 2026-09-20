@@ -6,14 +6,14 @@ import type { World } from '../game/types';
 /**
  * Question and rainbow blocks (tiles 3 and 5) have no level-specific colour in the
  * level data, unlike ground and brick — these are fixed, matching the live game's own
- * hardcoded fills (index.html:1692-1694).
+ * hardcoded fills (index.html:1692-1693).
  */
 const QUESTION_FILL = 0xffcc00;
 const QUESTION_STROKE = 0xcc8800;
 const RAINBOW_STROKE = 0xffffff;
 
 /**
- * `'#00000033'` / `'#00000022'` (index.html:1692) as Graphics alpha — Graphics takes
+ * `'#00000033'` / `'#00000022'` (index.html:1691) as Graphics alpha — Graphics takes
  * colour and alpha as separate arguments rather than an 8-digit hex string.
  */
 const BRICK_BORDER_ALPHA = 0x33 / 0xff;
@@ -42,7 +42,7 @@ export interface RainbowBlock {
  * the rainbow block below), so unlike `updateRainbowBlocks` this is called exactly
  * once, in `create()`, and never touched again.
  *
- * Port of the tile 1/2/3 branches of the live tile loop (index.html:1690-1695). Two
+ * Port of the tile 1/2/3 branches of the live tile loop (index.html:1690-1692). Two
  * things are easy to miss porting this: the ground's top strip only draws where the
  * tile above is NOT solid — the grass edge, which is why a buried ground tile has no
  * green line through it — and the brick's `'#00000022'` fill is a 1px cross through
@@ -125,7 +125,7 @@ export function createRainbowBlocks(
 /**
  * Redraws every rainbow block's fill and border for this frame. Unlike everything
  * `drawStaticTiles` draws, this cannot be drawn once and left alone: the hue cycles
- * with `animFrame` and is offset per column (index.html:1694:
+ * with `animFrame` and is offset per column (index.html:1693:
  * `hsl(${(animFrame*3+tx*20)%360},100%,65%)`), so it is called every frame from the
  * scene's update loop. The '!' glyph text created above is untouched here — its
  * colour is always white, animated or not.

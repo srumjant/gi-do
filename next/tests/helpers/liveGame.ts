@@ -16,14 +16,14 @@ export interface FrameInput {
   jump: boolean;
   /**
    * Held fire. The live game only ever reads the four fire keys through `justPressed`
-   * (index.html:1383), so this is turned into a press on its rising edge below and
+   * (index.html:1392), so this is turned into a press on its rising edge below and
    * holding it down fires exactly one arrow — the same treatment `jump` gets, and the
    * same rule the port's own `firePressed` follows.
    */
   fire: boolean;
 }
 
-/** Just the five fields a live `arrows` entry carries (index.html:1385). */
+/** Just the five fields a live `arrows` entry carries (index.html:1394). */
 export interface ArrowSample {
   x: number;
   y: number;
@@ -205,7 +205,7 @@ export interface Driver {
   /**
    * The arrows currently in flight, as a fresh snapshot rather than a live reference —
    * unlike every other getter here. The live arrow pass REASSIGNS the top-level
-   * `arrows` binding every frame (index.html:1508's `arrows=arrows.filter(...)`), so a
+   * `arrows` binding every frame (index.html:1517's `arrows=arrows.filter(...)`), so a
    * reference captured once would go stale the first time an arrow was spent; reading
    * the binding through this closure re-resolves it each call.
    */
@@ -363,7 +363,7 @@ export function driveLiveGame(opts: DriveOptions): Sample[] {
     // on the exact frame it applies to. Rising edge only.
     if (held.jump && !prev.jump) d.justPressed.Space = true;
     // The four fire keys (KeyX, KeyZ, ShiftRight, ControlRight) are interchangeable —
-    // index.html:1383 ORs them — so driving one is driving all four, and KeyX is the
+    // index.html:1392 ORs them — so driving one is driving all four, and KeyX is the
     // one on the on-screen instructions (index.html:175). `keys` is deliberately NOT
     // set for it: the live game never reads the fire keys held, and setting it would
     // hide a port that wrongly did.

@@ -22,7 +22,7 @@ export interface PlayerState {
   frameTimer: number;
   /**
    * Set by a bow pickup (index.html:1447) and, from the chicken ray, by the rainbow
-   * block's silly power-up. Read by the firing branch (index.html:1383), which consults
+   * block's silly power-up. Read by the firing branch (index.html:1392), which consults
    * it alongside `bowCharges` — and cleared there, by the same branch, once both kinds
    * of charge are spent.
    */
@@ -34,7 +34,7 @@ export interface PlayerState {
    */
   bowCharges: number;
   /**
-   * Frames until the bow can fire again (index.html:1160, 1382, 1388). Decremented once
+   * Frames until the bow can fire again (index.html:1169, 1391, 1397). Decremented once
    * per player step, set to 15 by a shot — a quarter of a second between arrows, whether
    * the shot was an arrow or a chicken ray. It is decremented BEFORE the fire check reads
    * it, so a cooldown of exactly 1 is already 0 by the time that check runs and the
@@ -66,7 +66,7 @@ export interface PlayerState {
   /**
    * Chicken rays left (index.html:1171). Granted 8 — a flat constant, NOT `dc.bowCharges`
    * like the bow pickup — by the `chicken` branch, which also sets `hasBow`. The two are
-   * genuinely separate: the firing path (index.html:1383-1387, player.ts's fireArrow)
+   * genuinely separate: the firing path (index.html:1392-1396, player.ts's fireArrow)
    * fires when EITHER `hasBow && bowCharges > 0` OR `chickenRayCharges > 0`, picks
    * chicken over arrow whenever any chicken charge is left, and only clears `hasBow`
    * once BOTH are spent. Do not collapse them into one flag.
@@ -157,7 +157,7 @@ export interface EnemyState {
   /**
    * True for a flyer that writes its own `y` every frame instead of falling — bat and
    * icebat (ghost too, live, but this slice never spawns one). stepEnemy's
-   * gravity/floor-snap block is skipped entirely while this is true (index.html:1526's
+   * gravity/floor-snap block is skipped entirely while this is true (index.html:1527's
    * `if(!e.noGravity){...}`). False for every ground patroller, exactly like the live
    * source, which only ever ADDS this field for the types that need it.
    */
@@ -179,7 +179,7 @@ export interface EnemyState {
   /**
    * Frames since a bouncer's last hop (or since it spawned, for the first one);
    * stepEnemy fires a new hop once this clears 40 while the bouncer is resting
-   * (index.html:1219, 1537). Inert (0) for every other type.
+   * (index.html:1219, 1536). Inert (0) for every other type.
    */
   bounceTimer: number;
   /**
@@ -195,7 +195,7 @@ export interface EnemyState {
    */
   stunTimer: number;
   /**
-   * Already been turned into a chicken (index.html:1497-1498). The live game adds this
+   * Already been turned into a chicken (index.html:1506-1507). The live game adds this
    * field only at the moment of conversion, so every un-hit enemy reads `undefined`
    * there and this port's uniform `false` is the same test; `chickenify` in enemy.ts is
    * the only thing that ever sets it.
@@ -209,12 +209,12 @@ export interface EnemyState {
 }
 
 /**
- * One arrow in flight (index.html:1385) — fired by the bow, or, when any chicken ray
+ * One arrow in flight (index.html:1394) — fired by the bow, or, when any chicken ray
  * charge is left, the same object with `isChicken` set. There is no vy and no gravity:
  * an arrow flies dead straight at `vx` until it runs out of `life`, hits a solid tile,
  * or hits an enemy.
  *
- * Its two collision shapes are DIFFERENT and both deliberate (index.html:1495-1496):
+ * Its two collision shapes are DIFFERENT and both deliberate (index.html:1504-1505):
  * tiles are probed at two bare points, `x` and `x + 10`, while enemies are tested
  * against a 12x4 rectangle. Neither is derived from the other, and neither is the
  * drawn sprite's size. See world.ts's stepArrows.
@@ -346,7 +346,7 @@ export interface World {
    */
   stars: Star[];
   /**
-   * index.html:984, 1179. Arrows and chicken rays currently in flight, in firing order.
+   * index.html:993, 1188. Arrows and chicken rays currently in flight, in firing order.
    * Emptied by `initLevel` like every other level collection, which is why a respawn
    * throws away whatever was mid-air — along with the bow that fired it.
    *

@@ -227,7 +227,7 @@ describe('death freezes the whole world, not just the player', () => {
 describe('checkRescue', () => {
   afterEach(() => setSelectedChar('gigi')); // never leak a character choice into an unrelated test
 
-  // Level 0's rescue is at tile (115,20) — index.html:1631's rX/rY, derived the same
+  // Level 0's rescue is at tile (115,20) — index.html:1629's rX/rY, derived the same
   // way here: rGY=findGroundY(map,115)=368 (flat ground, no platform covers column
   // 115), and rDH from the RESCUED character's sprite at scale 2. Playing gigi
   // rescues Dodo (DODO_STAND, 12 rows -> 24), so rY=368-24=344.
@@ -487,7 +487,7 @@ describe('the level spawn tables vs. the live game', () => {
   });
 });
 
-// Port of index.html:1494-1508. The flight itself, the kill and the conversion are all
+// Port of index.html:1503-1517. The flight itself, the kill and the conversion are all
 // driven against the live game in trace.test.ts. Two branches of it are not, because no
 // arrangement of level 0 puts them in front of an arrow: a chicken ray meeting an enemy
 // that is ALREADY a chicken, and an arrow meeting a wall.

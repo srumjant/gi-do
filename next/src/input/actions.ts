@@ -11,7 +11,7 @@ export interface InputState {
   /** Rising edge — true only on the step the button went down. */
   jumpPressed: boolean;
   /**
-   * Rising edge of the fire keys (index.html:1383). There is no held `fire` beside it,
+   * Rising edge of the fire keys (index.html:1392). There is no held `fire` beside it,
    * on purpose: the live game reads the fire keys through `justPressed` and NEVER
    * through `keys`, so holding the button down fires exactly one arrow. Jump is the
    * other way round — it needs both, because the variable-height cut reads the HELD

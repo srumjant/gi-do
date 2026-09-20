@@ -91,7 +91,7 @@ export function spawnEnemy(
 }
 
 /**
- * Port of index.html:1497-1500 — what a chicken ray does to whatever it hits. Called
+ * Port of index.html:1507-1509 — what a chicken ray does to whatever it hits. Called
  * from world.ts's stepArrows, which owns the arrow pass the live source has this inside.
  *
  * This REWRITES the enemy in place rather than replacing it: same object, same slot in
@@ -168,7 +168,7 @@ export function stepEnemy(world: World, e: EnemyState): void {
   const p = world.player;
   const dc = world.dc;
 
-  // Gravity + floor snap (index.html:1526-1528), skipped entirely for a noGravity
+  // Gravity + floor snap (index.html:1527-1528), skipped entirely for a noGravity
   // flyer (bat/icebat here; ghost too, live, but this slice never spawns one) — it
   // writes its own y every frame instead, in its own branch below.
   if (!e.noGravity) {
@@ -194,7 +194,7 @@ export function stepEnemy(world: World, e: EnemyState): void {
     e.y = e.originY + Math.sin(world.animFrame * 0.06 + e.sineOffset) * 30;
     if (e.x < 0 || e.x > world.level.width * TILE) e.vx *= -1;
   } else if (e.type === 'bouncer') {
-    // index.html:1537 — hops rather than walks. Sits until `bounceTimer` clears 40
+    // index.html:1536-1537 — hops rather than walks. Sits until `bounceTimer` clears 40
     // while resting (vy===0 — the gravity block above already resolved that for this
     // frame), then fires a new hop: a fixed vertical kick (dc.bouncerJumpForce) and a
     // fresh horizontal aim at whichever side the PLAYER is currently on, re-decided on
@@ -212,7 +212,7 @@ export function stepEnemy(world: World, e: EnemyState): void {
     const ef = e.vx > 0 ? e.x + e.w : e.x;
     if (isSolid(getTile(map, ef, e.y + e.h / 2))) e.vx *= -1;
   } else {
-    // Ground patrol (index.html:1546-1547): doll, car, dino, penguin — and 'chicken',
+    // Ground patrol (index.html:1538-1539): doll, car, dino, penguin — and 'chicken',
     // which has no branch of its own here for the same reason it has none in the live
     // source, so a converted enemy patrols the floor like a doll. No horizontal
     // tile resolution at all, only a direction flip. `ef`/`ef2` are computed once,

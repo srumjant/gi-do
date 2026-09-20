@@ -18,7 +18,7 @@ const CAMERA_PIVOT_X = (BASE_W - VIEW_W) / 2;
 const CAMERA_PIVOT_Y = (BASE_H - VIEW_H) / 2;
 
 /**
- * The sprite draws 2px larger than the hitbox on every side (index.html:1838:
+ * The sprite draws 2px larger than the hitbox on every side (index.html:1848:
  * `drawSprite(spr,p.x-2,p.y-2,ps.palette,2,p.facing<0)`, because the hitbox itself is
  * inset from the sprite by `w = spriteW - 4`, `h = spriteH - 4`, player.ts:35-36). Not
  * cosmetic — get this wrong and the art sits 2px off the hitbox, which reads as a
@@ -29,7 +29,7 @@ const PLAYER_DRAW_INSET = 2;
 /** `player.frame`: 0 stand, 1 run, 2 jump (types.ts, index.html:1424-1429). */
 const PLAYER_POSES = ['stand', 'run', 'jump'] as const;
 
-/** Cloud alpha (index.html:1676: `ctx.globalAlpha=0.75`). */
+/** Cloud alpha (index.html:1681: `ctx.globalAlpha=0.75`). */
 const CLOUD_ALPHA = 0.75;
 
 /** One cloud's fixed tile position plus the Image drawing it. */
@@ -99,7 +99,7 @@ export class SliceScene extends Phaser.Scene {
   /**
    * Builds the sky, the parallax hill layers, and the clouds — everything
    * `drawParallax` and the live game's cloud block draw BEFORE the world's own
-   * `ctx.scale(ZOOM)` (index.html:1044-1072, 1676), i.e. unzoomed and independent of
+   * `ctx.scale(ZOOM)` (index.html:1044-1072, 1681-1682), i.e. unzoomed and independent of
    * camera scroll. `PARALLAX[levelIndex]` mirrors the live game's own guard
    * (`if(!pd)return`, index.html:1045): the one level this slice runs (0) has an
    * entry, but a level that did not would simply get no sky, hills or clouds rather
@@ -134,7 +134,7 @@ export class SliceScene extends Phaser.Scene {
    * three render through the SAME shared main camera as the world (tiles, player,
    * enemies) — there is no second camera — but must not scroll or zoom with it,
    * matching the live game drawing them before its own `ctx.scale(ZOOM)`
-   * (index.html:1044-1072, 1676). `scrollFactor(0)` handles the scroll half. The
+   * (index.html:1044-1072, 1681-1682). `scrollFactor(0)` handles the scroll half. The
    * other half is zoom: Phaser zooms every object about the camera's CENTRE —
    * including scrollFactor(0) ones — while the live drawing is unzoomed and
    * top-left-anchored, so positioning at (CAMERA_PIVOT_X, CAMERA_PIVOT_Y) and scaling
@@ -195,7 +195,7 @@ export class SliceScene extends Phaser.Scene {
 
     this.playerImage.setTexture(resolvePlayerTextureKey(player.frame));
     this.playerImage.setPosition(player.x - PLAYER_DRAW_INSET, player.y - PLAYER_DRAW_INSET);
-    // Sprites face right by default; flip to face left (index.html:1838: `p.facing<0`).
+    // Sprites face right by default; flip to face left (index.html:1848: `p.facing<0`).
     this.playerImage.setFlipX(player.facing < 0);
     // index.html:1838 — `p.invincible<=0||Math.floor(animFrame/3)%2===0`, an
     // invincibility blink. This slice's PlayerState has no `invincible` field yet
@@ -254,7 +254,7 @@ export class SliceScene extends Phaser.Scene {
   }
 
   /**
-   * Port of the enemy branch of index.html:1761-1763. `fl = e.vx>0` — enemy sprites
+   * Port of the enemy branch of index.html:1759-1763. `fl = e.vx>0` — enemy sprites
    * face left by default (the opposite of the player's convention above), so the
    * flip is on moving RIGHT, not left. Ghost transparency
    * (`.6+Math.sin(animFrame*.08)*.2`, index.html:1761) is skipped: `spawnEnemy`

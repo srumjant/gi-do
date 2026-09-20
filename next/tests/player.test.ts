@@ -167,7 +167,7 @@ describe('jump buffer', () => {
   // Held continuously from pressCall onward (not tapped-and-released): confirmed
   // against the live game while developing this port that a buffered jump tapped and
   // released well before landing still "fires", but the variable-jump-height cut
-  // (index.html:1386) applies in the very same frame, since it only looks at whether
+  // (index.html:1388) applies in the very same frame, since it only looks at whether
   // the button is CURRENTLY held — it has no idea the jump came from the buffer. That
   // is real live-game behaviour, not a porting bug, but it would muddy this test, so
   // this holds the button down through landing to isolate the buffer itself.
@@ -252,7 +252,7 @@ describe('wall collision', () => {
   });
 
   // Holding right against a wall does NOT settle at rest. The snap leaves the player
-  // one pixel clear (the +1 at index.html:1397), so the next frame's 0.6 of
+  // one pixel clear (the +1 at index.html:1406), so the next frame's 0.6 of
   // acceleration does not quite reach the wall, and the frame after that does — giving
   // a two-frame cycle where x alternates by 0.6px and vx alternates 0 / 0.6. Verified
   // against the live game, which jitters identically. It is preserved, not fixed.
@@ -439,7 +439,7 @@ describe('the power-up popup freezes the whole world', () => {
   });
 });
 
-// Port of index.html:1381-1389. The trace suite shoots a real bow at a real enemy and a
+// Port of index.html:1390-1398. The trace suite shoots a real bow at a real enemy and a
 // real chicken ray at a real bat (trace.test.ts), which is where the firing is actually
 // validated. What no trace can show is the END of the ammunition — the bow trace spends
 // two of three charges and the ray trace one of eight, and shooting either counter dry

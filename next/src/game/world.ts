@@ -91,7 +91,7 @@ function buildLevelState(level: Level, dc: DifficultyRecord, map: TileMap): Leve
       collected: false,
     },
     stars: [],
-    // index.html:1179's `arrows=[]`, on the same line as `stars=[]`. In this bundle for
+    // index.html:1188's `arrows=[]`, on the same line as `stars=[]`. In this bundle for
     // the same reason the stars are: a respawn has to throw away whatever was in flight.
     arrows: [],
     questionBlocks,
@@ -263,7 +263,7 @@ export function stepWorld(world: World, input: InputState): void {
   // stepEnemies' loop) would freeze one frame earlier than the live game does and
   // desync the trace. So: one check, all three calls inside it, exactly like this.
   if (!world.dead) {
-    // index.html:1447-1448, :1495-1508 and :1519 — all three sit between the player
+    // index.html:1447-1448, :1504-1517 and :1519 — all three sit between the player
     // block and the enemies loop, in this order, with the cat companion (a later task)
     // between the first two. Inside the `!world.dead` guard because a PIT death returns
     // from the live update() at index.html:1423, above all of this: you do not sweep up
@@ -317,7 +317,7 @@ export function collectPickups(world: World): void {
 }
 
 /**
- * Port of index.html:1495-1508 — every arrow and chicken ray in flight, moved, tested
+ * Port of index.html:1504-1517 — every arrow and chicken ray in flight, moved, tested
  * against the tiles, tested against the enemies, then swept up.
  *
  * Four details are load-bearing and none of them is tidy:
@@ -372,7 +372,7 @@ export function stepArrows(world: World): void {
       world.score += Math.round(200 * world.dc.scoreMultiplier);
     }
   }
-  // index.html:1508. A fresh array, exactly as the live line assigns one, so anything
+  // index.html:1517. A fresh array, exactly as the live line assigns one, so anything
   // holding the old one (nothing does) would see the same thing the live game's would.
   world.arrows = world.arrows.filter((a) => a.life > 0);
 }

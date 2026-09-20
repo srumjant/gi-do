@@ -1015,8 +1015,8 @@ describe('the rainbow block vs. the live game', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The bow, arrows and the chicken ray (Plan 5, Task 4) — index.html:1381-1389 (firing,
-// inside the player block) and :1494-1508 (flight and hits, its own pass between the
+// The bow, arrows and the chicken ray (Plan 5, Task 4) — index.html:1390-1398 (firing,
+// inside the player block) and :1503-1517 (flight and hits, its own pass between the
 // pickups and the stars).
 //
 // Two traces. The first collects a real bow off the map and shoots a real enemy with
@@ -1265,7 +1265,7 @@ describe('the chicken ray vs. the live game', () => {
         p.facing = -1; // shooting left, at a bat that is already to the left
         p.hasBow = true;
         p.bowCharges = 3; // normal's dc.bowCharges — arrows in hand, and they stay there
-        p.chickenRayCharges = 8; // index.html:1144
+        p.chickenRayCharges = 8; // index.html:1153
       },
       onFrame: (d) => {
         const p = d.getPlayer();
@@ -1333,7 +1333,7 @@ describe('the chicken ray vs. the live game', () => {
     expect(portRays).toEqual(liveRays);
 
     // The shot must be a RAY, not an arrow. The bow is fully charged and the ray still
-    // goes first (index.html:1384's `isChicken = p.chickenRayCharges > 0`, tested before
+    // goes first (index.html:1393's `isChicken = p.chickenRayCharges > 0`, tested before
     // anything is spent), and only the ray counter moves.
     expect(portArrows[FIRE_FRAME]).toHaveLength(1);
     expect(portArrows[FIRE_FRAME][0].isChicken).toBe(true);

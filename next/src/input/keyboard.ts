@@ -12,7 +12,7 @@ export interface KeyboardInput {
  * Reads a Phaser scene's keyboard and produces an `InputState`. This is the only
  * Phaser-aware input code in the port — `src/game/` never sees a key.
  *
- * Binds the same keys the live game accepts (index.html:1356-1368, 1383): left is
+ * Binds the same keys the live game accepts (index.html:1365-1377, 1392): left is
  * ArrowLeft or A, right is ArrowRight or D, jump is Space, ArrowUp or W, and fire is
  * X, Z, RIGHT Shift or RIGHT Ctrl.
  *
