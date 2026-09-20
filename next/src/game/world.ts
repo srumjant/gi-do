@@ -43,10 +43,25 @@ export function createWorld(
  * would drift apart for a reason that looks nothing like the cause.
  */
 export function stepWorld(world: World, input: InputState): void {
+  // Already dead: nothing runs. The live update() returns at index.html:1348, above the
+  // playing branch entirely, so the camera and every enemy freeze along with the player
+  // rather than carrying on around a corpse.
+  if (world.dead) {
+    world.frame++;
+    return;
+  }
+
   spawnEnemiesInView(world);
   stepPlayer(world, input);
-  stepEnemies(world);
-  stepCamera(world);
+
+  // Died on THIS frame. Dying happens inside the player block, which returns right there
+  // (index.html:1423), so enemies and the camera are skipped for this frame too. The
+  // spawn pass above has already run, which is also what the live game does.
+  if (!world.dead) {
+    stepEnemies(world);
+    stepCamera(world);
+  }
+
   world.frame++;
 }
 

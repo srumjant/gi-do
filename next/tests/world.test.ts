@@ -129,3 +129,76 @@ describe('camera vs. the live game', () => {
     expect(new Set(port.map((s) => s.y)).size).toBeGreaterThan(1);
   });
 });
+
+describe('death freezes the whole world, not just the player', () => {
+  // The live update() returns as soon as the state is 'dead' (index.html:1348), above the
+  // playing branch — so the camera and every enemy stop dead too. An earlier version of
+  // stepWorld froze only the player and let the camera keep scrolling around the corpse.
+  //
+  // This needs a PIT death specifically. Level 0's doll@15 patrols into the oncoming
+  // player and kills it by contact around frame 59, but contact damage is deliberately
+  // out of the slice, so the port would not die there and the comparison would be about
+  // the wrong thing. A gap carved next to spawn kills both implementations the same way,
+  // well before the doll is anywhere near.
+  const GAP_FROM = 4;
+  const GAP_TO = 8;
+  const carveGap = (map: number[][]): void => {
+    for (let ty = map.length - 2; ty < map.length; ty++) {
+      for (let tx = GAP_FROM; tx <= GAP_TO; tx++) map[ty][tx] = 0;
+    }
+  };
+
+  it('matches the live game across the death and after it', () => {
+    const FRAMES = 60; // well inside the live game's 90-frame respawn, which is out of scope
+    const live = driveLiveGame({
+      level: 0, difficulty: 'normal', character: 'gigi', frames: FRAMES,
+      input: () => ({ left: false, right: true, jump: false }),
+      mutateMap: carveGap,
+    });
+
+    const world = createWorld(0, 'normal');
+    world.map = world.map.map((row) => row.slice());
+    carveGap(world.map);
+
+    const port = [];
+    for (let i = 0; i < FRAMES; i++) {
+      stepWorld(world, held({ right: true }));
+      const p = world.player;
+      port.push({
+        x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
+        camera: { x: world.camera.x, y: world.camera.y },
+        enemies: world.enemies.map((e) => ({
+          type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
+        })),
+      });
+    }
+
+    // The script must actually kill the player, or this proves nothing.
+    expect(world.dead).toBe(true);
+    expect(port).toEqual(live);
+  });
+
+  it('stops the camera and the enemies on the death frame, not one frame later', () => {
+    const world = createWorld(0, 'normal');
+    world.map = world.map.map((row) => row.slice());
+    carveGap(world.map);
+
+    let frozenAt = -1;
+    const after: Array<{ cam: number; enemyX: number[] }> = [];
+    for (let i = 0; i < 60; i++) {
+      stepWorld(world, held({ right: true }));
+      if (world.dead) {
+        if (frozenAt < 0) frozenAt = i;
+        after.push({
+          cam: world.camera.x,
+          enemyX: world.enemies.map((e) => e.x),
+        });
+      }
+    }
+
+    expect(frozenAt).toBeGreaterThan(0);
+    expect(after.length).toBeGreaterThan(5);
+    // Every sample taken from the death frame onward is identical to the first.
+    for (const sample of after) expect(sample).toEqual(after[0]);
+  });
+});
