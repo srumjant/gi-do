@@ -31,6 +31,14 @@ export interface DriveOptions {
   frames: number;
   /** Held state for each frame. Presses are derived from the rising edge. */
   input: (frame: number) => FrameInput;
+  /**
+   * Optional hook to edit the live game's tile map after the level is built, so
+   * scenarios the stock levels do not contain can still be driven against the real
+   * implementation rather than only unit-tested. No level has a vertical wall at player
+   * height, for instance — makeGround writes two bottom rows and addPlats writes single
+   * rows, so nothing stacks.
+   */
+  mutateMap?: (map: number[][]) => void;
 }
 
 const noop = (): void => {};
@@ -82,6 +90,7 @@ interface Driver {
   initLevel: (i: number) => void;
   setLevel: (i: number) => void;
   getLevelIndex: () => number;
+  getMap: () => number[][];
   update: () => void;
   keys: Record<string, boolean>;
   justPressed: Record<string, boolean>;
@@ -137,6 +146,7 @@ function bootLiveGame(): Driver {
   setChar: (c) => { selectedChar = c; },
   setLevel: (i) => { currentLevel = i; },
   getLevelIndex: () => currentLevel,
+  getMap: () => map,
 };`;
   vm.runInContext(legacySource() + expose, sandbox, { filename: 'live-game' });
   return sandbox.__drive as Driver;
@@ -168,6 +178,8 @@ export function driveLiveGame(opts: DriveOptions): Sample[] {
   // against another level's dimensions. Invisible at level 0; wrong everywhere else.
   d.setLevel(opts.level);
   d.initLevel(opts.level);
+  // After initLevel, because initLevel is what builds the map.
+  opts.mutateMap?.(d.getMap());
 
   const trace: Sample[] = [];
   let prev: FrameInput = { left: false, right: false, jump: false };

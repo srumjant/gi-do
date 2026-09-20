@@ -37,6 +37,13 @@ export interface World {
   enemies: EnemyState[];
   /** Frames since the level started. Everything here is frame-counted, not seconds. */
   frame: number;
+  /**
+   * Set once the player has fallen into a pit (index.html's `playerDie` -> `gameState
+   * = 'dead'`). The live `update()` checks its own dead-state branch before it ever
+   * reaches player movement, so once true, nothing about the player moves again this
+   * run. `stepPlayer` reproduces that by returning immediately when this is set.
+   */
+  dead: boolean;
 }
 
 /** An axis-aligned box, as the live game's rectOverlap takes them. */
