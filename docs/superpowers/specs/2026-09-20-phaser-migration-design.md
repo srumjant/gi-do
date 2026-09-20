@@ -300,18 +300,35 @@ run proves graceful degradation for unmodelled APIs, not that anything is drawn 
 
 ## Sequencing
 
-Feel-critical work goes early so nothing is built on a wrong foundation.
+Feel-critical work goes early so nothing is built on a wrong foundation, and the
+validation gate comes before any fidelity work.
+
+> **Resequenced after Plan 1 shipped.** The first version of this list put textures and
+> the felt shader before the player controller, and the plan decomposition then made that
+> an entire plan — pushing the playtest gate out behind a whole phase of work whose only
+> risk is transcription. That inverted this section's own opening sentence. Rendering
+> fidelity is refinement; whether the movement feels right is the question that can
+> invalidate the approach, so it now comes first, in the ugliest form that can answer it.
 
 1. **Scaffold** — Vite, TS, Vitest, tsconfig under `next/`; CI builds it alongside the live
    game. An empty Phaser game boots at `/next/`; `/` is untouched.
 2. **Data port** — sprites, levels, i18n, difficulty, BGM themes into typed modules.
    Mechanical, low risk. Test: level generation matches the old build exactly.
 3. **Audio port** — verbatim, behind a typed interface. Test: scheduler with a fake clock.
-4. **BootScene + textures + felt shader.** Visual checkpoint: flat and felt side by side
-   against the current build.
-5. **Player controller + tile collision + fixed step.** ← **playtest gate.** Nothing
-   further is built until the movement feels right.
-6. **Enemies, boss, cat, projectiles, power-ups.**
+4. **Vertical slice.** Fixed step, player controller, tile collision, camera, and one
+   patrolling enemy so stomping is covered. Level 1 drawn as flat coloured rectangles —
+   no sprites, no felt, no parallax, no HUD, no menus. Keyboard only.
+   ← **validation gate.** Two things must hold before anything else is built:
+   - **Golden traces match.** The live game's physics is drivable headlessly (the whole
+     script evaluates in a Node VM, `initLevel` runs, and `update()` can be stepped with
+     injected key state), so both implementations take an identical input sequence and
+     their position and velocity are compared frame by frame. Feel drift becomes a
+     failing test rather than an argument.
+   - **The kids play it.** Numbers cannot tell us that Phaser's input latency or
+     presentation feels different in a real browser. They can.
+5. **Textures and the felt shader.** Sprite arrays rasterised to GPU textures, bevel baked
+   at boot, palette/grain/shadow in a Filter. Visual checkpoint against the live build.
+6. **The rest of the world** — remaining enemies, boss, cat, projectiles, power-ups.
 7. **Scenes** — title, mode select, difficulty, char select, intro, between, game over,
    win, plus HUD and pause.
 8. **Learn mode.**
@@ -327,8 +344,8 @@ Feel-critical work goes early so nothing is built on a wrong foundation.
   freeze it; coexistence means the live game keeps working and keeps accepting small
   changes. What stops is *large* new features, since anything added to the old engine has
   to be built twice.
-- **Feel drift.** Mitigated by the playtest gate at step 5 and golden traces for the player
-  controller.
+- **Feel drift.** Mitigated by the validation gate at step 4: golden traces against the
+  live game's own physics, plus the kids playing the slice before anything is built on it.
 - **Felt shader parity.** The bevel compromise (baked at boot) is the known unknown.
   Needs a visual A/B checkpoint before step 5 proceeds.
 - **Scope.** ~2,400 of 3,350 lines rewritten, plus a new toolchain, plus a shader. This is
