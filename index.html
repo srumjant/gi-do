@@ -7,7 +7,13 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #222; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: monospace; }
-canvas { image-rendering: pixelated; image-rendering: crisp-edges; border: 3px solid #555; }
+canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+#stage { position: relative; line-height: 0; border: 3px solid #555; }
+/* Fibre grain as a composited layer rather than a per-frame canvas fill.
+   Blending a full screen inside the canvas cost ~13ms a frame; the compositor
+   does the same job on the GPU for nothing. */
+#grain { position: absolute; inset: 0; pointer-events: none; display: none;
+  mix-blend-mode: overlay; opacity: 0.55; background-repeat: repeat; }
 #fullscreen-btn { position: fixed; top: 8px; right: 8px; z-index: 20; background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.4); color: #fff; font-size: 18px; width: 40px; height: 40px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; touch-action: manipulation; }
 #fullscreen-btn:hover, #fullscreen-btn:active { background: rgba(255,255,255,0.4); }
 #mobile-controls { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; padding: 6px 10px 10px; }
@@ -42,7 +48,7 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; border: 3px s
 </style>
 </head>
 <body>
-<canvas id="game"></canvas>
+<div id="stage"><canvas id="game"></canvas><div id="grain"></div></div>
 <button id="fullscreen-btn" title="Fullscreen">⛶</button>
 <div id="mobile-controls">
   <div id="dpad">
@@ -67,7 +73,7 @@ const BASE_W = 640, BASE_H = 400;
 // screen, same physics — but every art pixel gets RENDER device pixels under it,
 // which is the room the felt grain and bevel need to sit beneath the art instead
 // of on top of it. 1 = the old look.
-const RENDER = 3;
+let RENDER = 2;
 // World zoom. 1 shows 40 tiles across, which is very wide for a platformer —
 // Super Mario Bros showed 16. Higher = bigger characters, less level visible.
 // Only affects the world; the HUD is drawn outside it.
@@ -507,6 +513,7 @@ function toggleFeltStyle(){
   STYLE_FELT=!STYLE_FELT;
   // Every cached sprite was baked with the old style, so throw them all away.
   spriteCache.clear(); feltColorCache.clear(); grainPattern=null;
+  syncSceneGrain();
   try { localStorage.setItem('gd_style',STYLE_FELT?'felt':'flat'); } catch(e) {}
 }
 const FELT = {
@@ -3366,25 +3373,49 @@ if(location.search.indexOf('test=1')>=0)window.addEventListener('load',runSelfTe
 
 // Grain over the finished frame. Without this the sky and hills stay plastic-smooth
 // and the felt sprites look pasted onto them.
-let grainPattern=null;
-function drawSceneGrain(){
-  if(!STYLE_FELT||FELT.sceneGrainOpacity<=0)return;
-  if(!grainPattern)grainPattern=ctx.createPattern(getGrain(),'repeat');
-  ctx.save();
-  ctx.globalCompositeOperation='overlay';
-  ctx.globalAlpha=FELT.sceneGrainOpacity;
-  ctx.fillStyle=grainPattern;
-  // Drawn in device space so the fibre stays one real pixel however high RENDER is.
-  ctx.setTransform(1,0,0,1,0,0);
-  ctx.fillRect(0,0,BASE_W*RENDER,BASE_H*RENDER);
-  ctx.restore();
+// The scene grain is a CSS layer, not a canvas pass. Filling the whole frame
+// with a blend mode every frame cost more than the entire rest of the render.
+const grainEl=document.getElementById('grain');
+let grainPattern=null;   // kept: the sprite cache still uses the tile directly
+function syncSceneGrain(){
+  if(!grainEl)return;
+  if(!STYLE_FELT||FELT.sceneGrainOpacity<=0){grainEl.style.display='none';return;}
+  if(!grainEl.style.backgroundImage)
+    grainEl.style.backgroundImage='url('+getGrain().toDataURL()+')';
+  grainEl.style.opacity=FELT.sceneGrainOpacity;
+  grainEl.style.display='block';
 }
-function gameLoop(){
+// Weak hardware safety net. A TV browser has a fraction of a laptop's fill rate,
+// and RENDER is the biggest single lever on how much we ask of it. Watch real
+// frames and step down once if we cannot hold the budget. One-way, so it can
+// never oscillate.
+let slowFrames=0, lastFrameAt=0, renderDowngraded=false;
+function watchFrameRate(now){
+  if(renderDowngraded)return;
+  if(lastFrameAt){
+    const dt=now-lastFrameAt;
+    // 28ms is about 35fps: past a dropped frame, short of a backgrounded tab.
+    if(dt>28&&dt<500)slowFrames++; else slowFrames=Math.max(0,slowFrames-1);
+    if(slowFrames>45){
+      renderDowngraded=true;
+      RENDER=1;
+      spriteCache.clear();
+      resizeCanvas();
+      console.log('[perf] sustained slow frames, dropped RENDER to 1');
+    }
+  }
+  lastFrameAt=now;
+}
+function gameLoop(now){
+  // requestAnimationFrame always supplies a timestamp; the first manual call
+  // has none, and the test harness runs without a performance global at all.
+  if(now)watchFrameRate(now);
   // Everything below draws in 640x400 logical coordinates.
   ctx.setTransform(RENDER,0,0,RENDER,0,0);
-  pollGamepad();update();draw();drawSceneGrain();drawPowerupPopup();
+  pollGamepad();update();draw();drawPowerupPopup();
   requestAnimationFrame(gameLoop);
 }
+syncSceneGrain();   // felt may have been restored from localStorage
 gameLoop();
 </script>
 </body>
