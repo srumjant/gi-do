@@ -828,14 +828,14 @@ import {
 const legacy = loadLegacySection({
   from: '//  LANGUAGE / TRANSLATIONS',
   to: '//  SOUND ENGINE',
-  prelude: 'function padGlyph(k){ return k; }',
+  prelude: 'function padGlyph(action){ return "[" + action + "]"; }',
   expose: ['TRANSLATIONS', 'LANG_KEYS'],
 });
 
 describe('translations match the live game', () => {
   beforeEach(() => {
     setLang('et');
-    setGlyphResolver((k) => k);
+    setGlyphResolver((action) => action);
   });
 
   it('has the same languages', () => {
@@ -857,7 +857,7 @@ describe('translations match the live game', () => {
 describe('T()', () => {
   beforeEach(() => {
     setLang('et');
-    setGlyphResolver((k) => k);
+    setGlyphResolver((action) => action);
   });
 
   it('returns the Estonian string by default', () => {
@@ -866,6 +866,7 @@ describe('T()', () => {
 
   it('follows the selected language', () => {
     setLang('en');
+    expect(getLang()).toBe('en');
     expect(T('score')).toBe(legacy.TRANSLATIONS.score.en);
   });
 
@@ -881,9 +882,18 @@ describe('T()', () => {
     expect(phrases).toEqual(legacy.TRANSLATIONS.dino_phrases.et);
   });
 
-  it('substitutes gamepad glyphs in strings only', () => {
-    setGlyphResolver((k) => (k === 'A' ? 'Cross' : k));
-    expect(T('__test_glyph', { A: 'Cross' })).toBe('__test_glyph');
+  // The live game substitutes by ACTION, not by letter: {A} resolves through
+  // padGlyph('confirm'), because the glyph depends on the connected pad.
+  it('substitutes gamepad placeholders by their action name', () => {
+    setGlyphResolver((action) => `[${action}]`);
+    const raw = legacy.TRANSLATIONS.press_start.et as string;
+    expect(raw).toContain('{A}');
+    expect(T('press_start')).toBe(raw.replace('{A}', '[confirm]'));
+  });
+
+  it('leaves strings without a placeholder alone', () => {
+    setGlyphResolver(() => 'SHOULD NOT APPEAR');
+    expect(T('score')).toBe(legacy.TRANSLATIONS.score.et);
   });
 });
 
@@ -938,14 +948,29 @@ export function setLang(next: Lang): void {
 }
 
 /**
- * Resolves a gamepad glyph placeholder such as {A} to the glyph for the pad in use.
- * Injected rather than imported so this module stays free of input concerns; the
- * default is the identity, which is what the tests and the menus want before a pad
- * is connected.
+ * Placeholders in translated strings, mapped to the ACTION each one means. The live
+ * game calls padGlyph('confirm'), not padGlyph('A') — the letters are only how the
+ * placeholder is spelled, and the glyph that replaces one depends on the connected
+ * pad (Cross on a DualSense, A on an Xbox pad). Keep the action names: Plan 4's
+ * gamepad code implements the resolver against this contract.
  */
-let glyphFor: (key: string) => string = (key) => key;
+export type GlyphAction = 'confirm' | 'back' | 'shoot' | 'pause';
 
-export function setGlyphResolver(fn: (key: string) => string): void {
+const GLYPH_ACTIONS: Record<string, GlyphAction> = {
+  A: 'confirm',
+  B: 'back',
+  X: 'shoot',
+  P: 'pause',
+};
+
+/**
+ * Injected rather than imported so this module stays free of input concerns. The
+ * default returns the action name, which is what the tests want and is harmless in
+ * the menus before a pad is connected.
+ */
+let glyphFor: (action: GlyphAction) => string = (action) => action;
+
+export function setGlyphResolver(fn: (action: GlyphAction) => string): void {
   glyphFor = fn;
 }
 
@@ -960,7 +985,10 @@ export function T(key: string): Phrase {
   if (typeof value !== 'string') return value;
   if (value.indexOf('{') < 0) return value;
 
-  return value.replace(/\{([ABXP])\}/g, (_, k: string) => glyphFor(k));
+  return value.replace(/\{([ABXP])\}/g, (whole, letter: string) => {
+    const action = GLYPH_ACTIONS[letter];
+    return action ? glyphFor(action) : whole;
+  });
 }
 
 /** Convenience for the common case where the caller knows the value is a string. */
@@ -983,7 +1011,7 @@ export function TDiff(key: string): string {
 - [ ] **Step 4: Run the test to confirm it passes**
 
 Run: `cd next && npx vitest run tests/i18n.test.ts`
-Expected: PASS, 9 tests. If `__test_glyph` fails, drop that one assertion — it exercises a key that does not exist and should return the key itself.
+Expected: PASS, 10 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1002,7 +1030,25 @@ fixed when indexOf('{') started comparing whole array elements."
 
 **Files:**
 - Create: `next/src/data/sprites.ts`
+- Modify: `next/tests/helpers/legacy.ts` (add `legacySectionSource`)
 - Test: `next/tests/sprites.test.ts`
+
+- [ ] **Step 0: Add `legacySectionSource` to the existing harness**
+
+The completeness test below needs the raw section text, not its evaluated values. Add
+this export to `next/tests/helpers/legacy.ts`, above `loadLegacySection`:
+
+```ts
+/** The raw text of one section, for tests that need to inspect the source itself. */
+export function legacySectionSource(from: string, to: string): string {
+  const src = legacyScript();
+  const start = src.indexOf(from);
+  if (start < 0) throw new Error(`Start marker not found in index.html: ${from}`);
+  const end = src.indexOf(to, start);
+  if (end < 0) throw new Error(`End marker not found in index.html: ${to}`);
+  return src.slice(start, end);
+}
+```
 
 Sprites are 2D arrays of palette indices — `0` is transparent, everything else keys into a palette of hex strings. This task ports the **data only**. Nothing rasterises it until Plan 2.
 
@@ -1012,7 +1058,7 @@ Create `next/tests/sprites.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { loadLegacySection } from './helpers/legacy';
+import { loadLegacySection, legacySectionSource } from './helpers/legacy';
 import * as ported from '../src/data/sprites';
 import type { SpriteData, Palette } from '../src/data/sprites';
 
@@ -1029,8 +1075,9 @@ const NAMES = [
   'STAR_S', 'STAR_P', 'HEART_S', 'HEART_P', 'BOW_S', 'BOW_P',
   'ARROW_S', 'ARROW_P', 'SUPER_S', 'SUPER_P', 'CAPE_S', 'CAPE_P',
   'CAT_S', 'CAT_P', 'CAT_SCRATCH_S', 'CAT_SCRATCH_P',
+  'CHICKEN_S', 'CHICKEN_P',
   'CLOUD_S', 'CLOUD_P',
-  'GIGI_SKINS', 'DODO_SKINS',
+  'GIGI_SKINS', 'DODO_SKINS', 'KIDNAPPERS',
 ];
 
 const legacy = loadLegacySection({
@@ -1039,12 +1086,28 @@ const legacy = loadLegacySection({
   expose: NAMES,
 });
 
+const legacySpritesSource = () => legacySectionSource('//  SPRITES', '//  LEVELS');
+
 describe('sprite data matches the live game', () => {
   for (const name of NAMES) {
     it(`${name} is identical`, () => {
       expect((ported as Record<string, unknown>)[name]).toEqual(legacy[name]);
     });
   }
+
+  // NAMES is hand-written, so it cannot catch its own omissions — the first draft of
+  // this plan silently missed CHICKEN_S, CHICKEN_P and KIDNAPPERS. Derive the expected
+  // set from the live file instead, so a sprite the kids add later cannot be dropped
+  // on the floor without a test going red.
+  it('exports every constant the live SPRITES section declares', () => {
+    const declared = [...legacySpritesSource().matchAll(/^const ([A-Z][A-Z0-9_]*)\s*=/gm)]
+      .map((m) => m[1]);
+    expect(declared.length).toBeGreaterThan(60);
+    for (const name of declared) {
+      expect((ported as Record<string, unknown>)[name], `${name} not exported`)
+        .toBeDefined();
+    }
+  });
 });
 
 // The live game's own testSprites checks, ported. They catch the mistake that
@@ -1357,9 +1420,13 @@ import { loadLegacySection } from './helpers/legacy';
 import { LEVELS } from '../src/data/levels';
 import { PARALLAX } from '../src/data/parallax';
 
+// Stop at drawParallax, NOT at the next banner. The text between PARALLAX and the
+// SILLY POWER-UPS banner also contains the keyboard/touch input setup, which calls
+// window.addEventListener at evaluation time and throws in the VM. Narrowing to the
+// data keeps the slice free of anything that needs a DOM.
 const legacy = loadLegacySection({
   from: '//  PARALLAX BACKGROUNDS',
-  to: '//  SILLY POWER-UPS',
+  to: 'function drawParallax',
   expose: ['PARALLAX'],
 });
 
@@ -1673,7 +1740,7 @@ Create `next/tests/synth.test.ts`:
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FakeAudioContext } from './helpers/fakeAudio';
 import { setAudioContext, getAudioContext } from '../src/audio/context';
-import { playTone } from '../src/audio/synth';
+import { playBGMNote, playTone } from '../src/audio/synth';
 
 let fake: FakeAudioContext;
 
@@ -1697,11 +1764,13 @@ describe('playTone', () => {
     expect(fake.oscillators[0].frequency.calls[0].value).toBe(660);
   });
 
-  it('starts now and stops after the requested duration', () => {
+  it('starts now and stops just after the requested duration', () => {
     fake.currentTime = 5;
     playTone(440, 0.25, 'square', 0.1);
     expect(fake.oscillators[0].started).toBe(5);
-    expect(fake.oscillators[0].stopped).toBeCloseTo(5.25, 5);
+    // index.html:307 stops at now + dur + 0.01 — the extra 10ms lets the release
+    // ramp reach zero before the node is torn down, which is what stops the click.
+    expect(fake.oscillators[0].stopped).toBeCloseTo(5.26, 5);
   });
 
   // The envelope exists to stop clicks: gain ramps up from 0 and back down to 0,
@@ -1719,6 +1788,11 @@ describe('playTone', () => {
     playTone(300, 0.15, 'square', 0.12, 600);
     const freq = fake.oscillators[0].frequency.calls;
     expect(freq.some((c) => c.method === 'linearRampToValueAtTime' && c.value === 600)).toBe(true);
+  });
+
+  it('treats frequency 0 as a rest and makes no sound', () => {
+    playBGMNote('square', 0, 1, 0.2, 0.1);
+    expect(fake.oscillators.length).toBe(0);
   });
 
   it('does nothing and does not throw when there is no audio context', () => {
@@ -1753,9 +1827,20 @@ export function setAudioContext(next: AudioContext | null): void {
   ctx = next;
 }
 
-/** Call from a user-gesture handler. Returns null if the browser has no AudioContext. */
+/**
+ * Returns the context, creating it on first use. Browsers refuse to start an
+ * AudioContext outside a user gesture, so the live game calls this lazily from
+ * inside playTone rather than at load — that is preserved here.
+ *
+ * The `typeof window` guard is load-bearing: the tests run in Vitest's `node`
+ * environment, where `window` is not merely undefined but an unresolved
+ * identifier, so touching it throws a ReferenceError rather than yielding
+ * undefined. An injected context short-circuits before that line, but the
+ * "no audio context" test deliberately sets null and would otherwise crash.
+ */
 export function ensureAudio(): AudioContext | null {
   if (ctx) return ctx;
+  if (typeof window === 'undefined') return null;
   const Ctor = window.AudioContext
     ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!Ctor) return null;
@@ -1774,7 +1859,7 @@ Create `next/src/audio/synth.ts`. Port `playTone` from `index.html:299-308`, `pl
 
 ```ts
 import type { OscillatorKind } from '../data/bgmThemes';
-import { getAudioContext } from './context';
+import { ensureAudio, getAudioContext } from './context';
 
 /**
  * One oscillator straight to the destination, with a three-segment gain envelope.
@@ -1790,7 +1875,11 @@ export function playTone(
   vol: number,
   slideTo?: number,
 ): void {
-  const ctx = getAudioContext();
+  // ensureAudio, not getAudioContext: the live game creates the context lazily
+  // from inside playTone (index.html:300), because a browser will not open one
+  // before a user gesture. An already-set context (including an injected test
+  // double) is returned unchanged.
+  const ctx = ensureAudio();
   if (!ctx) return;
   try {
     // <<< port index.html:300-307 verbatim, using `ctx`, `freq`, `dur`,
@@ -1829,12 +1918,22 @@ export function playPercNote(type: number, at: number, vol: number): void {
 }
 ```
 
-While porting `playPercNote`, drop the `g2.gain=g;` assignment at the **start of line 453** — keep the rest of that line, which does the real wiring (`o.connect(g); o2.connect(g); g.connect(destination)`). The assignment writes over a read-only `AudioParam`, so it is a no-op; the hi-hat's second oscillator already reaches `g` through `o2.connect(g)`. Dropping it changes nothing audible.
+While porting `playPercNote`, drop the dead hi-hat gain node entirely:
+
+- Line 453 begins `g2.gain=g;` — drop that assignment, **keep the rest of the line**,
+  which does the real wiring (`o.connect(g); o2.connect(g); g.connect(destination)`).
+  It writes over a read-only `AudioParam`, so it is a no-op.
+- That leaves `g2` from line 449 (`const o2=...,g2=audioCtx.createGain();`) completely
+  unused, which `noUnusedLocals` will reject — so drop `g2` from that declaration too,
+  keeping `o2`.
+
+Nothing audible changes: `g2` was never connected to anything, and the hi-hat's second
+oscillator already reaches the live gain node through `o2.connect(g)`.
 
 - [ ] **Step 6: Run the test to confirm it passes**
 
 Run: `cd next && npx vitest run tests/synth.test.ts`
-Expected: PASS, 6 tests.
+Expected: PASS, 7 tests.
 
 - [ ] **Step 7: Commit**
 
@@ -2012,7 +2111,10 @@ describe('BGM scheduler', () => {
   it('schedules a bounded window rather than the whole song', () => {
     startBGM(0);
     const horizon = Math.max(...fake.oscillators.map((o) => o.started ?? 0));
-    expect(horizon).toBeLessThan(fake.currentTime + 1);
+    // The window is 400ms plus at most one step. The slowest theme steps every
+    // 800ms, so 2s is a safe ceiling for any theme — while a whole track runs ~37s,
+    // which is what this test exists to rule out.
+    expect(horizon).toBeLessThan(fake.currentTime + 2);
   });
 
   it('schedules more notes as the clock advances', () => {
@@ -2068,13 +2170,20 @@ Create `next/src/audio/bgm.ts`. Port `startBGM` from `index.html:457-495` and `s
 
 ```ts
 import { BGM_THEMES } from '../data/bgmThemes';
-import { getAudioContext } from './context';
+import { ensureAudio } from './context';
 import { playBGMNote, playPercNote } from './synth';
 
-/** How far ahead of the clock notes are placed. */
+/** How far ahead of the audio clock notes are placed. */
 const LOOKAHEAD_S = 0.4;
-/** How often the scheduler wakes to top the window up. */
+/** How often the scheduler wakes to refill that window. */
 const TICK_MS = 120;
+/** Note length as a fraction of the step, so consecutive steps do not run together. */
+const NOTE_DUTY = 0.85;
+/** Bass rings a little longer than the melody, harmony a little shorter. */
+const BASS_STRETCH = 1.1;
+const HARM_STRETCH = 0.7;
+/** Percussion is mixed at a fixed level rather than per theme. */
+const PERC_VOL = 0.06;
 
 let currentTheme = -1;
 let noteIndex = 0;
@@ -2085,26 +2194,6 @@ export function getCurrentTheme(): number {
   return currentTheme;
 }
 
-export function startBGM(themeIndex: number): void {
-  stopBGM();
-  const ctx = getAudioContext();
-  const theme = BGM_THEMES[themeIndex];
-  if (!ctx || !theme) return;
-
-  currentTheme = themeIndex;
-  noteIndex = 0;
-  nextNoteTime = ctx.currentTime + 0.1;
-
-  // <<< port the scheduleNotes() body from index.html:465-494 here, keeping:
-  //   - the `while (nextNoteTime < ctx.currentTime + LOOKAHEAD_S)` loop
-  //   - melody, bass (dur x1.1), harmony (dur x0.7) and percussion, each read
-  //     with `i % arr.length` so the parts loop at different periods
-  //   - `nextNoteTime += 60 / theme.bpm` and `noteIndex++` per step
-  //   - the stale guard: bail out if currentTheme !== themeIndex
-  //   - re-arm with `timer = setTimeout(scheduleNotes, TICK_MS)`
-  // >>>
-}
-
 export function stopBGM(): void {
   if (timer !== null) {
     clearTimeout(timer);
@@ -2112,9 +2201,71 @@ export function stopBGM(): void {
   }
   currentTheme = -1;
 }
+
+export function startBGM(themeIndex: number): void {
+  stopBGM();
+
+  const theme = BGM_THEMES[themeIndex];
+  if (!theme) return;
+
+  const ctx = ensureAudio();
+  if (!ctx) return;
+
+  currentTheme = themeIndex;
+  noteIndex = 0;
+  nextNoteTime = ctx.currentTime + 0.1;
+
+  const interval = 60 / theme.bpm;
+
+  /**
+   * A lookahead scheduler, not a setTimeout-per-note loop. Notes are placed at
+   * absolute AudioContext times inside a 400ms window, and setTimeout only wakes
+   * this function to refill that window — so jitter in the timer never becomes
+   * jitter in the music.
+   */
+  function scheduleNotes(): void {
+    // Stale guard. Starting a different theme leaves this closure's timer pending;
+    // returning WITHOUT re-arming lets the old scheduler die instead of playing
+    // underneath the new one.
+    if (currentTheme !== themeIndex) return;
+
+    try {
+      while (nextNoteTime < ctx.currentTime + LOOKAHEAD_S) {
+        const i = noteIndex;
+        const at = nextNoteTime;
+        const dur = interval * NOTE_DUTY;
+
+        // Each part is read modulo its OWN length, so melody, bass, harmony and
+        // percussion loop at different periods and the track stops sounding like
+        // one short loop.
+        playBGMNote(theme.wave, theme.notes[i % theme.notes.length], at, dur, theme.vol);
+        playBGMNote(theme.bass, theme.bassN[i % theme.bassN.length],
+                    at, dur * BASS_STRETCH, theme.bassVol);
+        playBGMNote(theme.harm, theme.harmN[i % theme.harmN.length],
+                    at, dur * HARM_STRETCH, theme.harmVol);
+        playPercNote(theme.perc[i % theme.perc.length], at, PERC_VOL);
+
+        nextNoteTime += interval;
+        noteIndex++;
+      }
+    } catch {
+      // A failing audio stack must never take a frame down with it.
+    }
+
+    timer = setTimeout(scheduleNotes, TICK_MS);
+  }
+
+  scheduleNotes();
+}
 ```
 
-The stale guard is the important part. Without it, calling `startBGM` for a new level leaves the old theme's timer alive and both play at once.
+Three deliberate differences from `index.html:457-496`, each verified against the data:
+
+1. **The `theme.harm || 'triangle'` and `theme.harmVol || 0.012` fallbacks are dropped.** All ten themes define both fields, so the fallbacks are unreachable, and `BgmTheme` types them as required.
+2. **`bgmTimer` is not ported.** It is declared at `index.html:321` and cleared in `stopBGM`, but never assigned anywhere — dead code that predates this migration.
+3. **Missing audio returns instead of throwing.** The live game runs `bgmNextTime = audioCtx.currentTime + 0.1` outside its try/catch, so `startBGM` throws outright if the context could not be created. Returning quietly is what the "does nothing without an audio context" test requires, and silent degradation is what every other audio function here already does.
+
+The stale guard is the part to get right. Without it, starting a new level's theme leaves the previous scheduler's timer alive and both tracks play at once.
 
 - [ ] **Step 4: Run the test to confirm it passes**
 
