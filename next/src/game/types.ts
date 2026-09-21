@@ -99,6 +99,78 @@ export interface Star {
   collected: boolean;
 }
 
+/**
+ * The cat companion (index.html:995, 1452) — `null` until the cat pickup is walked over
+ * and `null` again three scratches later. It is not a player, not an enemy and not a
+ * physics body: nothing in the game collides with it, it never touches the tile map, and
+ * it cannot be hurt. See world.ts's stepCat for the movement, which is stranger than it
+ * looks.
+ */
+export interface CatState {
+  x: number;
+  y: number;
+  /**
+   * Written once, by the spawn literal, and never read or assigned again anywhere in the
+   * live source — the cat's horizontal motion is `bounceDir * 2.5` applied straight to
+   * `x`. Carried anyway so the field set stays the live object's, exactly like
+   * PowerupPopup.maxTimer.
+   */
+  vx: number;
+  /**
+   * The bounce arc's vertical speed. The cat has its OWN gravity, a flat 0.35, and its
+   * own jump force, -5.5 — neither is the world's GRAVITY (0.4) nor the player's
+   * `dc.jumpForce`, and neither scales with difficulty.
+   */
+  vy: number;
+  /**
+   * Drawing flip. Only the two bounce-reversal branches ever write it, so it is the
+   * direction of the last REVERSAL rather than of the current travel: it stays 1 for the
+   * whole first swing out to the right and only becomes -1 once the cat has crossed
+   * `playerCenterX + 60` and turned back.
+   */
+  facing: 1 | -1;
+  /** Which of the two cat frames to draw, flipped every 9th frame (index.html:1478). */
+  frame: number;
+  /** Counts up to 8 and resets; `> 8` not `>= 8`, so the flip is every 9 frames. */
+  frameTimer: number;
+  /**
+   * Frames until the next scratch is allowed, from 30. Decremented with
+   * `Math.max(0, ... - 1)` at the TOP of the cat pass, before the guard that reads it,
+   * so a scratch on frame N permits the next on frame N+30 — thirty frames apart, not
+   * thirty-one.
+   */
+  scratchTimer: number;
+  /**
+   * Where the last scratch landed (the victim's centre), for the claw sprite the draw
+   * code puts there while `scratchTimer > 20` (index.html:1728-1729). Presentation-only,
+   * carried because it is part of the live object and a trace compares the whole shape.
+   */
+  scratchTarget: { x: number; y: number } | null;
+  /**
+   * Scratches left, from 3. Reaching 0 does NOT remove the cat on the spot: the removal
+   * lives in the `else if` AFTER the whole cat block (index.html:1498-1500), so the frame
+   * the cat spends its last scratch it is still there, still drawn, still bouncing, and
+   * only the NEXT frame finds `hitsLeft > 0` false and nulls it.
+   */
+  hitsLeft: number;
+  /** Which way the side-to-side bounce is currently travelling: +1 right, -1 left. */
+  bounceDir: 1 | -1;
+  /**
+   * The height the current arc falls back to. Assigned TWICE per frame (index.html:1471
+   * and :1477) — once inside the takeoff branch, then again unconditionally at the
+   * bottom — and the second write is the load-bearing one: it re-aims the landing at the
+   * player's CURRENT feet every frame, which is what lets the cat follow a player who is
+   * climbing. Without it the cat keeps landing wherever it took off from.
+   */
+  baseY: number;
+  /**
+   * There is no rest state. Landing sets this true, and the very next frame's takeoff
+   * branch consumes it and launches again, so the cat bounces continuously from the
+   * moment it spawns until it is gone.
+   */
+  onGround: boolean;
+}
+
 /** Which silly power-up the rainbow block handed out (index.html:1149). */
 export type PowerupType = 'fart' | 'bighead' | 'chicken';
 
@@ -335,10 +407,18 @@ export interface World {
   /**
    * index.html:1183-1187. `null` for a level with no `catPosition`; every level record
    * this port carries has one, so it is never null today, but the live guard is real
-   * and is reproduced rather than assumed away. The cat COMPANION this pickup spawns
-   * is a later task; only the pickup itself exists here.
+   * and is reproduced rather than assumed away. Walking over it spawns `cat` below —
+   * through a 16x22 hitbox, not the 16x16 the bow and super use (world.ts's
+   * collectPickups).
    */
   catPickup: Pickup | null;
+  /**
+   * index.html:995, 1183. The cat companion, `null` except between the pickup and its
+   * third scratch. Cleared by `initLevel` like every other level collection, on the line
+   * directly above the one that rebuilds `catPickup`, so a death takes the cat away and
+   * hands the pickup back in the same breath. See CatState above and world.ts's stepCat.
+   */
+  cat: CatState | null;
   /**
    * index.html:1188. Empty at level build; filled by bumping a question block from
    * below (player.ts's bumpBlocksAbove), one star per block, one tile ABOVE the block

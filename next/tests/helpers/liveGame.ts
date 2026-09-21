@@ -23,6 +23,23 @@ export interface FrameInput {
   fire: boolean;
 }
 
+/** Every field the live cat companion carries (index.html:1452). */
+export interface CatSample {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  facing: number;
+  frame: number;
+  frameTimer: number;
+  scratchTimer: number;
+  scratchTarget: { x: number; y: number } | null;
+  hitsLeft: number;
+  bounceDir: number;
+  baseY: number;
+  onGround: boolean;
+}
+
 /** Just the five fields a live `arrows` entry carries (index.html:1394). */
 export interface ArrowSample {
   x: number;
@@ -211,6 +228,14 @@ export interface Driver {
    */
   getArrows: () => ArrowSample[];
   /**
+   * The cat companion, or null while there is none — a fresh snapshot rather than a live
+   * reference, for the same reason `getArrows` above is one: the live `cat` binding is
+   * REASSIGNED (index.html:1183, 1452, 1500), so a reference captured once would go
+   * stale the moment the pickup spawned one or the third scratch took it away. Reading
+   * the binding through this closure re-resolves it every call.
+   */
+  getCat: () => CatSample | null;
+  /**
    * Zeroes the live script's top-level `animFrame` IN PLACE. `initLevel` never resets
    * it (its one direct assignment in the whole file is the top-level declaration
    * `animFrame=0` — every other reference is either `animFrame++` or a read), so
@@ -297,6 +322,10 @@ function bootLiveGame(): Driver {
   getLevelSpawn: () => ({ bowPickups, superPickups, catPickup, stars, questionBlocks, rainbowBlocks }),
   getGameState: () => gameState,
   getArrows: () => arrows.map(a => ({ x: a.x, y: a.y, vx: a.vx, life: a.life, isChicken: !!a.isChicken })),
+  getCat: () => cat && ({ x: cat.x, y: cat.y, vx: cat.vx, vy: cat.vy, facing: cat.facing,
+    frame: cat.frame, frameTimer: cat.frameTimer, scratchTimer: cat.scratchTimer,
+    scratchTarget: cat.scratchTarget && ({ x: cat.scratchTarget.x, y: cat.scratchTarget.y }),
+    hitsLeft: cat.hitsLeft, bounceDir: cat.bounceDir, baseY: cat.baseY, onGround: !!cat.onGround }),
   resetAnimFrame: () => { animFrame = 0; },
   getEnemies: () => enemies,
   clearEnemies: () => { pendingEnemies.length = 0; enemies.length = 0; },

@@ -25,7 +25,7 @@
 // scripts run with enemies off, everything else runs with them on, and dieAndRespawn
 // covers the death-and-respawn path deliberately.
 import { afterEach, describe, expect, it } from 'vitest';
-import { driveLiveGame, type ArrowSample } from './helpers/liveGame';
+import { driveLiveGame, type ArrowSample, type CatSample } from './helpers/liveGame';
 import { SCRIPTS, STOMP_SCRIPT } from './helpers/inputScript';
 import { createWorld, respawnLevel, stepWorld } from '../src/game/world';
 import { findGroundY } from '../src/game/tiles';
@@ -1404,6 +1404,187 @@ describe('the chicken ray vs. the live game', () => {
     expect(ys.slice(landed).every((y) => y === ys[landed])).toBe(true);
     const walk = port.slice(convertFrame + landed).map((s) => s.enemies[BAT_INDEX].x);
     expect(walk[walk.length - 1]).toBe(walk[0] - 1.5 * (walk.length - 1));
+    expect(world.dead).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The cat companion (Plan 5, Task 5) — index.html:1449-1455 (the pickup, sitting
+// between the bow/super pickups and the arrow pass) and :1456-1501 (the companion,
+// its own pass in the same gap).
+//
+// One trace, because one run of level 1 happens to hit every part of it: the pickup,
+// the spawn-frame scratch, the 30-frame cooldown measured exactly, all three scratches
+// on three different enemy types, and the cat vanishing on the frame after the last
+// one. bat@48 is in the window, so this stubs `Math.random` (its sineOffset is drawn at
+// spawn) and projects enemy `vy` away with stripEnemyVy, exactly like the two traces
+// above.
+// ---------------------------------------------------------------------------
+
+describe('the cat vs. the live game', () => {
+  afterEach(() => setRandom(Math.random));
+
+  const REF = createWorld(0, 'normal', 'gigi');
+  /** 26 — a 13-row grid at scale 2, the same `spriteH(CAT_S,2)` the live cat pass uses. */
+  const CAT_H = 26;
+  /**
+   * The cat pickup is at column 50 (`catPosition: 50`), which is the LEFT EDGE of the
+   * platform at [50,18,6] — the same platform the chicken-ray trace above deliberately
+   * starts two tiles right of, to avoid this. Here we want it: the player is planted at
+   * column 52 on that platform and walks left onto the pickup.
+   *
+   * Nothing lower can reach it. The pickup's box is 22 tall from `findGroundY(50) - 26`,
+   * i.e. 262-284, and a player standing on the base ground two rows below occupies
+   * 344-368 — so the platform is the only place in the level this cat can be collected
+   * from, which is what makes the rest of this script forced rather than chosen.
+   */
+  const START_TILE = 52;
+  const START_X = START_TILE * TILE;
+  const START_Y = findGroundY(REF.map, START_TILE) - REF.player.h;
+  /**
+   * Left onto the pickup, then right for the rest of the run. Fourteen frames is just
+   * enough: the player collects on frame 8 and the turn-around costs three more frames
+   * of drift, which stops at 797 — two pixels clear of the edge it would otherwise walk
+   * off.
+   */
+  const TURN_FRAME = 14;
+  /**
+   * 110 frames. The third scratch lands on frame 89 and the cat is gone on frame 90, so
+   * this is twenty frames of "and it stays gone" — and it stops twelve frames short of
+   * bouncer@73, which the player walks into on frame 122. That death is real and has
+   * nothing to do with the cat; the window is bounded to exclude it rather than left to
+   * chance (see `world.dead` at the bottom).
+   */
+  const FRAMES = 110;
+
+  const script = (f: number) => ({
+    left: f < TURN_FRAME, right: f >= TURN_FRAME, jump: false, fire: false,
+  });
+
+  it('spawns on the pickup, scratches three enemies 30 frames apart, and goes the frame after the third', () => {
+    const liveCats: Array<CatSample | null> = [];
+    const live = driveLiveGame({
+      level: 0, difficulty: 'normal', character: 'gigi',
+      frames: FRAMES, input: script,
+      beforeRun: (d) => {
+        const p = d.getPlayer();
+        p.x = START_X; p.y = START_Y; p.vx = 0; p.vy = 0; p.onGround = true;
+      },
+      onFrame: (d) => { liveCats.push(d.getCat()); },
+    });
+
+    setRandom(() => 0.5); // the live driver's own stubbed Math.random, for bat@48
+    const world = createWorld(0, 'normal', 'gigi');
+    world.player.x = START_X;
+    world.player.y = START_Y;
+    world.player.onGround = true;
+
+    const port: typeof live = [];
+    const portCats: Array<CatSample | null> = [];
+    for (let f = 0; f < FRAMES; f++) {
+      const h = script(f);
+      stepWorld(world, { ...h, jumpPressed: false, firePressed: false });
+      port.push(sampleWorld(world));
+      const c = world.cat;
+      portCats.push(c === null ? null : {
+        x: c.x, y: c.y, vx: c.vx, vy: c.vy, facing: c.facing, frame: c.frame,
+        frameTimer: c.frameTimer, scratchTimer: c.scratchTimer,
+        scratchTarget: c.scratchTarget && { x: c.scratchTarget.x, y: c.scratchTarget.y },
+        hitsLeft: c.hitsLeft, bounceDir: c.bounceDir, baseY: c.baseY, onGround: c.onGround,
+      });
+    }
+
+    // Player, camera, animFrame, score and every enemy, frame for frame — which already
+    // covers all three victims from their own side (`alive`, `squashTimer`) and the
+    // score each one paid. Enemy `vy` alone is projected away; see stripEnemyVy.
+    expect(port.map(stripEnemyVy)).toEqual(live.map(stripEnemyVy));
+    // ...and the cat itself, every field of it, on every frame — including the frames
+    // where it is null on both sides, before the pickup and after the third scratch.
+    expect(portCats).toEqual(liveCats);
+
+    // The spawn. It is the PICKUP that creates the cat, so it appears on the exact frame
+    // the pickup is taken, and 20px LEFT of the player whichever way they are facing —
+    // already stepped once by the cat pass that runs later in the same update, so the
+    // first x a trace can ever see is `p.x - 20 + 2.5` and the first y is a jump already
+    // in progress, never the `y: p.y` the spawn literal writes.
+    const spawn = portCats.findIndex((c) => c !== null);
+    expect(spawn).toBeGreaterThan(0);
+    expect(world.catPickup!.collected).toBe(true);
+    expect(portCats[spawn]!.x).toBe(port[spawn].x - 20 + 2.5);
+    expect(portCats[spawn]!.onGround).toBe(false);
+    // Its own gravity, not the world's: a takeoff of -5.5 and +0.35 a frame. Under
+    // GRAVITY (0.4) the same frame would read -5.1.
+    expect(portCats[spawn]!.vy).toBe(-5.5 + 0.35);
+    expect(portCats[spawn]!.vy).not.toBe(-5.5 + GRAVITY);
+    expect(portCats[spawn + 1]!.vy).toBe(portCats[spawn]!.vy + 0.35);
+
+    // It bounces continuously. `onGround` is set by a landing and spent by the very next
+    // frame's takeoff, so it is never true twice running — there is no rest state, from
+    // the spawn frame to the last one.
+    const alive = portCats.filter((c): c is CatSample => c !== null);
+    expect(alive.some((c) => c.onGround)).toBe(true);
+    expect(alive.every((c, i) => i === 0 || !(c.onGround && alive[i - 1].onGround))).toBe(true);
+
+    // `baseY` is written TWICE a frame and the second write is the one that counts: it
+    // re-aims the landing at the player's feet AS THEY ARE THIS FRAME. Which is exactly
+    // this, on every single frame the cat exists — including the ones where the player
+    // is in mid-air off the platform edge, where a cat landing where it took off would
+    // have drifted away from this the moment the fall started.
+    expect(portCats.every((c, f) => c === null || c.baseY === port[f].y + REF.player.h - CAT_H))
+      .toBe(true);
+    expect(port.some((s, f) => portCats[f] !== null && !s.onGround)).toBe(true);
+
+    // And it ignores the map completely. On the spawn frame the cat is over column 49,
+    // whose ground is the base floor 100px below the height it is bouncing at — it is
+    // standing on the air beside the platform because the player is standing on the
+    // platform. There is no tile lookup anywhere in the cat pass.
+    const catColumn = Math.floor(portCats[spawn]!.x / TILE);
+    expect(findGroundY(world.map, catColumn)).toBe((LEVELS[0].height - 2) * TILE);
+    expect(findGroundY(world.map, catColumn) - portCats[spawn]!.baseY).toBeGreaterThan(100);
+
+    // Three scratches, three different enemy types, 300 points each — the biggest
+    // per-enemy award in the game. The first lands on the spawn frame itself, because
+    // `scratchTimer` starts at 0 and `Math.max(0, 0 - 1)` leaves it there.
+    const KILL = Math.round(300 * world.dc.scoreMultiplier);
+    const scratches = port
+      .map((s, f) => (f > 0 && s.score !== port[f - 1].score ? f : -1))
+      .filter((f) => f >= 0);
+    expect(scratches).toEqual([spawn, spawn + 30, 89]);
+    expect(scratches.every((f) => port[f].score - port[f - 1].score === KILL)).toBe(true);
+    expect(port[FRAMES - 1].score).toBe(3 * KILL);
+    expect(scratches.map((f) => portCats[f]!.hitsLeft)).toEqual([2, 1, 0]);
+    // One victim per scratch and never two in a frame: the `scratchTimer > 0` guard is
+    // re-tested per enemy inside the loop, so the first hit closes the rest of the frame.
+    const dead = (f: number) => port[f].enemies.filter((e) => !e.alive).map((e) => e.type);
+    expect(scratches.map(dead)).toEqual([['bat'], ['bat', 'dino'], ['bat', 'dino', 'doll']]);
+    // 29, not the 30 the scratch assigns: stepEnemies runs after stepCat in the same
+    // step and the dead-enemy branch at the top of it spends one straight away.
+    expect(scratches.map((f) => port[f].enemies.find((e) => !e.alive)!.squashTimer)).toContain(29);
+    // The claw lands on the victim's centre, not the cat's position.
+    const bat = port[spawn].enemies[3];
+    expect(portCats[spawn]!.scratchTarget).toEqual({ x: bat.x + 12.6 / 2, y: bat.y + 10.8 / 2 });
+
+    // The cooldown, exactly. 30 on the frame of a scratch, counted down one a frame at
+    // the TOP of the pass — so it is already 0 on the frame the guard next reads it, and
+    // the second scratch lands 30 frames after the first, not 31.
+    expect(portCats[scratches[0]]!.scratchTimer).toBe(30);
+    expect(portCats[scratches[1] - 1]!.scratchTimer).toBe(1);
+    expect(portCats[scratches[1]]!.scratchTimer).toBe(30);
+    expect(scratches[1] - scratches[0]).toBe(30);
+
+    // The disappearance. Spending the last scratch does NOT remove the cat: the removal
+    // is the `else if` on the way into the next frame's pass, so the cat lives out the
+    // whole frame it killed on — still bouncing, still at `hitsLeft` 0 — and only then
+    // goes. And it never comes back: the pickup is collected.
+    const last = scratches[2];
+    expect(portCats[last]).not.toBeNull();
+    expect(portCats[last]!.hitsLeft).toBe(0);
+    expect(portCats[last + 1]).toBeNull();
+    expect(portCats.slice(last + 1).every((c) => c === null)).toBe(true);
+    expect(world.cat).toBeNull();
+
+    // Nothing in this window kills the player — bouncer@73 would, twelve frames past the
+    // end of it, and that is the bound this frame count is chosen to stay inside.
     expect(world.dead).toBe(false);
   });
 });

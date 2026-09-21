@@ -8,7 +8,7 @@ import { createPlayer, stepPlayer, type Character } from './player';
 import { random } from './random';
 import { getRescueSprites } from './run';
 import { findGroundY, getTile, isSolid, rectOverlap } from './tiles';
-import type { Arrow, BlockState, Pickup, Star, World } from './types';
+import type { Arrow, BlockState, CatState, Pickup, Star, World } from './types';
 
 /**
  * Everything `initLevel` rebuilds from scratch every time a level starts — including
@@ -21,6 +21,7 @@ interface LevelSpawnState {
   bowPickups: Pickup[];
   superPickups: Pickup[];
   catPickup: Pickup | null;
+  cat: CatState | null;
   stars: Star[];
   arrows: Arrow[];
   questionBlocks: BlockState[];
@@ -83,13 +84,17 @@ function buildLevelState(level: Level, dc: DifficultyRecord, map: TileMap): Leve
       x: tx * TILE, y: findGroundY(map, tx) - SUPER_S.length * 2, collected: false,
     })),
     // index.html:1183-1187. Always non-null for the six records this port carries, but
-    // the live guard is real and kept. The `cat=null` on the line above it belongs to
-    // the companion, which is a later task.
+    // the live guard is real and kept.
     catPickup: level.catPosition == null ? null : {
       x: level.catPosition * TILE,
       y: findGroundY(map, level.catPosition) - CAT_S.length * 2,
       collected: false,
     },
+    // index.html:1183's `cat=null`, the line directly above the pickup it belongs to.
+    // In this bundle for exactly the reason the bundle exists: the line above hands the
+    // pickup back, so this one has to take the companion away, or a respawn would leave
+    // the player with a cat AND a cat to collect.
+    cat: null,
     stars: [],
     // index.html:1188's `arrows=[]`, on the same line as `stars=[]`. In this bundle for
     // the same reason the stars are: a respawn has to throw away whatever was in flight.
@@ -263,17 +268,22 @@ export function stepWorld(world: World, input: InputState): void {
   // stepEnemies' loop) would freeze one frame earlier than the live game does and
   // desync the trace. So: one check, all three calls inside it, exactly like this.
   if (!world.dead) {
-    // index.html:1447-1448, :1504-1517 and :1519 — all three sit between the player
-    // block and the enemies loop, in this order, with the cat companion (a later task)
-    // between the first two. Inside the `!world.dead` guard because a PIT death returns
-    // from the live update() at index.html:1423, above all of this: you do not sweep up
-    // the pickups you happen to be falling through on the frame you die.
+    // index.html:1447-1455, :1456-1501, :1504-1517 and :1519 — all four sit between the
+    // player block and the enemies loop, in exactly this order. Inside the `!world.dead`
+    // guard because a PIT death returns from the live update() at index.html:1423, above
+    // all of this: you do not sweep up the pickups you happen to be falling through on
+    // the frame you die, and the cat freezes mid-bounce with everything else.
+    //
+    // The cat runs BEFORE the arrows, which is the only thing that decides who gets the
+    // points when both could reach the same enemy on the same frame: the cat's 300
+    // beats the arrow's 200, and the arrow then flies through a corpse.
     //
     // Arrows fly BEFORE the enemies move, which is what makes the arrow trace's timing
     // what it is: an arrow tests this frame's own position against last frame's enemy
     // positions, and an enemy turned into a chicken here is then stepped as a chicken,
     // falling and walking, in the very same frame.
     collectPickups(world);
+    stepCat(world);
     stepArrows(world);
     stepStars(world);
     stepEnemies(world);
@@ -285,18 +295,18 @@ export function stepWorld(world: World, input: InputState): void {
 }
 
 /**
- * Port of index.html:1447-1448 — the bow and super pickups. The cat's own overlap
- * check sits between them in the live source (index.html:1450) and is deliberately
- * absent: it spawns the cat companion, which is a later task in this plan.
+ * Port of index.html:1447-1455 — all three pickups, in the live source's own order.
  *
- * The pickup hitboxes are FLAT LITERALS, 16x16 for both, and they match neither
- * sprite: BOW_S and SUPER_S are 8x8 grids drawn at scale 2, so 16 wide happens to
- * agree while the cat's is 16x22 against a 20x26 drawn sprite. Do not derive one from
- * the other in either direction — the spawn `y` above genuinely uses the sprite
- * height, and this genuinely does not.
+ * The pickup hitboxes are FLAT LITERALS and they match no sprite: 16x16 for the bow and
+ * the super (8x8 grids drawn at scale 2, so 16 wide happens to agree and 16 tall happens
+ * to as well) and 16x22 for the cat, against a 10x13 grid drawn 20x26. Do not derive one
+ * from the other in either direction, and do not "unify" the cat's with the other two —
+ * the spawn `y` in buildLevelState genuinely uses the sprite height, and this genuinely
+ * does not.
  *
  * `bowCharges` comes off the difficulty record, not a constant (see PlayerState).
- * Neither pickup awards score; only stars, stomps, kills and the rescue do.
+ * No pickup awards score; only stars, stomps, kills, the cat's scratches and the
+ * rescue do.
  */
 export function collectPickups(world: World): void {
   const p = world.player;
@@ -312,6 +322,117 @@ export function collectPickups(world: World): void {
     if (!s.collected && rectOverlap(box, { x: s.x, y: s.y, w: 16, h: 16 })) {
       s.collected = true;
       p.hasCape = true;
+    }
+  }
+  // index.html:1450-1455. The companion spawns 20px LEFT of the player whichever way
+  // either of them is facing (it starts `facing: 1`, so it is looking away from where it
+  // stands) — and that x is real, it is where the bounce starts from. The other two odd
+  // values in the literal are not: `y: p.y` is the player's TOP rather than either of
+  // their feet, and `baseY: 0` is nowhere at all, and stepCat below runs later in this
+  // very same step and overwrites both before anything can read them. Reproduced exactly
+  // as written all the same — the literal is the live object's.
+  const c = world.catPickup;
+  if (c && !c.collected && rectOverlap(box, { x: c.x, y: c.y, w: 16, h: 22 })) {
+    c.collected = true;
+    world.cat = {
+      x: p.x - 20, y: p.y, vx: 0, vy: 0, facing: 1, frame: 0, frameTimer: 0,
+      scratchTimer: 0, scratchTarget: null, hitsLeft: 3, bounceDir: 1,
+      baseY: 0, onGround: true,
+    };
+  }
+}
+
+/**
+ * Port of index.html:1456-1501 — the cat companion, which is a lot odder than "a pet
+ * that follows you". Five things here are load-bearing:
+ *
+ *   - ITS OWN GRAVITY. `vy += 0.35` and a takeoff of `-5.5`, neither of which is the
+ *     world's GRAVITY (0.4) or the player's `dc.jumpForce`, and neither of which scales
+ *     with difficulty. The cat's hop is the same on super_easy and hard.
+ *   - `baseY` IS ASSIGNED TWICE, once in the takeoff branch and once unconditionally at
+ *     the bottom. The second write is the whole point: it re-aims the landing at the
+ *     player's feet AS THEY ARE NOW, every frame, so the cat climbs with a player going
+ *     up stairs. Delete it as a duplicate and the cat sinks into the floor behind them.
+ *   - IT NEVER RESTS. Landing sets `onGround`, and the next frame's first branch spends
+ *     it on another takeoff. There is no idle pose and no timer between hops.
+ *   - IT IGNORES THE MAP COMPLETELY. Its floor is `p.y + p.h - catH` — the PLAYER's
+ *     feet — not the ground under it. The cat bounces across a pit at the height of a
+ *     player standing on the far side of it, and stands in mid-air whenever the player
+ *     is on a platform it is bouncing out past the edge of. There is no tile lookup
+ *     anywhere in this function, deliberately.
+ *   - SPENDING THE LAST SCRATCH DOES NOT REMOVE IT. `hitsLeft` hitting 0 is caught by
+ *     the `else if` on the way IN, on the following frame, so the cat lives out the rest
+ *     of the frame it killed on. The early return below is that `else if`.
+ *
+ * The scratch is measured from `cat.x + 8, cat.y + 8` — a fixed inset that is NOT the
+ * centre of a 20x26 sprite — to the enemy's true centre, and 45px reaches it. The
+ * 30-frame cooldown is decremented at the top of the pass, before the guard reads it, so
+ * scratches land exactly 30 frames apart at best. The guard is re-tested per enemy, so
+ * one frame can only ever kill one thing.
+ *
+ * The live `spawnParticles`/`sfxStomp`/`playTone` calls are presentation and sound.
+ */
+export function stepCat(world: World): void {
+  const cat = world.cat;
+  if (!cat) return;
+  // index.html:1498-1500's `else if(cat&&cat.hitsLeft<=0){cat=null;}` — the frame AFTER
+  // the third scratch, never the frame of it.
+  if (cat.hitsLeft <= 0) {
+    world.cat = null;
+    return;
+  }
+
+  const p = world.player;
+  const catH = CAT_S.length * 2;
+  const playerCenterX = p.x + p.w / 2;
+  const bounceRange = 60;
+  cat.x += cat.bounceDir * 2.5;
+  if (cat.x > playerCenterX + bounceRange) {
+    cat.bounceDir = -1;
+    cat.facing = -1;
+  } else if (cat.x < playerCenterX - bounceRange) {
+    cat.bounceDir = 1;
+    cat.facing = 1;
+  }
+
+  const groundY = p.y + p.h - catH;
+  if (cat.onGround) {
+    cat.vy = -5.5;
+    cat.onGround = false;
+    cat.baseY = groundY;
+  }
+  cat.vy += 0.35;
+  cat.y += cat.vy;
+  if (cat.y >= cat.baseY) {
+    cat.y = cat.baseY;
+    cat.vy = 0;
+    cat.onGround = true;
+  }
+  // index.html:1477. The second write. See the note above — this is not the duplicate
+  // it looks like.
+  cat.baseY = groundY;
+  cat.frameTimer++;
+  if (cat.frameTimer > 8) {
+    cat.frame = 1 - cat.frame;
+    cat.frameTimer = 0;
+  }
+
+  cat.scratchTimer = Math.max(0, cat.scratchTimer - 1);
+  const scratchRange = 45;
+  for (const e of world.enemies) {
+    if (!e.alive || cat.scratchTimer > 0 || cat.hitsLeft <= 0) continue;
+    const edx = e.x + e.w / 2 - (cat.x + 8);
+    const edy = e.y + e.h / 2 - (cat.y + 8);
+    if (Math.sqrt(edx * edx + edy * edy) < scratchRange) {
+      e.alive = false;
+      e.squashTimer = 30;
+      cat.scratchTimer = 30;
+      cat.scratchTarget = { x: e.x + e.w / 2, y: e.y + e.h / 2 };
+      cat.hitsLeft--;
+      // 300 — the biggest per-enemy award in the game, half again what an arrow pays
+      // and three times a stomp. Rounded at the award site like every other one; see
+      // stepStars.
+      world.score += Math.round(300 * world.dc.scoreMultiplier);
     }
   }
 }
