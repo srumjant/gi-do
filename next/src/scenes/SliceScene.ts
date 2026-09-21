@@ -197,14 +197,10 @@ export class SliceScene extends Phaser.Scene {
     this.playerImage.setPosition(player.x - PLAYER_DRAW_INSET, player.y - PLAYER_DRAW_INSET);
     // Sprites face right by default; flip to face left (index.html:1848: `p.facing<0`).
     this.playerImage.setFlipX(player.facing < 0);
-    // index.html:1838 — `p.invincible<=0||Math.floor(animFrame/3)%2===0`, an
-    // invincibility blink. This slice's PlayerState has no `invincible` field yet
-    // (nothing sets it), so it is hardcoded to 0 here, which makes the left side of
-    // the `||` always true and the blink permanently inert. The expression itself is
-    // wired up so that plumbing a real `invincible` field through later only means
-    // changing this one constant, not this line.
-    const invincible = 0;
-    this.playerImage.setVisible(invincible <= 0 || Math.floor(animFrame / 3) % 2 === 0);
+    // index.html:1838 — `p.invincible<=0||Math.floor(animFrame/3)%2===0`, the
+    // invincibility blink: while the window a cape bought is running, the player is
+    // drawn on three frames out of every six and hidden on the other three.
+    this.playerImage.setVisible(player.invincible <= 0 || Math.floor(animFrame / 3) % 2 === 0);
 
     for (let i = 0; i < enemies.length; i++) {
       const enemy = enemies[i];

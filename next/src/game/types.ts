@@ -21,6 +21,25 @@ export interface PlayerState {
   /** Counts up toward the walk cycle's speed-scaled threshold (index.html:1168, 1426-1427). */
   frameTimer: number;
   /**
+   * Frames of invincibility left (index.html:1168, 1430). Only the cape ever sets it,
+   * and the two ways it can are NOT the same number: absorbing a contact hit gives
+   * `dc.invincibleTime || 60` (index.html:1646) while surviving a pit gives a
+   * hardcoded 60 (index.html:1423). On super_easy — the one difficulty that carries
+   * `invincibleTime` at all, and the one difficulty where a pit is survivable — those
+   * are 120 and 60 respectively.
+   *
+   * Decremented once per player step, between the walk cycle and the power-up timers
+   * (index.html:1430), and read as `p.invincible <= 0` by the enemy contact check
+   * (index.html:1544, enemy.ts) and by the draw code's blink (index.html:1838).
+   *
+   * Where the decrement sits relative to the two writers is what fixes the window's
+   * width. A contact hit is resolved in the enemies pass, AFTER this frame's decrement
+   * has already run; a pit save returns out of the player step ABOVE it. So neither
+   * write is spent on the frame it happens, and a window of 60 covers the next 59
+   * frames' contact checks, with the 60th frame after the hit vulnerable again.
+   */
+  invincible: number;
+  /**
    * Set by a bow pickup (index.html:1447) and, from the chicken ray, by the rainbow
    * block's silly power-up. Read by the firing branch (index.html:1392), which consults
    * it alongside `bowCharges` — and cleared there, by the same branch, once both kinds
@@ -42,11 +61,15 @@ export interface PlayerState {
    */
   arrowCooldown: number;
   /**
-   * Set by a super pickup (index.html:1448). The live `initLevel` seeds this from
-   * `dc.startWithCape` (index.html:1169) rather than the plain `false` createPlayer
-   * gives it — that spawn state, and everything the cape then DOES (absorbing a hit,
-   * the invincibility window, the pit save), is Task 6 of this plan. Only the pickup
-   * that grants it is ported here.
+   * Set by a super pickup (index.html:1448), and seeded at spawn from
+   * `dc.startWithCape` (index.html:1169) — true on super_easy alone, so that is the
+   * one difficulty where the player is already wearing one before touching anything.
+   *
+   * Spent, never worn out: the first hit of any kind takes it. A contact hit is
+   * absorbed for a bounce and an invincibility window (index.html:1646, playerHit),
+   * and on a difficulty with `capeSavesPit` a pit fall is absorbed too, by teleporting
+   * back above the floor of the world (index.html:1423, stepPlayer). Both clear it, so
+   * the second hit — of either kind — kills.
    */
   hasCape: boolean;
   /**

@@ -1,4 +1,5 @@
 import { GRAVITY, TILE } from '../config/constants';
+import type { DifficultyRecord } from '../config/difficulty';
 import { TILE_BRICK, type Level } from '../data/levels';
 import { GIGI_SKINS, DODO_SKINS } from '../data/sprites';
 import type { InputState } from '../input/actions';
@@ -23,8 +24,14 @@ export const AIR_DECEL = 0.92;
  * `spriteH(s,sc) = s.length*sc` (index.html:670), called with sc=2; the hitbox then
  * insets each dimension by 4 (index.html:1167). Only the classic (index 0) skin is
  * ported — skin selection is a later plan.
+ *
+ * `dc` is here for one field: `hasCape:dc.startWithCape` (index.html:1169). Every
+ * other value in the live literal is a constant, so this is the only reason the
+ * difficulty record has to reach the player at all — and it is not optional, since
+ * super_easy spawns the player already wearing a cape and therefore already able to
+ * absorb the first hit of the level, on every respawn as well as at the start.
  */
-export function createPlayer(level: Level, character: Character): PlayerState {
+export function createPlayer(level: Level, dc: DifficultyRecord, character: Character): PlayerState {
   const stand = character === 'dodo' ? DODO_SKINS[0].stand : GIGI_SKINS[0].stand;
   const pw = stand[0].length * 2;
   const ph = stand.length * 2;
@@ -41,6 +48,10 @@ export function createPlayer(level: Level, character: Character): PlayerState {
     jumpBuffer: 0,
     frame: 0,
     frameTimer: 0,
+    // index.html:1168's `invincible:0`. Level state, and there is no path that carries
+    // it across a death: a respawn rebuilds the player through here, so the window a
+    // cape bought is gone along with everything else.
+    invincible: 0,
     // index.html:1169's `hasBow:false, bowCharges:0`. Both are level state, not run
     // state: every respawn goes through initLevel, so dying really does cost you the
     // bow you picked up — unlike `score`, one field over on the World, which does not
@@ -49,12 +60,10 @@ export function createPlayer(level: Level, character: Character): PlayerState {
     bowCharges: 0,
     // index.html:1169's `arrowCooldown:0`. Level state like the bow itself.
     arrowCooldown: 0,
-    // index.html:1169 is `hasCape:dc.startWithCape`, not a flat false — true on
-    // super_easy, which is the only difficulty where the player spawns already wearing
-    // one. Seeding it from the difficulty record belongs with the cape's own behaviour
-    // (Task 6 of this plan); what the pickup grants is all that reads it today, and no
-    // trace runs anything but `normal`, where the live value is false either way.
-    hasCape: false,
+    // index.html:1169's `hasCape:dc.startWithCape`, not a flat false — true on
+    // super_easy and nowhere else, which is the only difficulty where the player
+    // spawns already wearing one. It is why the `dc` parameter exists.
+    hasCape: dc.startWithCape,
     // index.html:1171's `fartTimer:0, bigHeadTimer:0, chickenRayCharges:0`. Level state
     // like the bow, not run state: every respawn goes through initLevel, so dying
     // cancels a silly power-up mid-countdown. Only giveRandomSillyPowerup below ever
@@ -221,17 +230,25 @@ function fireArrow(world: World, input: InputState): void {
  * and the task notes on the jump buffer, apex hang, and the two collision insets.
  *
  * Out of scope, and simply absent below: landing dust particles, the fart trail's own
- * particles, the cape branch of pit death, sound, and score. Enemy collision
- * is simulated (enemy.ts's stepEnemy), but calls into this file's `playerHit` rather
- * than living here — there is no enemy-collision branch in THIS function because the
- * live game's own equivalent isn't in `update`'s player block either; it is in the
- * enemies loop, ported alongside the enemies themselves.
+ * particles, sound, and score. Enemy collision is simulated (enemy.ts's stepEnemy), but
+ * calls into this file's `playerHit` rather than living here — there is no
+ * enemy-collision branch in THIS function because the live game's own equivalent isn't
+ * in `update`'s player block either; it is in the enemies loop, ported alongside the
+ * enemies themselves.
+ *
+ * RETURNS whether the rest of the frame should still run. The live pit branch's
+ * `return` (index.html:1423) is a return from `update()` ITSELF, not from some player
+ * sub-function, so a pit frame skips the pickups, the cat, the arrows, the enemies, the
+ * rescue check and the camera lerp — and it does that whether the player DIED there or
+ * was SAVED by a cape. `world.dead` alone cannot tell stepWorld which happened, because
+ * a cape save takes that same `return` while leaving the player alive, so the answer is
+ * reported here instead.
  */
-export function stepPlayer(world: World, input: InputState): void {
+export function stepPlayer(world: World, input: InputState): boolean {
   // index.html:1348 — the live update() checks its dead-state branch, and returns,
   // before it ever reaches player movement. Reproduced by returning immediately: once
   // dead, nothing below runs again, so position and velocity freeze on the death frame.
-  if (world.dead) return;
+  if (world.dead) return false;
 
   const p = world.player;
   const dc = world.dc;
@@ -355,16 +372,48 @@ export function stepPlayer(world: World, input: InputState): void {
   // Left clamp only — there is no right-hand bound (index.html:1422).
   if (p.x < 0) p.x = 0;
 
-  // Pit death (index.html:1423). The cape-saves-the-pit branch is out of scope,
-  // so every pit fall here takes the live `else{playerDie();}` path. Setting
-  // world.dead (inside playerDie) is what makes the next call (and every call after
-  // that, until a respawn clears it) return at the top, freezing the player where it
-  // fell. The live source's own `return` right after this (index.html:1423) skips its
-  // walk-cycle block below on the death frame itself — reproduced here the same way,
-  // rather than letting the animation update once more on the frame the player dies.
+  // The pit (index.html:1423), and the cape that can survive it.
+  //
+  // The `return` is OUTSIDE the branch and fires whether the player was saved or
+  // killed, so nothing below this line runs on a pit frame either way — not the walk
+  // cycle, not the invincibility decrement, not the power-up timers. That is what
+  // keeps the 60 below a full 60 rather than a 59. And it is a return from the live
+  // `update()` itself, so it also ends the whole frame: hence the `false` returned
+  // here, which is what stops stepWorld running the enemies and the camera after a
+  // SAVE, the same way `world.dead` already stopped them after a death.
+  //
+  // Four things in the save branch are easy to get subtly wrong:
+  //
+  //   - `capeSavesPit` is a super_easy-only field (difficulty.ts) and is read for
+  //     truthiness, not compared — on every other difficulty it is simply absent and
+  //     the pit kills. The live source reads it off a FRESH `DC()` here rather than
+  //     the `dc` it captured at the top of update(); `world.dc` is the same record for
+  //     the whole run, so this is the same read, just without the indirection.
+  //   - The invincibility is a HARDCODED 60, NOT `dc.invincibleTime || 60` like the
+  //     contact hit in playerHit below. On super_easy — the only difficulty that can
+  //     reach this branch at all — invincibleTime is 120, so the two paths genuinely
+  //     hand out different windows: 120 for a hit absorbed, 60 for a pit survived.
+  //   - It is a RESCUE, not a bounce. `p.y` is teleported to `lvl.height*TILE - 32`,
+  //     two tiles above the bottom of the world, which is well above wherever the
+  //     player actually fell from — and it is assigned AFTER the condition above has
+  //     already read the old `p.y`. `vy:-10` then throws it upward from there, harder
+  //     than any jump on any difficulty.
+  //   - The cape is spent. A second pit fall in the same life kills.
+  //
+  // Setting world.dead (inside playerDie) is what makes the next call (and every call
+  // after that, until a respawn clears it) return at the top, freezing the player
+  // where it fell. The live source's `spawnParticles`/`playTone` in the save branch
+  // are presentation and sound, which src/game/ does not own.
   if (p.y > level.height * TILE + 32) {
-    playerDie(world);
-    return;
+    if (world.dc.capeSavesPit && p.hasCape) {
+      p.hasCape = false;
+      p.invincible = 60;
+      p.vy = -10;
+      p.y = level.height * TILE - 32;
+    } else {
+      playerDie(world);
+    }
+    return false;
   }
 
   // Smooth animation — walk cycle speed matches player speed (index.html:1424-1429).
@@ -383,11 +432,15 @@ export function stepPlayer(world: World, input: InputState): void {
     p.frame = 0;
   }
 
+  // Invincibility (index.html:1430), between the animation above and the power-up
+  // timers below — and, crucially, well before the enemies pass that can SET it. A
+  // cape absorbing a contact hit therefore never loses a frame to this: the enemy
+  // check runs later in the same step, after the decrement has already gone by.
+  if (p.invincible > 0) p.invincible--;
+
   // Power-up timers (index.html:1432-1433), after the walk cycle and therefore after
   // this frame's jump has already read `fartTimer` and this frame's stomp check has
-  // not yet read `bigHeadTimer` (that happens in stepEnemy, later in the step). The
-  // live `if(p.invincible>0)p.invincible--;` sits between the animation and these two;
-  // there is no invincibility on this port yet, so nothing stands in for it.
+  // not yet read `bigHeadTimer` (that happens in stepEnemy, later in the step).
   if (p.fartTimer > 0) p.fartTimer--;
   if (p.bigHeadTimer > 0) p.bigHeadTimer--;
 
@@ -411,17 +464,41 @@ export function stepPlayer(world: World, input: InputState): void {
       if (Math.sqrt(edx * edx + edy * edy) < 50) e.stunTimer += 120;
     }
   }
+
+  // Reached the bottom of the live player block without falling in a pit, so the rest
+  // of update() still has a frame to run.
+  return true;
 }
 
 /**
- * Port of index.html:1646. The live function's first branch spends the cape for a
- * bounce plus temporary invincibility; there is no cape in this slice (`PlayerState`
- * has no `hasCape`/`invincible` field, and none is added here — invincibility frames
- * arrive with the cape, in a later plan), so every call here falls straight through
- * to the live function's only remaining path. When the cape does arrive, its branch
- * belongs in front of the call below, exactly where the live function has it.
+ * Port of index.html:1646 — what a cape is FOR. Called from the contact branch of the
+ * enemy pass (enemy.ts), and by nothing else in this port; the live game also calls it
+ * from the enemy-projectile and boss passes, neither of which exists here yet.
+ *
+ * With a cape on, the hit is absorbed: the cape is spent, the player is kicked up at
+ * -4 (a nudge, not a jump — every difficulty's jumpForce is at least -7.2), and an
+ * invincibility window opens. Without one, it is a death.
+ *
+ * `dc.invincibleTime || 60` is the fallback pattern the difficulty records force:
+ * `invincibleTime` exists on super_easy alone, where it is 120 (difficulty.ts). Note
+ * the live source computes `iTime` BEFORE testing `hasCape`, so it is read on the
+ * death path too and simply thrown away — harmless, and not worth reproducing as a
+ * dead read, but it is why the live line looks the way it does.
+ *
+ * This window is NOT the same as the pit save's, which hardcodes 60 (stepPlayer,
+ * above). Do not factor the two together.
+ *
+ * The live function's `spawnParticles`/`playTone`/`triggerShake` are presentation,
+ * sound and screen shake, none of which src/game/ owns.
  */
 export function playerHit(world: World): void {
+  const p = world.player;
+  if (p.hasCape) {
+    p.hasCape = false;
+    p.invincible = world.dc.invincibleTime || 60;
+    p.vy = -4;
+    return;
+  }
   playerDie(world);
 }
 

@@ -28,7 +28,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { driveLiveGame, type ArrowSample, type CatSample } from './helpers/liveGame';
 import { SCRIPTS, STOMP_SCRIPT } from './helpers/inputScript';
 import { createWorld, respawnLevel, stepWorld } from '../src/game/world';
-import { findGroundY } from '../src/game/tiles';
+import { findGroundY, rectOverlap } from '../src/game/tiles';
 import { setRandom } from '../src/game/random';
 import { LEVELS, TILE_BRICK, TILE_QUESTION, TILE_RAINBOW } from '../src/data/levels';
 import { GRAVITY, TILE } from '../src/config/constants';
@@ -1586,5 +1586,275 @@ describe('the cat vs. the live game', () => {
     // Nothing in this window kills the player — bouncer@73 would, twelve frames past the
     // end of it, and that is the bound this frame count is chosen to stay inside.
     expect(world.dead).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The cape (Plan 5, Task 6) — index.html:1169, 1423, 1430, 1544, 1646.
+//
+// Two traces, because the two ways a cape can be spent are NOT the same code and do not
+// hand out the same window: absorbing a contact hit gives `dc.invincibleTime||60`
+// (index.html:1646), surviving a pit gives a hardcoded 60 (index.html:1423). Normal
+// difficulty can only show the first, and shows the `||60` fallback while it is at it
+// (it has neither `invincibleTime` nor `capeSavesPit`); super_easy shows both, at 120
+// and 60, which is the only arrangement where the two numbers visibly differ.
+// ---------------------------------------------------------------------------
+
+/** The two cape-side fields, pulled through `onFrame` rather than grown onto Sample. */
+interface CapeSample { hasCape: boolean; invincible: number }
+
+describe('the cape absorbing a hit vs. the live game', () => {
+  /**
+   * Normal difficulty, and the same doll@15 collision at frame 60 that every hold-right
+   * script at the top of this file already dies on (see EXPECT_DEATH) — only this time
+   * the player is wearing a cape, so it survives.
+   *
+   * `hasCape` is seeded on both sides rather than picked up: normal's `startWithCape` is
+   * false and the nearest super pickup is at tile 22, inside the first pit, so there is
+   * no way to reach doll@15 with a cape by walking. The live side is seeded through
+   * `beforeRun` (the driver hands back the script's own `player` object), the port's is
+   * a plain field — the same trick the fart and big-head traces above use.
+   *
+   * The input is hold-right until the hit lands, then a turn back left and a turn right
+   * again. None of that is decoration:
+   *
+   *   - Holding right THROUGH the hit walks the player straight across the doll while
+   *     invincible — the boxes genuinely overlap and nothing happens, which is what
+   *     `p.invincible<=0` gating the WHOLE stomp/hit check (index.html:1544) looks like
+   *     from outside.
+   *   - Turning left brings the player back across the doll a second time, still inside
+   *     the window.
+   *   - Turning right again on the frame the window runs out walks into the doll a
+   *     third time, and that one kills.
+   *
+   * It also stays west of the first pit the whole way (x tops out around 180 against a
+   * gap at 320), so the death in this window is unambiguously a contact death.
+   */
+  const TURN_LEFT = 75;
+  const TURN_RIGHT = 120;
+  /**
+   * Dies at 127 and stays frozen for 13 — well inside the 90-frame respawn, which the
+   * scripts at the top of this file already cross rather than this one repeating it.
+   */
+  const FRAMES = 140;
+
+  const script = (f: number) => ({
+    left: f >= TURN_LEFT && f < TURN_RIGHT,
+    right: f < TURN_LEFT || f >= TURN_RIGHT,
+    jump: false,
+    fire: false,
+  });
+
+  it('survives the hit, walks through the doll while it blinks, and dies once it lapses', () => {
+    const liveCape: CapeSample[] = [];
+    const live = driveLiveGame({
+      level: 0, difficulty: 'normal', character: 'gigi',
+      frames: FRAMES, input: script,
+      beforeRun: (d) => { d.getPlayer().hasCape = true; },
+      onFrame: (d) => {
+        const p = d.getPlayer();
+        liveCape.push({ hasCape: p.hasCape as boolean, invincible: p.invincible as number });
+      },
+    });
+
+    const world = createWorld(0, 'normal', 'gigi');
+    world.player.hasCape = true;
+
+    const port: typeof live = [];
+    const portCape: CapeSample[] = [];
+    const portDead: boolean[] = [];
+    /** Whether the player's contact box overlapped doll@15 on each frame. */
+    const touching: boolean[] = [];
+    for (let f = 0; f < FRAMES; f++) {
+      const held = script(f);
+      stepWorld(world, { ...held, jumpPressed: false, firePressed: false });
+      const p = world.player;
+      port.push(sampleWorld(world));
+      portCape.push({ hasCape: p.hasCape, invincible: p.invincible });
+      portDead.push(world.dead);
+      const doll = world.enemies[0];
+      touching.push(!!doll && rectOverlap(
+        { x: p.x + 2, y: p.y, w: p.w - 4, h: p.h },
+        { x: doll.x, y: doll.y, w: doll.w, h: doll.h },
+      ));
+    }
+
+    expect(port).toEqual(live);
+    expect(portCape).toEqual(liveCape);
+
+    // The hit itself. `hasCape` goes false on exactly one frame in this window — the
+    // cape is spent, not worn down — and the window it buys is normal's, which has no
+    // `invincibleTime` at all, so this is the `||60` fallback being read.
+    const hitFrame = portCape.findIndex((s) => !s.hasCape);
+    expect(hitFrame).toBeGreaterThan(0);
+    expect(portDead[hitFrame]).toBe(false); // absorbed, not fatal
+    expect(world.dc.invincibleTime).toBeUndefined();
+    expect(portCape[hitFrame].invincible).toBe(60);
+    // A nudge, not a jump: -4 against a jumpForce of -7.5.
+    expect(port[hitFrame].vy).toBe(-4);
+
+    // The window, frame by frame rather than at its peak — 60 on the hit frame itself
+    // (the decrement at index.html:1430 has already gone by when the enemies pass sets
+    // it), then exactly one per frame down to 0, and 0 from then on. An off-by-one
+    // anywhere in here is a game that "feels wrong" later and nothing more obvious.
+    const countdown = portCape.slice(hitFrame, hitFrame + 61).map((s) => s.invincible);
+    expect(countdown).toEqual(Array.from({ length: 61 }, (_, i) => 60 - i));
+    expect(portCape.slice(hitFrame + 61).every((s) => s.invincible === 0)).toBe(true);
+
+    // What the window is FOR. The player crosses the doll TWICE while it runs — two
+    // separate overlapping stretches, not one long one — and survives both, so the
+    // contact check was reached and declined rather than simply never met.
+    const protectedTouches = touching
+      .map((t, f) => (t && f > hitFrame && f < hitFrame + 61 ? f : -1))
+      .filter((f) => f >= 0);
+    expect(protectedTouches.length).toBeGreaterThan(10);
+    expect(protectedTouches.filter((f, i) => i === 0 || f !== protectedTouches[i - 1] + 1))
+      .toHaveLength(2);
+    expect(portDead.slice(0, hitFrame + 61).every((d) => !d)).toBe(true);
+
+    // And once it has lapsed, the next contact kills: one life spent, and the player is
+    // standing on the ground well short of the first gap (x=320), so this is a contact
+    // death and not a pit wearing one's clothes.
+    const deathFrame = portDead.indexOf(true);
+    expect(deathFrame).toBeGreaterThan(hitFrame + 60);
+    expect(portCape[deathFrame].invincible).toBe(0);
+    expect(world.lives).toBe(world.dc.lives - 1);
+    expect(world.player.x).toBeLessThan(320);
+    expect(world.player.y)
+      .toBe(findGroundY(world.map, Math.floor(world.player.x / TILE)) - world.player.h);
+  });
+});
+
+describe('the cape saving a pit fall vs. the live game', () => {
+  afterEach(() => setRandom(Math.random));
+
+  /**
+   * super_easy, the only difficulty that carries `capeSavesPit` at all — and, not
+   * coincidentally, the only one that carries `startWithCape`, so the cape needed to
+   * reach a pit is simply the one the level starts you in. Nothing is seeded here and
+   * the map is not edited.
+   *
+   * The pit is a gap carved next to spawn, exactly as world.test.ts's own death trace
+   * carves one, rather than the level's real first gap. That is a harness limit, not a
+   * reachability one: level 1's real gap IS reachable with the cape on (column 20, one
+   * tile wide at super_easy's `gapWidth` of 0.3, walked into from column 17 — which is
+   * the last base-ground tile UNDER the platform at `[18,17,4]`, since that platform
+   * bridges columns 18-21 six rows up and a player starting on it walks clean over the
+   * hole). Standing over that gap puts the camera past column 48 and streams in bat@48,
+   * and a live bat object carries no `vy` field at all while this port's EnemyState
+   * always does — so the shared Sample shape would compare `undefined` against `0` for
+   * reasons with nothing to do with capes. A gap at columns 4-8 keeps the camera far
+   * enough west that only the three ground patrollers ever spawn.
+   *
+   * What the 240 frames then contain, in order:
+   *
+   *   - The save. The cape is spent, `invincible` is set to a HARDCODED 60 — not
+   *     super_easy's `invincibleTime` of 120 — `vy` is -10, and `y` is teleported to
+   *     `lvl.height*TILE - 32`. That lands the player back inside the same hole, just
+   *     two tiles higher, which is why the second fall follows so quickly: the rescue is
+   *     not a bounce out of the pit, it is another go at it.
+   *   - The second fall, about thirty frames later, with `invincible` still counting
+   *     down. Invincibility has nothing to do with pits (there is no `p.invincible`
+   *     anywhere in index.html:1423) and the cape is already gone, so this one kills.
+   *   - The respawn ninety frames after that, which hands the cape straight back:
+   *     `hasCape:dc.startWithCape` runs on EVERY level start, not just the first
+   *     (index.html:1169). Nothing else in this suite can show that.
+   *   - doll@15 taking that fresh cape by ordinary contact — and THAT is where
+   *     super_easy's `invincibleTime` of 120 appears. Twice the window the pit gave,
+   *     from the same cape, on the same difficulty, in the same trace.
+   */
+  const GAP_FROM = 4;
+  const GAP_TO = 8;
+  const carveGap = (map: number[][]): void => {
+    for (let ty = map.length - 2; ty < map.length; ty++) {
+      for (let tx = GAP_FROM; tx <= GAP_TO; tx++) map[ty][tx] = 0;
+    }
+  };
+  const FRAMES = 240;
+  const script = () => ({ left: false, right: true, jump: false, fire: false });
+
+  it('throws the player back out of the pit for 60 frames, where a hit would give 120', () => {
+    const liveCape: CapeSample[] = [];
+    const live = driveLiveGame({
+      level: 0, difficulty: 'super_easy', character: 'gigi',
+      frames: FRAMES, input: script,
+      mutateMap: carveGap,
+      onFrame: (d) => {
+        const p = d.getPlayer();
+        liveCape.push({ hasCape: p.hasCape as boolean, invincible: p.invincible as number });
+      },
+    });
+
+    setRandom(() => 0.5); // the live driver's own stubbed Math.random, for enemySkipChance
+    const world = createWorld(0, 'super_easy', 'gigi');
+    world.map = world.map.map((row) => row.slice());
+    carveGap(world.map);
+
+    const port: typeof live = [];
+    const portCape: CapeSample[] = [];
+    const portDead: boolean[] = [];
+    for (let f = 0; f < FRAMES; f++) {
+      stepWorld(world, { ...script(), jumpPressed: false, firePressed: false });
+      port.push(sampleWorld(world));
+      portCape.push({ hasCape: world.player.hasCape, invincible: world.player.invincible });
+      portDead.push(world.dead);
+    }
+
+    expect(port).toEqual(live);
+    expect(portCape).toEqual(liveCape);
+
+    // The player really did start the level wearing one, off `dc.startWithCape` alone:
+    // nothing in this test grants it and the nearest super pickup is tiles away.
+    expect(world.dc.startWithCape).toBe(true);
+    expect(world.dc.capeSavesPit).toBe(true);
+    expect(liveCape[0].hasCape).toBe(true);
+
+    // The save. The cape is spent, the world does NOT go dead, and the window is 60 —
+    // the branch's own hardcoded number, not `dc.invincibleTime`, which is twice that
+    // and is what a contact hit gives on this very difficulty (see below).
+    const saveFrame = portCape.findIndex((s) => !s.hasCape);
+    expect(saveFrame).toBeGreaterThan(0);
+    expect(portDead[saveFrame]).toBe(false);
+    expect(world.dc.invincibleTime).toBe(120);
+    expect(portCape[saveFrame].invincible).toBe(60);
+    // Thrown up at -10 from `lvl.height*TILE - 32`, both flat numbers: not a bounce off
+    // anything, and unrelated to any jump force.
+    expect(port[saveFrame].vy).toBe(-10);
+    expect(port[saveFrame].y).toBe(LEVELS[0].height * TILE - 32);
+    // ...and it was a real fall being survived: the frame before, the player was already
+    // below the bottom row of the map and still dropping at terminal velocity, and the
+    // save moved it a long way back UP rather than nudging it.
+    expect(port[saveFrame - 1].y).toBeGreaterThanOrEqual(LEVELS[0].height * TILE);
+    expect(port[saveFrame - 1].vy).toBe(8);
+    expect(port[saveFrame].y).toBeLessThan(port[saveFrame - 1].y - TILE);
+
+    // The second fall kills, and it kills WHILE STILL INVINCIBLE: the pit check reads
+    // `capeSavesPit && hasCape` and nothing else.
+    const deathFrame = portDead.indexOf(true);
+    expect(deathFrame).toBeGreaterThan(saveFrame);
+    expect(portCape[deathFrame].invincible).toBeGreaterThan(0);
+    expect(port[deathFrame].y).toBeGreaterThan(LEVELS[0].height * TILE + 32);
+
+    // The respawn hands the cape back, exactly 90 frames after the death like every
+    // other respawn in this suite — and hands back a clean invincibility counter with
+    // it, rather than the one the player died holding.
+    const respawnFrame = portDead.indexOf(false, deathFrame + 1);
+    expect(respawnFrame).toBe(deathFrame + 90);
+    expect(portCape[respawnFrame].hasCape).toBe(true);
+    expect(portCape[respawnFrame].invincible).toBe(0);
+
+    // doll@15 then takes that second cape the ordinary way, and that is the 120.
+    const hitFrame = portCape.findIndex((s, f) => f > respawnFrame && !s.hasCape);
+    expect(hitFrame).toBeGreaterThan(respawnFrame);
+    expect(portDead[hitFrame]).toBe(false); // absorbed, not fatal
+    expect(portCape[hitFrame].invincible).toBe(world.dc.invincibleTime);
+    expect(port[hitFrame].vy).toBe(-4); // the hit's nudge, not the pit's -10
+    // Counting down one a frame from 120, the same way the 60 does at normal.
+    expect(portCape.slice(hitFrame).map((s) => s.invincible))
+      .toEqual(Array.from({ length: FRAMES - hitFrame }, (_, i) => 120 - i));
+
+    // Infinite lives really are infinite: two deaths, still Infinity (index.html:1647's
+    // untyped `lives--`, and `dc.lives` is Infinity on this difficulty alone).
+    expect(world.lives).toBe(Infinity);
   });
 });

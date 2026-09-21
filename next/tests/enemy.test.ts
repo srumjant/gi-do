@@ -272,7 +272,7 @@ describe('stepEnemy', () => {
         noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
       isChicken: false,
       };
-      world.player = createPlayer(LEVELS[0], 'gigi'); // w=16, h=24
+      world.player = createPlayer(LEVELS[0], world.dc, 'gigi'); // w=16, h=24
       world.player.x = 98;
       // Enemy gravity runs before the stomp check even on this first step, so its y by
       // the time the check happens is 150 + GRAVITY, i.e. 150.4 — this places the
@@ -299,9 +299,10 @@ describe('stepEnemy', () => {
       stepEnemy(world, enemy);
 
       expect(enemy.alive).toBe(true);
-      // Side/rising contact now calls playerHit (death, no cape in this slice) — but
-      // playerDie only touches world.dead/lives/stateTimer, never player.vy, so vy
-      // stays exactly what it was going in.
+      // Side/rising contact calls playerHit, and this world is at normal difficulty with
+      // no cape, so that is a death — but playerDie only touches world.dead/lives/
+      // stateTimer, never player.vy, so vy stays exactly what it was going in. (With a
+      // cape it WOULD be touched: the absorb branch sets vy to -4.)
       expect(world.player.vy).toBe(-3);
       expect(world.dead).toBe(true);
       expect(enemy.squashTimer).toBe(0); // never stomped, so never started counting down
@@ -341,7 +342,7 @@ describe('stepEnemy', () => {
       noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
       isChicken: false,
     };
-    world.player = createPlayer(LEVELS[0], 'gigi');
+    world.player = createPlayer(LEVELS[0], world.dc, 'gigi');
     world.player.x = 98;
     world.player.y = 140;
     world.player.vy = 3; // would stomp a live enemy at this position
@@ -523,14 +524,13 @@ describe('bat and bouncer vs. the live game', () => {
 });
 
 // index.html:1542's `const shm=(dc.stompHitbox||1)*(p.bigHeadTimer>0?1.5:1)`. The two
-// factors COMPOUND, and neither the fallback nor the multiplication can be seen from a
-// trace: `stompHitbox` exists on super_easy alone (difficulty.ts), and a super_easy
-// trace is not available yet — the live game starts that difficulty with a cape
-// (`startWithCape`), which the port cannot yet honour because absorbing a hit is Task 6
-// of this plan, so the two sides part company the moment anything touches the player.
-// So this is port-side only, and deliberately so; the big head's OTHER two effects (the
-// widened box and the 45-frame squash) are pinned against the live game in
-// trace.test.ts, where normal difficulty can reach them.
+// factors COMPOUND, and neither the fallback nor the multiplication can be seen from
+// the traces this suite drives: `stompHitbox` exists on super_easy alone
+// (difficulty.ts), and reaching it from a trace would mean walking a super_easy player
+// into an enemy at an exact sub-pixel height, which no input script arranges. So this
+// is port-side only, and deliberately so; the big head's OTHER two effects (the widened
+// box and the 45-frame squash) are pinned against the live game in trace.test.ts, where
+// normal difficulty can reach them.
 describe('the big-head stomp multiplier compounds with dc.stompHitbox', () => {
   /**
    * One fixed geometry, three difficulties-and-timers. The player is placed so that its
@@ -551,7 +551,7 @@ describe('the big-head stomp multiplier compounds with dc.stompHitbox', () => {
       noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
       isChicken: false,
     };
-    world.player = createPlayer(LEVELS[0], 'gigi'); // w=16, h=24
+    world.player = createPlayer(LEVELS[0], world.dc, 'gigi'); // w=16, h=24
     world.player.x = 98; // overlaps horizontally with AND without the 8px big-head widening
     world.player.y = 150; // stomp line at 170, between the 2.0 and 3.0 thresholds
     world.player.vy = 3; // falling — the stomp branch needs it
@@ -570,12 +570,18 @@ describe('the big-head stomp multiplier compounds with dc.stompHitbox', () => {
     expect(a.enemy.alive).toBe(true);
     expect(a.world.dead).toBe(true);
 
-    // 2.0 alone (super_easy, no big head): also too short, by 3.4px.
+    // 2.0 alone (super_easy, no big head): also too short, by 3.4px. super_easy is the
+    // one difficulty whose players spawn already wearing a cape (`startWithCape`), so
+    // the hit this case takes is ABSORBED rather than fatal — the point of the case is
+    // that the enemy survives, and it still does. The cape is spent for super_easy's
+    // own 120-frame window, which is `dc.invincibleTime`, NOT the 60 a pit save gives.
     const b = setup('super_easy', false);
     expect(b.world.dc.stompHitbox).toBe(2);
     stepEnemy(b.world, b.enemy);
     expect(b.enemy.alive).toBe(true);
-    expect(b.world.dead).toBe(true);
+    expect(b.world.dead).toBe(false);
+    expect(b.world.player.hasCape).toBe(false);
+    expect(b.world.player.invincible).toBe(120);
 
     // 2.0 * 1.5: reaches. If the two were added, or if either replaced the other, this
     // would be 3.5, 2.0 or 1.5 — and only the first of those also lands here, so the

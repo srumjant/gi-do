@@ -130,7 +130,7 @@ export function createWorld(
     level,
     map,
     dc,
-    player: createPlayer(level, character),
+    player: createPlayer(level, dc, character),
     enemies: [],
     frame: 0,
     animFrame: 0,
@@ -167,7 +167,7 @@ export function createWorld(
  */
 export function respawnLevel(world: World): void {
   world.map = world.level.generate(world.dc);
-  world.player = createPlayer(world.level, world.character);
+  world.player = createPlayer(world.level, world.dc, world.character);
   world.enemies = [];
   world.pending = world.level.enemyDefs.map((d) => ({ type: d.type, x: d.x, spawned: false }));
   world.camera = { x: 0, y: 0 };
@@ -251,28 +251,32 @@ export function stepWorld(world: World, input: InputState): void {
   }
 
   spawnEnemiesInView(world);
-  stepPlayer(world, input);
-
-  // A PIT death happens inside the player block, which returns right there
-  // (index.html:1423) — a direct return from update() itself — so enemies, the
-  // rescue check and the camera are all skipped for the rest of that frame too. The
-  // spawn pass above has already run, which is also what the live game does.
+  // A PIT frame ends the whole update() right there (index.html:1423) — a direct return
+  // from update() itself, not from a sub-function — so enemies, the rescue check and the
+  // camera are all skipped for the rest of it. The spawn pass above has already run,
+  // which is also what the live game does.
   //
+  // That is true whether the pit KILLED the player or a cape SAVED it, which is why
+  // this reads stepPlayer's answer rather than `world.dead`: a save takes the same
+  // `return` and leaves the player alive, so `world.dead` would wave the rest of the
+  // frame through and the camera would lerp one extra time on the rescue frame.
+  const playedOn = stepPlayer(world, input);
+
   // A CONTACT death is different, and this `if` is checked only ONCE, before
   // stepEnemies runs, deliberately: the live equivalent (index.html:1547's
   // `playerHit();return;`) sits inside `enemies.forEach`, so that `return` only ends
   // ITS OWN enemy's turn — the live forEach still steps every enemy after it, and
   // `update()` still runs its rescue check and camera lerp afterward, all on the very
   // same frame the player died (index.html has no gameState guard in front of either).
-  // Checking `world.dead` again between stepEnemies and stepCamera (or inside
-  // stepEnemies' loop) would freeze one frame earlier than the live game does and
-  // desync the trace. So: one check, all three calls inside it, exactly like this.
-  if (!world.dead) {
+  // Checking for death again between stepEnemies and stepCamera (or inside stepEnemies'
+  // loop) would freeze one frame earlier than the live game does and desync the trace.
+  // So: one check, all three calls inside it, exactly like this.
+  if (playedOn) {
     // index.html:1447-1455, :1456-1501, :1504-1517 and :1519 — all four sit between the
-    // player block and the enemies loop, in exactly this order. Inside the `!world.dead`
-    // guard because a PIT death returns from the live update() at index.html:1423, above
-    // all of this: you do not sweep up the pickups you happen to be falling through on
-    // the frame you die, and the cat freezes mid-bounce with everything else.
+    // player block and the enemies loop, in exactly this order. Inside this guard
+    // because a pit frame returns from the live update() at index.html:1423, above all
+    // of this: you do not sweep up the pickups you happen to be falling through on the
+    // frame you die, and the cat freezes mid-bounce with everything else.
     //
     // The cat runs BEFORE the arrows, which is the only thing that decides who gets the
     // points when both could reach the same enemy on the same frame: the cat's 300

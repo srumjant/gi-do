@@ -134,13 +134,14 @@ export function chickenify(e: EnemyState): void {
 /**
  * Port of the per-enemy step at index.html:1524-1547: gravity + floor snap (skipped
  * for a noGravity flyer), the per-type movement branch, the frame flip, the stomp, and
- * side/rising contact (playerHit — death, since there is no cape in this slice).
+ * side/rising contact (playerHit — a death, or the cape being spent instead).
  * ghost and cannon still never reach the per-type branch below — `spawnEnemy` above
  * never creates either — so, as before, there is no branch for them here at all.
  *
- * Mutates `enemy` in place, `world.player.vy` on a kill, and `world` itself (`dead`,
- * `lives`, `stateTimer`, via playerHit) on a hit — exactly like `stepPlayer` mutates
- * `world.player` and `world.dead`.
+ * Mutates `enemy` in place, `world.player.vy` on a kill, and, via playerHit, either the
+ * player (`hasCape`, `invincible`, `vy`) or `world` itself (`dead`, `lives`,
+ * `stateTimer`) on a hit — exactly like `stepPlayer` mutates `world.player` and
+ * `world.dead`.
  */
 export function stepEnemy(world: World, e: EnemyState): void {
   // index.html:1525 — the squash countdown runs even for a dead enemy (set to 30, or 45
@@ -251,15 +252,19 @@ export function stepEnemy(world: World, e: EnemyState): void {
   //     WITH and easier to get hit WITH, since the same wider box feeds the `else`
   //     branch below.
   //
-  // The live source's `p.invincible<=0` gate on the whole check, and its `!e.noStomp`
-  // gate on the stomp branch, are still absent: neither field exists on this port (the
-  // cape's invincibility window is a later task; noStomp is set by cannon alone,
-  // index.html:1218, a type spawnEnemy never creates), which has the same effect as both
-  // always being "off". This is NOT the tile-collision box from player.ts: that one
-  // insets y by 1-3px too; this one does not.
+  // `p.invincible<=0` gates the WHOLE check, not just the damage branch: a player in
+  // the window after a cape absorbed a hit cannot be hurt by an enemy, and cannot
+  // stomp one either — walking through a doll mid-blink kills neither of you.
+  //
+  // The live source's `!e.noStomp` gate on the stomp branch is still absent: noStomp
+  // is set by cannon alone (index.html:1218), a type spawnEnemy never creates, so
+  // omitting it has the same effect as it always being off.
+  //
+  // This is NOT the tile-collision box from player.ts: that one insets y by 1-3px too;
+  // this one does not.
   const shm = (dc.stompHitbox || 1) * (p.bigHeadTimer > 0 ? 1.5 : 1);
   const bhx = p.bigHeadTimer > 0 ? 8 : 0;
-  if (rectOverlap(
+  if (p.invincible <= 0 && rectOverlap(
     { x: p.x + 2 - bhx, y: p.y, w: p.w - 4 + bhx * 2, h: p.h },
     { x: e.x, y: e.y, w: e.w, h: e.h },
   )) {
@@ -276,9 +281,11 @@ export function stepEnemy(world: World, e: EnemyState): void {
       // this is the shape that stays obviously faithful if either number ever moves.
       if (p.bigHeadTimer > 0) e.squashTimer = 45;
     } else {
-      // Side or rising contact (index.html:1547's `else{playerHit();return;}`). No
-      // cape in this slice, so this goes straight to death — see player.ts's
-      // playerHit/playerDie. The live `return` only exits THIS enemy's own
+      // Side or rising contact (index.html:1547's `else{playerHit();return;}`). With
+      // a cape on this is survived rather than fatal, and the survivor is invincible
+      // for a while afterwards — see player.ts's playerHit. The `return` below fires
+      // either way, so an enemy that is merely bumped into still ends its own turn
+      // here without moving again. The live `return` only exits THIS enemy's own
       // `enemies.forEach` callback (there is nothing left in it anyway); it does not
       // stop the live forEach from stepping the rest of `enemies`, nor the camera
       // lerp after it, on the same frame — both already happen unconditionally here

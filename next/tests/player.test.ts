@@ -15,6 +15,7 @@ import { emptyInput, type InputState } from '../src/input/actions';
 import { LEVELS, TILE_GROUND } from '../src/data/levels';
 import { GIGI_SKINS, DODO_SKINS } from '../src/data/sprites';
 import { TILE, GRAVITY } from '../src/config/constants';
+import { DIFFICULTY_CONFIG, DIFF_KEYS } from '../src/config/difficulty';
 import { findGroundY } from '../src/game/tiles';
 import type { World } from '../src/game/types';
 
@@ -27,8 +28,10 @@ function makeWorld(character: 'gigi' | 'dodo' = 'gigi'): World {
 }
 
 describe('createPlayer', () => {
+  const NORMAL = DIFFICULTY_CONFIG.normal;
+
   it('sizes gigi from the ported sprite data, not a hardcoded constant', () => {
-    const p = createPlayer(LEVELS[0], 'gigi');
+    const p = createPlayer(LEVELS[0], NORMAL, 'gigi');
     const stand = GIGI_SKINS[0].stand;
     expect(p.w).toBe(stand[0].length * 2 - 4);
     expect(p.h).toBe(stand.length * 2 - 4);
@@ -37,7 +40,7 @@ describe('createPlayer', () => {
   });
 
   it('sizes dodo from the ported sprite data, not a hardcoded constant', () => {
-    const p = createPlayer(LEVELS[0], 'dodo');
+    const p = createPlayer(LEVELS[0], NORMAL, 'dodo');
     const stand = DODO_SKINS[0].stand;
     expect(p.w).toBe(stand[0].length * 2 - 4);
     expect(p.h).toBe(stand.length * 2 - 4);
@@ -47,7 +50,7 @@ describe('createPlayer', () => {
 
   it('starts airborne at the level\'s playerStart, in pixels', () => {
     const level = LEVELS[0];
-    const p = createPlayer(level, 'gigi');
+    const p = createPlayer(level, NORMAL, 'gigi');
     expect(p.x).toBe(level.playerStart[0] * TILE);
     expect(p.y).toBe(level.playerStart[1] * TILE);
     expect(p.vx).toBe(0);
@@ -56,6 +59,22 @@ describe('createPlayer', () => {
     expect(p.facing).toBe(1);
     expect(p.coyoteTime).toBe(0);
     expect(p.jumpBuffer).toBe(0);
+    expect(p.invincible).toBe(0);
+  });
+
+  // index.html:1169's `hasCape:dc.startWithCape` — the one field in the whole literal
+  // that varies, and the reason createPlayer takes a difficulty record at all. No frame
+  // trace at `normal` can tell a correct `dc.startWithCape` from a hardcoded `false`,
+  // so this reads the real records rather than restating the table: whichever
+  // difficulties set the flag, the player must spawn with a cape on exactly those.
+  it('seeds hasCape from the difficulty record, on every difficulty', () => {
+    for (const key of DIFF_KEYS) {
+      const dc = DIFFICULTY_CONFIG[key];
+      expect(createPlayer(LEVELS[0], dc, 'gigi').hasCape, key).toBe(dc.startWithCape);
+    }
+    // ...and that is not a vacuous agreement between two constants: exactly one of the
+    // four records actually turns it on, so the loop above sees both answers.
+    expect(DIFF_KEYS.filter((k) => DIFFICULTY_CONFIG[k].startWithCape)).toEqual(['super_easy']);
   });
 });
 
