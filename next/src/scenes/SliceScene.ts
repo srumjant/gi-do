@@ -8,7 +8,13 @@ import { getDodoSkin, getGigiSkin, getPlayerSprites, getSelectedChar } from '../
 import { createWorld, stepWorld } from '../game/world';
 import type { EnemyState, World } from '../game/types';
 import { cloudPosition, cloudScale, drawRidges, drawSky } from '../gfx/parallax';
-import { createRainbowBlocks, drawStaticTiles, updateRainbowBlocks, type RainbowBlock } from '../gfx/tiles';
+import {
+  type BlockView,
+  createRainbowBlocks,
+  drawStaticTiles,
+  updateBumpedBlocks,
+  updateRainbowBlocks,
+} from '../gfx/tiles';
 import {
   ARROW_TEXTURE,
   BIG_HEAD_SCALE,
@@ -139,8 +145,11 @@ export class SliceScene extends Phaser.Scene {
   /** The pickup haloes and the arrow trails: shapes, not sprites, redrawn each frame. */
   private glowGraphics!: Phaser.GameObjects.Graphics;
   private arrowTrailGraphics!: Phaser.GameObjects.Graphics;
-  private rainbowBlocks: RainbowBlock[] = [];
+  /** The two kinds of block that can be bumped from below, and the bricks they become. */
+  private questionBlocks: BlockView[] = [];
+  private rainbowBlocks: BlockView[] = [];
   private rainbowGraphics!: Phaser.GameObjects.Graphics;
+  private bumpedGraphics!: Phaser.GameObjects.Graphics;
   private hillsGraphics: Phaser.GameObjects.Graphics | undefined;
   private parallaxLayers: readonly ParallaxLayer[] = [];
   private clouds: CloudView[] = [];
@@ -158,10 +167,14 @@ export class SliceScene extends Phaser.Scene {
 
     this.createParallax(levelIndex);
 
-    drawStaticTiles(this, this.world);
+    this.questionBlocks = drawStaticTiles(this, this.world);
     const rainbow = createRainbowBlocks(this, this.world);
     this.rainbowBlocks = rainbow.blocks;
     this.rainbowGraphics = rainbow.graphics;
+    // Created after both of those on purpose — see updateBumpedBlocks in gfx/tiles.ts.
+    // Every tile layer sits at depth 0, where creation order alone decides what covers
+    // what, and a bumped block's brick has to cover the block that was drawn there.
+    this.bumpedGraphics = this.add.graphics();
 
     this.glowGraphics = this.add.graphics().setDepth(DEPTH_PICKUP_GLOW);
     this.arrowTrailGraphics = this.add.graphics().setDepth(DEPTH_ARROW_TRAIL);
@@ -355,8 +368,14 @@ export class SliceScene extends Phaser.Scene {
       this.positionFixedLayer(cloud.image, pos.x, pos.y);
     }
 
-    // The only tile that animates — see gfx/tiles.ts. Everything else the tile grid
-    // draws was drawn once, in create(), and is left alone.
+    // The only two tiles the static pass in create() cannot draw for good — see
+    // gfx/tiles.ts. A block bumped from below becomes a plain brick until a respawn
+    // brings it back, and the rainbow blocks cycle their hue every frame. Everything
+    // else the tile grid draws was drawn once, in create(), and is left alone.
+    //
+    // The bumped pass runs first so that a block spent this frame is already out of the
+    // rainbow list by the time the animated pass below walks it.
+    updateBumpedBlocks(this.bumpedGraphics, this.world, this.questionBlocks, this.rainbowBlocks);
     updateRainbowBlocks(this.rainbowGraphics, this.rainbowBlocks, animFrame);
 
     // Phaser zooms about the camera's CENTRE; the live game zooms about the top-left
