@@ -327,7 +327,8 @@ reachable in a trace only via the rainbow block's `bighead` — so cover it by s
 
 **Files:** `next/src/game/world.ts`, `types.ts`
 
-**Pickup (`index.html:1450-1454`).**
+**Pickup (`index.html:1449-1455`).** Note also `cat=null` at `:1183`, inside `initLevel` —
+without it a respawn leaves you holding a cat *and* a cat to collect.
 
 ```js
 if(catPickup&&!catPickup.collected&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:catPickup.x,y:catPickup.y,w:16,h:22})){
@@ -337,7 +338,7 @@ if(catPickup&&!catPickup.collected&&rectOverlap({x:p.x,y:p.y,w:p.w,h:p.h},{x:cat
 }
 ```
 
-**The companion (`index.html:1457-1499`).** Reproduce verbatim; the whole block is listed
+**The companion (`index.html:1456-1501`).** Reproduce verbatim; the whole block is listed
 in the source at those lines. The shape:
 
 ```js
@@ -369,6 +370,10 @@ Five traps, and this task has the most of them:
 Scratch range is 45px, measured from `cat.x+8, cat.y+8` — a fixed inset, not the cat's
 centre. `scratchTimer` is a 30-frame cooldown. Each scratch is worth
 `Math.round(300 * dc.scoreMultiplier)`.
+
+**The first scratch is free.** The cat spawns at `p.x - 20`, which is the side an enemy
+you just walked up to is on, and `scratchTimer` starts at 0. So it can and does kill
+something on the very frame you pick it up, before it has bounced once.
 
 **Test.** One trace: walk to level 1's cat at tile 50, then keep walking into the bat at
 tile 48 and assert the cat's position, `hitsLeft` and the enemy's `alive`/`squashTimer`
