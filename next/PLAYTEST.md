@@ -59,20 +59,43 @@ Q6 which would you rather play:
 Anything they said unprompted:
 ```
 
-## What the machine already checked
+## What the machine still checks — and what it no longer can
 
-Worth knowing so the questions above are the only ones being asked of the children.
+**This changed on 2026-09-22, and the change matters for how you read the children.**
 
-Twelve scripted input sequences are fed to **both** the live game and the port, and their
-position, velocity, grounded state, camera and enemies are compared **every frame, to the
-decimal**. The live game's real physics is driven headlessly for this — not a copy of it,
-the actual `index.html` running in a sandbox. All twelve match exactly.
+The port used to be compared against the live game frame by frame, to the decimal: scripted
+inputs fed to both, positions and velocities diffed with no tolerance. That was true, and it
+is no longer.
 
-So "does it move identically" is answered, and answered harder than a person could. What
-that cannot tell us is whether it *feels* the same to play in a real browser — input
-latency, how the screen scrolls, whether landing on something reads right. That is what
-the children are for.
+The player and the ground-patrol enemies now run on Phaser's Arcade Physics, by choice. Arcade
+separates bodies from tiles its own way, so exact agreement with the hand-rolled original is
+not merely untested — it is **not possible**, and not wanted. That comparison has been retired
+deliberately.
 
-If they say it feels different, believe them and come back to the traces. A frame-perfect
-match and a child saying "it's wrong" at the same time would mean the difference is in
-presentation rather than simulation, and that is a useful thing to have narrowed down.
+**Still checked, and still exact:** everything that is not movement. Pickups, score, the
+blocks you hit from below, the three silly power-ups, the cat, arrows and the chicken ray,
+level building, the sprites, the sounds, the translations. Those are pure logic and they still
+have their tests.
+
+**No longer checked by anything:** how it feels to move. The weight of a jump, whether landing
+reads right, whether a ledge catches you.
+
+### So the children are now the only judge of feel
+
+There is no test that can disagree with them. If a child says the jump feels wrong, there is
+nothing to check it against — **believe them, and say so**.
+
+### Three things we already know changed
+
+Worth watching for, and worth not treating as new bugs if they come up:
+
+- **Walking into a wall used to jitter.** The old code left a 1px gap and the player buzzed
+  against it. Now it rests flush. This is a fix, but it will look different.
+- **Ledges are more forgiving.** The old code dropped you once about 3px of you hung over the
+  edge; Arcade keeps you up while any part of you is on. Easier, and a real change to how
+  jumps off platforms feel.
+- **Two `?` blocks side by side can no longer both be popped with one jump.** No level has such
+  a pair today, so this may never show up.
+
+Anything *else* they notice about movement is new information, and there is no longer a trace
+that can confirm or deny it. That is the cost of the switch, and it was accepted knowingly.
