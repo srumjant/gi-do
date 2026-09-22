@@ -3,7 +3,8 @@ import { STEP_HZ, TILE } from '../src/config/constants';
 import { isSolid, TILE_BRICK } from '../src/data/levels';
 import { bumpBlocksAbove } from '../src/game/player';
 import { createWorld } from '../src/game/world';
-import { headTileRow, PX_PER_FRAME_TO_PX_PER_SECOND } from '../src/physics/player';
+import { PX_PER_FRAME_TO_PX_PER_SECOND } from '../src/physics/body';
+import { headTileRow } from '../src/physics/player';
 import { SOLID_TILE_INDEXES } from '../src/physics/tiles';
 
 /**

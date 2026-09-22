@@ -85,7 +85,7 @@ reads right, whether a ledge catches you.
 There is no test that can disagree with them. If a child says the jump feels wrong, there is
 nothing to check it against — **believe them, and say so**.
 
-### Three things we already know changed
+### Four things we already know changed
 
 Worth watching for, and worth not treating as new bugs if they come up:
 
@@ -94,6 +94,10 @@ Worth watching for, and worth not treating as new bugs if they come up:
 - **Ledges are more forgiving.** The old code dropped you once about 3px of you hung over the
   edge; Arcade keeps you up while any part of you is on. Easier, and a real change to how
   jumps off platforms feel.
+- **Enemies no longer sink into walls.** A doll or a dino walking into a wall used to push a
+  fraction of itself into the wall tile for the one frame before it turned around, and you
+  could see it. Now it stops against the face and turns. Same fix as the player's, and the
+  same kind of small visual difference.
 - **Two `?` blocks side by side can no longer both be popped with one jump.** No level has such
   a pair today, so this may never show up.
 

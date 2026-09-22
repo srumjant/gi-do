@@ -3,7 +3,7 @@ import { DIFFICULTY_CONFIG, type DifficultyKey, type DifficultyRecord } from '..
 import { LEVELS, TILE_QUESTION, TILE_RAINBOW, type Level, type TileMap } from '../data/levels';
 import { BOW_S, CAT_S, SUPER_S } from '../data/sprites';
 import type { InputState } from '../input/actions';
-import { chickenify, spawnEnemy, stepEnemy } from './enemy';
+import { chickenify, spawnEnemy, stepEnemy, type EnemyMove } from './enemy';
 import { createPlayer, stepPlayer, type Character, type PlayerMove } from './player';
 import { random } from './random';
 import { getRescueSprites } from './run';
@@ -193,8 +193,19 @@ export function respawnLevel(world: World): void {
  * in the browser (physics/player.ts). It is passed straight through to `stepPlayer` and
  * this function has no other opinion about it; see PlayerMove in player.ts for why it is
  * injected rather than imported, and why it is optional.
+ *
+ * `moveEnemy` is the same arrangement for the GROUND PATROLS (physics/enemy.ts), passed
+ * straight through to `stepEnemies`. Two seams rather than one because they are two
+ * different jobs — one body that outlives the level against a list of bodies that comes and
+ * goes — and because a caller that wants a moving player and still enemies, which is most
+ * of the test suite, should be able to say so.
  */
-export function stepWorld(world: World, input: InputState, move?: PlayerMove): void {
+export function stepWorld(
+  world: World,
+  input: InputState,
+  move?: PlayerMove,
+  moveEnemy?: EnemyMove,
+): void {
   // index.html:1275 — the very first line of update(), before every other state check
   // (including the live game's own dead-state branch), so it advances even while dead,
   // on the title screen, everywhere. Reproduced by incrementing unconditionally, first,
@@ -295,7 +306,7 @@ export function stepWorld(world: World, input: InputState, move?: PlayerMove): v
     stepCat(world);
     stepArrows(world);
     stepStars(world);
-    stepEnemies(world);
+    stepEnemies(world, moveEnemy);
     checkRescue(world);
     stepCamera(world);
   }
@@ -628,7 +639,11 @@ export function spawnEnemiesInView(world: World): void {
   }
 }
 
-/** Per-enemy step (index.html:1524-1547). See enemy.ts for gravity, patrol, the stomp and contact damage. */
-export function stepEnemies(world: World): void {
-  for (const enemy of world.enemies) stepEnemy(world, enemy);
+/**
+ * Per-enemy step (index.html:1524-1547). See enemy.ts for gravity, patrol, the stomp and
+ * contact damage, and EnemyMove there for what `moveEnemy` is and why a ground patroller
+ * that is handed none simply stands still.
+ */
+export function stepEnemies(world: World, moveEnemy?: EnemyMove): void {
+  for (const enemy of world.enemies) stepEnemy(world, enemy, moveEnemy);
 }

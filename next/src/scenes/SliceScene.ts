@@ -37,6 +37,7 @@ import {
 } from '../gfx/textures';
 import type { InputState } from '../input/actions';
 import { createKeyboardInput, type KeyboardInput } from '../input/keyboard';
+import { createEnemyBodies, type EnemyBodies } from '../physics/enemy';
 import { createPlayerMove } from '../physics/player';
 import { createCollisionLayer, syncCollisionLayer } from '../physics/tiles';
 import { HUD_SCENE_KEY, type HudData } from './HudScene';
@@ -167,6 +168,12 @@ export class SliceScene extends Phaser.Scene {
    * it: move, separate, report back. See src/physics/player.ts.
    */
   private movePlayer!: PlayerMove;
+  /**
+   * The ground patrols' Arcade bodies — the same arrangement, plus the lifecycle the
+   * player's singleton does not need: enemies stream in and a respawn throws them all
+   * away. See src/physics/enemy.ts.
+   */
+  private enemyBodies!: EnemyBodies;
   private hillsGraphics: Phaser.GameObjects.Graphics | undefined;
   private parallaxLayers: readonly ParallaxLayer[] = [];
   private clouds: CloudView[] = [];
@@ -201,10 +208,12 @@ export class SliceScene extends Phaser.Scene {
     // what, and a bumped block's brick has to cover the block that was drawn there.
     this.bumpedGraphics = this.add.graphics();
     // Built from the very same `world.map` those three just drew, and kept in step with
-    // it by `syncCollisionLayer` in update() below. The player stands on it; the enemies
-    // still move themselves, for now.
+    // it by `syncCollisionLayer` in update() below. The player stands on it, and so do the
+    // doll, the car, the dino, the penguin and any chicken a ray makes of one; the bats,
+    // the bouncer and every projectile still move themselves, deliberately.
     this.collisionLayer = createCollisionLayer(this, this.world);
     this.movePlayer = createPlayerMove(this, this.world, this.collisionLayer);
+    this.enemyBodies = createEnemyBodies(this, this.world, this.collisionLayer);
 
     this.glowGraphics = this.add.graphics().setDepth(DEPTH_PICKUP_GLOW);
     this.arrowTrailGraphics = this.add.graphics().setDepth(DEPTH_ARROW_TRAIL);
@@ -364,14 +373,16 @@ export class SliceScene extends Phaser.Scene {
    * a 120Hz screen the live game runs at double speed. This runs STEP_MS's worth of
    * simulation per STEP_MS of real time whatever the display does.
    *
-   * Arcade has to be inside that loop or the fix is undone for the player alone. Left to
+   * Arcade has to be inside that loop or the fix is undone for the bodies alone. Left to
    * itself it steps once per RENDERED frame (it listens to the scene's UPDATE event), so
-   * on that same 120Hz screen the player would move twice for every one step everything
-   * else took — exactly the bug, reintroduced for exactly one entity, and found by a
-   * child on a fast laptop rather than by a test. So `customUpdate: true` in main.ts
-   * unhooks it, and `createPlayerMove` calls `physics.world.singleStep()` from inside
-   * `stepWorld` -> `stepPlayer`, once per iteration of this loop, with Arcade's own fixed
-   * delta.
+   * on that same 120Hz screen the player and the patrolling enemies would move twice for
+   * every one step everything else took — exactly the bug, reintroduced for exactly the
+   * entities that have bodies, and found by a child on a fast laptop rather than by a
+   * test. So `customUpdate: true` in main.ts unhooks it, and each mover steps its own body
+   * from inside `stepWorld` — `stepPlayer` for the player, `stepEnemy` for each ground
+   * patroller — once per iteration of this loop, with Arcade's own fixed delta. Every body
+   * integrates exactly once per pass through this `while`; see stepBodyAlone in
+   * physics/body.ts for how one body is stepped without dragging the rest along.
    *
    * Driving it from in there rather than from out here buys one more thing worth having:
    * the frames the simulation does NOT run — dead, won, or frozen behind a power-up
@@ -382,7 +393,13 @@ export class SliceScene extends Phaser.Scene {
     // Clamp so a backgrounded tab does not produce a hundred catch-up steps at once.
     this.accumulator = Math.min(this.accumulator + delta, STEP_MS * 5);
     while (this.accumulator >= STEP_MS) {
-      stepWorld(this.world, this.readInput(), this.movePlayer);
+      stepWorld(this.world, this.readInput(), this.movePlayer, this.enemyBodies.move);
+      // Also INSIDE the loop. A death inside this step replaces `world.enemies` with an
+      // empty array (world.ts's respawnLevel), and the bodies of the enemies that were in
+      // it are still in Arcade's world, still being stepped and still separating against
+      // the level. Left until after the loop, the next step in this same rendered frame
+      // would run with the dead attempt's collision still standing in it.
+      this.enemyBodies.reap();
       // INSIDE the loop, not after it. A bumped block and a respawn both rewrite
       // `world.map`, and the collision layer is a copy of that map rather than a view of
       // it — and the player now separates against the layer rather than reading the map.

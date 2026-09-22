@@ -6,7 +6,7 @@ import path from 'node:path';
 import url from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
-import { testMove } from './helpers/testMove';
+import { testEnemyMove, testMove } from './helpers/testMove';
 import { checkRescue, createWorld, stepArrows, stepCamera, stepWorld } from '../src/game/world';
 import { findGroundY } from '../src/game/tiles';
 import { getRescueSprites, setSelectedChar } from '../src/game/run';
@@ -193,7 +193,10 @@ describe('death freezes the whole world, not just the player', () => {
     const after: Array<{ cam: number; enemyX: number[]; frame: number; frameTimer: number }> = [];
     const animFrameAfter: number[] = [];
     for (let i = 0; i < 60; i++) {
-      stepWorld(world, held({ right: true }), testMove);
+      // BOTH movers, and the enemy one is what makes the enemy half of this test mean
+      // anything: a ground patroller handed no mover stands still anyway (see EnemyMove
+      // in game/enemy.ts), so "the enemies stopped" would be a claim about nothing.
+      stepWorld(world, held({ right: true }), testMove, testEnemyMove);
       if (world.dead) {
         if (frozenAt < 0) frozenAt = i;
         after.push({

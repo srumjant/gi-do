@@ -32,8 +32,9 @@ const game = new Phaser.Game({
        * SliceScene's fixed-step accumulator runs the rest of the simulation, and the
        * player alone would move at double speed. That is precisely the bug the
        * accumulator exists to fix (index.html runs straight off requestAnimationFrame;
-       * this port deliberately does not). `customUpdate` takes the hook away, and
-       * SliceScene drives `physics.world.singleStep()` itself, once per fixed step.
+       * this port deliberately does not). `customUpdate` takes the hook away, and the
+       * simulation drives Arcade itself from inside SliceScene's fixed step, once per
+       * body per step — see stepBodyAlone in physics/body.ts.
        *
        * It also fixes the ORDER. Phaser emits UPDATE before it calls `Scene.update`, so
        * the default would step the bodies BEFORE the frame's input had set a velocity.

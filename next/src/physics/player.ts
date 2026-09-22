@@ -1,34 +1,16 @@
 // A TYPE import, exactly as in physics/tiles.ts next door, and for the same reason:
 // everything below hangs off objects the scene hands us (`scene.physics.add.body`,
 // `world.singleStep`, `body.velocity`), so nothing here needs a Phaser VALUE and the
-// import erases at compile time. That is what keeps the two pure helpers at the top of
-// this file — the unit conversion and the head-bump row — reachable from
-// tests/physics.test.ts, because `import Phaser from 'phaser'` throws outright under
-// Vitest's node environment (Phaser reads `navigator`, then `window`, then a canvas,
-// while its module body runs; shimming that far means the shim is what is under test).
+// import erases at compile time. That is what keeps the pure helper at the top of
+// this file — the head-bump row — reachable from tests/physics.test.ts, because
+// `import Phaser from 'phaser'` throws outright under Vitest's node environment (Phaser
+// reads `navigator`, then `window`, then a canvas, while its module body runs; shimming
+// that far means the shim is what is under test).
 import type Phaser from 'phaser';
-import { STEP_HZ, TILE } from '../config/constants';
+import { TILE } from '../config/constants';
 import { bumpBlocksAbove, type PlayerMove } from '../game/player';
 import type { World } from '../game/types';
-
-/**
- * The whole unit mismatch between this port and Arcade, in one number.
- *
- * Every speed in the game is PER FRAME — `GRAVITY` is 0.4 px a frame, `dc.jumpForce` is
- * -7.5 px a frame, `dc.playerSpeed` is 2.6 — because index.html integrates straight off
- * its own frame loop and this port carries the same arithmetic. Arcade integrates in
- * SECONDS: `position += velocity * delta`, with `delta` in seconds. The simulation runs
- * at exactly STEP_HZ, so one frame is 1/STEP_HZ of a second and a velocity of `v` px a
- * frame is `v * STEP_HZ` px a second.
- *
- * Multiplying in and dividing back out costs at most one ulp a step, which is around
- * 1e-14 px over a whole jump — far below the point where anything can see it. The
- * alternative, setting Arcade's own clock to one step per second so that its "seconds"
- * ARE our frames and the conversion disappears, was considered and rejected: it makes
- * `body.velocity` mean something no Phaser reader would expect, and it would mislead
- * whoever adds the next body.
- */
-export const PX_PER_FRAME_TO_PX_PER_SECOND = STEP_HZ;
+import { PX_PER_FRAME_TO_PX_PER_SECOND, stepBodyAlone } from './body';
 
 /**
  * Which tile row a head-first hit landed on, given the body's top edge AFTER Arcade has
@@ -132,6 +114,12 @@ export function createPlayerMove(
   // which is where separation has to happen.
   physics.add.collider(body, collisionLayer);
 
+  // `physics.add.body` hands the body to the world, and the world switches it on. Off
+  // again, immediately: a body in this port rests disabled and is switched on for the one
+  // step that belongs to it, or the enemies' own steps (physics/enemy.ts) would drag the
+  // player along with them. See stepBodyAlone.
+  body.enable = false;
+
   return (w: World): void => {
     const player = w.player;
 
@@ -148,12 +136,13 @@ export function createPlayerMove(
       player.vy * PX_PER_FRAME_TO_PX_PER_SECOND,
     );
 
-    // Exactly one Arcade step, with Arcade's own fixed delta. `singleStep` is
-    // `update(0, oneFrameInMs)` followed by `postUpdate`, so the body integrates once,
-    // the colliders run once, and the accumulated time comes back out to zero — see the
-    // fixed-step note in SliceScene.update, which is the whole reason this is called from
-    // here rather than left to run itself once per RENDERED frame.
-    physics.world.singleStep();
+    // Exactly one Arcade step, for this body and no other. Underneath it is
+    // `singleStep` — `update(0, oneFrameInMs)` followed by `postUpdate` — so the body
+    // integrates once, its collider runs once, and the accumulated time comes back out to
+    // zero. See the fixed-step note in SliceScene.update, which is the whole reason this
+    // is called from here rather than left to run itself once per RENDERED frame, and
+    // stepBodyAlone in physics/body.ts for why the other bodies have to sit it out.
+    stepBodyAlone(physics.world, body);
 
     player.x = body.x;
     player.y = body.y;
