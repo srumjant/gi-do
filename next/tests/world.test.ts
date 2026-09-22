@@ -6,6 +6,7 @@ import path from 'node:path';
 import url from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
+import { testMove } from './helpers/testMove';
 import { checkRescue, createWorld, stepArrows, stepCamera, stepWorld } from '../src/game/world';
 import { findGroundY } from '../src/game/tiles';
 import { getRescueSprites, setSelectedChar } from '../src/game/run';
@@ -101,38 +102,59 @@ it('src/game stays free of Phaser so it can run headlessly', () => {
   }
 });
 
-describe('camera vs. the live game', () => {
-  // A plain "hold right" script was tried first, as the task suggested, and turned out
-  // to be genuinely awkward: doll@15 (index.html's own level-0 enemyDefs) patrols left
-  // into the oncoming player and kills it around frame 59 — well before the player
-  // ever reaches the ~205px dead zone the camera needs to start scrolling at all. That
-  // is a real live-game interaction, but not one this port simulates yet (enemies are
-  // Task 5), so comparing through it would be comparing against a death this side of
-  // the fence can't reproduce, not against the camera math this task is about.
+describe('the camera through a real jump', () => {
+  // CONVERTED with plan 7, from a frame-for-frame comparison against the live game.
   //
-  // Jumping in place sidesteps it: the player never leaves the neighbourhood of spawn
-  // (x≈32), doll@15 patrols from x=240 and covers at most 96px in 120 frames, so they
-  // never meet, while the vertical motion still drives the Y camera through exactly
-  // the cases the unit tests above exercise in isolation — clamped-at-rest, lerping
-  // while the target moves, and snapping once it's close — against the real update().
-  it('matches frame by frame over a jump-in-place script', () => {
+  // That comparison drove a jump-in-place script through both sides and asserted the two
+  // cameras were equal every frame. The camera is pure math over the player's position,
+  // so with the player on an Arcade body the comparison is a comparison of player
+  // physics wearing a camera's clothes, and it retires with the rest of them.
+  //
+  // Two things learned while retiring it, both worth keeping:
+  //
+  //   - The script it used could not show what it claimed. The camera's Y target is
+  //     `clamp(p.y - VIEW_H/2, 0, lvl.height*TILE - VIEW_H)`, and in level 1 that upper
+  //     clamp is 133.33 while a jump from the base ground only lifts the player to
+  //     y≈280 — a raw target of ~146, still over the clamp. So the Y camera sat pinned
+  //     at 133.33 for every frame of that jump, on BOTH sides, and the test's own sanity
+  //     check ("the Y camera is not just sitting still") was satisfied by the opening
+  //     lerp up from the origin, not by the jump at all.
+  //   - Where the Y camera does move is up on the high platforms, which is where this
+  //     replacement stands: [58,14,4] — columns 58-61, row 14, top at 224 — leaves the
+  //     player at y=200 and a raw target of ~67, well inside the clamps.
+  //
+  // What remains is the port against its own arithmetic, through the real loop rather
+  // than by poking `player.x` and calling `stepCamera` (the describe above). `testMove`
+  // holds the player up and the jump is stepPlayer's; neither is asserted here, only
+  // that the camera goes where the player is.
+  it('tracks the player up and back down, without overshooting its target', () => {
     const FRAMES = 120;
-    const script = (f: number) => ({ left: false, right: false, jump: f >= 5 && f < 20, fire: false });
-    const live = driveLiveGame({
-      level: 0, difficulty: 'normal', character: 'gigi', frames: FRAMES, input: script,
-    });
-
+    const PLATFORM_TILE = 59;
     const world = createWorld(0, 'normal');
-    const port: Array<{ x: number; y: number }> = [];
-    for (let i = 0; i < FRAMES; i++) {
-      stepWorld(world, held(script(i)));
-      port.push({ x: world.camera.x, y: world.camera.y });
+    // No enemies: the camera has no opinion about them, and a dino patrolling the
+    // question block at [55,15] two rows below is not worth the coupling.
+    world.pending.length = 0;
+    world.enemies.length = 0;
+    world.player.x = PLATFORM_TILE * TILE;
+    world.player.y = findGroundY(world.map, PLATFORM_TILE) - world.player.h;
+    world.player.onGround = true;
+
+    const targets: number[] = [];
+    for (let f = 0; f < FRAMES; f++) {
+      stepWorld(world, held({ jump: f >= 5 && f < 20, jumpPressed: f === 5 }), testMove);
+      targets.push(cameraTarget(world).y);
+      // Never outside the level, whatever the player is doing.
+      expect(world.camera.y).toBeGreaterThanOrEqual(0);
+      expect(world.camera.y).toBeLessThanOrEqual(world.level.height * TILE - VIEW_H);
     }
 
-    expect(port).toEqual(live.map((s) => s.camera));
-    // Sanity: the Y camera is not just sitting still at its rest clamp the whole
-    // time — the jump actually moved it, which is the point of this test.
-    expect(new Set(port.map((s) => s.y)).size).toBeGreaterThan(1);
+    // The jump really did move the target — up while rising, back down on landing —
+    // rather than the whole run happening against a pinned clamp.
+    expect(new Set(targets).size).toBeGreaterThan(5);
+    expect(Math.max(...targets) - Math.min(...targets)).toBeGreaterThan(20);
+    // ...and by the end the camera has caught up with it.
+    expect(Math.abs(world.camera.y - cameraTarget(world).y)).toBeLessThan(1);
+    expect(world.player.onGround).toBe(true); // landed back on the platform, as intended
   });
 });
 
@@ -154,39 +176,14 @@ describe('death freezes the whole world, not just the player', () => {
     }
   };
 
-  it('matches the live game across the death and after it', () => {
-    const FRAMES = 60; // well inside the live game's 90-frame respawn, which is out of scope
-    const live = driveLiveGame({
-      level: 0, difficulty: 'normal', character: 'gigi', frames: FRAMES,
-      input: () => ({ left: false, right: true, jump: false, fire: false }),
-      mutateMap: carveGap,
-    });
-
-    const world = createWorld(0, 'normal');
-    world.map = world.map.map((row) => row.slice());
-    carveGap(world.map);
-
-    const port = [];
-    for (let i = 0; i < FRAMES; i++) {
-      stepWorld(world, held({ right: true }));
-      const p = world.player;
-      port.push({
-        x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
-        frame: p.frame, frameTimer: p.frameTimer, animFrame: world.animFrame,
-        camera: { x: world.camera.x, y: world.camera.y },
-        enemies: world.enemies.map((e) => ({
-          type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
-          frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
-        })),
-        score: world.score,
-      });
-    }
-
-    // The script must actually kill the player, or this proves nothing.
-    expect(world.dead).toBe(true);
-    expect(port).toEqual(live);
-  });
-
+  // RETIRED with plan 7: 'matches the live game across the death and after it', which
+  // drove this same carved gap through both sides and compared player, camera, enemies
+  // and score frame for frame across the death. It is a player-physics comparison, and
+  // those are over. What it knew, kept because the test below still depends on half of
+  // it: the live game's 90-frame respawn is what bounds the 60-frame window (past that,
+  // the level rebuilds and the comparison is about something else), and the live camera
+  // and enemies stop on the death frame itself, not the one after — index.html:1348's
+  // `return` is above the whole playing branch.
   it('stops the camera and the enemies on the death frame, not one frame later', () => {
     const world = createWorld(0, 'normal');
     world.map = world.map.map((row) => row.slice());
@@ -196,7 +193,7 @@ describe('death freezes the whole world, not just the player', () => {
     const after: Array<{ cam: number; enemyX: number[]; frame: number; frameTimer: number }> = [];
     const animFrameAfter: number[] = [];
     for (let i = 0; i < 60; i++) {
-      stepWorld(world, held({ right: true }));
+      stepWorld(world, held({ right: true }), testMove);
       if (world.dead) {
         if (frozenAt < 0) frozenAt = i;
         after.push({
@@ -339,7 +336,7 @@ describe('winning freezes the whole world, same as dying does', () => {
     world.player.vx = 0;
     world.player.vy = 0;
 
-    stepWorld(world, held({})); // the win itself
+    stepWorld(world, held({}), testMove); // the win itself
     expect(world.won).toBe(true);
     expect(world.stateTimer).toBe(200);
 
@@ -350,7 +347,10 @@ describe('winning freezes the whole world, same as dying does', () => {
     };
     const animFrames: number[] = [world.animFrame];
     for (let i = 0; i < 20; i++) {
-      stepWorld(world, held({ right: true, jump: i % 2 === 0 })); // input that would move a live world
+      // Input that would move a live world — and, with a mover injected, genuinely
+      // would: without one the player cannot move at all and "nothing moved" is a
+      // claim about nothing.
+      stepWorld(world, held({ right: true, jump: i % 2 === 0 }), testMove);
       animFrames.push(world.animFrame);
     }
 
@@ -369,47 +369,39 @@ describe('winning freezes the whole world, same as dying does', () => {
   });
 });
 
-describe('the rescue vs. the live game', () => {
+describe('walking into the rescue', () => {
   // The rescue sits 113 tiles from spawn, across four gaps and past six ground
   // enemies (doll, doll, car, bat, dino, doll) before ever reaching the bouncer and
   // the rest of the level — briefly tried as a real "hold right, jump periodically"
   // script (enemies suppressed) and it died in a pit around frame 649, x=617,
   // nowhere near tile 115. Choreographing a script that reliably clears all four
-  // gaps is exactly the kind of jump-timing problem out of scope here (see
-  // inputScript.ts's own derived-timing helpers for how much machinery clearing even
-  // ONE gap already takes) — so this tests the win condition directly (the
-  // `checkRescue` describe block above) instead of via a script that walks there.
+  // gaps is exactly the kind of jump-timing problem out of scope here — the retired
+  // trace suite needed a derived, searched-for jump frame to clear even ONE gap — so
+  // this tests the win condition directly (the `checkRescue` describe block above)
+  // instead of via a script that walks there.
   //
-  // A short trace IS practical, though: teleporting the player straight to the
-  // rescue on both sides needs no choreography at all, only a couple of frames of
-  // "hold right" to walk the last few pixels into the box, with enemies suppressed
-  // (irrelevant to what this checks) on both sides. `beforeRun`/`onFrame`
-  // (tests/helpers/liveGame.ts, added for this) mirror `mutateMap`'s own pattern:
-  // `getPlayer()` returns the live script's actual `player` object, so mutating it
-  // moves the real thing, and `getGameState()` reads the live `gameState` string
-  // directly so the frame the live game itself flips to 'levelcomplete' can be
-  // compared against `world.won` on the port's side.
-  it('wins on the same frame as the live game when teleported to the rescue and walked in', () => {
+  // A short trace WAS practical and this used to be one: teleport the player straight
+  // to the rescue on both sides, hold right for the last few pixels, and assert the two
+  // win on the same frame with the same score. CONVERTED with plan 7 — the frame the
+  // player arrives is now Arcade's answer rather than the live sweep's, so only the
+  // port's own side of it survives. The live half is recorded rather than run: measured
+  // on the day it was retired, the original flips `gameState` to 'levelcomplete' on
+  // frame 3 of this script, scores 500 doing it, and ends the tenth frame at x=1826.
+  // `driveLiveGame`'s `beforeRun`/`getGameState` will say so again if it is ever worth
+  // re-asking (tests/helpers/liveGame.ts).
+  //
+  // Worth knowing WHY that number is not asserted, since it currently agrees to the
+  // pixel: this stretch is open flat ground, where the live sweep never separates
+  // anything and x is plain `x += vx`. So the agreement is about the acceleration ramp
+  // — hand-written, unchanged, shared — and says nothing whatever about Arcade, which is
+  // not what runs here. Asserting it would be asserting `testMove`.
+  it('wins, and scores 500 exactly once, when walked into the rescue box', () => {
     const FRAMES = 10;
     const rX = 115 * TILE;
     const rY = 344; // findGroundY(map,115) - dodo's rDH(24); pinned literally here as
     // an independent check on the derivation the checkRescue tests above already do.
     const startX = rX - 20; // a few pixels short, so "hold right" walks it in rather
     // than starting already inside the box.
-
-    let liveWinFrame = -1;
-    const live = driveLiveGame({
-      level: 0, difficulty: 'normal', character: 'gigi', frames: FRAMES,
-      input: () => ({ left: false, right: true, jump: false, fire: false }),
-      suppressEnemies: true,
-      beforeRun: (d) => {
-        const p = d.getPlayer();
-        p.x = startX; p.y = rY; p.vx = 0; p.vy = 0; p.onGround = true;
-      },
-      onFrame: (d, f) => {
-        if (liveWinFrame < 0 && d.getGameState() === 'levelcomplete') liveWinFrame = f;
-      },
-    });
 
     const world = createWorld(0, 'normal', 'gigi');
     world.pending.length = 0;
@@ -421,20 +413,23 @@ describe('the rescue vs. the live game', () => {
     world.player.onGround = true;
 
     let portWinFrame = -1;
+    const scores: number[] = [];
     for (let f = 0; f < FRAMES; f++) {
-      stepWorld(world, held({ right: true }));
+      stepWorld(world, held({ right: true }), testMove);
       if (portWinFrame < 0 && world.won) portWinFrame = f;
+      scores.push(world.score);
     }
 
     expect(portWinFrame).toBeGreaterThanOrEqual(0); // it must actually win, or this proves nothing
-    expect(portWinFrame).toBe(liveWinFrame);
-    expect(world.player.x).toBe(live[FRAMES - 1].x);
-    expect(world.player.y).toBe(live[FRAMES - 1].y);
+    // Walked in rather than starting inside the box: the first frames are a walk, not a
+    // win. (`checkRescue` above covers the box arithmetic; this covers reaching it.)
+    expect(portWinFrame).toBeGreaterThan(0);
     // The rescue is a scoring event too (index.html:1631's `score+=Math.round(500*
     // dc.scoreMultiplier)`) — 500 at normal's 1.0 multiplier, awarded on the win frame
     // and exactly once, since `won` freezes the world from the next frame on.
-    expect(world.score).toBe(live[FRAMES - 1].score);
     expect(world.score).toBe(500);
+    expect(scores.filter((s) => s === 0)).toHaveLength(portWinFrame);
+    expect(new Set(scores)).toEqual(new Set([0, 500]));
   });
 });
 
