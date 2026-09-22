@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import { BASE_H, BASE_W } from '../config/constants';
 import { getDifficulty } from '../config/difficulty';
 import { TDiff, TStr } from '../config/i18n';
+import { startBGM, stopBGM } from '../audio/bgm';
+import { sfxWin } from '../audio/sfx';
+import { BGM_WIN } from '../data/bgmThemes';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { characterName, siblingOf } from '../game/menu';
 import type { Character } from '../game/player';
@@ -131,6 +134,16 @@ export class WinScene extends Phaser.Scene {
     registerWinHeartTexture(this);
 
     this.cameras.main.setBackgroundColor(BACKGROUND);
+    // index.html:1350's `sfxWin();startBGM(BGM_WIN);`, in that order — the fanfare fires
+    // over the first moments of the theme rather than before it. Both sit on the live line
+    // that enters this state, which is the same moment SliceScene starts this scene.
+    //
+    // Note there is a SECOND sfxWin two hundred frames earlier: the rescue itself
+    // (index.html:1631, the `win` cue) plays one and then stops the music. So finishing
+    // the last level really does sound the fanfare twice, and the second one is the one
+    // that arrives with the music.
+    sfxWin();
+    startBGM(BGM_WIN);
     this.clock = createFrameClock();
     this.keys = bindMenuKeys(this);
 
@@ -190,6 +203,7 @@ export class WinScene extends Phaser.Scene {
 
     if (t >= AUTO_EXIT || justDown(this.keys.confirm)) {
       this.leaving = true;
+      stopBGM(); // index.html:1352, the same exit GameOverScene takes
       this.scene.start(this.next);
     }
   }

@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { startBGM } from '../audio/bgm';
+import { ensureAudio } from '../audio/context';
 import { BASE_W } from '../config/constants';
 import { DIFFICULTY_CONFIG, DIFF_KEYS, setDifficulty } from '../config/difficulty';
 import { TDiff, TStr } from '../config/i18n';
@@ -6,6 +8,7 @@ import { clampIndex, difficultyAt, difficultyLines } from '../game/menu';
 import { getSkinIndex } from '../game/run';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
 import { menuPlayerTextureKey, MENU_PREVIEW_SCALE, registerMenuTextures } from '../gfx/textures';
+import { BGM_TITLE } from '../data/bgmThemes';
 import { bindMenuKeys, type MenuKeys, pressedAny } from '../input/menuKeys';
 import type { CharacterData } from './CharacterScene';
 import { CHARACTER_SCENE_KEY, DIFFICULTY_SCENE_KEY } from './keys';
@@ -158,8 +161,30 @@ export class DifficultyScene extends Phaser.Scene {
    * index.html:1334. The choice is committed here, into the same module-level run state
    * the live game keeps in `selectedDifficulty` — `SliceScene` reads it back out when it
    * builds the world, and hands it to the HUD for its label.
+   *
+   * ## This is also where the game stops being silent
+   *
+   * A browser will not start an AudioContext outside a user gesture, so every sound in
+   * the port — the jump, the coin, all six level themes — is waiting on one keypress.
+   * The live game spends it on the title screen's confirm (index.html:1313's
+   * `ensureAudio();startBGM(BGM_TITLE);`); this port has no title screen yet, so the
+   * first confirm a child can possibly make is this one, and that is what makes it the
+   * unlock point. When the title screen lands it takes these two lines with it.
+   *
+   * Both of them, in this order, and they are the live pair: the context is opened, and
+   * the menu theme starts over it. BGM_TITLE is what the live game plays across mode
+   * select, the difficulty screen and the character screen alike — so the music that
+   * begins here is heard on the screen after this one, and is replaced by the level's own
+   * theme when the level starts (SliceScene, index.html:1209). There is no equivalent of
+   * the live intro's BGM_INTRO (:1344): the intro is not ported, and starting a theme for
+   * a screen that does not exist would only be replaced a moment later.
+   *
+   * Note what is NOT here: a confirm sound. index.html:1334 is silent, unlike the mode
+   * select above it (:1323's `ensureAudio();sfxPickup();`). Kept silent to match.
    */
   private confirm(): void {
+    ensureAudio();
+    startBGM(BGM_TITLE);
     setDifficulty(difficultyAt(this.index));
     this.scene.start(CHARACTER_SCENE_KEY, { back: DIFFICULTY_SCENE_KEY } satisfies CharacterData);
   }

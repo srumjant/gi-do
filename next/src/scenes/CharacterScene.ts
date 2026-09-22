@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { sfxPickup } from '../audio/sfx';
 import { BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
 import type { Character } from '../game/player';
@@ -167,7 +168,17 @@ export class CharacterScene extends Phaser.Scene {
     if (pressedAny(this.keys.up, this.keys.altUp)) this.cycleSkin(-1);
     if (pressedAny(this.keys.down, this.keys.altDown)) this.cycleSkin(1);
     if (pressedAny(this.keys.confirm, this.keys.enter)) this.confirm();
-    if (justDown(this.keys.back)) this.scene.start(this.back);
+    if (justDown(this.keys.back)) this.goBack();
+  }
+
+  /**
+   * index.html:1269 — `handleBack` plays `sfxPickup()` on its way to the previous screen.
+   * This is the port's only back navigation (the difficulty screen is the root and has
+   * nowhere further to go), so it is the one place that live line is reachable from.
+   */
+  private goBack(): void {
+    sfxPickup();
+    this.scene.start(this.back);
   }
 
   private select(index: number): void {

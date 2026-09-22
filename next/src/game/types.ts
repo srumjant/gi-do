@@ -329,6 +329,46 @@ export interface Arrow {
   isChicken: boolean;
 }
 
+/**
+ * One thing the world just did that makes a noise, pushed at exactly the point the live
+ * game calls the matching `sfx*()` — see `World.sounds` below for why it is a value in a
+ * list rather than a call.
+ *
+ * Every name is the live sound it stands for, except the last two, which are music rather
+ * than an effect. They are here because the live source puts them on the same line as the
+ * effect: the rescue is `sfxWin();stopBGM();` (index.html:1631) and a death is
+ * `sfxHurt();stopBGM();` (:1647), and `initLevel` — which a respawn IS — ends on
+ * `startBGM(idx)` (:1209). Splitting them out would mean a second mechanism watching for
+ * the same three moments.
+ *
+ *   - `cape` is index.html:1423 and :1646, a bare `playTone(400,.15,'sawtooth',.12,200)`
+ *     rather than a named effect, in both the pit save and the contact hit a cape absorbs.
+ *     Identical arguments in both places, so one cue covers both.
+ *   - `cat-arrive` (:1454) and `cat-vanish` (:1494) are bare `playTone` calls too. They are
+ *     easy to miss when grepping for `sfx`, and the port went without them until they were
+ *     found; see audio/sfx.ts.
+ *   - `music-level` is the level's own theme, restarted by a respawn. Which theme that is
+ *     is the SCENE's business — a World does not know its own level index — so the cue
+ *     carries no argument and the scene supplies it.
+ */
+export type SoundCue =
+  | 'jump'
+  | 'fart'
+  | 'shoot'
+  | 'cluck'
+  | 'block'
+  | 'pickup'
+  | 'coin'
+  | 'stomp'
+  | 'boing'
+  | 'hurt'
+  | 'win'
+  | 'cape'
+  | 'cat-arrive'
+  | 'cat-vanish'
+  | 'music-level'
+  | 'music-stop';
+
 export interface World {
   level: Level;
   map: TileMap;
@@ -476,6 +516,27 @@ export interface World {
    * in the game that can stop the world.
    */
   powerupPopup: PowerupPopup | null;
+  /**
+   * What this step sounded like: the cues the simulation raised, in the order it raised
+   * them, for whoever is holding a pair of speakers to play.
+   *
+   * THE SOUND IS NOT PLAYED HERE, and that is the point. `ensureAudio()` touches `window`,
+   * which is an unresolved identifier in the node environment the whole test suite runs
+   * in, so a single `import` of the audio stack anywhere under src/game/ would take the
+   * simulation off the headless test bench it was built to sit on. A cue is a value; a
+   * value costs src/game/ nothing and can be asserted on. Where index.html has an
+   * untestable side effect (`sfxStomp()` deep inside a loop, reachable only by a browser
+   * with a speaker), this port has `expect(world.sounds).toContain('stomp')`.
+   *
+   * `stepWorld` EMPTIES this at the top of every step, so it only ever holds the cues of
+   * the step just taken and a driver that never reads it cannot leak. The scene reads and
+   * clears it after each step — inside the fixed-step loop, not after it, so a rendered
+   * frame that takes three steps plays all three steps' sounds rather than only the last
+   * one's. A frozen step (dead, won, or behind a power-up announcement) is still a step
+   * and is still emptied, which is what stops a death banking up cues that would fire in a
+   * burst when play resumes.
+   */
+  sounds: SoundCue[];
 }
 
 export interface PendingEnemy {
