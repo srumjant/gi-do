@@ -269,10 +269,10 @@ Each is a candidate for the separate re-tune pass afterwards.
 
 | # | Behaviour | Where |
 |---|---|---|
-| 1 | Boss has no gravity and no tile collision; `boss.y` is never integrated | `:1550-1617` |
+| 1 | Boss has no gravity and no tile collision; `boss.y` is never integrated | `:1559-1626` |
 | 2 | Cat phases through all geometry; `baseY` re-pinned to the player's feet every frame | `:1443-1492` |
 | 3 | Stars from `?` blocks rise then freeze in mid-air forever (`vy=-2; vy+=.1; if(vy>0)vy=0`) | `:1511` |
-| 4 | Boss "fireball spread" is two straight lines, not an arc | `:1561-1563` |
+| 4 | Boss "fireball spread" is two straight lines, not an arc | `:1570-1571` |
 | 5 | Big-head applies a second, different hitbox for the enemy check only | `:1533-1537` |
 | 6 | Fart aura adds 120 frames of stun *every frame* of overlap, stacking unboundedly | `:1423-1435` |
 | 7 | Enemies have no horizontal tile collision — one leading-edge probe, can clip | `:1518-1530` |
