@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { isCarriedHold } from './edges';
 
 /**
  * The keys a menu reads, as opposed to the keys the game reads.
@@ -54,14 +55,22 @@ export function bindMenuKeys(scene: Phaser.Scene): MenuKeys {
  * auto-repeat the operating system sends. Phaser's `Key` applies the same guard before
  * it arms `JustDown`, so the two agree without either having to know about the other.
  *
- * `JustDown` is consumed by reading it, which is why nothing below reads a key twice.
- * (`createKeyboardInput` avoids it for the opposite reason: the game scene runs a
- * variable number of fixed steps per rendered frame, so a consumed-on-read edge could
- * land on the wrong one. A menu runs exactly once per rendered frame and has no such
- * problem.)
+ * With one exception, which is what `isCarriedHold` is doing here: Phaser's guard is per
+ * SCENE, because the Key is, while the live game's is per game. A key still held when a
+ * screen hands over to the next one is new to the next screen's Keys, and the first
+ * auto-repeat then arms `JustDown` on a press nobody made — a held Space on the
+ * difficulty screen confirmed the character screen half a second later, all by itself.
+ *
+ * `JustDown` is consumed by reading it, so it is read first and judged afterwards; a key
+ * left unread stays armed. (`createKeyboardInput` avoids `JustDown` entirely, for the
+ * opposite reason: the game scene runs a variable number of fixed steps per rendered
+ * frame, so a consumed-on-read edge could land on the wrong one. A menu runs exactly once
+ * per rendered frame and has no such problem.)
  */
 export function justDown(key: Phaser.Input.Keyboard.Key | undefined): boolean {
-  return key !== undefined && Phaser.Input.Keyboard.JustDown(key);
+  if (key === undefined) return false;
+  const pressed = Phaser.Input.Keyboard.JustDown(key);
+  return pressed && !isCarriedHold(key);
 }
 
 /** Either spelling of a direction, or of confirm. */
