@@ -4,7 +4,7 @@ import { LEVELS, TILE_QUESTION, TILE_RAINBOW, type Level, type TileMap } from '.
 import { BOW_S, CAT_S, SUPER_S } from '../data/sprites';
 import type { InputState } from '../input/actions';
 import { chickenify, spawnEnemy, stepEnemy } from './enemy';
-import { createPlayer, stepPlayer, type Character } from './player';
+import { createPlayer, stepPlayer, type Character, type PlayerMove } from './player';
 import { random } from './random';
 import { getRescueSprites } from './run';
 import { findGroundY, getTile, isSolid, rectOverlap } from './tiles';
@@ -188,8 +188,13 @@ export function respawnLevel(world: World): void {
  * playing branch), and the camera lerps LAST (index.html:1634, near the bottom). Doing
  * the camera first would shift every enemy's spawn frame by one and the enemy traces
  * would drift apart for a reason that looks nothing like the cause.
+ *
+ * `move` is what actually moves the player and separates it out of the tiles — Arcade,
+ * in the browser (physics/player.ts). It is passed straight through to `stepPlayer` and
+ * this function has no other opinion about it; see PlayerMove in player.ts for why it is
+ * injected rather than imported, and why it is optional.
  */
-export function stepWorld(world: World, input: InputState): void {
+export function stepWorld(world: World, input: InputState, move?: PlayerMove): void {
   // index.html:1275 — the very first line of update(), before every other state check
   // (including the live game's own dead-state branch), so it advances even while dead,
   // on the title screen, everywhere. Reproduced by incrementing unconditionally, first,
@@ -260,7 +265,7 @@ export function stepWorld(world: World, input: InputState): void {
   // this reads stepPlayer's answer rather than `world.dead`: a save takes the same
   // `return` and leaves the player alive, so `world.dead` would wave the rest of the
   // frame through and the camera would lerp one extra time on the rescue frame.
-  const playedOn = stepPlayer(world, input);
+  const playedOn = stepPlayer(world, input, move);
 
   // A CONTACT death is different, and this `if` is checked only ONCE, before
   // stepEnemies runs, deliberately: the live equivalent (index.html:1547's
