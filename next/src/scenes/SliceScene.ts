@@ -36,6 +36,7 @@ import {
 } from '../gfx/textures';
 import type { InputState } from '../input/actions';
 import { createKeyboardInput, type KeyboardInput } from '../input/keyboard';
+import { createCollisionLayer, syncCollisionLayer } from '../physics/tiles';
 
 /**
  * Half the difference between the canvas and the zoomed view. See setScroll below —
@@ -150,6 +151,11 @@ export class SliceScene extends Phaser.Scene {
   private rainbowBlocks: BlockView[] = [];
   private rainbowGraphics!: Phaser.GameObjects.Graphics;
   private bumpedGraphics!: Phaser.GameObjects.Graphics;
+  /**
+   * The same tiles again, as geometry Arcade can separate against rather than as a
+   * picture — invisible, and drawing nothing. See src/physics/tiles.ts.
+   */
+  private collisionLayer!: Phaser.Tilemaps.TilemapLayer;
   private hillsGraphics: Phaser.GameObjects.Graphics | undefined;
   private parallaxLayers: readonly ParallaxLayer[] = [];
   private clouds: CloudView[] = [];
@@ -175,6 +181,11 @@ export class SliceScene extends Phaser.Scene {
     // Every tile layer sits at depth 0, where creation order alone decides what covers
     // what, and a bumped block's brick has to cover the block that was drawn there.
     this.bumpedGraphics = this.add.graphics();
+    // Built from the very same `world.map` those three just drew, and kept in step with
+    // it by `syncCollisionLayer` in update() below. Nothing collides against it yet —
+    // the player and the enemies move themselves, for now — but it is what they will
+    // stand on once they are on Arcade bodies.
+    this.collisionLayer = createCollisionLayer(this, this.world);
 
     this.glowGraphics = this.add.graphics().setDepth(DEPTH_PICKUP_GLOW);
     this.arrowTrailGraphics = this.add.graphics().setDepth(DEPTH_ARROW_TRAIL);
@@ -314,6 +325,11 @@ export class SliceScene extends Phaser.Scene {
       stepWorld(this.world, this.readInput());
       this.accumulator -= STEP_MS;
     }
+    // Before the drawing, not with it: a bumped block and a respawn both rewrite
+    // `world.map`, and the collision layer is a copy of that map rather than a view of
+    // it. This belongs to the simulation half of the frame, which is why it sits here
+    // and not among the sprite syncing below.
+    syncCollisionLayer(this.collisionLayer, this.world);
     this.syncSprites();
   }
 
