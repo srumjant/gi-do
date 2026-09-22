@@ -40,6 +40,7 @@ import { createKeyboardInput, type KeyboardInput } from '../input/keyboard';
 import { createPlayerMove } from '../physics/player';
 import { createCollisionLayer, syncCollisionLayer } from '../physics/tiles';
 import { HUD_SCENE_KEY, type HudData } from './HudScene';
+import { POWERUP_POPUP_SCENE_KEY, type PowerupPopupData } from './PowerupPopupScene';
 
 export const SLICE_SCENE_KEY = 'Slice';
 
@@ -246,6 +247,14 @@ export class SliceScene extends Phaser.Scene {
       levelIndex,
       difficulty,
     } satisfies HudData);
+
+    // And the power-up announcement, in front of even the HUD — see main.ts's scene list
+    // and PowerupPopupScene itself. Launched here rather than when a rainbow block is hit
+    // because it is the world it watches, not an event it is sent: bumping the block sets
+    // `world.powerupPopup` deep inside the simulation, which knows nothing of scenes.
+    this.scene.launch(POWERUP_POPUP_SCENE_KEY, {
+      world: this.world,
+    } satisfies PowerupPopupData);
   }
 
   /**

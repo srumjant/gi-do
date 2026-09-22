@@ -4,6 +4,7 @@ import { BASE_W, BASE_H, STEP_HZ } from './config/constants';
 import { CharacterScene } from './scenes/CharacterScene';
 import { DifficultyScene } from './scenes/DifficultyScene';
 import { HudScene } from './scenes/HudScene';
+import { PowerupPopupScene } from './scenes/PowerupPopupScene';
 import { SliceScene } from './scenes/SliceScene';
 
 const game = new Phaser.Game({
@@ -58,11 +59,15 @@ const game = new Phaser.Game({
    * being first.
    *
    * Phaser also RENDERS the scenes in this same order, which is why the HUD is listed
-   * last: that is what puts it in front of the game rather than behind it. The two menu
-   * screens are stopped long before either of those runs, so where they sit only
+   * after the level: that is what puts it in front of the game rather than behind it. The
+   * two menu screens are stopped long before either of those runs, so where they sit only
    * decides which one boots.
+   *
+   * The power-up announcement comes last of all, and that is the live draw order too:
+   * index.html:3455 is `update();draw();drawPowerupPopup();`, and the HUD is drawn inside
+   * `draw()` (:1854-1867). So its dim falls over the hearts and the score as well.
    */
-  scene: [DifficultyScene, CharacterScene, SliceScene, HudScene],
+  scene: [DifficultyScene, CharacterScene, SliceScene, HudScene, PowerupPopupScene],
 });
 
 /**
