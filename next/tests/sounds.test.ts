@@ -398,6 +398,7 @@ describe('every cue reaches the audio stack', () => {
   const EFFECTS: SoundCue[] = [
     'jump', 'fart', 'shoot', 'cluck', 'block', 'pickup', 'coin',
     'stomp', 'boing', 'hurt', 'win', 'cape', 'cat-arrive', 'cat-vanish',
+    'boss-fire', 'boss-charge', 'boss-roar',
   ];
 
   // A cue the switch does not answer is silence with no error anywhere — exactly the

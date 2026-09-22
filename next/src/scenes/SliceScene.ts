@@ -3,7 +3,7 @@ import { startBGM } from '../audio/bgm';
 import { playSounds } from '../audio/cues';
 import { BASE_H, BASE_W, STEP_MS, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
 import { getDifficulty, type DifficultyKey } from '../config/difficulty';
-import { TStr } from '../config/i18n';
+import { T, TStr } from '../config/i18n';
 import { PARALLAX, type ParallaxLayer } from '../data/parallax';
 import type { SpriteData } from '../data/sprites';
 import type { Character, PlayerMove } from '../game/player';
@@ -17,6 +17,7 @@ import {
 } from '../game/run';
 import { createWorld, stepWorld } from '../game/world';
 import type { EnemyState, World } from '../game/types';
+import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
 import { cloudPosition, cloudScale, drawRidges, drawSky } from '../gfx/parallax';
 import {
   type BlockView,
@@ -29,6 +30,8 @@ import {
   ARROW_TEXTURE,
   BIG_HEAD_SCALE,
   bigHeadRows,
+  bossTextureKey,
+  type BossPose,
   BOW_TEXTURE,
   CAPE_TEXTURE,
   CAT_SCRATCH_TEXTURE,
@@ -36,6 +39,7 @@ import {
   CHICKEN_ARROW_TEXTURE,
   cloudTextureKey,
   enemyTextureKey,
+  FIREBALL_TEXTURE,
   playerBodyTextureKey,
   playerHeadTextureKey,
   PLAYER_SCALE,
@@ -118,11 +122,22 @@ const DEPTH_PICKUP_GLOW = 10;
 const DEPTH_PICKUP = 11;
 const DEPTH_CAT = 12;
 const DEPTH_ENEMY = 13;
-const DEPTH_ARROW = 14;
+/** The boss, after every ordinary enemy (index.html:1768) and in front of all of them. */
+const DEPTH_BOSS = 14;
+/**
+ * The boss's own health bar and taunt, which the live source draws after its sprite and
+ * — unlike the glow and the scar above them — outside the hurt flash's `globalAlpha`
+ * (index.html:1807-1819). A band of their own so they cannot end up behind the 72px
+ * sprite they are labelling.
+ */
+const DEPTH_BOSS_BAR = 15;
+/** Fireballs (index.html:1827-1828), between the boss and the player's own arrows. */
+const DEPTH_ENEMY_PROJECTILE = 16;
+const DEPTH_ARROW = 17;
 /** The trail is drawn after its arrow (index.html:1832-1833), so it sits on top. */
-const DEPTH_ARROW_TRAIL = 15;
-const DEPTH_CAPE = 16;
-const DEPTH_PLAYER = 17;
+const DEPTH_ARROW_TRAIL = 18;
+const DEPTH_CAPE = 19;
+const DEPTH_PLAYER = 20;
 
 /** The four pickup glows (index.html:1699, 1704, 1709-1710, 1717), as colour + alpha. */
 const STAR_GLOW = { color: 0xffdd00, alpha: 0.2 };
@@ -134,6 +149,27 @@ const CAT_GLOW = { color: 0x6464b4, alpha: 0.2 };
 /** The two arrow trails (index.html:1832-1833). */
 const CHICKEN_TRAIL = { color: 0xffff64, alpha: 0.3 };
 const ARROW_TRAIL = { color: 0xffc864, alpha: 0.4 };
+/** A fireball's own trail (index.html:1828), 4x4 behind the direction of travel. */
+const FIREBALL_TRAIL = { color: 0xff6400, alpha: 0.3 };
+
+/**
+ * The angry glow behind the boss's eyes once it is down to half health
+ * (index.html:1795-1800). The alpha is not this constant — it breathes on a sine, and
+ * this is only the colour — so it is spelled out at the draw site rather than carried
+ * here as a Tint like the ones above.
+ */
+const BOSS_EYE_COLOR = 0xff3200;
+/** The scar it carries below three-quarter health (index.html:1804). */
+const BOSS_SCAR = { color: 0x642814, alpha: 0.4 };
+/** The in-world bar's height (index.html:1809). Its colours are gfx/bossBar.ts's. */
+const BOSS_BAR_HEIGHT = 6;
+/** The bar sits twelve pixels above the boss's head, and does NOT wobble with it. */
+const BOSS_BAR_OFFSET_Y = 12;
+/** index.html:1818's `bold 8px monospace` in white, centred over the boss. */
+const BOSS_TAUNT_FONT = {
+  fontFamily: 'monospace', fontSize: '8px', fontStyle: 'bold', color: '#ffffff',
+};
+const BOSS_TAUNT_OFFSET_Y = 18;
 
 /**
  * index.html:1726's `bold 7px monospace` in `#aabbcc`. Origin (0, 1) rather than
@@ -178,6 +214,17 @@ export class SliceScene extends Phaser.Scene {
   private readonly bowImages: Phaser.GameObjects.Image[] = [];
   private readonly superImages: Phaser.GameObjects.Image[] = [];
   private readonly arrowImages: Phaser.GameObjects.Image[] = [];
+  private readonly fireballImages: Phaser.GameObjects.Image[] = [];
+  /**
+   * The boss: one Image for the sprite, and three overlays the live source draws around
+   * it. Two Graphics rather than one because the hurt flash covers the glow and the scar
+   * but NOT the health bar — the live `ctx.globalAlpha=1` at index.html:1807 lands
+   * between them.
+   */
+  private bossImage!: Phaser.GameObjects.Image;
+  private bossFxGraphics!: Phaser.GameObjects.Graphics;
+  private bossBarGraphics!: Phaser.GameObjects.Graphics;
+  private bossTaunt!: Phaser.GameObjects.Text;
   /** At most one of each exists at a time, so none of these needs a pool. */
   private catPickupImage!: Phaser.GameObjects.Image;
   private catImage!: Phaser.GameObjects.Image;
@@ -266,6 +313,19 @@ export class SliceScene extends Phaser.Scene {
 
     this.glowGraphics = this.add.graphics().setDepth(DEPTH_PICKUP_GLOW);
     this.arrowTrailGraphics = this.add.graphics().setDepth(DEPTH_ARROW_TRAIL);
+
+    // Built on every level, not only the last one. `world.boss` is null on the other five
+    // and `syncBoss` simply hides all four objects — which costs one `setVisible(false)`
+    // a frame and removes the whole class of bug where a per-level conditional build
+    // leaves the scene without something it later reaches for.
+    this.bossImage = this.hiddenImage(bossTextureKey('idle'), DEPTH_BOSS);
+    this.bossFxGraphics = this.add.graphics().setDepth(DEPTH_BOSS);
+    this.bossBarGraphics = this.add.graphics().setDepth(DEPTH_BOSS_BAR);
+    this.bossTaunt = this.add
+      .text(0, 0, '', BOSS_TAUNT_FONT)
+      .setOrigin(0.5, 1)
+      .setDepth(DEPTH_BOSS_BAR)
+      .setVisible(false);
 
     this.catPickupImage = this.hiddenImage(CAT_TEXTURE, DEPTH_PICKUP);
     this.catImage = this.hiddenImage(CAT_TEXTURE, DEPTH_CAT);
@@ -367,6 +427,7 @@ export class SliceScene extends Phaser.Scene {
     this.bowImages.length = 0;
     this.superImages.length = 0;
     this.arrowImages.length = 0;
+    this.fireballImages.length = 0;
     this.questionBlocks = [];
     this.rainbowBlocks = [];
     this.clouds = [];
@@ -606,6 +667,8 @@ export class SliceScene extends Phaser.Scene {
 
     this.syncPickups();
     this.syncCat();
+    this.syncBoss();
+    this.syncEnemyProjectiles();
     this.syncArrows();
     this.syncPlayer();
 
@@ -757,6 +820,172 @@ export class SliceScene extends Phaser.Scene {
     if (cat.scratchTarget && scratching) {
       this.catScratchImage.setPosition(cat.scratchTarget.x - 5, cat.scratchTarget.y - 5);
     }
+  }
+
+  /**
+   * The boss (index.html:1768-1825): one sprite, an angry glow, a scar, a health bar over
+   * its head and a taunt over that.
+   *
+   * WHICH POSE IS A THREE-WAY PICK ON STATE, in the live source's own order, and the
+   * order is what makes it readable: roaring beats charging, charging beats walking, and
+   * anything else is the idle. Each pose also has its OWN WOBBLE — a sine of the free
+   * clock whose frequency climbs as the boss gets more agitated (0.08 idle, 0.12 walking,
+   * 0.25 roaring, 0.4 charging) — so the boss visibly winds up before it commits, which
+   * is the only warning a child gets.
+   *
+   * The walking branch is the odd one. It fires on `|boss.vx| > 0.1 OR chargeTimer > 120`,
+   * i.e. also while the boss is standing perfectly still in the last second before a
+   * charge, and only THEN does `boss.frame` pick between the idle and the walk sprite. So
+   * the two-frame cycle the simulation has been counting all along (BossState.frameTimer)
+   * is visible in exactly one of the four states.
+   *
+   * The hurt flash is `hurtTimer % 4 < 2` at half alpha (index.html:1772) — two frames on,
+   * two frames off, a hard strobe rather than a fade — and it covers the sprite, the glow
+   * and the scar but NOT the health bar or the taunt, because the live
+   * `ctx.globalAlpha = 1` sits between them (index.html:1807).
+   *
+   * `bfl = boss.facing > 0` flips on facing RIGHT: the boss art faces left by default,
+   * the same convention the enemies use and the opposite of the player's.
+   *
+   * The live source's particles — roar shockwave rings, charge dust, and the explosion
+   * that goes on popping after the boss is dead (index.html:1780-1788, :1823) — are not
+   * here. This port has no particle system at all (see `syncPickups` above for the same
+   * note about the pickup sparkles), and adding one for the boss alone is a different
+   * task from the boss.
+   */
+  private syncBoss(): void {
+    const { boss, animFrame } = this.world;
+    const fx = this.bossFxGraphics;
+    const bar = this.bossBarGraphics;
+    fx.clear();
+    bar.clear();
+
+    if (!boss || !boss.alive) {
+      this.bossImage.setVisible(false);
+      this.bossTaunt.setVisible(false);
+      return;
+    }
+
+    const flip = boss.facing > 0;
+    const flashing = boss.hurtTimer > 0 && boss.hurtTimer % 4 < 2;
+    const alpha = flashing ? 0.5 : 1;
+
+    let pose: BossPose = 'idle';
+    let wobble = Math.sin(animFrame * 0.08) * 2;
+    if (boss.roarTimer > 0) {
+      pose = 'roar';
+      wobble = Math.sin(animFrame * 0.25) * 3;
+    } else if (boss.charging) {
+      pose = 'charge';
+      wobble = Math.sin(animFrame * 0.4) * 4;
+    } else if (Math.abs(boss.vx) > 0.1 || boss.chargeTimer > 120) {
+      pose = boss.frame === 0 ? 'idle' : 'walk';
+      wobble = Math.sin(animFrame * 0.12) * 2;
+    }
+
+    const drawY = boss.y + wobble;
+    this.bossImage
+      .setTexture(bossTextureKey(pose))
+      .setPosition(boss.x, drawY)
+      .setFlipX(flip)
+      .setAlpha(alpha)
+      .setVisible(true);
+
+    fx.setAlpha(alpha);
+    // The eyes light up at half health and grow at a quarter (index.html:1795-1800). Two
+    // overlapping circles rather than one per eye: the live code draws at .65/.55 of the
+    // width facing one way and .35/.45 the other, which is a pair of blobs that merge
+    // into a scowl rather than two separate eyes.
+    if (boss.hp <= boss.maxHp * 0.5) {
+      const intensity = 0.2 + Math.sin(animFrame * 0.15) * 0.15;
+      const radius = boss.hp <= boss.maxHp * 0.25 ? 8 : 5;
+      const eyeY = drawY + boss.h * 0.22;
+      fx.fillStyle(BOSS_EYE_COLOR, intensity);
+      fx.fillCircle(boss.x + (flip ? boss.w * 0.65 : boss.w * 0.35), eyeY, radius);
+      fx.fillCircle(boss.x + (flip ? boss.w * 0.55 : boss.w * 0.45), eyeY, radius);
+    }
+    // One short diagonal scratch, from three-quarter health onward (index.html:1803-1805).
+    // Note `<` where the eye glow above uses `<=`; it is the live asymmetry.
+    if (boss.hp < boss.maxHp * 0.75) {
+      fx.lineStyle(1, BOSS_SCAR.color, BOSS_SCAR.alpha);
+      fx.beginPath();
+      fx.moveTo(boss.x + boss.w * 0.3, drawY + boss.h * 0.5);
+      fx.lineTo(boss.x + boss.w * 0.4, drawY + boss.h * 0.6);
+      fx.strokePath();
+    }
+
+    // The bar over its head (index.html:1808-1813) — as wide as the boss itself, and
+    // positioned from `boss.y` rather than `drawY`, so it holds still while the boss
+    // wobbles underneath it. That is the live code: `hbY = boss.y - 12`, with no wobble
+    // term anywhere in it.
+    const barY = boss.y - BOSS_BAR_OFFSET_Y;
+    bar.fillStyle(BOSS_BAR_BACK, 1).fillRect(boss.x, barY, boss.w, BOSS_BAR_HEIGHT);
+    bar.fillStyle(bossBarColor(boss.hp, boss.maxHp), 1);
+    bar.fillRect(
+      boss.x + 1,
+      barY + 1,
+      (boss.w - 2) * (boss.hp / boss.maxHp),
+      BOSS_BAR_HEIGHT - 2,
+    );
+    bar.lineStyle(1, 0x000000, 1).strokeRect(boss.x, barY, boss.w, BOSS_BAR_HEIGHT);
+
+    // The taunt (index.html:1815-1819): one of three phrases, on for 100 frames out of
+    // every 180 and off for the other 80, advancing to the next phrase each cycle. Both
+    // numbers come off the same free-running clock, so it is on screen more than half the
+    // time — the boss is meant to be mouthy.
+    const showTaunt = animFrame % 180 < 100;
+    this.bossTaunt.setVisible(showTaunt);
+    if (showTaunt) {
+      const phrases = T('boss_taunt');
+      const list = Array.isArray(phrases) ? phrases : [phrases];
+      const index = Math.floor(animFrame / 180) % list.length;
+      this.bossTaunt
+        .setText(list[index])
+        .setPosition(boss.x + boss.w / 2, boss.y - BOSS_TAUNT_OFFSET_Y);
+    }
+  }
+
+  /**
+   * Fireballs (index.html:1827-1828) — the boss's today, the cannon's when that type
+   * lands, drawn by the same pool either way because the live draw code does not
+   * distinguish them.
+   *
+   * NEVER FLIPPED, unlike every other projectile in the game: the live call passes a
+   * literal `false` for the flip, so a fireball travelling left draws the same way round
+   * as one travelling right. The 4x4 trail behind it is what shows the direction instead.
+   *
+   * The flicker is a sine of `animFrame` OFFSET BY THE FIREBALL'S OWN X, exactly like the
+   * enemy wobble, so two fireballs from one volley pulse out of phase with each other
+   * rather than as a single flashing pair.
+   *
+   * The trail goes on `arrowTrailGraphics`, which `syncArrows` CLEARS — so this must run
+   * before it, and it does (see `syncSprites`). One Graphics for both kinds of trail
+   * because they are the same kind of thing drawn a few depth bands apart, and a Graphics
+   * has one depth: the fireball's smear therefore sits at the arrow trail's depth rather
+   * than at its own, which is invisible in practice (nothing is ever between them) and
+   * the alternative is a second Graphics for four pixels.
+   */
+  private syncEnemyProjectiles(): void {
+    const { enemyProjectiles, animFrame } = this.world;
+    const trails = this.arrowTrailGraphics;
+
+    for (let i = 0; i < enemyProjectiles.length; i++) {
+      const shot = enemyProjectiles[i];
+      const image = this.pooledImage(
+        this.fireballImages,
+        i,
+        FIREBALL_TEXTURE,
+        DEPTH_ENEMY_PROJECTILE,
+      );
+      const flicker = Math.sin(animFrame * 0.3 + shot.x) * 0.3;
+      image
+        .setPosition(shot.x, shot.y)
+        .setAlpha(0.8 + flicker * 0.2)
+        .setVisible(true);
+      const trailX = shot.vx > 0 ? shot.x - 4 : shot.x + 10;
+      fillRect(trails, FIREBALL_TRAIL, trailX, shot.y + 2, 4, 4);
+    }
+    hideSurplus(this.fireballImages, enemyProjectiles.length);
   }
 
   /**

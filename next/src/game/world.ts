@@ -3,12 +3,15 @@ import { DIFFICULTY_CONFIG, type DifficultyKey, type DifficultyRecord } from '..
 import { LEVELS, TILE_QUESTION, TILE_RAINBOW, type Level, type TileMap } from '../data/levels';
 import { BOW_S, CAT_S, SUPER_S } from '../data/sprites';
 import type { InputState } from '../input/actions';
+import { isFinalLevel, spawnBoss, stepBoss } from './boss';
 import { chickenify, spawnEnemy, stepEnemy, type EnemyMove } from './enemy';
-import { createPlayer, stepPlayer, type Character, type PlayerMove } from './player';
+import { createPlayer, playerHit, stepPlayer, type Character, type PlayerMove } from './player';
 import { random } from './random';
 import { getRescueSprites, type RunTotals } from './run';
 import { findGroundY, getTile, isSolid, rectOverlap } from './tiles';
-import type { Arrow, BlockState, CatState, Pickup, Star, World } from './types';
+import type {
+  Arrow, BlockState, BossState, CatState, EnemyProjectile, Pickup, Star, World,
+} from './types';
 
 /**
  * Everything `initLevel` rebuilds from scratch every time a level starts — including
@@ -24,6 +27,9 @@ interface LevelSpawnState {
   cat: CatState | null;
   stars: Star[];
   arrows: Arrow[];
+  enemyProjectiles: EnemyProjectile[];
+  boss: BossState | null;
+  bossDefeated: boolean;
   questionBlocks: BlockState[];
   rainbowBlocks: BlockState[];
 }
@@ -99,6 +105,17 @@ function buildLevelState(level: Level, dc: DifficultyRecord, map: TileMap): Leve
     // index.html:1188's `arrows=[]`, on the same line as `stars=[]`. In this bundle for
     // the same reason the stars are: a respawn has to throw away whatever was in flight.
     arrows: [],
+    // index.html:1188's `enemyProjectiles=[]`, on that very same line. A death clears
+    // the air of fireballs as well as of arrows.
+    enemyProjectiles: [],
+    // index.html:1194-1208 — the last thing `initLevel` builds before it starts the
+    // music, and in this bundle rather than in `createWorld` alone because `initLevel` IS
+    // the respawn path. So dying to the boss hands it its full health back, exactly as it
+    // hands back a bumped question block. That is the live behaviour and not a bug to fix.
+    boss: isFinalLevel(level) ? spawnBoss(map, dc, level) : null,
+    // index.html:1196, immediately above the `if(isFinal)`. Cleared on EVERY level build,
+    // including the five with no boss on them at all.
+    bossDefeated: false,
     questionBlocks,
     rainbowBlocks,
   };
@@ -341,6 +358,14 @@ export function stepWorld(
     stepArrows(world);
     stepStars(world);
     stepEnemies(world, moveEnemy);
+    // index.html:1550-1556 and :1558-1626, in that order and in that place: after the
+    // enemies, before the rescue. The order of these two matters to the fight. The
+    // projectile pass moves what is ALREADY in the air, so a fireball the boss fires
+    // below travels for the first time on the NEXT step rather than on the one it was
+    // born — which is what puts its first position 10px from the boss's centre and not
+    // 12.5px, and what stops a volley fired point-blank hitting on its own frame.
+    stepEnemyProjectiles(world);
+    stepBoss(world);
     checkRescue(world);
     stepCamera(world);
   }
@@ -567,6 +592,75 @@ export function stepArrows(world: World): void {
 }
 
 /**
+ * Port of index.html:1550-1556 — everything an ENEMY has fired, moved and resolved in one
+ * pass. The mirror image of `stepArrows` above, and deliberately built for BOTH shooters
+ * that fill the list rather than only for the one that exists today: the boss's fireballs
+ * (game/boss.ts) now, and the cannon's single shot (index.html:1534-1535) when that enemy
+ * type is ported. The cannon needs nothing here — it only has to push onto
+ * `world.enemyProjectiles`, exactly as the boss does, and this pass will fly it.
+ *
+ * NO GRAVITY, anywhere. `y` gains `vy` and `vy` gains nothing, so every projectile in
+ * this game travels a perfectly straight line for its whole life: the cannon's at
+ * `vy: 0` is horizontal, and the boss's pair at -1 and -2 rise forever at a fixed rate.
+ * That is item 4 of the spec's bug-compatibility contract, and it is also why these are
+ * not Arcade bodies — see EnemyProjectile in types.ts.
+ *
+ * Three collision shapes, none of them derived from another and none of them the drawn
+ * sprite's size (an 8px FIREBALL_S at scale 2):
+ *
+ *   - Against TILES, two bare points — `x` and `x + 6` — and no y probe at all, so a
+ *     fireball passes through a floor or a ceiling and only stops at a wall it meets
+ *     head-on.
+ *   - Against the PLAYER, the +2/-4 inset box the enemy and boss checks also use,
+ *     against a flat 8x8.
+ *   - Against an ARROW, the same flat 8x8 against the arrow's own flat 12x4.
+ *
+ * An arrow shooting a fireball out of the air is worth 50 points — the cheapest award in
+ * the game, and the only one that costs the player a projectile to collect. It makes NO
+ * sound: the live line has particles and nothing else (index.html:1554), so no cue is
+ * raised here. Both are spent, so it is a genuine trade rather than a free parry.
+ *
+ * A hit on the player goes through the shared `playerHit`, so the cape absorbs it exactly
+ * as it absorbs a contact hit. There is no early return after it: the live source has
+ * none, so the arrow sub-loop below still runs for that same projectile on the frame it
+ * killed you, and every other projectile still moves.
+ */
+export function stepEnemyProjectiles(world: World): void {
+  const p = world.player;
+  for (const ep of world.enemyProjectiles) {
+    ep.x += ep.vx;
+    ep.y += ep.vy;
+    ep.life--;
+    if (isSolid(getTile(world.map, ep.x, ep.y)) || isSolid(getTile(world.map, ep.x + 6, ep.y))) {
+      ep.life = 0;
+    }
+    if (p.invincible <= 0 && rectOverlap(
+      { x: p.x + 2, y: p.y, w: p.w - 4, h: p.h },
+      { x: ep.x, y: ep.y, w: 8, h: 8 },
+    )) {
+      ep.life = 0;
+      playerHit(world);
+    }
+    // No `a.life > 0` guard, unlike the boss's own arrow loop (game/boss.ts), because the
+    // live line has none (index.html:1554). `stepArrows` ran earlier this step and threw
+    // out everything spent, so every arrow here starts the pass alive — but one that has
+    // already knocked out a fireball on THIS pass has `life` 0 and can still knock out a
+    // second. Preserved as written.
+    for (const a of world.arrows) {
+      if (!rectOverlap({ x: a.x, y: a.y, w: 12, h: 4 }, { x: ep.x, y: ep.y, w: 8, h: 8 })) {
+        continue;
+      }
+      ep.life = 0;
+      a.life = 0;
+      world.score += Math.round(50 * world.dc.scoreMultiplier);
+    }
+  }
+  // index.html:1556, and a fresh array exactly as the live line assigns one — the same
+  // shape `stepArrows` ends on, for the same reason.
+  world.enemyProjectiles = world.enemyProjectiles.filter((ep) => ep.life > 0);
+}
+
+/**
  * Port of index.html:1519-1521. A star's rise is a ONE-WAY RAMP, and the exact shape
  * of it matters:
  *
@@ -633,12 +727,14 @@ export function checkRescue(world: World): void {
   const rDH = rescue.sprite.length * 2;
   const rX = rTX * TILE;
   const rY = rGY - rDH;
-  // index.html:1630's `!boss||bossDefeated`. No boss exists in this slice's World (a
-  // boss fight is a later plan), which is exactly the live condition when there is no
-  // boss on the level at all — always true here, ported as a named constant rather
-  // than silently dropped, so that later plan has an obvious place to wire the real
-  // condition back in instead of having to rediscover this check from scratch.
-  const canRescue = true;
+  // index.html:1630, and the whole reason the boss exists: until it falls, walking into
+  // your sibling does nothing at all. On the five levels with no boss the left half is
+  // true and this is a no-op, exactly as it is in the live game.
+  //
+  // It reads `bossDefeated` rather than `!boss.alive` deliberately. The two are set on the
+  // same line and are the same thing in practice, but only one of them survives — see
+  // World.bossDefeated in types.ts — and this is the live source's own choice of test.
+  const canRescue = !world.boss || world.bossDefeated;
   if (canRescue && rectOverlap(
     { x: p.x, y: p.y, w: p.w, h: p.h },
     { x: rX, y: rY, w: 16, h: rDH },

@@ -10,8 +10,9 @@ If it fails, walking away is still cheap — which is the whole reason it comes 
 | **Old** | `https://srumjant.github.io/gi-do/` | the real game, unchanged |
 | **New** | `https://srumjant.github.io/gi-do/next/` | all six levels, on Phaser |
 
-Both work on the iPad and on the laptop. Keyboard only for the new one — arrows or WASD to
-move, space to jump.
+**The new one needs a keyboard, so it does not work on the iPad at all.** The real game has
+on-screen buttons; the port has none yet, so it is laptop-only for now. Arrows or WASD to
+move, space to jump, X to shoot.
 
 ## What the new one deliberately does not have
 

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import { BASE_W, STEP_HZ } from '../config/constants';
+import { BASE_H, BASE_W, STEP_HZ } from '../config/constants';
 import type { DifficultyKey } from '../config/difficulty';
 import { TDiff, TStr } from '../config/i18n';
+import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
 import { LEVEL_NAME_KEYS } from '../data/levels';
 import type { World } from '../game/types';
 import {
@@ -93,6 +94,35 @@ const FART_LABEL_FONT = { fontFamily: 'monospace', fontSize: '10px', fontStyle: 
 const BIG_HEAD_LABEL_FONT = { fontFamily: 'monospace', fontSize: '10px', fontStyle: 'bold', color: '#ff69b4' };
 const CHICKEN_LABEL_FONT = { fontFamily: 'monospace', fontSize: '10px', fontStyle: 'bold', color: '#ffffff' };
 
+/**
+ * The boss bar across the bottom of the screen (index.html:1885-1892) — 120x10, centred,
+ * 22px up from the bottom edge, with the word BOSS three pixels above it.
+ *
+ * A SECOND bar, not a relocation of the little one floating over the boss's head:
+ * SliceScene draws that one in world space and this one is here, in screen space, and the
+ * live game draws both at once. They share only their colour rule (gfx/bossBar.ts).
+ */
+const BOSS_BAR_W = 120;
+const BOSS_BAR_H = 10;
+const BOSS_BAR_X = BASE_W / 2 - BOSS_BAR_W / 2;
+const BOSS_BAR_Y = BASE_H - 22;
+const BOSS_LABEL_Y = BOSS_BAR_Y - 3;
+/**
+ * A bare literal in the live source (index.html:1892) and NOT a translation, unlike the
+ * 'BOSS DEFEATED!' banner three lines below it, which goes through `T('boss_defeated')`.
+ * Reproduced as a literal rather than quietly given a translation key it has never had.
+ */
+const BOSS_LABEL = 'BOSS';
+/** index.html:1892's `bold 9px monospace`, centred over the bar. */
+const BOSS_LABEL_FONT = {
+  fontFamily: 'monospace', fontSize: '9px', fontStyle: 'bold', color: '#ffffff',
+};
+/** index.html:1895's `bold 20px monospace` in the same gold the score uses. */
+const BOSS_DEFEATED_FONT = {
+  fontFamily: 'monospace', fontSize: '20px', fontStyle: 'bold', color: '#ffdd00',
+};
+const BOSS_DEFEATED_Y = BASE_H / 2 - 30;
+
 /** index.html:1865-1867, as codepoints rather than the source's surrogate-pair escapes. */
 const FART_GLYPH = '\u{1F4A8}';
 const BIG_HEAD_GLYPH = '\u{1F92A}';
@@ -141,6 +171,14 @@ export class HudScene extends Phaser.Scene {
   private bowIcon!: Phaser.GameObjects.Image;
   private bowCount!: Phaser.GameObjects.Text;
 
+  /**
+   * The boss's bar, its label and the banner that replaces both once it goes down. The
+   * Graphics is redrawn every frame; the two labels only change visibility.
+   */
+  private bossBar!: Phaser.GameObjects.Graphics;
+  private bossLabel!: Phaser.GameObjects.Text;
+  private bossDefeatedText!: Phaser.GameObjects.Text;
+
   private fartIcon!: Phaser.GameObjects.Text;
   private fartLabel!: Phaser.GameObjects.Text;
   private bigHeadIcon!: Phaser.GameObjects.Text;
@@ -186,6 +224,17 @@ export class HudScene extends Phaser.Scene {
     this.bowIcon = this.hudImage(HUD_BOW_TEXTURE);
     this.bowCount = this.hudText(0, 0, BOW_COUNT_FONT);
 
+    // Created on every level, like everything else here, and simply left hidden on the
+    // five that have no boss — `syncBoss` reads `world.boss` and answers null with three
+    // `setVisible(false)` calls.
+    this.bossBar = this.add.graphics().setVisible(false);
+    this.bossLabel = this.centredText(BOSS_LABEL_Y, BOSS_LABEL_FONT, BOSS_LABEL);
+    this.bossDefeatedText = this.centredText(
+      BOSS_DEFEATED_Y,
+      BOSS_DEFEATED_FONT,
+      TStr('boss_defeated'),
+    );
+
     this.fartIcon = this.hudText(POWERUP_ICON_X, 0, POWERUP_ICON_FONT, FART_GLYPH);
     this.fartLabel = this.hudText(POWERUP_LABEL_X, 0, FART_LABEL_FONT);
     this.bigHeadIcon = this.hudText(POWERUP_ICON_X, 0, POWERUP_ICON_FONT, BIG_HEAD_GLYPH);
@@ -221,6 +270,20 @@ export class HudScene extends Phaser.Scene {
     return this.add.text(x, y, text, style).setOrigin(0, 1).setVisible(false);
   }
 
+  /**
+   * A label centred horizontally on the screen, hidden until something wants it. The live
+   * game sets `ctx.textAlign='center'` for these two and puts it back to 'left'
+   * immediately afterwards (index.html:1892, :1895); an origin of (0.5, 1) is the same
+   * thing said once, and it cannot leak into the next draw the way the canvas flag could.
+   */
+  private centredText(
+    y: number,
+    style: Phaser.Types.GameObjects.Text.TextStyle,
+    text: string,
+  ): Phaser.GameObjects.Text {
+    return this.add.text(BASE_W / 2, y, text, style).setOrigin(0.5, 1).setVisible(false);
+  }
+
   update(): void {
     this.syncLives();
     // index.html:1857. `T('score')` is the label INCLUDING its trailing space and colon
@@ -228,6 +291,51 @@ export class HudScene extends Phaser.Scene {
     this.scoreText.setText(TStr('score') + this.world.score);
     this.syncIcons();
     this.syncPowerups();
+    this.syncBoss();
+  }
+
+  /**
+   * The boss's bar and, once it is down, the banner (index.html:1885-1896).
+   *
+   * The two are mutually exclusive in practice but NOT by construction: the live
+   * conditions are `boss && boss.alive` for the bar and `boss && bossDefeated` for the
+   * banner, which are different tests on different fields and could in principle both be
+   * true. They are written out separately here for that reason rather than as an
+   * if/else — see World.bossDefeated in game/types.ts for why the two flags exist.
+   *
+   * The banner BLINKS: `animFrame % 60 < 40` is two-thirds of every second on, a third
+   * off. `animFrame` keeps counting through the frozen rescue that follows, so it goes on
+   * blinking over the 'IS SAFE!' overlay for the whole 200-frame countdown.
+   */
+  private syncBoss(): void {
+    const { boss, bossDefeated, animFrame } = this.world;
+
+    const showBar = boss !== null && boss.alive;
+    this.bossBar.setVisible(showBar);
+    this.bossLabel.setVisible(showBar);
+    if (boss && showBar) {
+      this.bossBar.clear();
+      this.bossBar
+        .fillStyle(BOSS_BAR_BACK, 1)
+        .fillRect(BOSS_BAR_X, BOSS_BAR_Y, BOSS_BAR_W, BOSS_BAR_H);
+      this.bossBar.fillStyle(bossBarColor(boss.hp, boss.maxHp), 1);
+      this.bossBar.fillRect(
+        BOSS_BAR_X + 1,
+        BOSS_BAR_Y + 1,
+        (BOSS_BAR_W - 2) * (boss.hp / boss.maxHp),
+        BOSS_BAR_H - 2,
+      );
+      // White here, where the in-world bar's outline is black (index.html:1891 against
+      // :1813) — the screen bar sits over whatever the level happens to be, so it needs
+      // the lighter edge.
+      this.bossBar
+        .lineStyle(1, 0xffffff, 1)
+        .strokeRect(BOSS_BAR_X, BOSS_BAR_Y, BOSS_BAR_W, BOSS_BAR_H);
+    }
+
+    this.bossDefeatedText.setVisible(
+      boss !== null && bossDefeated && animFrame % 60 < 40,
+    );
   }
 
   /**

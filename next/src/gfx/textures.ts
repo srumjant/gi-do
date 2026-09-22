@@ -2,12 +2,14 @@ import Phaser from 'phaser';
 import { ENEMY_SCALE } from '../config/constants';
 import {
   ARROW_P, ARROW_S,
+  BOSS_CHARGE, BOSS_IDLE, BOSS_P, BOSS_ROAR, BOSS_WALK,
   BOW_P, BOW_S,
   CAPE_P, CAPE_S,
   CAT_P, CAT_S,
   CAT_SCRATCH_P, CAT_SCRATCH_S,
   CHICKEN_P, CHICKEN_S,
   CLOUD_P, CLOUD_S,
+  FIREBALL_P, FIREBALL_S,
   HEART_P, HEART_S,
   KIDNAPPERS,
   type Palette,
@@ -43,6 +45,7 @@ import { rasterise } from './rasterise';
 export function registerTextures(scene: Phaser.Scene): void {
   registerPlayerTextures(scene);
   registerEnemyTextures(scene);
+  registerBossTextures(scene);
   registerCloudTextures(scene);
   registerItemTextures(scene);
 }
@@ -163,6 +166,39 @@ function registerEnemyTextures(scene: Phaser.Scene): void {
 }
 
 /**
+ * The boss's four poses (index.html:1774-1791). It draws at 4 — bigger than anything else
+ * in the world, twice the player's scale and more than twice an enemy's — which is the
+ * whole reason it reads as a boss and not as a large doll.
+ *
+ * All four are registered on every level, not just the last one. They cost one rasterise
+ * apiece at boot and the alternative is a registration that depends on which level is
+ * starting, which is exactly the kind of conditional setup that fails quietly the first
+ * time something else reaches for the texture.
+ */
+const BOSS_POSES = {
+  idle: BOSS_IDLE,
+  walk: BOSS_WALK,
+  charge: BOSS_CHARGE,
+  roar: BOSS_ROAR,
+} as const;
+
+export type BossPose = keyof typeof BOSS_POSES;
+
+/** The scale the boss draws at (index.html:1793's `drawSprite(bossSpr,...,4,bfl)`). */
+export const BOSS_SCALE = 4;
+
+/** `boss-<pose>`, e.g. `boss-roar`. */
+export function bossTextureKey(pose: BossPose): string {
+  return `boss-${pose}`;
+}
+
+function registerBossTextures(scene: Phaser.Scene): void {
+  for (const pose of Object.keys(BOSS_POSES) as BossPose[]) {
+    addSprite(scene, bossTextureKey(pose), BOSS_POSES[pose], BOSS_P, BOSS_SCALE);
+  }
+}
+
+/**
  * Clouds draw at one of two scales, picked per-cloud by `cx % 3`
  * (index.html:1682: `cx%3?6:5`). Both are registered here; which one a given cloud
  * uses is a rendering decision for later, not a reason to skip either texture now.
@@ -204,6 +240,13 @@ export const ARROW_TEXTURE = 'arrow';
 export const CHICKEN_ARROW_TEXTURE = 'chicken-arrow';
 /** The cape, drawn behind the player while `hasCape` (index.html:1839). */
 export const CAPE_TEXTURE = 'cape';
+/**
+ * A fireball in flight (index.html:1828) — the boss's today, the cannon's later. Both
+ * shooters' shots draw this one sprite at this one scale: the live draw code renders
+ * FIREBALL_S for every entry in `enemyProjectiles` without ever looking at the `type`
+ * tag the cannon sets on its own (see EnemyProjectile in game/types.ts).
+ */
+export const FIREBALL_TEXTURE = 'fireball';
 
 /**
  * Everything the world draws that is not a player, an enemy or a cloud: the pickups,
@@ -220,6 +263,7 @@ const ITEM_TEXTURES: readonly [string, SpriteData, Palette, number][] = [
   [ARROW_TEXTURE, ARROW_S, ARROW_P, 2],
   [CHICKEN_ARROW_TEXTURE, CHICKEN_S, CHICKEN_P, 1.5],
   [CAPE_TEXTURE, CAPE_S, CAPE_P, 2],
+  [FIREBALL_TEXTURE, FIREBALL_S, FIREBALL_P, 2],
 ];
 
 function registerItemTextures(scene: Phaser.Scene): void {

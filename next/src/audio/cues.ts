@@ -3,6 +3,9 @@ import { startBGM, stopBGM } from './bgm';
 import {
   sfxBlock,
   sfxBoing,
+  sfxBossCharge,
+  sfxBossFire,
+  sfxBossRoar,
   sfxCapeSave,
   sfxCatArrive,
   sfxCatVanish,
@@ -45,6 +48,10 @@ export function playCue(cue: SoundCue, levelIndex: number): void {
     case 'cape': sfxCapeSave(); break;
     case 'cat-arrive': sfxCatArrive(); break;
     case 'cat-vanish': sfxCatVanish(); break;
+    // The three the boss makes, all bare playTone calls in the live source — see sfx.ts.
+    case 'boss-fire': sfxBossFire(); break;
+    case 'boss-charge': sfxBossCharge(); break;
+    case 'boss-roar': sfxBossRoar(); break;
     // index.html:1209 — a respawn is an initLevel, and initLevel ends on startBGM(idx).
     case 'music-level': startBGM(levelIndex); break;
     // index.html:1631 (rescued) and :1647 (died). Both go quiet on the spot.
