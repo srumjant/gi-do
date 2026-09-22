@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BASE_W, STEP_HZ } from '../config/constants';
 import type { DifficultyKey } from '../config/difficulty';
 import { TDiff, TStr } from '../config/i18n';
+import { LEVEL_NAME_KEYS } from '../data/levels';
 import type { World } from '../game/types';
 import {
   HUD_BOW_TEXTURE,
@@ -10,8 +11,7 @@ import {
   HUD_SUPER_TEXTURE,
   registerHudTextures,
 } from '../gfx/textures';
-
-export const HUD_SCENE_KEY = 'Hud';
+import { HUD_SCENE_KEY } from './keys';
 
 /**
  * What the HUD needs that it cannot read off the World: which level this is and which
@@ -30,9 +30,6 @@ export interface HudData {
   levelIndex: number;
   difficulty: DifficultyKey;
 }
-
-/** index.html:1858. Indexed by level, 0-based, so level 0 is `level_1`. */
-const LEVEL_NAME_KEYS = ['level_1', 'level_2', 'level_3', 'level_4', 'level_5', 'level_6'];
 
 /** Hearts start here and step right (index.html:1855-1856). */
 const HEART_X = 8;
@@ -163,6 +160,13 @@ export class HudScene extends Phaser.Scene {
 
   create(): void {
     registerHudTextures(this);
+    // Phaser reuses the scene INSTANCE, and this scene is now stopped and relaunched once
+    // per level rather than living for the whole run. Everything else here is rebuilt by
+    // the lines below; this pool is not, and `heartAt` hands back `hearts[i]` if it is
+    // there — which after a level boundary is a DESTROYED image from the level before.
+    // `setVisible(true)` on one of those throws nothing and draws nothing, so the symptom
+    // is simply that level 2 has no lives in the corner. Found in a browser, not by a test.
+    this.hearts.length = 0;
 
     this.infinityText = this.hudText(INFINITY_X, INFINITY_Y, INFINITY_FONT, INFINITY_GLYPH);
     this.scoreText = this.hudText(SCORE_X, SCORE_Y, SCORE_FONT).setVisible(true);

@@ -9,6 +9,7 @@ import {
   CHICKEN_P, CHICKEN_S,
   CLOUD_P, CLOUD_S,
   HEART_P, HEART_S,
+  KIDNAPPERS,
   type Palette,
   type SpriteData,
   STAR_P, STAR_S,
@@ -46,6 +47,27 @@ export function registerTextures(scene: Phaser.Scene): void {
   registerItemTextures(scene);
 }
 
+/**
+ * Rasterise a sprite into a named texture, unless that name is already taken.
+ *
+ * Every registration in this file goes through here, and the guard is not belt and braces:
+ * `SliceScene.create()` now runs once PER LEVEL rather than once per page load, so every
+ * `register*` call below is reached six times in a full run. Phaser's TextureManager is
+ * per-game and holds what it is given for the life of the game, so the second call has
+ * nothing to do — and `addCanvas` on a key in use does not merely no-op, it logs an error
+ * and returns null, which is six screenfuls of red on a run through to the end.
+ */
+function addSprite(
+  scene: Phaser.Scene,
+  key: string,
+  sprite: SpriteData,
+  palette: Palette,
+  scale: number,
+): void {
+  if (scene.textures.exists(key)) return;
+  scene.textures.addCanvas(key, rasterise(sprite, palette, scale));
+}
+
 /** Player and rescue-NPC sprites draw at this scale (index.html:1848). */
 export const PLAYER_SCALE = 2;
 
@@ -58,7 +80,7 @@ export const PLAYER_SCALE = 2;
 export const BIG_HEAD_SCALE = 5;
 
 const POSES = ['stand', 'run', 'jump'] as const;
-type Pose = typeof POSES[number];
+export type Pose = typeof POSES[number];
 
 /** `player-<character>-<skinIndex>-<pose>`, e.g. `player-gigi-0-stand`. */
 export function playerTextureKey(character: Character, skinIndex: number, pose: Pose): string {
@@ -105,18 +127,12 @@ function registerPlayerTextures(scene: Phaser.Scene): void {
       for (const pose of POSES) {
         const sprite = skin[pose];
         const headRows = bigHeadRows(sprite);
-        scene.textures.addCanvas(
-          playerTextureKey(character, skinIndex, pose),
-          rasterise(sprite, skin.palette, PLAYER_SCALE),
-        );
-        scene.textures.addCanvas(
-          playerHeadTextureKey(character, skinIndex, pose),
-          rasterise(sprite.slice(0, headRows), skin.palette, BIG_HEAD_SCALE),
-        );
-        scene.textures.addCanvas(
-          playerBodyTextureKey(character, skinIndex, pose),
-          rasterise(sprite.slice(headRows), skin.palette, PLAYER_SCALE),
-        );
+        const key = playerTextureKey(character, skinIndex, pose);
+        addSprite(scene, key, sprite, skin.palette, PLAYER_SCALE);
+        const head = playerHeadTextureKey(character, skinIndex, pose);
+        addSprite(scene, head, sprite.slice(0, headRows), skin.palette, BIG_HEAD_SCALE);
+        const body = playerBodyTextureKey(character, skinIndex, pose);
+        addSprite(scene, body, sprite.slice(headRows), skin.palette, PLAYER_SCALE);
       }
     });
   });
@@ -142,7 +158,7 @@ export function enemyTextureKey(type: string): string {
 function registerEnemyTextures(scene: Phaser.Scene): void {
   for (const type of ENEMY_TYPES) {
     const { sprite, palette } = getEnemySpriteInfo(type);
-    scene.textures.addCanvas(enemyTextureKey(type), rasterise(sprite, palette, ENEMY_SCALE));
+    addSprite(scene, enemyTextureKey(type), sprite, palette, ENEMY_SCALE);
   }
 }
 
@@ -160,7 +176,7 @@ export function cloudTextureKey(scale: number): string {
 
 function registerCloudTextures(scene: Phaser.Scene): void {
   for (const scale of CLOUD_SCALES) {
-    scene.textures.addCanvas(cloudTextureKey(scale), rasterise(CLOUD_S, CLOUD_P, scale));
+    addSprite(scene, cloudTextureKey(scale), CLOUD_S, CLOUD_P, scale);
   }
 }
 
@@ -208,7 +224,7 @@ const ITEM_TEXTURES: readonly [string, SpriteData, Palette, number][] = [
 
 function registerItemTextures(scene: Phaser.Scene): void {
   for (const [key, sprite, palette, scale] of ITEM_TEXTURES) {
-    scene.textures.addCanvas(key, rasterise(sprite, palette, scale));
+    addSprite(scene, key, sprite, palette, scale);
   }
 }
 
@@ -250,7 +266,7 @@ const HUD_TEXTURES: readonly [string, SpriteData, Palette, number][] = [
  */
 export function registerHudTextures(scene: Phaser.Scene): void {
   for (const [key, sprite, palette, scale] of HUD_TEXTURES) {
-    scene.textures.addCanvas(key, rasterise(sprite, palette, scale));
+    addSprite(scene, key, sprite, palette, scale);
   }
 }
 
@@ -285,19 +301,95 @@ export function menuPlayerTextureKey(
  * scene having booted first. They run BEFORE it now, so they could not borrow its
  * textures even if the scales agreed.
  *
- * The `exists` guard is load-bearing, unlike anywhere else in this file. Both menu
- * scenes call this, and backing out of the character screen re-runs the difficulty
- * screen's `create`, so this is the one registration in the port that really can be
- * reached twice.
+ * This was the first registration in the port that could really be reached twice — both
+ * menu scenes call it, and backing out of the character screen re-runs the difficulty
+ * screen's `create`. `addSprite`'s guard now covers every registration in the file, for the
+ * same reason grown larger: a level scene that restarts per level re-runs all of them.
  */
 export function registerMenuTextures(scene: Phaser.Scene): void {
   for (const character of CHARACTERS) {
     skinsOf(character).forEach((skin, skinIndex) => {
       for (const scale of MENU_SCALES) {
         const key = menuPlayerTextureKey(character, skinIndex, scale);
-        if (scene.textures.exists(key)) continue;
-        scene.textures.addCanvas(key, rasterise(skin.stand, skin.palette, scale));
+        addSprite(scene, key, skin.stand, skin.palette, scale);
       }
     });
   }
+}
+
+/** One pose of the player art, at one draw site's scale. */
+export type PoseAtScale = readonly [Pose, number];
+
+/** `pose-<character>-<skinIndex>-<pose>-<scale>`, e.g. `pose-gigi-0-stand-3`. */
+export function scaledPlayerTextureKey(
+  character: Character,
+  skinIndex: number,
+  pose: Pose,
+  scale: number,
+): string {
+  return `pose-${character}-${skinIndex}-${pose}-${scale}`;
+}
+
+/**
+ * Player art at whatever scale the caller draws it, for the screens between the levels.
+ *
+ * The three families above each bake one fixed set of scales, because their callers each
+ * have one: the world draws at 2, the HUD at 1.5, the menus at 2 and 4. The cutscenes do
+ * not — the between-level scene draws a hero and a sibling at 3 and a snatched sibling at 2
+ * (index.html:2310-2311, :2326, :2333) and the win screen draws both at 4 (:2457) — so
+ * rather than a fourth hard-coded list and a fifth after it, the caller declares the
+ * (pose, scale) pairs IT draws and gets exactly those.
+ *
+ * Which keeps the rule Plan 1 set and this file has followed since — scale belongs to the
+ * draw site, not to the sprite — while letting the draw site say so directly. `menu*` above
+ * is the older, narrower version of this same idea and could be folded in one day; it is
+ * left alone here because two working screens read it and this is not their task.
+ */
+export function registerScaledPlayerTextures(
+  scene: Phaser.Scene,
+  pairs: readonly PoseAtScale[],
+): void {
+  for (const character of CHARACTERS) {
+    skinsOf(character).forEach((skin, skinIndex) => {
+      for (const [pose, scale] of pairs) {
+        const key = scaledPlayerTextureKey(character, skinIndex, pose, scale);
+        addSprite(scene, key, skin[pose], skin.palette, scale);
+      }
+    });
+  }
+}
+
+/**
+ * The villain of the between-level cutscene draws at 4 (index.html:2325, :2332) — bigger
+ * than any enemy in the world does, which is the point of it.
+ */
+export const KIDNAPPER_SCALE = 4;
+
+/** `kidnapper-<index>`, indexed into KIDNAPPERS rather than by level. */
+export function kidnapperTextureKey(index: number): string {
+  return `kidnapper-${index}`;
+}
+
+/**
+ * Every kidnapper, at the one scale the cutscene draws them.
+ *
+ * Keyed by position in `KIDNAPPERS` and not by level, because the table is shorter than
+ * the run in principle (`getKidnapper` in game/run.ts wraps) and because two of its six
+ * entries are the same dino — keying by level would bake that sprite twice for no reason.
+ */
+export function registerKidnapperTextures(scene: Phaser.Scene): void {
+  KIDNAPPERS.forEach((kidnapper, index) => {
+    addSprite(scene, kidnapperTextureKey(index), kidnapper.s, kidnapper.p, KIDNAPPER_SCALE);
+  });
+}
+
+/**
+ * The five hearts bobbing across the win screen (index.html:2458), at 1.5 — the same
+ * sprite as the HUD's lives at a different size, so, per this file's rule, a texture of
+ * its own rather than the HUD's.
+ */
+export const WIN_HEART_TEXTURE = 'win-heart';
+
+export function registerWinHeartTexture(scene: Phaser.Scene): void {
+  addSprite(scene, WIN_HEART_TEXTURE, HEART_S, HEART_P, 1.5);
 }

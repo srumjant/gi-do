@@ -10,6 +10,76 @@ import { findGroundY, getTile, isSolid, rectOverlap } from './tiles';
 import type { EnemyState, World } from './types';
 
 /**
+ * Which side of a ground patroller Arcade had to push it off, on the step it just took.
+ * Both false is the ordinary case: it walked, and nothing was in the way.
+ */
+export interface EnemyBlocked {
+  readonly left: boolean;
+  readonly right: boolean;
+}
+
+/**
+ * What moves a ground-patrol enemy, injected into `stepEnemy` below — the enemies' half of
+ * `PlayerMove` (player.ts), and injected for exactly the same reasons.
+ *
+ * It replaces, for doll / car / dino / penguin / chicken only, the parts of
+ * index.html:1527-1528 and :1538 that touch position: the `e.y += e.vy` integration, the
+ * three-probe floor snap, the `e.x += e.vx` integration and the wall test. Its contract is
+ * the whole of what those did:
+ *
+ *   - integrate `e.x` from `e.vx` and `e.y` from `e.vy`;
+ *   - separate the enemy out of any solid tile it ended up inside;
+ *   - zero `e.vy` when it was the VERTICAL axis that was blocked (which is what the live
+ *     floor snap did, and what keeps a standing enemy standing);
+ *   - LEAVE `e.vx` ALONE, and report which side was blocked instead.
+ *
+ * That last one is the one surprise, and it is not an oversight. Arcade zeroes the
+ * velocity on whatever axis it separated (`ProcessTileSeparationX`), which is right for
+ * the player — it re-accelerates from the keys every frame — and wrong for an enemy, whose
+ * `vx` IS its patrol: `-0.8 * dc.enemySpeed`, assigned once at spawn and thereafter only
+ * ever sign-flipped. Read a separated `vx` back and a doll walking into a wall would stop
+ * dead, `-1 * 0` being 0. So the patrol keeps its own `vx`, and the wall reversal is
+ * driven from the flags this returns. It also means the patrol speed stays the exact
+ * number spawnEnemy assigned rather than drifting by an ulp a frame through the
+ * px-per-frame/px-per-second conversion.
+ *
+ * NOT used by bat, icebat or bouncer, which is deliberate and is the spec's own split.
+ * A bat writes its `y` from a sine every frame and has `noGravity` set, so there is no
+ * integration for a body to own; the bouncer hops, ignores ledges and is meant to sail
+ * into pits. Neither reaches this.
+ *
+ * OPTIONAL for the same reason `PlayerMove` is: most of the suite does not care how an
+ * enemy got where it is, and Arcade cannot be constructed under Vitest at all. Left out,
+ * a ground patroller simply does not move — which is honest, and visibly wrong the moment
+ * a test depends on movement, rather than quietly running a second physics engine that
+ * nothing ships. tests/helpers/testMove.ts has the stand-in the tests inject, and its
+ * header says what that does and does not prove.
+ */
+export type EnemyMove = (world: World, e: EnemyState) => EnemyBlocked;
+
+/**
+ * Does this enemy fall through to the ground-patrol branch of `stepEnemy` below — the live
+ * source's final `else` (index.html:1538-1539)?
+ *
+ * Asked rather than listed, and asked of the type rather than of a flag, because that is
+ * how the live `if/else if/else` chain decides it: everything that is not one of the
+ * types with a branch of its own is a ground patroller. This port has three such branches
+ * (bat, icebat, bouncer) where the live source has five — ghost and cannon are streamed
+ * types `spawnEnemy` never creates, so they cannot arrive here — which leaves doll, car,
+ * dino, penguin and `chicken`.
+ *
+ * `chicken` is why this is worth a named function. Nothing spawns one: a chicken is
+ * whatever a chicken ray hit (`chickenify` below), and a hit BAT becomes a ground
+ * patroller in mid-air, on the frame it is converted. Answering from the live rule rather
+ * than from a list of spawnable types is what makes that case need no special handling at
+ * all — including in physics/enemy.ts, which gives an enemy its Arcade body the first time
+ * it is asked to move one.
+ */
+export function isGroundPatrol(e: EnemyState): boolean {
+  return e.type !== 'bat' && e.type !== 'icebat' && e.type !== 'bouncer';
+}
+
+/**
  * Ground patrollers (index.html:1212-1222, 1524-1547) — doll, car, dino, penguin —
  * plus the two other types level 1 actually spawns: bat/icebat (sine-wave flight) and
  * bouncer (hops). Ghost (homes on the player) and cannon (shoots) remain streamed
@@ -142,8 +212,18 @@ export function chickenify(e: EnemyState): void {
  * player (`hasCape`, `invincible`, `vy`) or `world` itself (`dead`, `lives`,
  * `stateTimer`) on a hit — exactly like `stepPlayer` mutates `world.player` and
  * `world.dead`.
+ *
+ * `move` is what actually moves a GROUND PATROLLER and separates it out of the tiles —
+ * Arcade, in the browser (physics/enemy.ts). It reaches only the last branch below; the
+ * bat, the icebat and the bouncer are still moved by hand, deliberately. See EnemyMove at
+ * the top of this file.
+ *
+ * The stomp and the contact damage at the bottom are untouched by any of that. They read
+ * `rectOverlap` over player and enemy state that has already been resolved, which is
+ * exactly what they read before, and turning them into Arcade overlap callbacks would put
+ * the game's most safety-critical interaction at risk for nothing.
  */
-export function stepEnemy(world: World, e: EnemyState): void {
+export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
   // index.html:1525 — the squash countdown runs even for a dead enemy (set to 30, or 45
   // when a big head did the stomping — see the stomp below), so a stomped enemy keeps
   // rendering, flattened, for half a second rather than vanishing the instant it dies.
@@ -169,18 +249,27 @@ export function stepEnemy(world: World, e: EnemyState): void {
   const p = world.player;
   const dc = world.dc;
 
-  // Gravity + floor snap (index.html:1527-1528), skipped entirely for a noGravity
-  // flyer (bat/icebat here; ghost too, live, but this slice never spawns one) — it
-  // writes its own y every frame instead, in its own branch below.
+  // Gravity (index.html:1527-1528), skipped entirely for a noGravity flyer (bat/icebat
+  // here; ghost too, live, but this slice never spawns one) — it writes its own y every
+  // frame instead, in its own branch below.
+  //
+  // The ACCELERATION is everyone's; the INTEGRATION and the three-probe floor snap under
+  // it are the bouncer's alone now. A ground patroller is an Arcade body from this task
+  // on, and `move` below does both for it — see EnemyMove at the top of this file. The
+  // acceleration stays here rather than becoming Arcade's `body.gravity` for the same
+  // reason the player's does (main.ts): the world's gravity is zero, and a body that
+  // brought its own would be a second place the number lives.
   if (!e.noGravity) {
     e.vy += GRAVITY;
     if (e.vy > 8) e.vy = 8;
-    e.y += e.vy;
-    const eF = e.y + e.h;
-    if (isSolid(getTile(map, e.x + e.w / 2, eF)) || isSolid(getTile(map, e.x + 2, eF))
-        || isSolid(getTile(map, e.x + e.w - 2, eF))) {
-      e.y = Math.floor(eF / TILE) * TILE - e.h;
-      e.vy = 0;
+    if (!isGroundPatrol(e)) {
+      e.y += e.vy;
+      const eF = e.y + e.h;
+      if (isSolid(getTile(map, e.x + e.w / 2, eF)) || isSolid(getTile(map, e.x + 2, eF))
+          || isSolid(getTile(map, e.x + e.w - 2, eF))) {
+        e.y = Math.floor(eF / TILE) * TILE - e.h;
+        e.vy = 0;
+      }
     }
   }
 
@@ -215,18 +304,37 @@ export function stepEnemy(world: World, e: EnemyState): void {
   } else {
     // Ground patrol (index.html:1538-1539): doll, car, dino, penguin — and 'chicken',
     // which has no branch of its own here for the same reason it has none in the live
-    // source, so a converted enemy patrols the floor like a doll. No horizontal
-    // tile resolution at all, only a direction flip. `ef`/`ef2` are computed once,
-    // from the direction of travel AFTER `e.x` has already moved, and reused for both
-    // checks — so a wall-flip and a ledge-flip on the same frame can cancel each other
-    // out, exactly as the live game's own logic does; that is reproduced rather than
-    // smoothed over. Unlike the player's wall collision, there is no position
-    // correction here: the enemy can end up one frame's `vx` deep into a wall tile
-    // before the flip takes effect, exactly as live.
-    e.x += e.vx;
+    // source, so a converted enemy patrols the floor like a doll.
+    //
+    // Arcade moves it and separates it (`move`, and physics/enemy.ts behind that); the two
+    // direction flips stay here, hand-written, because only one of them has an Arcade
+    // equivalent:
+    //
+    //   - THE WALL. `blocked.left`/`blocked.right` is the answer, and it has to be. The
+    //     live test — is the tile under the leading edge solid? — cannot survive
+    //     separation: Arcade puts the body FLUSH against the wall, and a leftward
+    //     patroller's leading edge is then exactly on the tile boundary, which `getTile`
+    //     floors into the empty column it was just pushed out of. The probe would never
+    //     fire again and the enemy would grind against the wall for the rest of the level.
+    //     (Rightward it would still fire, since the right edge is exclusive — an asymmetry
+    //     worth knowing about before anyone tries to keep the old probe.)
+    //   - THE LEDGE, which has no Arcade equivalent at all and is the whole reason enemies
+    //     stay on their platforms: the tile ahead-and-below is empty while the tile
+    //     below-centre is solid, so there is floor underfoot but none to walk onto.
+    //
+    // `ef`/`ef2` are computed once, from the direction of travel BEFORE either flip, and
+    // `ef` is reused for both checks — so a wall-flip and a ledge-flip on the same frame
+    // can cancel each other out, exactly as the live game's own single `ef` does; that is
+    // reproduced rather than smoothed over.
+    //
+    // Changed, and worth saying out loud: the live enemy has no position correction at a
+    // wall, so it walks up to one frame's `vx` INTO the wall tile before the flip takes
+    // effect and visibly sinks into it. Arcade stops it flush. Same defect the player's
+    // own wall snap had, fixed the same way, and a real difference from index.html.
+    const blocked = move?.(world, e);
     const ef2 = e.y + e.h + 2;
     const ef = e.vx > 0 ? e.x + e.w : e.x;
-    if (isSolid(getTile(map, ef, e.y + e.h / 2))) e.vx *= -1; // wall
+    if (blocked && (e.vx > 0 ? blocked.right : blocked.left)) e.vx *= -1; // wall
     const gA = getTile(map, ef, ef2);
     if (!isSolid(gA) && isSolid(getTile(map, e.x + e.w / 2, ef2))) e.vx *= -1; // ledge
   }

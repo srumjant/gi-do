@@ -5,7 +5,14 @@ import { TStr } from '../config/i18n';
 import { PARALLAX, type ParallaxLayer } from '../data/parallax';
 import type { SpriteData } from '../data/sprites';
 import type { Character, PlayerMove } from '../game/player';
-import { getPlayerSprites, getSelectedChar, getSkinIndex } from '../game/run';
+import {
+  finishLevel,
+  getCurrentLevel,
+  getPlayerSprites,
+  getRunTotals,
+  getSelectedChar,
+  getSkinIndex,
+} from '../game/run';
 import { createWorld, stepWorld } from '../game/world';
 import type { EnemyState, World } from '../game/types';
 import { cloudPosition, cloudScale, drawRidges, drawSky } from '../gfx/parallax';
@@ -37,12 +44,37 @@ import {
 } from '../gfx/textures';
 import type { InputState } from '../input/actions';
 import { createKeyboardInput, type KeyboardInput } from '../input/keyboard';
+import { createEnemyBodies, type EnemyBodies } from '../physics/enemy';
 import { createPlayerMove } from '../physics/player';
 import { createCollisionLayer, syncCollisionLayer } from '../physics/tiles';
-import { HUD_SCENE_KEY, type HudData } from './HudScene';
-import { POWERUP_POPUP_SCENE_KEY, type PowerupPopupData } from './PowerupPopupScene';
+import type { BetweenData } from './BetweenScene';
+import type { GameOverData } from './GameOverScene';
+import type { HudData } from './HudScene';
+import {
+  BETWEEN_SCENE_KEY,
+  DIFFICULTY_SCENE_KEY,
+  GAME_OVER_SCENE_KEY,
+  HUD_SCENE_KEY,
+  LEVEL_OVERLAY_SCENE_KEY,
+  POWERUP_POPUP_SCENE_KEY,
+  SLICE_SCENE_KEY,
+  WIN_SCENE_KEY,
+} from './keys';
+import type { LevelOverlayData } from './LevelOverlayScene';
+import type { PowerupPopupData } from './PowerupPopupScene';
+import type { WinData } from './WinScene';
 
-export const SLICE_SCENE_KEY = 'Slice';
+/**
+ * Where a finished run goes back to — won or lost.
+ *
+ * The live game sends both endings to `title` on the key press or the timer running out
+ * (index.html:1349, :1352) and to `modeselect` on Escape (`BACK_TARGET`, :1233-1236).
+ * Neither of those two screens is ported yet, so both routes lead to the difficulty screen,
+ * which is this port's root: the first scene in main.ts's list and the one Escape already
+ * has nowhere to go back from. When the title and mode select land, this is what they
+ * replace.
+ */
+const AFTER_RUN = DIFFICULTY_SCENE_KEY;
 
 /**
  * Half the difference between the canvas and the zoomed view. See setScroll below —
@@ -167,26 +199,40 @@ export class SliceScene extends Phaser.Scene {
    * it: move, separate, report back. See src/physics/player.ts.
    */
   private movePlayer!: PlayerMove;
+  /**
+   * The ground patrols' Arcade bodies — the same arrangement, plus the lifecycle the
+   * player's singleton does not need: enemies stream in and a respawn throws them all
+   * away. See src/physics/enemy.ts.
+   */
+  private enemyBodies!: EnemyBodies;
   private hillsGraphics: Phaser.GameObjects.Graphics | undefined;
   private parallaxLayers: readonly ParallaxLayer[] = [];
   private clouds: CloudView[] = [];
   private accumulator = 0;
+  /** Set once this level's ending has been acted on — see `leaveIfRunOver`. */
+  private leaving = false;
 
   constructor() {
     super(SLICE_SCENE_KEY);
   }
 
   create(): void {
-    const levelIndex = 0;
+    this.resetForNewLevel();
+    // Which level, and what the run brings into it. `getCurrentLevel` was a hard-coded 0
+    // here until the run loop landed; it now moves because `finishLevel` (game/run.ts)
+    // moved it, and `getRunTotals` is the lives and score the last level ended with — a
+    // fresh run's `startRun` having just set them to the difficulty's lives and zero.
+    const levelIndex = getCurrentLevel();
     // What the two choice screens decided, read back out of the run state they wrote
     // to — the port's equivalents of the live game's `selectedDifficulty`
     // (index.html:161) and `selectedChar` (:988), which is where the live game reads
     // them from too. Named rather than inlined into createWorld because the HUD needs
     // the difficulty to label itself, and a HUD that said 'Normal' over a world built
-    // on some other record would be worse than no HUD at all.
+    // on some other record would be worse than no HUD at all. Neither is re-asked
+    // between levels: both were chosen once, before the run, and nothing here writes them.
     const difficulty: DifficultyKey = getDifficulty();
     const character: Character = getSelectedChar();
-    this.world = createWorld(levelIndex, difficulty, character);
+    this.world = createWorld(levelIndex, difficulty, character, getRunTotals());
 
     registerTextures(this);
 
@@ -201,10 +247,12 @@ export class SliceScene extends Phaser.Scene {
     // what, and a bumped block's brick has to cover the block that was drawn there.
     this.bumpedGraphics = this.add.graphics();
     // Built from the very same `world.map` those three just drew, and kept in step with
-    // it by `syncCollisionLayer` in update() below. The player stands on it; the enemies
-    // still move themselves, for now.
+    // it by `syncCollisionLayer` in update() below. The player stands on it, and so do the
+    // doll, the car, the dino, the penguin and any chicken a ray makes of one; the bats,
+    // the bouncer and every projectile still move themselves, deliberately.
     this.collisionLayer = createCollisionLayer(this, this.world);
     this.movePlayer = createPlayerMove(this, this.world, this.collisionLayer);
+    this.enemyBodies = createEnemyBodies(this, this.world, this.collisionLayer);
 
     this.glowGraphics = this.add.graphics().setDepth(DEPTH_PICKUP_GLOW);
     this.arrowTrailGraphics = this.add.graphics().setDepth(DEPTH_ARROW_TRAIL);
@@ -248,6 +296,14 @@ export class SliceScene extends Phaser.Scene {
       difficulty,
     } satisfies HudData);
 
+    // The two labels the live game lays over the FROZEN world — 'Oops!' while you wait to
+    // respawn and '<SIBLING> IS SAFE!' after a rescue (index.html:1898-1899). Same
+    // arrangement as the HUD: a parallel scene, a live reference to the World, read-only.
+    this.scene.launch(LEVEL_OVERLAY_SCENE_KEY, {
+      world: this.world,
+      levelIndex,
+    } satisfies LevelOverlayData);
+
     // And the power-up announcement, in front of even the HUD — see main.ts's scene list
     // and PowerupPopupScene itself. Launched here rather than when a rainbow block is hit
     // because it is the world it watches, not an event it is sent: bumping the block sets
@@ -255,6 +311,47 @@ export class SliceScene extends Phaser.Scene {
     this.scene.launch(POWERUP_POPUP_SCENE_KEY, {
       world: this.world,
     } satisfies PowerupPopupData);
+
+    // All three of them run alongside this scene and hold a reference to THIS World, so all
+    // three have to go when it does — whether it is going to the next level, to the win
+    // screen or to game over. Hung off SHUTDOWN rather than written out at each of those
+    // three exits so that a fourth cannot forget: leaving without this leaves the HUD and
+    // the overlays painted over whatever comes next, still reading a World nobody is
+    // stepping. `once`, and re-armed by the next `create`.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scene.stop(HUD_SCENE_KEY);
+      this.scene.stop(LEVEL_OVERLAY_SCENE_KEY);
+      this.scene.stop(POWERUP_POPUP_SCENE_KEY);
+    });
+  }
+
+  /**
+   * Phaser reuses the scene INSTANCE across restarts, and this scene now restarts — once
+   * per level, where before it was created once per page load and a death only ever mutated
+   * its World in place (`respawnLevel`). Everything it caches between frames therefore has
+   * to be emptied here, at the top of `create`, or level 2 begins holding level 1's
+   * destroyed Images.
+   *
+   * The image pools are the sharp edge: `pooledImage` hands back `pool[i]` if it exists, so
+   * a stale entry is a destroyed object that will never draw again and will never be
+   * replaced — a level whose stars are simply missing, with nothing in the console about it.
+   * The accumulator matters for a subtler reason: left as it was, the time that elapsed
+   * during the cutscene would be spent stepping the new level before its first frame is
+   * ever shown.
+   */
+  private resetForNewLevel(): void {
+    this.enemyImages.length = 0;
+    this.starImages.length = 0;
+    this.bowImages.length = 0;
+    this.superImages.length = 0;
+    this.arrowImages.length = 0;
+    this.questionBlocks = [];
+    this.rainbowBlocks = [];
+    this.clouds = [];
+    this.parallaxLayers = [];
+    this.hillsGraphics = undefined;
+    this.accumulator = 0;
+    this.leaving = false;
   }
 
   /**
@@ -364,14 +461,16 @@ export class SliceScene extends Phaser.Scene {
    * a 120Hz screen the live game runs at double speed. This runs STEP_MS's worth of
    * simulation per STEP_MS of real time whatever the display does.
    *
-   * Arcade has to be inside that loop or the fix is undone for the player alone. Left to
+   * Arcade has to be inside that loop or the fix is undone for the bodies alone. Left to
    * itself it steps once per RENDERED frame (it listens to the scene's UPDATE event), so
-   * on that same 120Hz screen the player would move twice for every one step everything
-   * else took — exactly the bug, reintroduced for exactly one entity, and found by a
-   * child on a fast laptop rather than by a test. So `customUpdate: true` in main.ts
-   * unhooks it, and `createPlayerMove` calls `physics.world.singleStep()` from inside
-   * `stepWorld` -> `stepPlayer`, once per iteration of this loop, with Arcade's own fixed
-   * delta.
+   * on that same 120Hz screen the player and the patrolling enemies would move twice for
+   * every one step everything else took — exactly the bug, reintroduced for exactly the
+   * entities that have bodies, and found by a child on a fast laptop rather than by a
+   * test. So `customUpdate: true` in main.ts unhooks it, and each mover steps its own body
+   * from inside `stepWorld` — `stepPlayer` for the player, `stepEnemy` for each ground
+   * patroller — once per iteration of this loop, with Arcade's own fixed delta. Every body
+   * integrates exactly once per pass through this `while`; see stepBodyAlone in
+   * physics/body.ts for how one body is stepped without dragging the rest along.
    *
    * Driving it from in there rather than from out here buys one more thing worth having:
    * the frames the simulation does NOT run — dead, won, or frozen behind a power-up
@@ -382,7 +481,13 @@ export class SliceScene extends Phaser.Scene {
     // Clamp so a backgrounded tab does not produce a hundred catch-up steps at once.
     this.accumulator = Math.min(this.accumulator + delta, STEP_MS * 5);
     while (this.accumulator >= STEP_MS) {
-      stepWorld(this.world, this.readInput(), this.movePlayer);
+      stepWorld(this.world, this.readInput(), this.movePlayer, this.enemyBodies.move);
+      // Also INSIDE the loop. A death inside this step replaces `world.enemies` with an
+      // empty array (world.ts's respawnLevel), and the bodies of the enemies that were in
+      // it are still in Arcade's world, still being stepped and still separating against
+      // the level. Left until after the loop, the next step in this same rendered frame
+      // would run with the dead attempt's collision still standing in it.
+      this.enemyBodies.reap();
       // INSIDE the loop, not after it. A bumped block and a respawn both rewrite
       // `world.map`, and the collision layer is a copy of that map rather than a view of
       // it — and the player now separates against the layer rather than reading the map.
@@ -393,8 +498,57 @@ export class SliceScene extends Phaser.Scene {
       // being explicit before something can.
       syncCollisionLayer(this.collisionLayer, this.world);
       this.accumulator -= STEP_MS;
+      // Also INSIDE the loop, and for the third version of the same reason: this `while`
+      // can run several steps in one rendered frame, and both of the endings below are
+      // "the step on which a countdown reached zero". Checked after the loop instead, a
+      // frame that stepped twice would count the rescue's last frame down to -1 and could
+      // hand `finishLevel` a second level advance for the one level that was finished.
+      if (this.leaveIfRunOver()) return;
     }
     this.syncSprites();
+  }
+
+  /**
+   * The three ways a level ends, and the only place in the port that decides what follows
+   * one. Returns true once this scene is on its way out, which ends the fixed-step loop
+   * above with it.
+   *
+   * Ported from the two live state branches that do this — index.html:1350's
+   * `levelcomplete` (count down, then advance or win) and the tail of :1348's `dead` (out of
+   * lives, so game over). The countdowns themselves are the World's and run in `stepWorld`;
+   * what is here is only what happens at the end of one, because that is the part a single
+   * level cannot know.
+   *
+   * `leaving` is not defensive. `this.scene.start` is QUEUED — Phaser runs it between
+   * frames, not inside this call — so without the flag a rendered frame that had already
+   * decided to leave could decide again.
+   */
+  private leaveIfRunOver(): boolean {
+    if (this.leaving) return true;
+    const { won, stateTimer, gameOver, score, lives } = this.world;
+
+    if (won && stateTimer <= 0) {
+      this.leaving = true;
+      // Banks this level's lives and score into the run and steps `currentLevel` on, so the
+      // cutscene and the level after it are both about the NEXT world (game/run.ts).
+      const outcome = finishLevel({ lives, score });
+      if (outcome === 'next-level') {
+        this.scene.start(BETWEEN_SCENE_KEY, { next: SLICE_SCENE_KEY } satisfies BetweenData);
+      } else {
+        this.scene.start(WIN_SCENE_KEY, { score, next: AFTER_RUN } satisfies WinData);
+      }
+      return true;
+    }
+
+    if (gameOver) {
+      this.leaving = true;
+      // Nothing is banked: the run is over, and the next one starts from `startRun`. The
+      // score goes across as a number because the World it came off is about to be dropped.
+      this.scene.start(GAME_OVER_SCENE_KEY, { score, next: AFTER_RUN } satisfies GameOverData);
+      return true;
+    }
+
+    return false;
   }
 
   private readInput(): InputState {

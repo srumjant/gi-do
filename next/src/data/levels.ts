@@ -56,6 +56,18 @@ export function addGaps(m: TileMap, gs: Array<[number, number]>, h: number, gapM
   });
 }
 
+/**
+ * Each level's name, as a translation key, indexed 0-based — so level 0 is `level_1`.
+ *
+ * The live game writes this array out TWICE, once in the HUD (index.html:1858) and once in
+ * the between-level cutscene (:2363), which is two chances to get the off-by-one wrong. It
+ * is data about the levels, so it lives with them, once.
+ *
+ * Separate from each record's own `name` field, which is the untranslated English the level
+ * was authored under ("Doll Garden") and is not what either screen shows.
+ */
+export const LEVEL_NAME_KEYS = ['level_1', 'level_2', 'level_3', 'level_4', 'level_5', 'level_6'];
+
 export const LEVELS: Level[] = [
   // --- Level 1: Doll Garden ---
   {

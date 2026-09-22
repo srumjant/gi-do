@@ -3,13 +3,11 @@ import { BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
 import type { Character } from '../game/player';
 import { characterAt, characterName, siblingOf, wrapIndex } from '../game/menu';
-import { getSkinIndex, setSelectedChar, setSkinIndex, skinsOf } from '../game/run';
+import { getSkinIndex, setSelectedChar, setSkinIndex, skinsOf, startRun } from '../game/run';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
 import { menuPlayerTextureKey, MENU_PORTRAIT_SCALE, registerMenuTextures } from '../gfx/textures';
 import { bindMenuKeys, type MenuKeys, justDown, pressedAny } from '../input/menuKeys';
-import { SLICE_SCENE_KEY } from './SliceScene';
-
-export const CHARACTER_SCENE_KEY = 'Character';
+import { CHARACTER_SCENE_KEY, SLICE_SCENE_KEY } from './keys';
 
 /**
  * Where Escape goes. Passed in rather than imported, so this scene knows nothing about
@@ -119,6 +117,10 @@ export class CharacterScene extends Phaser.Scene {
   }
 
   create(): void {
+    // index.html:1334 — confirming a difficulty sets `selectIndex=0`. Same reason as
+    // DifficultyScene's: the field initialiser runs once per instance, and Phaser reuses
+    // instances, so re-entering would otherwise keep the previous choice's cursor.
+    this.index = 0;
     registerMenuTextures(this);
     this.cameras.main.setBackgroundColor(BACKGROUND);
 
@@ -187,9 +189,16 @@ export class CharacterScene extends Phaser.Scene {
    * `selectedChar`, which is what every sprite lookup in the port already reads
    * (`getPlayerSprites`, and SliceScene's own texture-key resolution). `SliceScene`
    * reads it, and the difficulty chosen on the screen before, when it builds the world.
+   *
+   * And this is where a RUN begins — level 0, a full set of lives, no score (`startRun`,
+   * game/run.ts). The live game does it one screen later, on the way out of the intro
+   * (index.html:1347's `currentLevel=0;lives=DC().lives;score=0`); the intro is not ported
+   * yet, so this is the last screen before the first level and therefore the place. When
+   * IntroScene lands it takes this line with it.
    */
   private confirm(): void {
     setSelectedChar(this.chosen());
+    startRun();
     this.scene.start(SLICE_SCENE_KEY);
   }
 

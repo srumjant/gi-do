@@ -8,7 +8,7 @@ If it fails, walking away is still cheap — which is the whole reason it comes 
 | | Where | What it is |
 |---|---|---|
 | **Old** | `https://srumjant.github.io/gi-do/` | the real game, unchanged |
-| **New** | `https://srumjant.github.io/gi-do/next/` | level 1 only, on Phaser, drawn as coloured rectangles |
+| **New** | `https://srumjant.github.io/gi-do/next/` | all six levels, on Phaser |
 
 Both work on the iPad and on the laptop. Keyboard only for the new one — arrows or WASD to
 move, space to jump.
@@ -17,14 +17,20 @@ move, space to jump.
 
 Say this up front or the first thirty seconds are just them listing it:
 
-no music, no sounds, one level, no hearts, no score, no menus, no cat, no bow, no
-power-ups, and **the enemies cannot hurt you** — you can jump on them, but walking into
-one does nothing.
+**no music and no sounds at all**, no title screen (it starts on the difficulty screen),
+no pause, and no learn mode. Two enemies are missing — the **ghost** and the **cannon** —
+so levels 2, 3, 4 and 6 are emptier than they should be. There is **no boss**, so level 6
+ends like any other level.
 
-It does now look like the game: the real characters, the real enemies, the tile grid with
-its grass edge and brick mortar, the `?` and rainbow blocks, and the parallax sky. The
-felt style is not there — but that is off by default in the real game too, so unless
-someone has turned it on with `F`, both should look the same.
+Everything else is there now: all six levels, difficulty and character choice, hearts,
+score, the cat, the bow, the chicken ray, the silly power-ups, the cape, and the
+between-level cutscene. Level 5, the ice one, is complete — every penguin and icebat it
+is supposed to have.
+
+The felt style is not there, but that is off by default in the real game too, so unless
+someone has turned it on with `F`, both should look the same. A couple of visual extras
+are missing: the sparkles when you pick something up, and the coloured border that flashes
+round the screen while a power-up is running.
 
 ## What to ask
 
@@ -85,7 +91,7 @@ reads right, whether a ledge catches you.
 There is no test that can disagree with them. If a child says the jump feels wrong, there is
 nothing to check it against — **believe them, and say so**.
 
-### Three things we already know changed
+### Four things we already know changed
 
 Worth watching for, and worth not treating as new bugs if they come up:
 
@@ -94,6 +100,10 @@ Worth watching for, and worth not treating as new bugs if they come up:
 - **Ledges are more forgiving.** The old code dropped you once about 3px of you hung over the
   edge; Arcade keeps you up while any part of you is on. Easier, and a real change to how
   jumps off platforms feel.
+- **Enemies no longer sink into walls.** A doll or a dino walking into a wall used to push a
+  fraction of itself into the wall tile for the one frame before it turned around, and you
+  could see it. Now it stops against the face and turns. Same fix as the player's, and the
+  same kind of small visual difference.
 - **Two `?` blocks side by side can no longer both be popped with one jump.** No level has such
   a pair today, so this may never show up.
 

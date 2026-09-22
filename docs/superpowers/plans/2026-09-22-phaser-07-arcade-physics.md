@@ -148,9 +148,23 @@ The ledge probe has no Arcade equivalent and stays hand-written. Read the existi
 implementation before replacing anything: it reverses on `isSolid` ahead at mid-height, and
 separately when the tile ahead-and-below is empty while the tile below-centre is solid.
 
+**The bouncer is not bodied.** Decided 2026-09-22, after the task flagged that it appeared in
+neither list here. It is gravity-bound, so Arcade could carry it — but it is a hopper, not a
+patrol, it has no ledge probe, and bodying it would change how it lands with nothing left to
+test feel against. Keeping it hand-rolled is the conservative reading of the spec's explicit
+list, which names doll, car, dino, penguin and chicken and stops there.
+
+**One Arcade step per body per fixed step, not one step per fixed step.** `singleStep()`
+advances the *whole world*: with N bodies sharing it, N calls integrate every body N times,
+which is the 120Hz bug multiplied. Bodies therefore rest with `enable = false` and are
+enabled only for their own step. The invariant to protect is **every body integrates exactly
+once per fixed step** — not the number of `singleStep` calls.
+
 **Explicitly NOT bodied**, and this is deliberate rather than an oversight to fix later:
 
-- **bats and ghosts** — `y` is written from a sine each frame, `noGravity` is true
+- **bats and ghosts** — a bat writes `y` from a sine each frame with `noGravity` true; the
+  ghost *homes* on the player and only falls back to a sine outside aggro range, so the sine
+  is the lesser half of its reason
 - **the boss** — no `y` integration, `x` clamped to a window
 - **all projectiles** — arrows are pure horizontal `vx`; fireballs have a constant `vy` that
   never accelerates

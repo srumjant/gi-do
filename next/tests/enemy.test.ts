@@ -5,11 +5,12 @@
 // for where they are recognised and skipped rather than half-simulated.
 import { afterEach, describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
-import { testMove } from './helpers/testMove';
-import { spawnEnemy, stepEnemy } from '../src/game/enemy';
+import { testEnemyMove, testMove } from './helpers/testMove';
+import { chickenify, isGroundPatrol, spawnEnemy, stepEnemy } from '../src/game/enemy';
 import { setRandom } from '../src/game/random';
 import { createWorld, spawnEnemiesInView, stepEnemies, stepWorld } from '../src/game/world';
 import { createPlayer } from '../src/game/player';
+import { getTile, isSolid } from '../src/game/tiles';
 import { LEVELS, makeGround, TILE_GROUND } from '../src/data/levels';
 import { emptyInput, type InputState } from '../src/input/actions';
 import { TILE } from '../src/config/constants';
@@ -17,6 +18,23 @@ import type { EnemyState, World } from '../src/game/types';
 
 function held(overrides: Partial<InputState>): InputState {
   return { ...emptyInput(), ...overrides };
+}
+
+/**
+ * Is this enemy standing on solid floor — feet on a solid tile, and no part of it inside
+ * one? The behavioural form of "it did not fall off and it did not sink in", asked of the
+ * state the mover left behind rather than of a coordinate. Exactly one pixel below the
+ * feet, because a body separated flush has its feet ON the boundary and the tile the
+ * boundary itself floors into is the empty one above the floor.
+ */
+function standsOnGround(map: number[][], e: EnemyState): boolean {
+  if (!isSolid(getTile(map, e.x + e.w / 2, e.y + e.h + 1))) return false;
+  for (const x of [e.x, e.x + e.w / 2, e.x + e.w - 0.01]) {
+    for (const y of [e.y, e.y + e.h / 2, e.y + e.h - 0.01]) {
+      if (isSolid(getTile(map, x, y))) return false;
+    }
+  }
+  return true;
 }
 
 describe('spawnEnemy', () => {
@@ -123,21 +141,34 @@ describe('spawnEnemiesInView', () => {
   });
 });
 
+// The ground patrollers are on Arcade bodies from plan 7, task 3, so `stepEnemy` no longer
+// moves one itself: it is handed an `EnemyMove` exactly as `stepPlayer` is handed a
+// `PlayerMove`. `testEnemyMove` (tests/helpers/testMove.ts) is what these inject — read its
+// header, which says plainly that it is NOT Arcade. So the assertions below are about what
+// the enemy DID (it came to rest, it turned, it stayed on its platform) and never about
+// where exactly it ended up, which is Arcade's answer and is checked in a browser.
+//
+// The bat, the icebat and the bouncer are still moved by hand inside `stepEnemy`, on
+// purpose (see EnemyMove in enemy.ts), which is why their tests pass no mover at all.
 describe('stepEnemy', () => {
-  it('falls under gravity, snaps to the ground, and then stays there', () => {
+  afterEach(() => setRandom(Math.random));
+
+  it('falls under gravity, comes to rest on the ground, and then stays there', () => {
     const world = createWorld(0, 'normal');
     world.map = makeGround(30, 20); // flat ground, rows 18-19 — no platforms to complicate the fall
     const enemy = spawnEnemy(world.map, world.dc, { type: 'doll', x: 10 })!;
-    const restY = enemy.y;
     enemy.y -= 64; // lift it well above its natural ground-contact spawn point
+    const droppedFrom = enemy.y;
 
-    for (let i = 0; i < 30; i++) stepEnemy(world, enemy);
+    for (let i = 0; i < 30; i++) stepEnemy(world, enemy, testEnemyMove);
 
-    expect(enemy.y).toBe(restY);
-    expect(enemy.vy).toBe(0);
+    expect(enemy.y).toBeGreaterThan(droppedFrom); // it came down
+    expect(enemy.vy).toBe(0); // and stopped: the fall is over, not merely slow
+    expect(standsOnGround(world.map, enemy)).toBe(true);
 
-    stepEnemy(world, enemy); // idempotent once grounded
-    expect(enemy.y).toBe(restY);
+    const restedAt = enemy.y;
+    stepEnemy(world, enemy, testEnemyMove); // idempotent once grounded: no sink, no bounce
+    expect(enemy.y).toBe(restedAt);
     expect(enemy.vy).toBe(0);
   });
 
@@ -146,12 +177,14 @@ describe('stepEnemy', () => {
     world.map = makeGround(30, 20);
     const enemy = spawnEnemy(world.map, world.dc, { type: 'doll', x: 10 })!;
 
-    const startX = enemy.x;
+    let previousX = enemy.x;
     for (let i = 1; i <= 10; i++) {
-      stepEnemy(world, enemy);
-      expect(enemy.x).toBeCloseTo(startX - i * 0.8, 10);
-      expect(enemy.vx).toBe(-0.8);
+      stepEnemy(world, enemy, testEnemyMove);
+      expect(enemy.x).toBeLessThan(previousX); // still going left, every single step
+      expect(enemy.vx).toBe(-0.8); // and at the speed spawnEnemy gave it, undiminished
       expect(enemy.vy).toBe(0); // resting on flat ground the whole time
+      expect(standsOnGround(world.map, enemy)).toBe(true);
+      previousX = enemy.x;
     }
   });
 
@@ -166,15 +199,17 @@ describe('stepEnemy', () => {
 
     let minX = enemy.x;
     for (let i = 0; i < 100; i++) {
-      stepEnemy(world, enemy);
+      stepEnemy(world, enemy, testEnemyMove);
       minX = Math.min(minX, enemy.x);
     }
 
-    expect(enemy.vx).toBeGreaterThan(0); // turned away from the wall
-    // No position correction on an enemy wall hit, unlike the player's (index.html has
-    // none — only the vx flip) — it can end up briefly inside the wall tile, but never
-    // clear through to the wall's far side.
-    expect(minX).toBeGreaterThan(WALL_TX * TILE);
+    expect(enemy.vx).toBe(0.8); // turned away from the wall, at the same speed
+    // CHANGED FROM THE LIVE GAME, deliberately. index.html has no position correction on
+    // an enemy wall hit — only the vx flip — so a live doll ends up as much as one frame's
+    // `vx` INSIDE the wall tile before it turns, and visibly sinks into it. A separated
+    // body stops flush, so the enemy never overlaps the wall at all. Same defect the
+    // player's own wall snap had, fixed the same way. See enemy.ts's ground-patrol branch.
+    expect(minX).toBeGreaterThanOrEqual((WALL_TX + 1) * TILE);
   });
 
   it('turns around at a ledge rather than walking off it', () => {
@@ -188,12 +223,91 @@ describe('stepEnemy', () => {
 
     const enemy = spawnEnemy(map, world.dc, { type: 'doll', x: 12 })!; // heading left, toward the drop
 
-    for (let i = 0; i < 80; i++) stepEnemy(world, enemy);
+    for (let i = 0; i < 80; i++) {
+      stepEnemy(world, enemy, testEnemyMove);
+      // Checked EVERY step, not just at the end: an enemy that walked off, fell and was
+      // then caught by something would pass a check made only afterwards.
+      expect(standsOnGround(map, enemy)).toBe(true);
+    }
 
     expect(enemy.vx).toBeGreaterThan(0); // turned away from the drop
     expect(enemy.alive).toBe(true); // never fell
     expect(enemy.vy).toBe(0); // still grounded, never airborne
-    expect(enemy.x).toBeGreaterThan(LEDGE_TX * TILE - enemy.w); // never walked past the edge
+  });
+
+  // The plan's own wording for what this task has to be able to say, and the thing the
+  // ledge probe exists for. A platform in mid-air with a drop at both ends: no walls
+  // anywhere, so every one of these turns is the second rule — the tile ahead-and-below is
+  // empty while the tile below-centre is solid — and nothing else.
+  it('patrols a platform and turns at both ends without falling off', () => {
+    const FROM_TX = 5;
+    const TO_TX = 14; // solid columns 5..14 at rows 8-9, open air everywhere else
+    const world = createWorld(0, 'normal');
+    const map: number[][] = Array.from({ length: 10 }, () => Array(20).fill(0));
+    for (let ty = 8; ty < 10; ty++) {
+      for (let tx = FROM_TX; tx <= TO_TX; tx++) map[ty][tx] = TILE_GROUND;
+    }
+    world.map = map;
+
+    const enemy = spawnEnemy(map, world.dc, { type: 'doll', x: 10 })!; // mid-platform, heading left
+    const restedAt = enemy.y;
+
+    let turns = 0;
+    let wentLeft = false;
+    let wentRight = false;
+    let vx = enemy.vx;
+    // Long enough for at least four turns: the platform is 160px wide and the patrol
+    // covers 0.8 of it a step, so one traverse is about 180 steps.
+    for (let i = 0; i < 1000; i++) {
+      stepEnemy(world, enemy, testEnemyMove);
+      if (enemy.vx !== vx) turns++;
+      vx = enemy.vx;
+      if (enemy.vx < 0) wentLeft = true;
+      if (enemy.vx > 0) wentRight = true;
+      expect(standsOnGround(map, enemy)).toBe(true);
+      expect(enemy.y).toBe(restedAt); // never left the floor: no hop, no sink, no fall
+    }
+
+    expect(wentLeft).toBe(true);
+    expect(wentRight).toBe(true);
+    expect(turns).toBeGreaterThanOrEqual(4); // both ends, more than once each
+    expect(Math.abs(enemy.vx)).toBe(0.8); // and the patrol speed survived every turn
+  });
+
+  // The case most likely to be missed, and the reason `isGroundPatrol` is asked of the
+  // type rather than kept as a list of what spawns: a bat has no body, because nothing
+  // ever asks it to move. A chicken ray rewrites it into a ground patroller in MID-AIR,
+  // and from that step on it is asked — which is exactly when physics/enemy.ts gives it
+  // one. What this can check without a browser is the simulation half: the branch it falls
+  // into flips, gravity starts applying to it, and it lands and walks.
+  it('a chicken ray turns a bat into a ground patroller, which falls, lands and walks', () => {
+    const world = createWorld(0, 'normal');
+    world.map = makeGround(30, 20);
+    const bat = spawnEnemy(world.map, world.dc, { type: 'bat', x: 10 })!;
+
+    expect(isGroundPatrol(bat)).toBe(false); // a flyer: never asked to move, never bodied
+    expect(bat.noGravity).toBe(true);
+    const flyingAt = bat.y;
+
+    setRandom(() => 0.9); // `> .5` — the coin flip in chickenify sends it rightward
+    chickenify(bat);
+
+    expect(isGroundPatrol(bat)).toBe(true); // from this step on it is asked, so it is bodied
+    expect(bat.noGravity).toBe(false);
+    expect(bat.w).toBe(14.4); // and at the chicken's size, not the bat's 12.6
+    expect(bat.h).toBe(12.6);
+
+    for (let i = 0; i < 60; i++) stepEnemy(world, bat, testEnemyMove);
+
+    expect(bat.y).toBeGreaterThan(flyingAt); // it dropped out of the air
+    expect(bat.vy).toBe(0); // and landed rather than still falling
+    expect(standsOnGround(world.map, bat)).toBe(true);
+
+    const landedAt = bat.x;
+    for (let i = 0; i < 10; i++) stepEnemy(world, bat, testEnemyMove);
+    expect(bat.x).toBeGreaterThan(landedAt); // walking, and rightward, as the flip decided
+    expect(bat.vx).toBe(1.5); // chickenify's FLAT 1.5, with no dc.enemySpeed in it
+    expect(standsOnGround(world.map, bat)).toBe(true);
   });
 
   it('bat/icebat ignore walls entirely and flip only at the world edges', () => {
@@ -365,10 +479,28 @@ describe('stepEnemies', () => {
     );
     const [before1, before2] = world.enemies.map((e) => e.x);
 
-    stepEnemies(world);
+    stepEnemies(world, testEnemyMove);
 
-    expect(world.enemies[0].x).toBeCloseTo(before1 - 0.8, 10);
-    expect(world.enemies[1].x).toBeCloseTo(before2 - 0.8, 10);
+    // Both moved, and both leftward: the mover reached the second enemy as well as the
+    // first. How far is testEnemyMove's business, not this test's.
+    expect(world.enemies[0].x).toBeLessThan(before1);
+    expect(world.enemies[1].x).toBeLessThan(before2);
+  });
+
+  // The mover is optional exactly as `PlayerMove` is, and the honest consequence of
+  // leaving it out is that a ground patroller does not move. Pinned, because the
+  // alternative — a silent second physics engine for whoever forgets to pass one — is
+  // precisely what the seam exists to prevent.
+  it('leaves a ground patroller exactly where it found it when handed no mover', () => {
+    const world = createWorld(0, 'normal');
+    world.map = makeGround(30, 20);
+    world.enemies.push(spawnEnemy(world.map, world.dc, { type: 'doll', x: 10 })!);
+    const before = { ...world.enemies[0] };
+
+    for (let i = 0; i < 10; i++) stepEnemies(world);
+
+    expect(world.enemies[0].x).toBe(before.x);
+    expect(world.enemies[0].y).toBe(before.y);
   });
 });
 
@@ -377,28 +509,38 @@ describe('stepWorld wiring', () => {
     const world = createWorld(0, 'normal');
     expect(world.enemies).toHaveLength(0);
 
-    stepWorld(world, held({}));
+    stepWorld(world, held({}), testMove, testEnemyMove);
     expect(world.enemies.length).toBeGreaterThan(0);
 
     const xBefore = world.enemies[0].x;
-    stepWorld(world, held({}));
-    expect(world.enemies[0].x).not.toBe(xBefore); // stepEnemies actually ran
+    stepWorld(world, held({}), testMove, testEnemyMove);
+    expect(world.enemies[0].x).not.toBe(xBefore); // stepEnemies actually ran, mover and all
   });
 });
 
-// THESE COMPARISONS SURVIVE PLAN 7, and it is worth saying why, since the player's own
-// traces did not. Arcade took the player and nothing else: the enemies are still on the
-// hand-rolled physics this port ported from index.html, line for line, so comparing them
-// against the original is still comparing like with like. It stops being true the day
-// they get bodies of their own (plan 7, task 3), and these tests should be read again
-// then rather than patched.
+// THESE COMPARISONS CHANGED WITH PLAN 7, TASK 3, and the note they used to carry said so
+// in advance: they survived task 2 because Arcade had taken the player and nothing else,
+// so the enemies were still the hand-rolled port of index.html, line for line, and
+// comparing them against the original was still comparing like with like. That expired
+// the moment the ground patrols got bodies of their own. Read again rather than patched,
+// as that note asked, and split in two:
 //
-// What is NOT compared any more is the player's own x/y/vx/vy inside these traces. The
-// player is driven here by `testMove` (tests/helpers/testMove.ts), which exists to get it
-// onto the ground and out of the way — asserting a position it resolved would be
-// asserting what that helper does.
+//   - RETIRED: every x/y/vx/vy comparison of a GROUND PATROLLER. The shipped answer to
+//     where a doll ends up is Arcade's; the tests below cannot run Arcade, and comparing
+//     `testEnemyMove` against index.html would be pinning a test helper to the original
+//     while the code that ships goes unchecked. Worse than nothing, because it would look
+//     like coverage. What that costs is real and is written down in PLAYTEST.md.
+//   - KEPT, and still exact: the bat, the icebat and the bouncer, which are deliberately
+//     NOT bodied (see EnemyMove in enemy.ts) and are still the hand-rolled port — so the
+//     sine flight and the hop are still pinned frame for frame to the original. And, for
+//     every type, the things that were never physics in the first place: WHICH enemies
+//     stream in, in what order, on which frame, and the walk-cycle counter, all of which
+//     are pure arithmetic over the camera and the frame number.
+//
+// The player's own x/y/vx/vy went the same way in task 2. It is driven here by `testMove`
+// (tests/helpers/testMove.ts), which exists to get it onto the ground and out of the way.
 describe('enemies vs. the live game', () => {
-  it('spawns and patrols identically to the real update(), while the player holds still', () => {
+  it('streams in exactly the enemies the real update() does, when it does, and animates them the same', () => {
     const FRAMES = 90;
     const script = () => ({ left: false, right: false, jump: false, fire: false });
     const live = driveLiveGame({
@@ -408,7 +550,7 @@ describe('enemies vs. the live game', () => {
     const world = createWorld(0, 'normal');
     const port: EnemyState[][] = [];
     for (let i = 0; i < FRAMES; i++) {
-      stepWorld(world, held(script()), testMove);
+      stepWorld(world, held(script()), testMove, testEnemyMove);
       port.push(world.enemies.map((e) => ({ ...e })));
     }
 
@@ -416,13 +558,13 @@ describe('enemies vs. the live game', () => {
     // streams in doll@15, doll@28 and car@40, all ground patrollers this port
     // implements, so the two arrays line up by index without needing to key by type
     // and spawn column — see enemy.ts's ENEMY_SPRITES map for which types those are.
+    //
+    // The spawn schedule is worth pinning on its own: `spawnEnemiesInView` reads the
+    // camera, and the camera reads the player, so a frame's difference here would mean
+    // the port had drifted somewhere upstream of the enemies entirely.
     for (let f = 0; f < FRAMES; f++) {
       expect(port[f].map((e) => e.type)).toEqual(live[f].enemies.map((e) => e.type));
       for (let i = 0; i < port[f].length; i++) {
-        expect(port[f][i].x).toBeCloseTo(live[f].enemies[i].x, 9);
-        expect(port[f][i].y).toBeCloseTo(live[f].enemies[i].y, 9);
-        expect(port[f][i].vx).toBeCloseTo(live[f].enemies[i].vx, 9);
-        expect(port[f][i].vy).toBeCloseTo(live[f].enemies[i].vy, 9);
         expect(port[f][i].alive).toBe(live[f].enemies[i].alive);
         expect(port[f][i].frame).toBe(live[f].enemies[i].frame);
         expect(port[f][i].frameTimer).toBe(live[f].enemies[i].frameTimer);
@@ -431,12 +573,15 @@ describe('enemies vs. the live game', () => {
     }
 
     // Sanity: the player holds still for all 90 frames here, so nothing is ever
-    // stomped — this window's job is the patrol frame flip, not the squash countdown
-    // (see trace.test.ts's STOMP_SCRIPT trace for that). 90 frames at a 15-frame
-    // threshold is enough to see doll@15 actually flip, more than once, or this proves
-    // nothing about `e.frameTimer++;if(e.frameTimer>15){e.frame=1-e.frame;...}`.
+    // stomped — this window's job is the patrol frame flip, not the squash countdown.
+    // 90 frames at a 15-frame threshold is enough to see doll@15 actually flip, more
+    // than once, or this proves nothing about
+    // `e.frameTimer++;if(e.frameTimer>15){e.frame=1-e.frame;...}`.
     const doll15Frames = port.map((frame) => frame[0]?.frame).filter((f) => f !== undefined);
     expect(new Set(doll15Frames).size).toBeGreaterThan(1);
+    // And sanity of the other kind, now that positions are no longer compared: the
+    // patrollers did move. Without this the loop above would pass over frozen enemies.
+    expect(port[FRAMES - 1][0].x).toBeLessThan(port[0][0].x);
   });
 });
 
@@ -479,7 +624,7 @@ describe('bat and bouncer vs. the live game', () => {
     world.camera.x = 700;
     const port: typeof live = [];
     for (let f = 0; f < FRAMES; f++) {
-      stepWorld(world, held(script()), testMove);
+      stepWorld(world, held(script()), testMove, testEnemyMove);
       const p = world.player;
       port.push({
         x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
@@ -493,6 +638,15 @@ describe('bat and bouncer vs. the live game', () => {
       });
     }
 
+    // Which types still have their POSITIONS compared, and it is the whole of this
+    // test's remaining physics claim: bat, icebat and bouncer are deliberately not on
+    // Arcade bodies (EnemyMove in enemy.ts), so they are still the hand-rolled port of
+    // index.html and still comparable to it, line for line. The ground patrollers beside
+    // them in this window — car@40, dino@55, doll@65, doll@28, doll@15, car@80 — are
+    // Arcade's now, and only their spawn schedule and animation are compared. See the
+    // note above the previous describe.
+    const HAND_ROLLED = new Set(['bat', 'icebat', 'bouncer']);
+
     for (let f = 0; f < FRAMES; f++) {
       // The player's own x/y/vx/vy/onGround and the camera that follows them used to be
       // compared here too, and retired with plan 7 — see the note above this describe.
@@ -500,13 +654,14 @@ describe('bat and bouncer vs. the live game', () => {
       // nearest thing this window streams in, so nothing it does reaches these enemies.
       expect(port[f].enemies.map((e) => e.type)).toEqual(live[f].enemies.map((e) => e.type));
       for (let i = 0; i < port[f].enemies.length; i++) {
-        expect(port[f].enemies[i].x).toBe(live[f].enemies[i].x);
-        expect(port[f].enemies[i].y).toBe(live[f].enemies[i].y);
-        expect(port[f].enemies[i].vx).toBe(live[f].enemies[i].vx);
         expect(port[f].enemies[i].alive).toBe(live[f].enemies[i].alive);
         expect(port[f].enemies[i].frame).toBe(live[f].enemies[i].frame);
         expect(port[f].enemies[i].frameTimer).toBe(live[f].enemies[i].frameTimer);
         expect(port[f].enemies[i].squashTimer).toBe(live[f].enemies[i].squashTimer);
+        if (!HAND_ROLLED.has(port[f].enemies[i].type)) continue;
+        expect(port[f].enemies[i].x).toBe(live[f].enemies[i].x);
+        expect(port[f].enemies[i].y).toBe(live[f].enemies[i].y);
+        expect(port[f].enemies[i].vx).toBe(live[f].enemies[i].vx);
         // enemy vy is deliberately NOT compared: a noGravity flyer (bat/icebat) never
         // has its vy touched on the live side (index.html's gravity block, the only
         // place that ever assigns it, is skipped entirely for one), so it stays
@@ -515,10 +670,16 @@ describe('bat and bouncer vs. the live game', () => {
         // ground patroller already does for fields it does not need either. A
         // representational difference between an ad-hoc live object and a uniformly
         // shaped one, not a physics difference; verified directly (not assumed) while
-        // building this test, and trace.test.ts's own STOMP_SCRIPT comparison omits
-        // enemy vy for the same reason.
+        // building this test.
       }
     }
+
+    // Both of those types were actually in this window, or the loop above skipped every
+    // position comparison it has left and the `continue` reads as coverage it is not.
+    const compared = new Set(
+      port.flatMap((f) => f.enemies.map((e) => e.type)).filter((t) => HAND_ROLLED.has(t)),
+    );
+    expect(compared).toEqual(new Set(['bat', 'bouncer']));
 
     // Sanity: both new behaviours actually happened here, or the equality checks
     // above prove nothing about them specifically.
