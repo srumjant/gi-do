@@ -26,9 +26,15 @@ the screen shake, and the screen shake is still missing.
 
 Say this up front or the first thirty seconds are just them listing it:
 
-no title screen (it starts on the difficulty screen), no pause, and no learn mode. Two
-enemies are missing — the **ghost** and the **cannon** — so levels 2, 3, 4 and 6 are
-emptier than they should be.
+no title screen (it starts on the difficulty screen), no pause, and no learn mode.
+
+**Every enemy is there now.** The **ghost** and the **cannon** were the last two, and they
+arrived on 2026-09-22, so levels 2, 3, 4 and 6 are no longer emptier than they should be —
+that is the thing to check on those levels. A ghost hangs in the air bobbing until you get
+close, then comes straight at you through walls and floors; it is see-through and it
+pulses. A cannon sits still and spits flat fireballs along the ground, and **you cannot
+jump on it** — landing on a cannon's head hurts you, exactly as in the real game. Shoot it,
+or turn it into a chicken and then jump on it.
 
 **Level 6 has its boss now.** It breathes fireballs, roars when it is losing, and has to be
 beaten before you can reach your sibling — who is in a cage behind it until it falls. An
@@ -36,10 +42,9 @@ arrow hurts it; a chicken ray bounces off, exactly as in the real game. What is 
 the punch around it: no screen shake when you land on its head, and none of the sparks and
 smoke, because the port has no particle system yet.
 
-Everything else is there now: all six levels, difficulty and character choice, hearts,
-score, the cat, the bow, the chicken ray, the silly power-ups, the cape, and the
-between-level cutscene. Level 5, the ice one, is complete — every penguin and icebat it
-is supposed to have.
+Everything else is there now: all six levels with every enemy on them, difficulty and
+character choice, hearts, score, the cat, the bow, the chicken ray, the silly power-ups,
+the cape, and the between-level cutscene.
 
 **The sound arrived on 2026-09-22 and is the thing to listen to.** Every effect and every
 theme, including two the original plays that are easy to miss: the cat has a little tune of

@@ -1,16 +1,20 @@
 // Port of the streaming enemy spawn (index.html:1212-1222, 1358) and the per-enemy step
-// (index.html:1524-1547): ground patrollers (doll, car, dino, penguin), plus bat/icebat
-// (sine-wave flight) and bouncer (hops) — every type level 1 actually spawns. Ghost and
-// cannon are the two streamed types this slice still does not implement; see enemy.ts
-// for where they are recognised and skipped rather than half-simulated.
+// (index.html:1524-1547), now covering EVERY type the six levels spawn: the ground
+// patrollers (doll, car, dino, penguin), the flyers (bat, icebat and, as of this task,
+// ghost), the bouncer and the cannon. Nothing in the level data is skipped any more.
+import fs from 'node:fs';
+import path from 'node:path';
+import url from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
 import { testEnemyMove, testMove } from './helpers/testMove';
 import { chickenify, isGroundPatrol, spawnEnemy, stepEnemy } from '../src/game/enemy';
 import { setRandom } from '../src/game/random';
-import { createWorld, spawnEnemiesInView, stepEnemies, stepWorld } from '../src/game/world';
+import {
+  createWorld, spawnEnemiesInView, stepArrows, stepEnemies, stepEnemyProjectiles, stepWorld,
+} from '../src/game/world';
 import { createPlayer } from '../src/game/player';
-import { getTile, isSolid } from '../src/game/tiles';
+import { findGroundY, getTile, isSolid } from '../src/game/tiles';
 import { LEVELS, makeGround, TILE_GROUND } from '../src/data/levels';
 import { emptyInput, type InputState } from '../src/input/actions';
 import { TILE } from '../src/config/constants';
@@ -40,14 +44,90 @@ function standsOnGround(map: number[][], e: EnemyState): boolean {
 describe('spawnEnemy', () => {
   afterEach(() => setRandom(Math.random)); // never leak a stub into an unrelated test
 
-  it('returns undefined for streamed types this slice still does not implement', () => {
+  // Every type the level data names is built now — ghost and cannon were the last two —
+  // so the only thing left on the skip path is a type nothing has ever heard of. It is
+  // kept because an enemy def is plain data with a plain `string` type: a typo in
+  // levels.ts must cost that one enemy, not the level. See enemy.ts's ENEMY_SPRITES.
+  it('builds every type the levels name, and skips one it does not know', () => {
     const world = createWorld(0, 'normal');
-    // ghost and cannon are the two types left out after this task (see enemy.ts's
-    // ENEMY_SPRITES) — neither appears in level 0's own enemyDefs, so this is the only
-    // remaining coverage of the skip path at all; everything level 0 actually streams
-    // (doll, car, dino, bat, bouncer) is a real spawn now, exercised below instead.
-    expect(spawnEnemy(world.map, world.dc, { type: 'ghost', x: 10 })).toBeUndefined();
-    expect(spawnEnemy(world.map, world.dc, { type: 'cannon', x: 10 })).toBeUndefined();
+    const SPAWNABLE = [
+      'doll', 'car', 'dino', 'penguin', 'ghost', 'bat', 'icebat', 'cannon', 'bouncer',
+    ];
+    for (const type of SPAWNABLE) {
+      expect(spawnEnemy(world.map, world.dc, { type, x: 10 }), type).toBeDefined();
+    }
+    // Read off the real level records rather than trusting the list above: if a level
+    // ever gains a type this map has no sprite for, that enemy would silently stop
+    // existing, which is exactly how ghost and cannon went missing for four levels.
+    const inLevels = new Set(LEVELS.flatMap((l) => l.enemyDefs.map((d) => d.type)));
+    for (const type of inLevels) {
+      expect(SPAWNABLE, `${type} is in the level data but not spawnable`).toContain(type);
+    }
+
+    expect(spawnEnemy(world.map, world.dc, { type: 'wyvern', x: 10 })).toBeUndefined();
+  });
+
+  it('spawns a ghost 40px up, motionless, gravity-free and with no sine offset of its own', () => {
+    const world = createWorld(0, 'normal');
+    const ghost = spawnEnemy(world.map, world.dc, { type: 'ghost', x: 10 })!;
+
+    // Column 10 on level 0 is the platform at [10,19,5], so findGroundY is row 19
+    // (gy=304): y = 304 - h(16.2) - 40 = 247.8. FORTY, not the bat's sixty.
+    expect(ghost).toMatchObject({
+      type: 'ghost', x: 10 * TILE, y: 247.8, w: 14.4, h: 16.2, vy: 0,
+      alive: true, noGravity: true, originY: 247.8, noStomp: false,
+    });
+    // vx is 0 at spawn and is FACING, not movement, from the first step on — see the
+    // ghost tests further down, which pin that it never moves the thing.
+    expect(ghost.vx).toBe(0);
+    // No sineOffset, unlike a bat: every ghost drifts on the same phase of the same
+    // clock. This is the live line (index.html:1216 sets no offset), so it must stay 0
+    // even though the field exists on every enemy.
+    expect(ghost.sineOffset).toBe(0);
+  });
+
+  it('spawns a cannon standing on the ground, unstompable, with a randomised first shot', () => {
+    const world = createWorld(0, 'normal');
+    setRandom(() => 0.5); // the live driver's own stubbed Math.random
+    const cannon = spawnEnemy(world.map, world.dc, { type: 'cannon', x: 10 })!;
+
+    expect(cannon).toMatchObject({
+      type: 'cannon', x: 10 * TILE, y: 304 - 14.4, w: 14.4, h: 14.4, vx: 0, vy: 0,
+      alive: true, noStomp: true,
+      // NOT a flyer: it falls and floor-snaps every frame like a doll (index.html:1527
+      // has no exception for it), it just never gains any x.
+      noGravity: false,
+    });
+    // 60 + floor(0.5*60) — one to two seconds before the first shot.
+    expect(cannon.shootTimer).toBe(90);
+    // The difficulty's own rate, flat. The boss takes the same number times 1.2.
+    expect(cannon.shootInterval).toBe(world.dc.enemyShootInterval);
+    expect(cannon.shootInterval).toBe(90);
+  });
+
+  // The whole reason the first timer is drawn at random: level 2 has two cannons and
+  // level 4 has five, all sharing one interval. Give them a fixed start and every cannon
+  // in a level fires on the same frame for the whole level — one dodgeable wall of
+  // fireballs instead of a scattering, and the same noise five times at once.
+  it('gives a row of cannons different first shots, spread across exactly one second', () => {
+    const world = createWorld(0, 'normal');
+    const draws = [0, 0.25, 0.5, 0.75, 0.999];
+    let i = 0;
+    setRandom(() => draws[i++]);
+
+    const row = [26, 73, 103, 134, 136].map(
+      (x) => spawnEnemy(world.map, world.dc, { type: 'cannon', x })!, // level 4's own columns
+    );
+    const timers = row.map((c) => c.shootTimer);
+
+    expect(timers).toEqual([60, 75, 90, 105, 119]);
+    expect(new Set(timers).size).toBe(row.length); // no two of them in lockstep
+    for (const t of timers) {
+      expect(t).toBeGreaterThanOrEqual(60); // never sooner than a second
+      expect(t).toBeLessThan(120); // never later than two
+    }
+    // And they all reload to the same rate afterwards — the spread is in the START only.
+    expect(new Set(row.map((c) => c.shootInterval))).toEqual(new Set([90]));
   });
 
   it('spawns a bat 60px above the ground, sized off the sprite, sine-offset from the injected random source', () => {
@@ -385,6 +465,7 @@ describe('stepEnemy', () => {
         type: 'doll', x: 100, y: 150, vx: -0.8, vy: 0, w: 14.4, h: 16.2, alive: true,
         frame: 0, frameTimer: 0, squashTimer: 0,
         noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+        shootTimer: 0, shootInterval: 0, noStomp: false,
       isChicken: false,
       };
       world.player = createPlayer(LEVELS[0], world.dc, 'gigi'); // w=16, h=24
@@ -455,6 +536,7 @@ describe('stepEnemy', () => {
       // fully inert, not the countdown itself (see the 'stomp' tests above for that).
       frame: 0, frameTimer: 0, squashTimer: 0,
       noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+      shootTimer: 0, shootInterval: 0, noStomp: false,
       isChicken: false,
     };
     world.player = createPlayer(LEVELS[0], world.dc, 'gigi');
@@ -466,6 +548,298 @@ describe('stepEnemy', () => {
     for (let i = 0; i < 10; i++) stepEnemy(world, enemy);
 
     expect(enemy).toEqual(before);
+  });
+});
+
+// index.html:1530-1532. A ghost has two states and a distance decides which: inside
+// `dc.ghostAggroRange` it homes, outside it hangs on a sine. Everything here is port-side
+// arithmetic the live comparison at the bottom of this file also pins frame for frame;
+// these say WHAT the numbers mean, which a trace cannot.
+describe('the ghost', () => {
+  /** A ghost on flat ground, and a player put wherever the test wants one. */
+  function ghostWorld(difficulty: 'super_easy' | 'normal' | 'hard' = 'normal') {
+    const world = createWorld(0, difficulty);
+    world.map = makeGround(60, 20);
+    world.player = createPlayer(LEVELS[0], world.dc, 'gigi');
+    const ghost = spawnEnemy(world.map, world.dc, { type: 'ghost', x: 30 })!;
+    world.enemies.push(ghost);
+    return { world, ghost };
+  }
+
+  it('homes on the player when inside the aggro range, sideways faster than downwards', () => {
+    const { world, ghost } = ghostWorld();
+    // Exactly diagonal, 100px each way: dist 141.42, comfortably inside normal's 200.
+    world.player.x = ghost.x + 100;
+    world.player.y = ghost.y + 100;
+    const from = { x: ghost.x, y: ghost.y };
+
+    stepEnemy(world, ghost);
+
+    const dx = ghost.x - from.x;
+    const dy = ghost.y - from.y;
+    expect(dx).toBeGreaterThan(0); // toward the player on both axes
+    expect(dy).toBeGreaterThan(0);
+    // 0.7 against 0.5 on the same unit vector — the ghost CUTS THE PLAYER OFF rather than
+    // diving onto them, and a child running away from one is caught before it drops.
+    // Asserted as the ratio, not as two magic numbers, so it survives dc.enemySpeed.
+    expect(dx / dy).toBeCloseTo(0.7 / 0.5, 10);
+    expect(dx).toBeCloseTo((100 / Math.SQRT2 / 100) * 0.7 * world.dc.enemySpeed, 10);
+  });
+
+  it('drifts on a sine about originY, and does not move sideways at all, when out of range', () => {
+    const { world, ghost } = ghostWorld();
+    // 400px away: outside every difficulty's range, normal's 200 included.
+    world.player.x = ghost.x + 400;
+    world.player.y = ghost.y;
+    const parkedAt = ghost.x;
+
+    const ys: number[] = [];
+    for (let f = 0; f < 200; f++) {
+      world.animFrame = f;
+      stepEnemy(world, ghost);
+      ys.push(ghost.y);
+      // The whole claim about `vx`: it is FACING, never movement. It is rewritten ±0.1
+      // every single frame and the ghost's x never changes by so much as an ulp, because
+      // nothing integrates it — not this branch, not gravity, and not a mover, since a
+      // ghost is never a ground patroller and so never gets an Arcade body.
+      expect(Math.abs(ghost.vx)).toBe(0.1);
+      expect(ghost.x).toBe(parkedAt);
+    }
+
+    // A real wave about originY, amplitude 15 — not the bat's 30 — on the 0.04 clock.
+    expect(Math.max(...ys)).toBeCloseTo(ghost.originY + 15, 1);
+    expect(Math.min(...ys)).toBeCloseTo(ghost.originY - 15, 1);
+  });
+
+  it('turns to face the player, which is the only thing its vx is for', () => {
+    const { world, ghost } = ghostWorld();
+    world.player.x = ghost.x + 400; // out of range, so only the facing line runs
+    world.player.y = ghost.y;
+
+    stepEnemy(world, ghost);
+    expect(ghost.vx).toBe(0.1); // > 0, which is what the draw code flips on
+
+    world.player.x = ghost.x - 400;
+    stepEnemy(world, ghost);
+    expect(ghost.vx).toBe(-0.1);
+  });
+
+  // The boundary itself, read off the real difficulty records rather than a constant, so
+  // this fails loudly if the table ever moves. All four records carry the field and the
+  // type requires it, so there is no fallback anywhere and none is written.
+  it('switches branch exactly at dc.ghostAggroRange, which every difficulty carries', () => {
+    for (const difficulty of ['super_easy', 'normal', 'hard'] as const) {
+      const { world, ghost } = ghostWorld(difficulty);
+      const range = world.dc.ghostAggroRange;
+      expect(typeof range, difficulty).toBe('number');
+
+      // Purely horizontal, one pixel inside: `dist < range` is strict, so `range - 1`
+      // homes and `range` itself does not.
+      world.player.y = ghost.y;
+      world.player.x = ghost.x + range - 1;
+      const parkedAt = ghost.x;
+      stepEnemy(world, ghost);
+      expect(ghost.x, `${difficulty} should home at ${range - 1}px`).toBeGreaterThan(parkedAt);
+
+      ghost.x = parkedAt;
+      world.player.x = ghost.x + range;
+      stepEnemy(world, ghost);
+      expect(ghost.x, `${difficulty} should drift at ${range}px`).toBe(parkedAt);
+    }
+  });
+
+  it('homes straight through a wall, because nothing about it reads the tile map', () => {
+    const { world, ghost } = ghostWorld();
+    const wallTx = Math.floor(ghost.x / TILE) + 3;
+    for (let ty = 0; ty < world.map.length; ty++) world.map[ty][wallTx] = TILE_GROUND;
+    world.player.x = ghost.x + 120; // beyond the wall, inside the range
+    world.player.y = ghost.y;
+
+    for (let f = 0; f < 120; f++) stepEnemy(world, ghost);
+
+    // It crossed the solid column without turning, stopping or being pushed out. That is
+    // the point of a ghost and it is why it must never be handed to a mover.
+    expect(ghost.x).toBeGreaterThan((wallTx + 1) * TILE);
+  });
+
+  it('is killed by a stomp and by an arrow like anything else', () => {
+    const { world, ghost } = ghostWorld();
+    world.player.x = ghost.x - 400; // out of range: it stays put while the arrow arrives
+    world.arrows.push({ x: ghost.x + 2, y: ghost.y + 2, vx: 0, life: 60, isChicken: false });
+
+    stepArrows(world);
+
+    expect(ghost.alive).toBe(false);
+    expect(ghost.noStomp).toBe(false); // nothing but a cannon is unstompable
+  });
+});
+
+// index.html:1534-1535 and :1218. The cannon is three things: a countdown, a flat
+// fireball, and `noStomp`.
+describe('the cannon', () => {
+  function cannonWorld(difficulty: 'super_easy' | 'normal' | 'hard' = 'normal') {
+    const world = createWorld(0, difficulty);
+    world.map = makeGround(60, 20);
+    world.player = createPlayer(LEVELS[0], world.dc, 'gigi');
+    setRandom(() => 0.5); // shootTimer = 90
+    const cannon = spawnEnemy(world.map, world.dc, { type: 'cannon', x: 30 })!;
+    setRandom(Math.random);
+    world.enemies.push(cannon);
+    return { world, cannon };
+  }
+
+  it('counts down and fires on the frame the timer reaches zero, then reloads', () => {
+    const { world, cannon } = cannonWorld();
+    world.player.x = cannon.x + 300; // to the right
+
+    for (let f = 0; f < 89; f++) stepEnemy(world, cannon);
+    expect(cannon.shootTimer).toBe(1);
+    expect(world.enemyProjectiles).toHaveLength(0); // nothing yet, on any of those 89
+
+    stepEnemy(world, cannon); // the 90th
+    expect(world.enemyProjectiles).toHaveLength(1);
+    // Reloaded to the interval, not topped up by it: a cannon that fell behind never
+    // fires twice to catch up.
+    expect(cannon.shootTimer).toBe(cannon.shootInterval);
+
+    for (let f = 0; f < 90; f++) stepEnemy(world, cannon);
+    expect(world.enemyProjectiles).toHaveLength(2); // and again, one interval later
+  });
+
+  it('fires a FLAT fireball, aimed at whichever side the player is on', () => {
+    const { world, cannon } = cannonWorld();
+    world.player.x = cannon.x + 300;
+    for (let f = 0; f < 90; f++) stepEnemy(world, cannon);
+
+    expect(world.enemyProjectiles[0]).toEqual({
+      x: cannon.x + cannon.w / 2 + 8,
+      y: cannon.y + cannon.h / 2 - 3,
+      vx: 2.5 * world.dc.enemySpeed,
+      // THE NUMBER THAT MATTERS. The boss's two leave at -1 and -2 and rise for their
+      // whole life; this one is dead flat, and nothing in stepEnemyProjectiles ever
+      // accelerates any of them. Same list, same pass, different numbers.
+      vy: 0,
+      life: 120,
+      type: 'fireball',
+    });
+
+    // And it flies flat: y unchanged after fifty frames of the real projectile pass.
+    const shot = world.enemyProjectiles[0];
+    const firedAt = shot.y;
+    world.player.x = -1000; // out of the way, so the hit check cannot end the flight
+    for (let f = 0; f < 50; f++) stepEnemyProjectiles(world);
+    expect(shot.y).toBe(firedAt);
+    expect(shot.x).toBeCloseTo(cannon.x + cannon.w / 2 + 8 + 50 * 2.5 * world.dc.enemySpeed, 6);
+  });
+
+  it('aims left when the player is left', () => {
+    const { world, cannon } = cannonWorld();
+    world.player.x = cannon.x - 300;
+    for (let f = 0; f < 90; f++) stepEnemy(world, cannon);
+
+    const shot = world.enemyProjectiles[0];
+    expect(shot.vx).toBe(-2.5 * world.dc.enemySpeed);
+    expect(shot.x).toBe(cannon.x + cannon.w / 2 - 8); // out of the muzzle on that side too
+  });
+
+  it('makes its own noise, not the boss\'s', () => {
+    const { world, cannon } = cannonWorld();
+    world.player.x = cannon.x + 300;
+    for (let f = 0; f < 90; f++) stepEnemy(world, cannon);
+    expect(world.sounds).toEqual(['cannon-fire']);
+  });
+
+  // THE LANDMINE. `!e.noStomp` was left out of this port while nothing spawned a cannon,
+  // on the correct reasoning that the gate was dead code — and it stopped being correct
+  // the moment spawnEnemy learned to build one. Without it a child kills a cannon by
+  // jumping on it, which the original does not allow.
+  it('cannot be stomped: a jump onto its head hurts the player instead', () => {
+    const { world, cannon } = cannonWorld();
+    // Placed in mid-air with the player's feet just inside its top half — the exact
+    // geometry the doll stomp test above uses, so the only difference is `noStomp`.
+    cannon.noGravity = true; // hold it still; the stomp box is what is under test
+    cannon.x = 100;
+    cannon.y = 150;
+    world.player.x = 98;
+    world.player.y = 150 - world.player.h + 2;
+    world.player.vy = 3; // falling, which is the other half of the stomp condition
+
+    stepEnemy(world, cannon);
+
+    expect(cannon.alive).toBe(true); // survived
+    expect(cannon.squashTimer).toBe(0); // and was not even flattened
+    expect(world.player.vy).toBe(3); // no bounce: the stomp branch never ran
+    expect(world.dead).toBe(true); // it hit the player instead, which is the whole point
+    expect(world.score).toBe(0); // and paid nothing
+
+    // Same setup with the flag cleared kills it, so the test above is about `noStomp`
+    // and not about the geometry.
+    const other = cannonWorld();
+    other.cannon.noGravity = true;
+    other.cannon.noStomp = false;
+    other.cannon.x = 100;
+    other.cannon.y = 150;
+    other.world.player.x = 98;
+    other.world.player.y = 150 - other.world.player.h + 2;
+    other.world.player.vy = 3;
+    stepEnemy(other.world, other.cannon);
+    expect(other.cannon.alive).toBe(false);
+    expect(other.world.dead).toBe(false);
+  });
+
+  it('is killed by an arrow, which is the only way to be rid of one', () => {
+    const { world, cannon } = cannonWorld();
+    world.arrows.push({ x: cannon.x + 2, y: cannon.y + 2, vx: 0, life: 60, isChicken: false });
+
+    stepArrows(world);
+
+    expect(cannon.alive).toBe(false);
+    expect(world.score).toBe(Math.round(200 * world.dc.scoreMultiplier));
+  });
+
+  // index.html:1508's `e.noStomp=false`, which this port left out for the same reason it
+  // left out the gate. A chicken ray is the one thing that makes a cannon stompable: it
+  // stops being a cannon.
+  it('becomes stompable once a chicken ray has turned it into a bird', () => {
+    const { world, cannon } = cannonWorld();
+    world.arrows.push({ x: cannon.x + 2, y: cannon.y + 2, vx: 0, life: 60, isChicken: true });
+
+    stepArrows(world);
+
+    expect(cannon.alive).toBe(true);
+    expect(cannon.type).toBe('chicken');
+    expect(cannon.noStomp).toBe(false);
+    expect(isGroundPatrol(cannon)).toBe(true); // and it walks now, so it is bodied
+
+    cannon.noGravity = true;
+    cannon.x = 100;
+    cannon.y = 150;
+    world.player.x = 98;
+    world.player.y = 150 - world.player.h + 2;
+    world.player.vy = 3;
+    stepEnemy(world, cannon);
+
+    expect(cannon.alive).toBe(false);
+    expect(world.dead).toBe(false);
+  });
+
+  // The regression guard for `isGroundPatrol`. A cannon never moves, so calling it a
+  // ground patroller looks harmless — but that question decides who runs the gravity
+  // INTEGRATION and the floor snap, and the cannon has to run its own, exactly as live.
+  // Get it wrong and the cannon's vy climbs to the clamp of 8 and stays there, spent by
+  // nothing, for the whole level.
+  it('falls, lands and keeps its vy at zero without any mover at all', () => {
+    const { world, cannon } = cannonWorld();
+    expect(isGroundPatrol(cannon)).toBe(false);
+    cannon.y -= 64; // lift it well clear of the floor
+    const droppedFrom = cannon.y;
+
+    for (let f = 0; f < 60; f++) stepEnemy(world, cannon); // NO mover passed
+
+    expect(cannon.y).toBeGreaterThan(droppedFrom); // it came down under its own gravity
+    expect(cannon.vy).toBe(0); // and landed, rather than free-falling at the clamp
+    expect(standsOnGround(world.map, cannon)).toBe(true);
+    expect(cannon.x).toBe(30 * TILE); // and never moved sideways by a pixel
   });
 });
 
@@ -719,6 +1093,7 @@ describe('the big-head stomp multiplier compounds with dc.stompHitbox', () => {
       type: 'doll', x: 100, y: 150, vx: -0.8, vy: 0, w: 14.4, h: 16.2, alive: true,
       frame: 0, frameTimer: 0, squashTimer: 0,
       noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+      shootTimer: 0, shootInterval: 0, noStomp: false,
       isChicken: false,
     };
     world.player = createPlayer(LEVELS[0], world.dc, 'gigi'); // w=16, h=24
@@ -764,5 +1139,219 @@ describe('the big-head stomp multiplier compounds with dc.stompHitbox', () => {
     expect(c.enemy.squashTimer).toBe(45); // index.html:1546, not :1545's 30
     // super_easy's 0.5 multiplier, rounded at the award site like every other award.
     expect(c.world.score).toBe(Math.round(200 * c.world.dc.scoreMultiplier));
+  });
+});
+
+// ============================================================================
+// GHOST AND CANNON vs. THE LIVE GAME, frame for frame.
+//
+// This works where the ground patrollers' equivalent no longer can (see the note above
+// the previous comparison): neither type was handed to Arcade. A ghost writes `x` and `y`
+// outright and passes through walls; a cannon never moves at all. Both are still the
+// hand-rolled port of index.html, so "close enough" is neither required nor accepted here
+// — every field is compared exactly, and so is every fireball in the air.
+//
+// Two setups, because the ghost has two branches and no one run reaches both:
+//
+//   1. The player left at spawn, 900px from the ghost — the DRIFT branch, plus the
+//      cannon's whole countdown-fire-reload cycle.
+//   2. The player pinned 160px from the ghost — the HOMING branch.
+//
+// Both make the player INVINCIBLE every frame, on both sides. That is not a fudge: it
+// gates only the stomp and the contact hit (index.html:1544), touches nothing either of
+// these two enemies does, and removes the only thing that would otherwise end these
+// traces early — a patroller wandering into a stationary player and killing them. Level
+// 2's own defs put a dino within about 150 frames of the spawn point, which is less than
+// two cannon cycles.
+// ============================================================================
+describe('ghost and cannon vs. the live game', () => {
+  afterEach(() => setRandom(Math.random));
+
+  const LEVEL = 1; // "level 2" on screen: cannon@29 and ghost@58, both in one spawn window
+  const STILL = () => ({ left: false, right: false, jump: false, fire: false });
+  /** Big enough that nothing can count it down inside a trace. */
+  const IMMORTAL = 100000;
+
+  interface EnemyRow {
+    type: string; x: number; y: number; vx: number; vy: number; alive: boolean;
+    frame: number; frameTimer: number; squashTimer: number;
+    shootTimer: unknown; shootInterval: unknown;
+  }
+  interface Frame {
+    enemies: EnemyRow[];
+    shots: Array<{ x: number; y: number; vx: number; vy: number; life: number }>;
+  }
+
+  /**
+   * The two fields the live object only ever ADDS to a cannon. Every other live enemy
+   * reads `undefined` for them while this port carries a real 0 — the same
+   * representational difference the bat's `vy` has (see the previous comparison) — so
+   * they are normalised to `undefined` for anything but a cannon, and compared exactly
+   * for a cannon, which is the only type that has them at all.
+   */
+  function shootFields(e: { type: string; shootTimer: number; shootInterval: number }) {
+    if (e.type !== 'cannon') return { shootTimer: undefined, shootInterval: undefined };
+    return { shootTimer: e.shootTimer, shootInterval: e.shootInterval };
+  }
+
+  function pinPlayer(p: { x: number; y: number; vx: number; vy: number; invincible: number },
+    pin?: { x: number; y: number }): void {
+    if (pin) {
+      p.x = pin.x;
+      p.y = pin.y;
+      p.vx = 0;
+      p.vy = 0;
+    }
+    p.invincible = IMMORTAL;
+  }
+
+  function drivePort(world: World, frames: number, pin?: { x: number; y: number }): Frame[] {
+    const out: Frame[] = [];
+    // Before the first step as well as after every one, mirroring the live side's
+    // `beforeRun` + `onFrame` pair exactly. Pin only afterwards and frame 0 would have
+    // the two players in different places, which — for a ghost — is a different branch.
+    pinPlayer(world.player, pin);
+    for (let f = 0; f < frames; f++) {
+      stepWorld(world, held({}), testMove, testEnemyMove);
+      pinPlayer(world.player, pin);
+      out.push({
+        enemies: world.enemies.map((e) => ({
+          type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
+          frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
+          ...shootFields(e),
+        })),
+        shots: world.enemyProjectiles.map(
+          (s) => ({ x: s.x, y: s.y, vx: s.vx, vy: s.vy, life: s.life }),
+        ),
+      });
+    }
+    return out;
+  }
+
+  function driveLive(frames: number, cameraX: number, pin?: { x: number; y: number }): Frame[] {
+    const out: Frame[] = [];
+    driveLiveGame({
+      level: LEVEL,
+      difficulty: 'normal',
+      character: 'gigi',
+      frames,
+      input: STILL,
+      beforeRun: (d) => {
+        d.getCamera().x = cameraX;
+        pinPlayer(d.getPlayer() as unknown as Parameters<typeof pinPlayer>[0], pin);
+      },
+      onFrame: (d) => {
+        pinPlayer(d.getPlayer() as unknown as Parameters<typeof pinPlayer>[0], pin);
+        out.push({
+          enemies: d.getEnemies().map((e) => ({
+            type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: !!e.alive,
+            frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
+            shootTimer: e.shootTimer, shootInterval: e.shootInterval,
+          })),
+          shots: d.getEnemyProjectiles(),
+        });
+      },
+    });
+    return out;
+  }
+
+  /** The types both sides still move by hand, and so the only ones positionally compared. */
+  const HAND_ROLLED = new Set(['ghost', 'bat', 'icebat', 'cannon', 'bouncer']);
+
+  function compare(port: Frame[], live: Frame[]): void {
+    expect(port.length).toBe(live.length);
+    for (let f = 0; f < port.length; f++) {
+      expect(port[f].enemies.map((e) => e.type), `types diverged on frame ${f}`)
+        .toEqual(live[f].enemies.map((e) => e.type));
+      // Every fireball in the air, every field of it, every frame — the cannon's shot is
+      // as much a part of this port as the cannon.
+      expect(port[f].shots, `fireballs diverged on frame ${f}`).toEqual(live[f].shots);
+      for (let i = 0; i < port[f].enemies.length; i++) {
+        const a = port[f].enemies[i];
+        const b = live[f].enemies[i];
+        expect(a.alive, `alive diverged on frame ${f}`).toBe(b.alive);
+        expect(a.frame, `frame diverged on frame ${f}`).toBe(b.frame);
+        expect(a.frameTimer, `frameTimer diverged on frame ${f}`).toBe(b.frameTimer);
+        expect(a.squashTimer, `squashTimer diverged on frame ${f}`).toBe(b.squashTimer);
+        expect(a.shootTimer, `${a.type} shootTimer diverged on frame ${f}`).toBe(b.shootTimer);
+        expect(a.shootInterval, `${a.type} shootInterval on frame ${f}`).toBe(b.shootInterval);
+        if (!HAND_ROLLED.has(a.type)) continue;
+        expect(a.x, `${a.type} x diverged on frame ${f}`).toBe(b.x);
+        expect(a.y, `${a.type} y diverged on frame ${f}`).toBe(b.y);
+        expect(a.vx, `${a.type} vx diverged on frame ${f}`).toBe(b.vx);
+      }
+    }
+  }
+
+  it('a drifting ghost and a firing cannon match exactly, fireballs included', () => {
+    const FRAMES = 260; // two full cannon cycles: it fires on frame 90 and again on 180
+    const CAMERA_X = 400; // window [24,66] — cannon@29 and ghost@58 both spawn on frame 0
+    setRandom(() => 0.5); // matches the live driver's own stubbed Math.random exactly
+
+    const live = driveLive(FRAMES, CAMERA_X);
+    const world = createWorld(LEVEL, 'normal');
+    world.camera.x = CAMERA_X;
+    const port = drivePort(world, FRAMES);
+
+    compare(port, live);
+
+    // The `continue` above must not be reading as coverage it is not: both types were
+    // really in this window.
+    const seen = new Set(port.flatMap((f) => f.enemies.map((e) => e.type)));
+    expect(seen.has('ghost')).toBe(true);
+    expect(seen.has('cannon')).toBe(true);
+
+    // And both behaviours really happened, or the equalities prove nothing about them.
+    const ghosts = port.flatMap((f) => f.enemies.filter((e) => e.type === 'ghost'));
+    expect(new Set(ghosts.map((g) => g.x)).size).toBe(1); // DRIFTED: never moved sideways
+    const ghostYs = ghosts.map((g) => g.y);
+    expect(Math.max(...ghostYs) - Math.min(...ghostYs)).toBeGreaterThan(25); // a real sine
+    expect(new Set(ghosts.map((g) => Math.sign(g.vx)))).toEqual(new Set([-1])); // faced west
+    expect(port.filter((f) => f.shots.length > 0).length).toBeGreaterThan(100); // it fired
+  });
+
+  it('a homing ghost matches exactly, chasing a player it can see', () => {
+    const FRAMES = 200;
+    const CAMERA_X = 400;
+    const PIN_TILE = 48; // ghost@58 is 160px east of this, inside normal's 200px range
+    setRandom(() => 0.5);
+
+    const world = createWorld(LEVEL, 'normal');
+    const pin = {
+      x: PIN_TILE * TILE,
+      y: findGroundY(world.map, PIN_TILE) - world.player.h,
+    };
+
+    const live = driveLive(FRAMES, CAMERA_X, pin);
+    world.camera.x = CAMERA_X;
+    const port = drivePort(world, FRAMES, pin);
+
+    compare(port, live);
+
+    // It really chased, rather than hanging on its sine.
+    const ghosts = port.flatMap((f) => f.enemies.filter((e) => e.type === 'ghost'));
+    expect(ghosts.length).toBeGreaterThan(0);
+    expect(ghosts[ghosts.length - 1].x).toBeLessThan(ghosts[0].x - 50); // came west
+    expect(new Set(ghosts.map((g) => Math.sign(g.vx)))).toEqual(new Set([-1]));
+  });
+});
+
+/**
+ * The cannon's shot is a bare `playTone` inside `update()` (index.html:1535), like the
+ * boss's three — no named `sfx*` function for tests/sfx.test.ts to load and call. So the
+ * port's copy is checked the one way left, exactly as boss.test.ts checks the fight's
+ * three: the call it was transcribed from has to still be in index.html, spelled like
+ * this. That the numbers are NOT the boss's is the trap this guards.
+ */
+describe('the cannon tone is the live game\'s', () => {
+  const here = path.dirname(url.fileURLToPath(import.meta.url));
+  const source = fs.readFileSync(path.resolve(here, '../../index.html'), 'utf8');
+
+  it('is still spelled that way (index.html:1535)', () => {
+    expect(source).toContain("playTone(150,.1,'sawtooth',.08,300)");
+  });
+
+  it('is not the boss\'s fireball, which is the same wave sliding the other way', () => {
+    expect(source).toContain("playTone(150,.2,'sawtooth',.08,80)"); // index.html:1572
   });
 });

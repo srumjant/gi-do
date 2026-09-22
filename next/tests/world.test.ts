@@ -543,6 +543,7 @@ describe('stepArrows', () => {
       type: 'doll', x, y, vx: 0, vy: 0, w: 14.4, h: 16.2, alive: true,
       frame: 0, frameTimer: 0, squashTimer: 0,
       noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+      shootTimer: 0, shootInterval: 0, noStomp: false,
       isChicken: false,
       ...over,
     };
