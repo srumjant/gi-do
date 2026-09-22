@@ -3,8 +3,7 @@ import { BASE_H, BASE_W } from '../config/constants';
 import { powerupLabel } from '../data/powerups';
 import type { PowerupType, World } from '../game/types';
 import { popupFrame, popupSparks } from '../gfx/powerupPopup';
-
-export const POWERUP_POPUP_SCENE_KEY = 'PowerupPopup';
+import { POWERUP_POPUP_SCENE_KEY } from './keys';
 
 /**
  * The same live reference to the simulation's World that the HUD is handed, and under
@@ -87,6 +86,12 @@ export class PowerupPopupScene extends Phaser.Scene {
 
   init(data: PowerupPopupData): void {
     this.world = data.world;
+    // This scene is relaunched per level onto the same instance, and `create` below makes
+    // three fresh, EMPTY labels. Left as it was, `shown` would still name the power-up the
+    // previous level's labels were spelled for, and `retext` — which is a no-op when the
+    // type has not changed — would leave the new ones blank for the same power-up twice in
+    // a row. See the field's own comment.
+    this.shown = null;
   }
 
   create(): void {

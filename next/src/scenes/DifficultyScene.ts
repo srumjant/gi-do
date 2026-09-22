@@ -7,9 +7,8 @@ import { getSkinIndex } from '../game/run';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
 import { menuPlayerTextureKey, MENU_PREVIEW_SCALE, registerMenuTextures } from '../gfx/textures';
 import { bindMenuKeys, type MenuKeys, pressedAny } from '../input/menuKeys';
-import { CHARACTER_SCENE_KEY, type CharacterData } from './CharacterScene';
-
-export const DIFFICULTY_SCENE_KEY = 'Difficulty';
+import type { CharacterData } from './CharacterScene';
+import { CHARACTER_SCENE_KEY, DIFFICULTY_SCENE_KEY } from './keys';
 
 /** index.html:2122. */
 const BACKGROUND = '#1a1a3a';

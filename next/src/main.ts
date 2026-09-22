@@ -1,11 +1,15 @@
 /// <reference types="vite/client" />
 import Phaser from 'phaser';
 import { BASE_W, BASE_H, STEP_HZ } from './config/constants';
+import { BetweenScene } from './scenes/BetweenScene';
 import { CharacterScene } from './scenes/CharacterScene';
 import { DifficultyScene } from './scenes/DifficultyScene';
+import { GameOverScene } from './scenes/GameOverScene';
 import { HudScene } from './scenes/HudScene';
+import { LevelOverlayScene } from './scenes/LevelOverlayScene';
 import { PowerupPopupScene } from './scenes/PowerupPopupScene';
 import { SliceScene } from './scenes/SliceScene';
+import { WinScene } from './scenes/WinScene';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -66,9 +70,25 @@ const game = new Phaser.Game({
    *
    * The power-up announcement comes last of all, and that is the live draw order too:
    * index.html:3455 is `update();draw();drawPowerupPopup();`, and the HUD is drawn inside
-   * `draw()` (:1854-1867). So its dim falls over the hearts and the score as well.
+   * `draw()` (:1854-1867). So its dim falls over the hearts and the score as well. The
+   * frozen-world overlays sit between the two for the same reason and by the same rule:
+   * :1898-1899 are the last lines of `draw()`, after the HUD, before the popup.
+   *
+   * The last three run the level loop rather than the level, and none of them is ever on
+   * screen at the same time as another scene, so where they sit in this list decides
+   * nothing at all — except that they must not be first, because first is what boots.
    */
-  scene: [DifficultyScene, CharacterScene, SliceScene, HudScene, PowerupPopupScene],
+  scene: [
+    DifficultyScene,
+    CharacterScene,
+    SliceScene,
+    HudScene,
+    LevelOverlayScene,
+    PowerupPopupScene,
+    BetweenScene,
+    GameOverScene,
+    WinScene,
+  ],
 });
 
 /**
