@@ -4,10 +4,31 @@ import { TILE_BRICK, type Level } from '../data/levels';
 import { GIGI_SKINS, DODO_SKINS } from '../data/sprites';
 import type { InputState } from '../input/actions';
 import { random } from './random';
-import { getTile, isSolid } from './tiles';
 import type { PlayerState, PowerupType, World } from './types';
 
 export type Character = 'gigi' | 'dodo';
+
+/**
+ * What moves the player, injected into `stepPlayer` below.
+ *
+ * It replaces index.html:1404-1422 — the X sweep, the Y sweep and the left clamp, the
+ * four things this port now hands to Phaser's Arcade Physics. Its contract is the whole
+ * of what those lines did: integrate `p.x`/`p.y` from `p.vx`/`p.vy`, separate the player
+ * out of any solid tile it ended up inside, zero the velocity on the axis that was
+ * blocked, set `p.onGround`, keep the player out of negative `x`, and bump a `?` or
+ * rainbow block taken from underneath. The one implementation is `createPlayerMove` in
+ * physics/player.ts.
+ *
+ * It is INJECTED rather than imported because src/game/ still holds the no-Phaser rule
+ * everywhere it possibly can (see the plan's "what stays pure"): the simulation does not
+ * get to know that a tilemap, a body or a Phaser scene exists. It is OPTIONAL because the
+ * great majority of the test suite does not care how the player got where it is and still
+ * has to be able to drive the simulation, and Arcade cannot be constructed under Vitest at
+ * all. Left out, the player simply does not move — which is honest, and visibly wrong the
+ * moment a test actually depends on movement, rather than quietly running a second physics
+ * engine that nothing ships.
+ */
+export type PlayerMove = (world: World) => void;
 
 /**
  * Port of index.html:1362 — engine constants, not tunable per difficulty. Exported so
@@ -115,16 +136,23 @@ export function giveRandomSillyPowerup(world: World): void {
 
 /**
  * Port of index.html:1418-1420 — what a head-first collision does to the two blocks it
- * could have landed on. Called from the head-hit branch of the Y sweep below, AFTER
- * that branch has already snapped `p.y` and zeroed `p.vy`.
+ * could have landed on. Called by the Arcade mover (physics/player.ts) on the step the
+ * body was blocked from above, which is the equivalent of the live source's head-hit
+ * branch: both fire after the player has already been snapped back down under the tile
+ * and had its upward velocity taken away.
  *
- * `hY` is the head's position BEFORE that snap, and it is what `hy` is floored from.
- * The snap moves the player down to the bottom edge of the tile that was hit, so
- * flooring the snapped `p.y` instead would name the tile row BELOW the block and the
- * lookup would miss. Same for `pL2`/`pR2`: the live source computes them once for the
- * whole Y sweep and reuses them here, and they are unaffected by the snap (which only
- * touches `y`), so passing them in rather than recomputing from `p.x` is the same
- * thing, just explicit.
+ * `headTileY` is the block's tile ROW. The live source floors it from the head's
+ * position BEFORE the snap (`hY`, index.html:1417-1418); Arcade has already separated
+ * the body by the time anyone can look, so the caller works the row out from where the
+ * body ended up instead — see `headTileRow` in physics/player.ts, which is where that
+ * arithmetic lives and is tested. What must not happen, either way, is flooring the
+ * SNAPPED position: that names the row below the block and every lookup here misses.
+ *
+ * The two probe columns are read off `p.x` here rather than passed in. The live source
+ * computes them once for the whole Y sweep and reuses them (`pL2`, `pR2`), but they are
+ * a function of `p.x` alone and the snap only ever touches `y`, so deriving them is the
+ * same two numbers — and it keeps the 3px inset, which is part of the bump RULE, in the
+ * same place as the rest of the rule.
  *
  * Two columns and two lists, four sweeps in total, in exactly this order:
  *
@@ -149,10 +177,11 @@ export function giveRandomSillyPowerup(world: World): void {
  * The live source's `spawnParticles(...)` and `sfxBlock()` are presentation and sound,
  * which src/game/ does not own.
  */
-function bumpBlocksAbove(world: World, pL2: number, pR2: number, hY: number): void {
-  const h1 = Math.floor(pL2 / TILE);
-  const h2 = Math.floor(pR2 / TILE);
-  const hy = Math.floor(hY / TILE);
+export function bumpBlocksAbove(world: World, headTileY: number): void {
+  const p = world.player;
+  const h1 = Math.floor((p.x + 3) / TILE);
+  const h2 = Math.floor((p.x + p.w - 3) / TILE);
+  const hy = headTileY;
 
   for (const hx of [h1, h2]) {
     const qb = world.questionBlocks.find((q) => q.x === hx && q.y === hy && !q.hit);
@@ -243,8 +272,12 @@ function fireArrow(world: World, input: InputState): void {
  * was SAVED by a cape. `world.dead` alone cannot tell stepWorld which happened, because
  * a cape save takes that same `return` while leaving the player alive, so the answer is
  * reported here instead.
+ *
+ * `move` is the only part of the live player block this function no longer does itself:
+ * the X sweep, the Y sweep, the left clamp and the head-first block bump, which are
+ * Arcade's from this plan on. See PlayerMove above and the call site below.
  */
-export function stepPlayer(world: World, input: InputState): boolean {
+export function stepPlayer(world: World, input: InputState, move?: PlayerMove): boolean {
   // index.html:1348 — the live update() checks its dead-state branch, and returns,
   // before it ever reaches player movement. Reproduced by returning immediately: once
   // dead, nothing below runs again, so position and velocity freeze on the death frame.
@@ -319,58 +352,25 @@ export function stepPlayer(world: World, input: InputState): boolean {
   p.vy += GRAVITY * gMul;
   if (p.vy > 8) p.vy = 8;
 
-  // X movement + resolution (index.html:1404-1407). Probes are inset by 2px and taken
-  // at three points: top, bottom, and the vertical midpoint.
-  p.x += p.vx;
-  const pL = p.x + 2;
-  const pR = p.x + p.w - 2;
-  const pT = p.y + 1;
-  const pB = p.y + p.h - 1;
-  const pMidY = pT + (pB - pT) / 2;
-  if (p.vx > 0) {
-    if (isSolid(getTile(world.map, pR, pT)) || isSolid(getTile(world.map, pR, pB))
-        || isSolid(getTile(world.map, pR, pMidY))) {
-      // The `+1` is real — this is not a mirror of the left side's `+ TILE - 2` below.
-      p.x = Math.floor(pR / TILE) * TILE - p.w + 1;
-      p.vx = 0;
-    }
-  } else if (p.vx < 0) {
-    if (isSolid(getTile(world.map, pL, pT)) || isSolid(getTile(world.map, pL, pB))
-        || isSolid(getTile(world.map, pL, pMidY))) {
-      p.x = Math.floor(pL / TILE) * TILE + TILE - 2;
-      p.vx = 0;
-    }
-  }
-
-  // Y movement + resolution (index.html:1408-1421). `onGround` is reset to false
-  // immediately and unconditionally, before the floor check below — reproduced even
-  // though it makes the live source's own `wasAirborne` always true (that variable
-  // only gated dust particles, which are out of scope). Probes here are inset by 3px
-  // and taken at two points, not three.
-  p.y += p.vy;
-  p.onGround = false;
-  const pL2 = p.x + 3;
-  const pR2 = p.x + p.w - 3;
-  if (p.vy > 0) {
-    const fY = p.y + p.h;
-    if (isSolid(getTile(world.map, pL2, fY)) || isSolid(getTile(world.map, pR2, fY))) {
-      p.y = Math.floor(fY / TILE) * TILE - p.h;
-      p.vy = 0;
-      p.onGround = true;
-    }
-  } else if (p.vy < 0) {
-    const hY = p.y;
-    if (isSolid(getTile(world.map, pL2, hY)) || isSolid(getTile(world.map, pR2, hY))) {
-      p.y = Math.floor(hY / TILE) * TILE + TILE;
-      p.vy = 0;
-      // index.html:1418-1420, inside this same branch and after this same snap — the
-      // pre-snap `hY` is passed on deliberately; see bumpBlocksAbove.
-      bumpBlocksAbove(world, pL2, pR2, hY);
-    }
-  }
-
-  // Left clamp only — there is no right-hand bound (index.html:1422).
-  if (p.x < 0) p.x = 0;
+  // Movement and collision (index.html:1404-1422): the X sweep, the Y sweep, the left
+  // clamp and the block bump, all four of them now Arcade's — see PlayerMove at the top
+  // of this file and physics/player.ts. It sits here, between gravity above and the pit
+  // below, because that is exactly where the live source moves the player; every line on
+  // either side of it reads state this has already resolved.
+  //
+  // What went away, and is worth knowing was deliberate rather than lost:
+  //
+  //   - The 2px X probes and the 3px Y probes (index.html:1405, 1409). Arcade separates
+  //     against the body's real edges, so an inset would be a second, competing hitbox.
+  //     The 3px pair survives in bumpBlocksAbove, where it decides which COLUMNS a head
+  //     hit can pop, which is a rule about blocks rather than about collision.
+  //   - The `+1` in the rightward snap (index.html:1406). It left a 1px gap between the
+  //     player and the wall, so holding right against one oscillated on a two-frame
+  //     cycle forever: step in, snap out, step in. Arcade puts the body flush and it
+  //     stops. That is a defect fixed, not a behaviour ported.
+  //   - `p.onGround = false` before the floor check (index.html:1408). The mover assigns
+  //     `onGround` outright from the body, so there is nothing to clear first.
+  move?.(world);
 
   // The pit (index.html:1423), and the cape that can survive it.
   //

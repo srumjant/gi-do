@@ -3,7 +3,7 @@ import { BASE_H, BASE_W, STEP_MS, VIEW_H, VIEW_W, ZOOM } from '../config/constan
 import { TStr } from '../config/i18n';
 import { PARALLAX, type ParallaxLayer } from '../data/parallax';
 import type { SpriteData } from '../data/sprites';
-import type { Character } from '../game/player';
+import type { Character, PlayerMove } from '../game/player';
 import { getDodoSkin, getGigiSkin, getPlayerSprites, getSelectedChar } from '../game/run';
 import { createWorld, stepWorld } from '../game/world';
 import type { EnemyState, World } from '../game/types';
@@ -36,6 +36,7 @@ import {
 } from '../gfx/textures';
 import type { InputState } from '../input/actions';
 import { createKeyboardInput, type KeyboardInput } from '../input/keyboard';
+import { createPlayerMove } from '../physics/player';
 import { createCollisionLayer, syncCollisionLayer } from '../physics/tiles';
 
 /**
@@ -156,6 +157,11 @@ export class SliceScene extends Phaser.Scene {
    * picture — invisible, and drawing nothing. See src/physics/tiles.ts.
    */
   private collisionLayer!: Phaser.Tilemaps.TilemapLayer;
+  /**
+   * The player's Arcade body, as the one function the simulation is allowed to see of
+   * it: move, separate, report back. See src/physics/player.ts.
+   */
+  private movePlayer!: PlayerMove;
   private hillsGraphics: Phaser.GameObjects.Graphics | undefined;
   private parallaxLayers: readonly ParallaxLayer[] = [];
   private clouds: CloudView[] = [];
@@ -182,10 +188,10 @@ export class SliceScene extends Phaser.Scene {
     // what, and a bumped block's brick has to cover the block that was drawn there.
     this.bumpedGraphics = this.add.graphics();
     // Built from the very same `world.map` those three just drew, and kept in step with
-    // it by `syncCollisionLayer` in update() below. Nothing collides against it yet —
-    // the player and the enemies move themselves, for now — but it is what they will
-    // stand on once they are on Arcade bodies.
+    // it by `syncCollisionLayer` in update() below. The player stands on it; the enemies
+    // still move themselves, for now.
     this.collisionLayer = createCollisionLayer(this, this.world);
+    this.movePlayer = createPlayerMove(this, this.world, this.collisionLayer);
 
     this.glowGraphics = this.add.graphics().setDepth(DEPTH_PICKUP_GLOW);
     this.arrowTrailGraphics = this.add.graphics().setDepth(DEPTH_ARROW_TRAIL);
@@ -318,18 +324,44 @@ export class SliceScene extends Phaser.Scene {
     obj.setPosition(rawX / ZOOM + CAMERA_PIVOT_X, rawY / ZOOM + CAMERA_PIVOT_Y);
   }
 
+  /**
+   * The fixed step, and the one place in this port where Arcade's clock is set.
+   *
+   * The accumulator is the single deliberate break from bug-compatibility in the whole
+   * migration: index.html runs its simulation straight off `requestAnimationFrame`, so on
+   * a 120Hz screen the live game runs at double speed. This runs STEP_MS's worth of
+   * simulation per STEP_MS of real time whatever the display does.
+   *
+   * Arcade has to be inside that loop or the fix is undone for the player alone. Left to
+   * itself it steps once per RENDERED frame (it listens to the scene's UPDATE event), so
+   * on that same 120Hz screen the player would move twice for every one step everything
+   * else took — exactly the bug, reintroduced for exactly one entity, and found by a
+   * child on a fast laptop rather than by a test. So `customUpdate: true` in main.ts
+   * unhooks it, and `createPlayerMove` calls `physics.world.singleStep()` from inside
+   * `stepWorld` -> `stepPlayer`, once per iteration of this loop, with Arcade's own fixed
+   * delta.
+   *
+   * Driving it from in there rather than from out here buys one more thing worth having:
+   * the frames the simulation does NOT run — dead, won, or frozen behind a power-up
+   * announcement — do not step Arcade either, so a frozen world really is frozen instead
+   * of leaving the player coasting behind the popup.
+   */
   update(_time: number, delta: number): void {
     // Clamp so a backgrounded tab does not produce a hundred catch-up steps at once.
     this.accumulator = Math.min(this.accumulator + delta, STEP_MS * 5);
     while (this.accumulator >= STEP_MS) {
-      stepWorld(this.world, this.readInput());
+      stepWorld(this.world, this.readInput(), this.movePlayer);
+      // INSIDE the loop, not after it. A bumped block and a respawn both rewrite
+      // `world.map`, and the collision layer is a copy of that map rather than a view of
+      // it — and the player now separates against the layer rather than reading the map.
+      // Left outside, a map change made by one fixed step would not reach the geometry
+      // until after every other step in this rendered frame had already collided against
+      // the stale copy. Nothing in the current tile vocabulary can show that (3, 5 and 2
+      // are all solid, so a bump changes no collision), which is exactly why it is worth
+      // being explicit before something can.
+      syncCollisionLayer(this.collisionLayer, this.world);
       this.accumulator -= STEP_MS;
     }
-    // Before the drawing, not with it: a bumped block and a respawn both rewrite
-    // `world.map`, and the collision layer is a copy of that map rather than a view of
-    // it. This belongs to the simulation half of the frame, which is why it sits here
-    // and not among the sprite syncing below.
-    syncCollisionLayer(this.collisionLayer, this.world);
     this.syncSprites();
   }
 
