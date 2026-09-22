@@ -17,15 +17,25 @@ move, space to jump.
 
 Say this up front or the first thirty seconds are just them listing it:
 
-**no music and no sounds at all**, no title screen (it starts on the difficulty screen),
-no pause, and no learn mode. Two enemies are missing — the **ghost** and the **cannon** —
-so levels 2, 3, 4 and 6 are emptier than they should be. There is **no boss**, so level 6
-ends like any other level.
+no title screen (it starts on the difficulty screen), no pause, and no learn mode. Two
+enemies are missing — the **ghost** and the **cannon** — so levels 2, 3, 4 and 6 are
+emptier than they should be. There is **no boss**, so level 6 ends like any other level.
 
 Everything else is there now: all six levels, difficulty and character choice, hearts,
 score, the cat, the bow, the chicken ray, the silly power-ups, the cape, and the
 between-level cutscene. Level 5, the ice one, is complete — every penguin and icebat it
 is supposed to have.
+
+**The sound arrived on 2026-09-22 and is the thing to listen to.** Every effect and every
+theme, including two the original plays that are easy to miss: the cat has a little tune of
+its own when it turns up, and a cape absorbing a hit makes a sound of its own.
+
+One thing about it is worth knowing before it looks like a bug. A browser will not start
+audio until somebody presses a key, so **the difficulty screen is silent until you confirm
+on it** — the menu music starts from that keypress and the level's own theme takes over
+when the level does. If the game stays silent after that first confirm, that is the failure
+to report and it is the most likely one: the sound has only ever been checked by
+instrumenting the browser, never by ear. **You are the first person to hear it.**
 
 The felt style is not there, but that is off by default in the real game too, so unless
 someone has turned it on with `F`, both should look the same. A couple of visual extras
@@ -80,8 +90,10 @@ deliberately.
 
 **Still checked, and still exact:** everything that is not movement. Pickups, score, the
 blocks you hit from below, the three silly power-ups, the cat, arrows and the chicken ray,
-level building, the sprites, the sounds, the translations. Those are pure logic and they still
-have their tests.
+level building, the sprites, the translations — and now the sounds, both ends of them: that
+the audio engine makes the right noise, and that the simulation asks for the right noise at
+the right moment. Stomping an enemy raising a stomp is a real test now, which it never was
+in the original. Those are pure logic and they still have their tests.
 
 **No longer checked by anything:** how it feels to move. The weight of a jump, whether landing
 reads right, whether a ledge catches you.

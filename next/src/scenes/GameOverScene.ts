@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
+import { startBGM, stopBGM } from '../audio/bgm';
 import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
+import { BGM_GAMEOVER } from '../data/bgmThemes';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { bindMenuKeys, type MenuKeys, justDown } from '../input/menuKeys';
 import { GAME_OVER_SCENE_KEY } from './keys';
@@ -72,6 +74,11 @@ export class GameOverScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(BACKGROUND);
+    // index.html:1348's `startBGM(BGM_GAMEOVER)`, which the live game plays on the line
+    // that ENTERS this state — the same moment SliceScene reads `world.gameOver` and
+    // starts this scene. The level's own music was stopped by the death ninety frames ago
+    // (playerDie, game/player.ts), so this lands in a silence rather than over anything.
+    startBGM(BGM_GAMEOVER);
     this.clock = createFrameClock();
     this.keys = bindMenuKeys(this);
 
@@ -96,6 +103,10 @@ export class GameOverScene extends Phaser.Scene {
     // else. The between-level cutscene takes both; these two end screens take one.
     if (this.clock.advance(delta) >= AUTO_EXIT || justDown(this.keys.confirm)) {
       this.leaving = true;
+      // index.html:1349's `gameState='title';stopBGM();`. The screen this returns to is
+      // silent until the next confirm unlocks and starts the menu theme again
+      // (DifficultyScene) — exactly as the live title screen is.
+      stopBGM();
       this.scene.start(this.next);
     }
   }

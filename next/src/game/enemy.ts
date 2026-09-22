@@ -384,10 +384,16 @@ export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
       // exists on the World at all. Rounded at the award site, never accumulated —
       // see world.ts's stepStars for why that distinction is load-bearing.
       world.score += Math.round(200 * dc.scoreMultiplier);
+      world.sounds.push('stomp'); // index.html:1545
       // index.html:1546 — written AFTER the 30 above, overwriting it, exactly as the
       // live source does rather than as a ternary on the assignment. Same result, but
       // this is the shape that stays obviously faithful if either number ever moves.
-      if (p.bigHeadTimer > 0) e.squashTimer = 45;
+      // The boing rides along with it: a big-head stomp makes BOTH noises, one on top of
+      // the other, which is most of what makes the power-up feel silly.
+      if (p.bigHeadTimer > 0) {
+        e.squashTimer = 45;
+        world.sounds.push('boing');
+      }
     } else {
       // Side or rising contact (index.html:1547's `else{playerHit();return;}`). With
       // a cape on this is survived rather than fatal, and the survivor is invincible

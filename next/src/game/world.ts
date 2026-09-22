@@ -159,6 +159,8 @@ export function createWorld(
     // owns. Kept out of that bundle because it is not a spawn table — but for the same
     // reason the bundle exists, respawnLevel below must clear it too.
     powerupPopup: null,
+    // Empty, and emptied again at the top of every step. See World.sounds in types.ts.
+    sounds: [],
     ...buildLevelState(level, dc, map),
   };
 }
@@ -188,6 +190,12 @@ export function respawnLevel(world: World): void {
   // Rebuilt from the FRESH map above, exactly as initLevel derives them, so a question
   // block bumped before the death is a question block again after it.
   Object.assign(world, buildLevelState(world.level, world.dc, world.map));
+  // index.html:1209 — the LAST line of initLevel, and easy to miss from the respawn end
+  // of it. Dying stops the music (playerDie, player.ts), and this is what brings it back
+  // ninety frames later. Without it the first death leaves the rest of the run silent.
+  // The cue carries no theme number: `world` does not know which level it is, and the
+  // scene that does supplies it on the way out. See World.sounds in types.ts.
+  world.sounds.push('music-level');
 }
 
 /**
@@ -216,6 +224,14 @@ export function stepWorld(
   move?: PlayerMove,
   moveEnemy?: EnemyMove,
 ): void {
+  // Last step's noises are last step's. Emptied HERE rather than by whoever plays them,
+  // so that the invariant holds for every caller: the list holds the cues of the step just
+  // taken and nothing older. A headless driver that never reads it (most of the test
+  // suite) therefore cannot grow it without bound, and — the part that is actually
+  // audible — a frozen step cannot bank cues up behind a death and fire them in a burst
+  // when play resumes, because a frozen step still runs this line before it returns.
+  world.sounds.length = 0;
+
   // index.html:1275 — the very first line of update(), before every other state check
   // (including the live game's own dead-state branch), so it advances even while dead,
   // on the title screen, everywhere. Reproduced by incrementing unconditionally, first,
@@ -354,12 +370,14 @@ export function collectPickups(world: World): void {
       b.collected = true;
       p.hasBow = true;
       p.bowCharges = world.dc.bowCharges;
+      world.sounds.push('pickup'); // index.html:1447
     }
   }
   for (const s of world.superPickups) {
     if (!s.collected && rectOverlap(box, { x: s.x, y: s.y, w: 16, h: 16 })) {
       s.collected = true;
       p.hasCape = true;
+      world.sounds.push('pickup'); // index.html:1448
     }
   }
   // index.html:1450-1455. The companion spawns 20px LEFT of the player whichever way
@@ -377,6 +395,11 @@ export function collectPickups(world: World): void {
       scratchTimer: 0, scratchTarget: null, hitsLeft: 3, bounceDir: 1,
       baseY: 0, onGround: true,
     };
+    // TWO sounds, not one: the ordinary pickup chime (index.html:1453) and then a
+    // three-note sine jingle of the cat's own on the line after it (:1454), written as
+    // bare `playTone` calls rather than as a named effect — which is exactly why it went
+    // missing from the first pass over this file. See audio/sfx.ts's sfxCatArrive.
+    world.sounds.push('pickup', 'cat-arrive');
   }
 }
 
@@ -471,6 +494,11 @@ export function stepCat(world: World): void {
       // and three times a stomp. Rounded at the award site like every other one; see
       // stepStars.
       world.score += Math.round(300 * world.dc.scoreMultiplier);
+      world.sounds.push('stomp'); // index.html:1490 — a scratch sounds like a stomp
+      // index.html:1492-1495, INSIDE the scratch branch: the puff the cat goes out in is
+      // played on the frame of the third scratch, not on the frame after it when the cat
+      // is actually removed. Another bare `playTone`. Keep it here, under the same `if`.
+      if (cat.hitsLeft <= 0) world.sounds.push('cat-vanish');
     }
   }
 }
@@ -523,12 +551,14 @@ export function stepArrows(world: World): void {
         chickenify(e);
         a.life = 0;
         world.score += Math.round(100 * world.dc.scoreMultiplier);
+        world.sounds.push('cluck'); // index.html:1511
         continue; // the live `return` — this enemy only; see the note above
       }
       e.alive = false;
       e.squashTimer = 30;
       a.life = 0;
       world.score += Math.round(200 * world.dc.scoreMultiplier);
+      world.sounds.push('stomp'); // index.html:1514
     }
   }
   // index.html:1517. A fresh array, exactly as the live line assigns one, so anything
@@ -572,6 +602,7 @@ export function stepStars(world: World): void {
       // award elsewhere in the live game gives 38 twice (76) rounded per award, and 75
       // rounded once at the end. Keep every award site shaped exactly like this one.
       world.score += Math.round(100 * world.dc.scoreMultiplier);
+      world.sounds.push('coin'); // index.html:1521
     }
   }
 }
@@ -620,6 +651,11 @@ export function checkRescue(world: World): void {
     // Also index.html:1631, and only reachable now that `score` exists. Same
     // round-at-the-award-site shape as every other award; see stepStars.
     world.score += Math.round(500 * world.dc.scoreMultiplier);
+    // The rest of index.html:1631, in its order: the fanfare, and then silence. The music
+    // stays off through the cutscene and only comes back with the next level's own theme
+    // (SliceScene's create, index.html:1209) — so the rescue is the quietest moment in
+    // the game on purpose.
+    world.sounds.push('win', 'music-stop');
   }
 }
 

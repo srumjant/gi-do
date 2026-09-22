@@ -117,8 +117,8 @@ export function createPlayer(level: Level, dc: DifficultyRecord, character: Char
  *     long as it exists, so granting a power-up stops the world for 120 frames. See
  *     PowerupPopup in types.ts and the gate at the top of stepWorld.
  *
- * The live function's trailing `sfxPickup();sfxWin();padRumble(...)` is sound and
- * haptics, which src/game/ does not own.
+ * The live function's trailing `padRumble(...)` is haptics, which src/game/ does not own.
+ * Its `sfxPickup();sfxWin();` DOES land here, as two cues — see World.sounds in types.ts.
  */
 export function giveRandomSillyPowerup(world: World): void {
   const types: PowerupType[] = ['fart', 'bighead', 'chicken'];
@@ -132,6 +132,11 @@ export function giveRandomSillyPowerup(world: World): void {
     world.player.hasBow = true;
   }
   world.powerupPopup = { type, timer: 120, maxTimer: 120 };
+  // index.html:1155, in this order: the pickup chime and then the win fanfare, both at
+  // once, which is what makes a rainbow block sound like more than a pickup. They are
+  // raised on the frame the world FREEZES, and the freeze lasts 120 frames — so these two
+  // play over a still picture, exactly as they do live.
+  world.sounds.push('pickup', 'win');
 }
 
 /**
@@ -174,8 +179,9 @@ export function giveRandomSillyPowerup(world: World): void {
  * like a prize. Both are rebuilt from a freshly generated map by `respawnLevel`
  * (world.ts), so dying restores every block bumped before the death.
  *
- * The live source's `spawnParticles(...)` and `sfxBlock()` are presentation and sound,
- * which src/game/ does not own.
+ * The live source's `spawnParticles(...)` is presentation, which src/game/ does not own.
+ * Its `sfxBlock()` is raised as a cue, once per block that actually pays out — so two
+ * blocks popped by one jump really do knock twice.
  */
 export function bumpBlocksAbove(world: World, headTileY: number): void {
   const p = world.player;
@@ -191,6 +197,7 @@ export function bumpBlocksAbove(world: World, headTileY: number): void {
       // One tile ABOVE the block, not at it — `qb.y*TILE - TILE` — and rising at -2,
       // which world.ts's stepStars then ramps toward zero and leaves hanging there.
       world.stars.push({ x: qb.x * TILE, y: qb.y * TILE - TILE, vy: -2, collected: false });
+      world.sounds.push('block'); // index.html:1419
     }
   }
   for (const hx of [h1, h2]) {
@@ -198,6 +205,10 @@ export function bumpBlocksAbove(world: World, headTileY: number): void {
     if (rb) {
       rb.hit = true;
       world.map[rb.y][rb.x] = TILE_BRICK;
+      // BEFORE the grant, exactly as index.html:1420 orders them, so the three cues come
+      // out block-pickup-win rather than pickup-win-block: the knock is the block being
+      // hit, the other two are the prize coming out of it.
+      world.sounds.push('block');
       // Not a quiet state change: this freezes the entire game for 120 frames. See
       // giveRandomSillyPowerup above and the gate at the top of stepWorld.
       giveRandomSillyPowerup(world);
@@ -231,7 +242,8 @@ export function bumpBlocksAbove(world: World, headTileY: number): void {
  *     right edge) but `p.x - 12` facing left, a hardcoded 12 that happens to equal the
  *     arrow's collision width and not the player's. Reproduced as written.
  *
- * The live function's `sfxCluck()` / `sfxShoot()` are sound, which src/game/ does not own.
+ * The live function's `sfxCluck()` / `sfxShoot()` are raised as cues on the same branch
+ * that spends the charge (index.html:1395) — see World.sounds in types.ts.
  */
 function fireArrow(world: World, input: InputState): void {
   const p = world.player;
@@ -247,8 +259,13 @@ function fireArrow(world: World, input: InputState): void {
     life: 60,
     isChicken,
   });
-  if (isChicken) p.chickenRayCharges--;
-  else p.bowCharges--;
+  if (isChicken) {
+    p.chickenRayCharges--;
+    world.sounds.push('cluck'); // index.html:1395 — a ray clucks, an arrow twangs
+  } else {
+    p.bowCharges--;
+    world.sounds.push('shoot');
+  }
   if (p.bowCharges <= 0 && p.chickenRayCharges <= 0) p.hasBow = false;
   p.arrowCooldown = 15;
 }
@@ -328,6 +345,11 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
     p.onGround = false;
     p.coyoteTime = 0;
     p.jumpBuffer = 0;
+    // index.html:1384-1385. Reads the same `fartTimer` the force above just read, one
+    // line later and before the timer is decremented at the bottom of this function, so a
+    // jump that got the 1.5x always gets the fart too. The live branch also spawns five
+    // green particles; those are presentation and are not ported.
+    world.sounds.push(p.fartTimer > 0 ? 'fart' : 'jump');
   }
 
   // Variable jump height — release early for a short hop (index.html:1387-1388). The
@@ -410,6 +432,11 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
       p.invincible = 60;
       p.vy = -10;
       p.y = level.height * TILE - 32;
+      // index.html:1423's `playTone(400,.15,'sawtooth',.12,200)` — a bare tone rather
+      // than one of the eleven named effects, which is how it stayed unported when this
+      // file was first written. The same four-hundred-hertz slide plays when a cape
+      // absorbs a contact hit (playerHit below), so one cue covers both.
+      world.sounds.push('cape');
     } else {
       playerDie(world);
     }
@@ -488,8 +515,10 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
  * This window is NOT the same as the pit save's, which hardcodes 60 (stepPlayer,
  * above). Do not factor the two together.
  *
- * The live function's `spawnParticles`/`playTone`/`triggerShake` are presentation,
- * sound and screen shake, none of which src/game/ owns.
+ * The live function's `spawnParticles`/`triggerShake` are presentation and screen shake,
+ * neither of which src/game/ owns. Its `playTone(400,.15,'sawtooth',.12,200)` is the
+ * `cape` cue — the same tone the pit save plays, and the only feedback a child gets that
+ * the cape is what just saved them.
  */
 export function playerHit(world: World): void {
   const p = world.player;
@@ -497,6 +526,7 @@ export function playerHit(world: World): void {
     p.hasCape = false;
     p.invincible = world.dc.invincibleTime || 60;
     p.vy = -4;
+    world.sounds.push('cape'); // index.html:1646
     return;
   }
   playerDie(world);
@@ -513,4 +543,9 @@ export function playerDie(world: World): void {
   world.lives--;
   world.dead = true;
   world.stateTimer = 90;
+  // index.html:1647's `sfxHurt();stopBGM();`, in that order. The music stays off for the
+  // whole ninety-frame countdown and comes back with the level itself — `respawnLevel`
+  // (world.ts) raises `music-level` on the step it rebuilds. So a death is followed by a
+  // real silence, and that silence is the game's loudest signal that something went wrong.
+  world.sounds.push('hurt', 'music-stop');
 }

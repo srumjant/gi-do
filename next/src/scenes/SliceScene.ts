@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { startBGM } from '../audio/bgm';
+import { playSounds } from '../audio/cues';
 import { BASE_H, BASE_W, STEP_MS, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
 import { getDifficulty, type DifficultyKey } from '../config/difficulty';
 import { TStr } from '../config/i18n';
@@ -209,6 +211,13 @@ export class SliceScene extends Phaser.Scene {
   private parallaxLayers: readonly ParallaxLayer[] = [];
   private clouds: CloudView[] = [];
   private accumulator = 0;
+  /**
+   * Which level this is. `create` already has it as a local; it is kept because `update`
+   * needs it too — a `music-level` cue (a respawn restarting the level's theme) says WHICH
+   * theme only by being this scene's, since a World does not know its own index. See
+   * audio/cues.ts.
+   */
+  private levelIndex = 0;
   /** Set once this level's ending has been acted on — see `leaveIfRunOver`. */
   private leaving = false;
 
@@ -223,6 +232,7 @@ export class SliceScene extends Phaser.Scene {
     // moved it, and `getRunTotals` is the lives and score the last level ended with — a
     // fresh run's `startRun` having just set them to the difficulty's lives and zero.
     const levelIndex = getCurrentLevel();
+    this.levelIndex = levelIndex;
     // What the two choice screens decided, read back out of the run state they wrote
     // to — the port's equivalents of the live game's `selectedDifficulty`
     // (index.html:161) and `selectedChar` (:988), which is where the live game reads
@@ -311,6 +321,18 @@ export class SliceScene extends Phaser.Scene {
     this.scene.launch(POWERUP_POPUP_SCENE_KEY, {
       world: this.world,
     } satisfies PowerupPopupData);
+
+    // The last line of `initLevel` (index.html:1209), and the reason each level sounds
+    // different: theme 0-5 IS the level index. Down here rather than up beside
+    // `createWorld` because that is where the live source has it — after everything else
+    // the level needs is built.
+    //
+    // A run's first level starts the music a moment after DifficultyScene's confirm opened
+    // the AudioContext; a later level starts it after the rescue's `music-stop` and a
+    // silent cutscene. A RESPAWN does not come through here at all — the scene is not
+    // restarted, the World is rebuilt in place — which is why `respawnLevel` raises a
+    // `music-level` cue of its own (game/world.ts).
+    startBGM(levelIndex);
 
     // All three of them run alongside this scene and hold a reference to THIS World, so all
     // three have to go when it does — whether it is going to the next level, to the win
@@ -482,6 +504,13 @@ export class SliceScene extends Phaser.Scene {
     this.accumulator = Math.min(this.accumulator + delta, STEP_MS * 5);
     while (this.accumulator >= STEP_MS) {
       stepWorld(this.world, this.readInput(), this.movePlayer, this.enemyBodies.move);
+      // Everything that step made a noise about, played now, before the next one clears
+      // the list. INSIDE the loop for the same reason as the three calls below it: a slow
+      // rendered frame takes several steps, and draining only after them all would play
+      // the last step's coin and silently drop the two before it. It is also what keeps a
+      // frozen frame honest — a dead or won step raises nothing and clears anything left,
+      // so a death cannot bank up a burst of stomps to fire on the respawn.
+      playSounds(this.world, this.levelIndex);
       // Also INSIDE the loop. A death inside this step replaces `world.enemies` with an
       // empty array (world.ts's respawnLevel), and the bodies of the enemies that were in
       // it are still in Arcade's world, still being stepped and still separating against
