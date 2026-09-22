@@ -6,16 +6,18 @@ import { getDifficulty, type DifficultyKey } from '../config/difficulty';
 import { T, TStr } from '../config/i18n';
 import { PARALLAX, type ParallaxLayer } from '../data/parallax';
 import type { SpriteData } from '../data/sprites';
+import { isFinalLevel } from '../game/boss';
 import type { Character, PlayerMove } from '../game/player';
 import {
   finishLevel,
   getCurrentLevel,
   getPlayerSprites,
+  getRescueSprites,
   getRunTotals,
   getSelectedChar,
   getSkinIndex,
 } from '../game/run';
-import { createWorld, stepWorld } from '../game/world';
+import { createWorld, rescueSpot, stepWorld } from '../game/world';
 import type { EnemyState, World } from '../game/types';
 import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
 import { cloudPosition, cloudScale, drawRidges, drawSky } from '../gfx/parallax';
@@ -121,23 +123,37 @@ const CLOUD_ALPHA = 0.75;
 const DEPTH_PICKUP_GLOW = 10;
 const DEPTH_PICKUP = 11;
 const DEPTH_CAT = 12;
-const DEPTH_ENEMY = 13;
+/**
+ * The three bands the sibling occupies, after the cat and BEFORE the enemies and the boss
+ * (index.html:1733-1756, with :1758 and :1768 after it) — so an enemy wandering past the
+ * end of the level walks in front of them, not behind.
+ *
+ * Three rather than one because the cage is drawn in two halves with the sibling between:
+ * the tinted pane goes down first and the bars over the top (index.html:1741 and :1746-
+ * :1750). Painting the pane on top instead would tint the sibling it is meant to sit
+ * behind, which is exactly the kind of difference a child notices and cannot name.
+ */
+const DEPTH_RESCUE_CAGE_BACK = 13;
+const DEPTH_RESCUE = 14;
+/** The bars, and the cry over them (index.html:1752, :1755). */
+const DEPTH_RESCUE_FRONT = 15;
+const DEPTH_ENEMY = 16;
 /** The boss, after every ordinary enemy (index.html:1768) and in front of all of them. */
-const DEPTH_BOSS = 14;
+const DEPTH_BOSS = 17;
 /**
  * The boss's own health bar and taunt, which the live source draws after its sprite and
  * — unlike the glow and the scar above them — outside the hurt flash's `globalAlpha`
  * (index.html:1807-1819). A band of their own so they cannot end up behind the 72px
  * sprite they are labelling.
  */
-const DEPTH_BOSS_BAR = 15;
+const DEPTH_BOSS_BAR = 18;
 /** Fireballs (index.html:1827-1828), between the boss and the player's own arrows. */
-const DEPTH_ENEMY_PROJECTILE = 16;
-const DEPTH_ARROW = 17;
+const DEPTH_ENEMY_PROJECTILE = 19;
+const DEPTH_ARROW = 20;
 /** The trail is drawn after its arrow (index.html:1832-1833), so it sits on top. */
-const DEPTH_ARROW_TRAIL = 18;
-const DEPTH_CAPE = 19;
-const DEPTH_PLAYER = 20;
+const DEPTH_ARROW_TRAIL = 21;
+const DEPTH_CAPE = 22;
+const DEPTH_PLAYER = 23;
 
 /** The four pickup glows (index.html:1699, 1704, 1709-1710, 1717), as colour + alpha. */
 const STAR_GLOW = { color: 0xffdd00, alpha: 0.2 };
@@ -179,6 +195,39 @@ const BOSS_TAUNT_OFFSET_Y = 18;
  * `?` glyph in gfx/tiles.ts).
  */
 const MEOW_FONT = { fontFamily: 'monospace', fontSize: '7px', fontStyle: 'bold', color: '#aabbcc' };
+
+/**
+ * The cage the sibling is held in until the boss falls (index.html:1738-1750). It is
+ * pinned to the sibling's UNBOBBED corner, 8px out on both axes, so the cage holds still
+ * while the child inside it moves — which is what makes the bobbing read as trapped
+ * rather than as the whole picture wobbling.
+ */
+const CAGE_W = 40;
+const CAGE_H = 50;
+const CAGE_OFFSET = 8;
+/** index.html:1741's `rgba(50,40,30,0.3)`. */
+const CAGE_BACK = { color: 0x32281e, alpha: 0.3 };
+/** The five uprights (index.html:1747) and the two rails (:1749-1750), both at lineWidth 2. */
+const CAGE_BARS = 5;
+const CAGE_BAR_SPACING = 10;
+const CAGE_BAR_OFFSET_X = 2;
+const CAGE_BAR_WIDTH = 2;
+const CAGE_BAR_COLOR = 0x888888;
+const CAGE_RAIL_COLOR = 0x999999;
+
+/**
+ * The two things the sibling calls out, and they are NOT one label with two skins: the
+ * caged cry is `bold 7px` blue 12px over their head and blinks on an 80-frame cycle
+ * (index.html:1752), the free call is `bold 8px` pink 8px over it on a 120-frame one
+ * (:1755). Same origin reasoning as MEOW_FONT above — the live `fillText` places a
+ * baseline, so the bottom is what gets anchored.
+ */
+const RESCUE_CRY_FONT = { fontFamily: 'monospace', fontSize: '7px', fontStyle: 'bold', color: '#3388ff' };
+const RESCUE_CRY_OFFSET_Y = 12;
+const RESCUE_CALL_FONT = { fontFamily: 'monospace', fontSize: '8px', fontStyle: 'bold', color: '#ff69b4' };
+const RESCUE_CALL_OFFSET_Y = 8;
+/** Both are drawn at `rX-2` (index.html:1752, :1755), not at the sibling's own left edge. */
+const RESCUE_TEXT_OFFSET_X = 2;
 
 /** One cloud's fixed tile position plus the Image drawing it. */
 interface CloudView {
@@ -230,6 +279,17 @@ export class SliceScene extends Phaser.Scene {
   private catImage!: Phaser.GameObjects.Image;
   private catScratchImage!: Phaser.GameObjects.Image;
   private meowText!: Phaser.GameObjects.Text;
+  /**
+   * The sibling at the end of the level, and everything drawn around them: the cage's
+   * backing pane, its bars, and the two things they call out. Two Graphics because the
+   * sibling is drawn BETWEEN the pane and the bars, and two Texts because the caged cry
+   * and the free call differ in every respect — see the fonts above.
+   */
+  private rescueImage!: Phaser.GameObjects.Image;
+  private cageBackGraphics!: Phaser.GameObjects.Graphics;
+  private cageBarsGraphics!: Phaser.GameObjects.Graphics;
+  private rescueCryText!: Phaser.GameObjects.Text;
+  private rescueCallText!: Phaser.GameObjects.Text;
   /** The pickup haloes and the arrow trails: shapes, not sprites, redrawn each frame. */
   private glowGraphics!: Phaser.GameObjects.Graphics;
   private arrowTrailGraphics!: Phaser.GameObjects.Graphics;
@@ -338,6 +398,17 @@ export class SliceScene extends Phaser.Scene {
       .setDepth(DEPTH_CAT)
       .setVisible(false);
 
+    // The sibling. Their texture is resolved once, here, and never swapped: which
+    // character is waiting at the end and in which skin is settled before the run starts
+    // and cannot change inside a level — unlike the player's pose, which is re-resolved
+    // every frame just below. `rescueTextureKey` at the foot of this file is where the
+    // "other character" rule is read, out of game/run.ts rather than worked out again.
+    this.rescueImage = this.hiddenImage(rescueTextureKey(), DEPTH_RESCUE);
+    this.cageBackGraphics = this.add.graphics().setDepth(DEPTH_RESCUE_CAGE_BACK);
+    this.cageBarsGraphics = this.add.graphics().setDepth(DEPTH_RESCUE_FRONT);
+    this.rescueCryText = this.rescueLabel(TStr('help_cry'), RESCUE_CRY_FONT);
+    this.rescueCallText = this.rescueLabel(TStr('help_npc'), RESCUE_CALL_FONT);
+
     const { player } = this.world;
     this.capeImage = this.hiddenImage(CAPE_TEXTURE, DEPTH_CAPE);
     this.playerImage = this.add
@@ -445,6 +516,23 @@ export class SliceScene extends Phaser.Scene {
    */
   private hiddenImage(texture: string, depth: number): Phaser.GameObjects.Image {
     return this.add.image(0, 0, texture).setOrigin(0, 0).setDepth(depth).setVisible(false);
+  }
+
+  /**
+   * One of the sibling's two cries, hidden until `syncRescue` blinks it on. Same
+   * bottom-anchored origin as the cat's meow, and for the same reason (see MEOW_FONT):
+   * the live `fillText` places a baseline, not a top edge. Resolved once, like every
+   * other label in this port — there is no language switch to re-read for.
+   */
+  private rescueLabel(
+    text: string,
+    style: Phaser.Types.GameObjects.Text.TextStyle,
+  ): Phaser.GameObjects.Text {
+    return this.add
+      .text(0, 0, text, style)
+      .setOrigin(0, 1)
+      .setDepth(DEPTH_RESCUE_FRONT)
+      .setVisible(false);
   }
 
   /**
@@ -667,6 +755,7 @@ export class SliceScene extends Phaser.Scene {
 
     this.syncPickups();
     this.syncCat();
+    this.syncRescue();
     this.syncBoss();
     this.syncEnemyProjectiles();
     this.syncArrows();
@@ -820,6 +909,81 @@ export class SliceScene extends Phaser.Scene {
     if (cat.scratchTarget && scratching) {
       this.catScratchImage.setPosition(cat.scratchTarget.x - 5, cat.scratchTarget.y - 5);
     }
+  }
+
+  /**
+   * The sibling you came for (index.html:1733-1756) — the whole point of the game, and
+   * until now the one thing at the end of a level this port did not draw at all. Walking
+   * into the empty air still won, so the bug was invisible to every test in the suite and
+   * obvious to the first person who looked at the screen.
+   *
+   * TWO BRANCHES, in the live source's own order, and they are not one branch with
+   * parameters. Caged while the boss is alive on the final level; free otherwise, and
+   * only once there is no boss left to fight. With a boss still standing on a level that
+   * is somehow not the final one, NEITHER runs and nothing is drawn — no level in this
+   * port can reach that, and the live `if/else if` is reproduced rather than flattened so
+   * that it stays true if one ever does.
+   *
+   * The two bobs differ (0.08 caged against 0.05 free) and so do the two blinks (50
+   * frames in every 80 against 80 in every 120): the trapped sibling is more agitated
+   * than the freed one and calls out more often. That is the live game's, and it is the
+   * difference between the two halves of this scene. Do not unify them.
+   *
+   * What bobs is the SPRITE only. The cage, both cries and the position the rescue
+   * actually triggers at are all pinned to the unbobbed `spot`, exactly as the live
+   * source pins them to `rY` rather than `rY+bob`.
+   */
+  private syncRescue(): void {
+    const { boss, bossDefeated, level, animFrame } = this.world;
+    const back = this.cageBackGraphics;
+    const bars = this.cageBarsGraphics;
+    back.clear();
+    bars.clear();
+
+    const caged = boss !== null && boss.alive && isFinalLevel(level);
+    const free = !caged && (!boss || bossDefeated);
+    this.rescueImage.setVisible(caged || free);
+    this.rescueCryText.setVisible(false);
+    this.rescueCallText.setVisible(false);
+    if (!caged && !free) return;
+
+    // The one derivation of where the sibling is, shared with the check that hands the
+    // level to the next one (game/world.ts). Read per frame rather than cached in
+    // `create` for the same reason that function resolves it per call.
+    const spot = rescueSpot(this.world);
+    const textX = spot.x - RESCUE_TEXT_OFFSET_X;
+
+    if (!caged) {
+      this.rescueImage.setPosition(spot.x, spot.y + Math.sin(animFrame * 0.05) * 2);
+      this.rescueCallText
+        .setVisible(animFrame % 120 < 80)
+        .setPosition(textX, spot.y - RESCUE_CALL_OFFSET_Y);
+      return;
+    }
+
+    this.rescueImage.setPosition(spot.x, spot.y + Math.sin(animFrame * 0.08) * 2);
+    this.rescueCryText
+      .setVisible(animFrame % 80 < 50)
+      .setPosition(textX, spot.y - RESCUE_CRY_OFFSET_Y);
+
+    const cageX = spot.x - CAGE_OFFSET;
+    const cageY = spot.y - CAGE_OFFSET;
+    fillRect(back, CAGE_BACK, cageX, cageY, CAGE_W, CAGE_H);
+    // Five uprights, then the two rails in their own slightly lighter grey.
+    //
+    // THE LAST UPRIGHT HANGS OFF THE END, and that is not a mistake here. Five bars at
+    // `cageX + i*10 + 2` land at 2, 12, 22, 32 and 42 across a cage only 40 wide, so the
+    // fifth one stands 2px BEYOND the right edge and past the ends of both rails. It is
+    // plainly visible in the live game and it is index.html:1747's own arithmetic; do not
+    // tidy it into four bars or shrink the spacing to make it fit.
+    bars.lineStyle(CAGE_BAR_WIDTH, CAGE_BAR_COLOR, 1);
+    for (let i = 0; i < CAGE_BARS; i++) {
+      const barX = cageX + i * CAGE_BAR_SPACING + CAGE_BAR_OFFSET_X;
+      bars.lineBetween(barX, cageY, barX, cageY + CAGE_H);
+    }
+    bars.lineStyle(CAGE_BAR_WIDTH, CAGE_RAIL_COLOR, 1);
+    bars.lineBetween(cageX, cageY, cageX + CAGE_W, cageY);
+    bars.lineBetween(cageX, cageY + CAGE_H, cageX + CAGE_W, cageY + CAGE_H);
   }
 
   /**
@@ -1163,6 +1327,26 @@ function resolvePlayerTextureKey(frame: number): string {
 function currentSkin(): [Character, number] {
   const character = getSelectedChar();
   return [character, getSkinIndex(character)];
+}
+
+/**
+ * The sibling's standing sprite, as a texture key.
+ *
+ * gfx/textures.ts registers no rescue texture of its own, and its comment says why: the
+ * sibling is the OTHER character's player art at the same scale 2 the player draws at
+ * (index.html:1744, :1754, both `drawSprite(rsSpr.sprite,...,2,false)`), so
+ * `registerPlayerTextures` has already baked it — both characters, every skin. Verified
+ * against that function rather than taken on trust; it really does walk `CHARACTERS`,
+ * not just the selected one.
+ *
+ * Which character that is comes from `getRescueSprites`, the one place the "always the
+ * other one" rule is written (game/run.ts), and the skin from `getSkinIndex`, which
+ * holds a skin per character whether or not they are the one being played — so the
+ * sibling wears the outfit the character screen picked for them.
+ */
+function rescueTextureKey(): string {
+  const { character } = getRescueSprites();
+  return playerTextureKey(character, getSkinIndex(character), 'stand');
 }
 
 /**

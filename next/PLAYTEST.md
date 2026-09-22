@@ -20,7 +20,13 @@ Say this up front or the first thirty seconds are just them listing it:
 
 no title screen (it starts on the difficulty screen), no pause, and no learn mode. Two
 enemies are missing — the **ghost** and the **cannon** — so levels 2, 3, 4 and 6 are
-emptier than they should be. There is **no boss**, so level 6 ends like any other level.
+emptier than they should be.
+
+**Level 6 has its boss now.** It breathes fireballs, roars when it is losing, and has to be
+beaten before you can reach your sibling — who is in a cage behind it until it falls. An
+arrow hurts it; a chicken ray bounces off, exactly as in the real game. What is missing is
+the punch around it: no screen shake when you land on its head, and none of the sparks and
+smoke, because the port has no particle system yet.
 
 Everything else is there now: all six levels, difficulty and character choice, hearts,
 score, the cat, the bow, the chicken ray, the silly power-ups, the cape, and the
