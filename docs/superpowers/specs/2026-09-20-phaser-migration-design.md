@@ -249,6 +249,20 @@ already pure and unit-testable).
 
 ## Bug-compatibility contract
 
+> **Superseded in part, 2026-09-22.** The owner has chosen a full switch to Arcade Physics
+> with the golden traces retired (Plan 7). Frame-exact equivalence with `index.html` is no
+> longer a goal for anything Arcade owns — the player and the ground-patrol enemies — because
+> Arcade's separation cannot reproduce the hand-rolled sweep's `+1` snap and probe insets.
+>
+> The contract still holds for everything else, and the table below still records what the
+> original does. Items 1 and 2 are unaffected: the boss and the cat were never going to be
+> Arcade bodies. Items that describe hand-rolled collision are now history rather than
+> specification.
+>
+> The stated reason for the contract — that changing behaviour during an engine rewrite makes
+> regressions unattributable — was real, and this decision accepts that cost knowingly. The
+> children are now the safety net for feel.
+
 These are known defects. They are **preserved**, because the kids may have come to rely on
 them and because changing them during an engine rewrite makes regressions unattributable.
 Each is a candidate for the separate re-tune pass afterwards.
