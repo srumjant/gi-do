@@ -1,3 +1,5 @@
+import { DC } from '../config/difficulty';
+import { LEVELS } from '../data/levels';
 import type { Character } from './player';
 import {
   BAT_P, BAT_S,
@@ -11,6 +13,7 @@ import {
   GHOST_P, GHOST_S,
   GIGI_SKINS,
   ICEBAT_P, ICEBAT_S,
+  KIDNAPPERS,
   PENGUIN_P, PENGUIN_S,
   type Palette,
   type Skin,
@@ -18,10 +21,17 @@ import {
 } from '../data/sprites';
 
 /**
- * Run state: which character is selected and which skin of them, plus the sprite
- * lookups that read it. Ported from index.html:848-867 (getEnemySpriteInfo,
- * getPlayerSprites, getRescueSprites) and the selectedChar/gigiSkin/dodoSkin globals
+ * Run state: which character is selected and which skin of them, which level the run is on
+ * and what it has left, plus the sprite lookups that read all of it. Ported from
+ * index.html:848-867 (getEnemySpriteInfo, getPlayerSprites, getRescueSprites), :825
+ * (getKidnapper) and the selectedChar/gigiSkin/dodoSkin/currentLevel/lives/score globals
  * declared at index.html:988.
+ *
+ * Two halves, in this one file because the spec's repo layout asks for one
+ * (`state/run.ts — currentLevel, lives, score`) and because they are the same thing: what
+ * the children chose, and where that choice has got to. The second half starts at "The run"
+ * below and has a long comment of its own about why `lives` and `score` are here at all
+ * when a `World` also has them.
  *
  * data/sprites.ts's header explains why these three were left out of that module:
  * they are behaviour, not data, and two of them read mutable state that has no home
@@ -177,4 +187,134 @@ export function getRescueSprites(): RescueSprites {
   }
   const sk = DODO_SKINS[dodoSkin] || DODO_SKINS[0];
   return { sprite: sk.stand, jump: sk.jump, palette: sk.palette, name: 'Dodo' };
+}
+
+/** One entry of the live `KIDNAPPERS` table (index.html:817-824): art, palette, colour. */
+export type Kidnapper = (typeof KIDNAPPERS)[number];
+
+/**
+ * Port of index.html:825, which sits a few lines above the three sprite lookups already in
+ * this file.
+ *
+ * Who steals the sibling between levels — the villain of the level you are about to walk
+ * into. Only the between-level cutscene draws it; it is nobody's enemy record, and the
+ * sprite it hands back is deliberately unrelated to what that level actually spawns.
+ *
+ * The modulo is the live game's own. With six levels and six entries it never wraps today,
+ * but the guard is real and is kept rather than assumed away.
+ */
+export function getKidnapper(levelIndex: number): Kidnapper {
+  return KIDNAPPERS[kidnapperIndex(levelIndex)];
+}
+
+/**
+ * The same lookup, as the position in `KIDNAPPERS` rather than the record there. The
+ * cutscene's textures are baked one per kidnapper rather than one per level — two of the
+ * six entries are the same dino — so the scene needs the index the modulo lands on, and
+ * this is the one place that modulo is written.
+ */
+export function kidnapperIndex(levelIndex: number): number {
+  return levelIndex % KIDNAPPERS.length;
+}
+
+/* -------------------------------------------------------------------------- *
+ *  The run
+ * -------------------------------------------------------------------------- */
+
+/** What one level hands the next: the lives that are left and the points so far. */
+export interface RunTotals {
+  lives: number;
+  score: number;
+}
+
+/** What follows the level that has just been finished. */
+export type LevelOutcome = 'next-level' | 'game-won';
+
+/**
+ * The run's own three numbers, and the only state in this port that outlives a `World`.
+ *
+ * A `World` is ONE LEVEL'S ATTEMPT — the map, the player, the enemies — and, while that
+ * level is running, the run's `lives` and `score` as well, because the simulation reads and
+ * writes them every single step: a death decrements `lives` (player.ts's playerDie), a star
+ * adds to `score`, and `stepWorld`'s dead branch chooses between a respawn and the end of
+ * the run by reading `lives`. Dying does NOT rebuild the World — `respawnLevel` mutates it
+ * in place, which is exactly how those two already survive a death. Finishing a level DOES
+ * rebuild it, and these three are what has to survive that.
+ *
+ * `currentLevel` has no other home at all: index.html keeps it as a global (index.html:988)
+ * and `SliceScene` simply hardcoded 0 until now.
+ *
+ * `lives` and `score` here are deliberately NOT a second, parallel copy of the World's.
+ * Exactly one of the two is authoritative at any moment, and both hand-over points are
+ * explicit and singular: `createWorld`'s `start` argument carries them run -> world as a
+ * level begins, and `finishLevel` below carries them world -> run as one ends. Nothing
+ * reads them from here mid-level — the HUD reads the World, as it must, or it would show
+ * the lives you had when the level started rather than the ones you have now.
+ *
+ * The initial values are index.html:988's globals (`currentLevel=0, lives=3, score=0`)
+ * rather than anything derived from a difficulty, because at module load nobody has chosen
+ * one yet. `startRun` is what actually seeds a run, and that is the live game's arrangement
+ * too: index.html:1347 sets all three together on the way out of the intro.
+ */
+let currentLevel = 0;
+let lives = 3;
+let score = 0;
+
+/** Which level the run is on. `SliceScene` builds this one; the HUD names it. */
+export function getCurrentLevel(): number {
+  return currentLevel;
+}
+
+/** What the next `World` starts with — see `createWorld`'s `start` argument. */
+export function getRunTotals(): RunTotals {
+  return { lives, score };
+}
+
+/**
+ * Begin a run: level 0, a full set of lives for the difficulty that was chosen, no score.
+ *
+ * Port of index.html:1347's `currentLevel=0;lives=DC().lives;score=0;initLevel(0)`, the
+ * line that leaves the intro. The three assignments belong together and are therefore one
+ * call: a "new game" that reset the level but kept the last run's score is not a thing
+ * anyone should have to discover in a browser.
+ *
+ * `DC()` is resolved here rather than passed in, because it is resolved there too — the
+ * number of lives is the difficulty's, and the difficulty has by definition already been
+ * chosen by the time anything calls this. On super_easy it is `Infinity`, which is a real
+ * setting rather than a debug state; see World.lives in game/types.ts.
+ */
+export function startRun(): void {
+  currentLevel = 0;
+  lives = DC().lives;
+  score = 0;
+}
+
+/**
+ * The level just finished: bank what it ended with, and step to the next one. Says whether
+ * there IS a next one.
+ *
+ * Port of index.html:1350 — `currentLevel++; if(currentLevel>=LEVELS.length) win; else
+ * between` — plus the banking the live game does not need, because there `lives` and
+ * `score` are the very same globals the level was already using.
+ *
+ * One call rather than a setter and an increment, so that the pair cannot be done by
+ * halves. The order is visible in one place: the increment happens BEFORE the between-level
+ * cutscene, which is why that cutscene shows the NEXT level's colours, name and kidnapper
+ * (index.html:2180, :2317 and :2364 all read `currentLevel` after the increment).
+ */
+export function finishLevel(totals: RunTotals): LevelOutcome {
+  lives = totals.lives;
+  score = totals.score;
+  currentLevel++;
+  return currentLevel >= LEVELS.length ? 'game-won' : 'next-level';
+}
+
+/**
+ * Is this the last level? index.html asks in three places and spells it out each time:
+ * `currentLevel===LEVELS.length-1` at :1735 and :2177, `currentLevel<LEVELS.length-1` at
+ * :1898. It decides whether the rescue overlay promises another world or congratulates you,
+ * and it is also what makes a level the boss level.
+ */
+export function isLastLevel(levelIndex: number): boolean {
+  return levelIndex === LEVELS.length - 1;
 }

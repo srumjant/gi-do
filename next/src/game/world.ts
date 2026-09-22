@@ -6,7 +6,7 @@ import type { InputState } from '../input/actions';
 import { chickenify, spawnEnemy, stepEnemy, type EnemyMove } from './enemy';
 import { createPlayer, stepPlayer, type Character, type PlayerMove } from './player';
 import { random } from './random';
-import { getRescueSprites } from './run';
+import { getRescueSprites, type RunTotals } from './run';
 import { findGroundY, getTile, isSolid, rectOverlap } from './tiles';
 import type { Arrow, BlockState, CatState, Pickup, Star, World } from './types';
 
@@ -117,11 +117,21 @@ function buildLevelState(level: Level, dc: DifficultyRecord, map: TileMap): Leve
  * touch it. `character` is kept on the world for the same reason `respawnLevel` needs
  * it later: a respawn has to rebuild an equivalent player without the caller passing
  * it again.
+ *
+ * `start` is how a run that is ALREADY UNDER WAY carries itself into its next level. The
+ * live game needs no equivalent: `lives` and `score` are globals there, and
+ * `initLevel(currentLevel)` at index.html:1351 — the line the between-level screen exits
+ * through — simply does not touch them, so they are still whatever the last level left. A
+ * port that rebuilds the World instead has to say so out loud, and this is where it says
+ * it. Left out, the defaults below are a FRESH run, which is both what index.html:1347
+ * assigns and what every test in the suite wants. See game/run.ts's `finishLevel` for the
+ * other end of the same hand-over.
  */
 export function createWorld(
   levelIndex: number,
   difficulty: DifficultyKey,
   character: Character = 'gigi',
+  start?: RunTotals,
 ): World {
   const level = LEVELS[levelIndex];
   const dc = DIFFICULTY_CONFIG[difficulty];
@@ -137,14 +147,14 @@ export function createWorld(
     dead: false,
     camera: { x: 0, y: 0 },
     pending: level.enemyDefs.map((d) => ({ type: d.type, x: d.x, spawned: false })),
-    lives: dc.lives,
+    lives: start?.lives ?? dc.lives,
     stateTimer: 0,
     gameOver: false,
     won: false,
     character,
     // A run starts at zero (index.html:1347's `score=0`, beside `lives=DC().lives`
     // above). Nothing else ever zeroes it — see the field's own comment in types.ts.
-    score: 0,
+    score: start?.score ?? 0,
     // index.html:1188's `powerupPopup=null`, alongside the collections buildLevelState
     // owns. Kept out of that bundle because it is not a spawn table — but for the same
     // reason the bundle exists, respawnLevel below must clear it too.
@@ -242,8 +252,10 @@ export function stepWorld(
   // branch rebuilds the level (or, out of lives, ends the game) before returning.
   if (world.dead) {
     world.frame++;
-    // Terminal: this slice has no game-over screen for it to lead anywhere, so once
-    // set, every later frame just re-enters here and returns, forever.
+    // Set and then left alone: the game-over SCREEN is a scene, and the scene that owns
+    // this World reads the flag and leaves (SliceScene's `leaveIfRunOver`). Until it does,
+    // every later frame re-enters here and returns, so the world stays exactly as the
+    // death left it.
     if (world.gameOver) return;
     world.stateTimer--;
     if (world.stateTimer <= 0) {
@@ -256,13 +268,19 @@ export function stepWorld(
     return;
   }
 
-  // Already won: nothing plays, forever — index.html's 'levelcomplete' state counts
-  // its own stateTimer down and advances to the next level (or a 'win' screen on the
-  // last one), but level advancement is out of scope for this plan, so there is
-  // nothing on the other side of this to return to. A plain terminal marker, same
-  // idea as `gameOver` above.
+  // Rescued: the level is over and nothing plays, but the clock the live 'levelcomplete'
+  // state runs still runs — index.html:1350 is `stateTimer--`, and when it reaches zero
+  // that branch advances the level (or, on the last one, wins the game).
+  //
+  // The countdown is here because it is there: it is the frozen world's own clock, ticking
+  // under the rescue overlay, and the live game counts it in `update()` alongside the
+  // `animFrame++` above. The DECISION at the end of it is not here, because it is not this
+  // level's business — `world` does not know its own index, and what follows a finished
+  // level is the RUN's question. So this counts, and SliceScene acts: see `leaveIfRunOver`
+  // there, and `finishLevel` in game/run.ts.
   if (world.won) {
     world.frame++;
+    world.stateTimer--;
     return;
   }
 
@@ -595,7 +613,10 @@ export function checkRescue(world: World): void {
     { x: rX, y: rY, w: 16, h: rDH },
   )) {
     world.won = true;
-    world.stateTimer = 200; // index.html:1631. No level-advance in this slice — won is terminal.
+    // index.html:1631. Two hundred frames of frozen world under the rescue overlay, counted
+    // down by stepWorld's `won` branch above; what happens when it reaches zero is
+    // SliceScene's and game/run.ts's business, not this function's.
+    world.stateTimer = 200;
     // Also index.html:1631, and only reachable now that `score` exists. Same
     // round-at-the-award-site shape as every other award; see stepStars.
     world.score += Math.round(500 * world.dc.scoreMultiplier);

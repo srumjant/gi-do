@@ -362,7 +362,10 @@ describe('winning freezes the whole world, same as dying does', () => {
     expect(world.camera).toEqual(frozen.camera);
     expect(world.enemies.length).toBe(frozen.enemyCount);
     expect(world.dead).toBe(false); // won, not dead — the two never overlap here
-    expect(world.stateTimer).toBe(200); // left alone — no level-advance in this slice
+    // The one thing that is NOT frozen besides animFrame: the rescue's own 200-frame
+    // countdown, which the live 'levelcomplete' state runs (index.html:1350) and which the
+    // scene reads to know when to advance the level. Twenty steps, twenty frames off it.
+    expect(world.stateTimer).toBe(180);
 
     // animFrame is the one exception, same as the dead-freeze test above: it keeps
     // counting through the freeze rather than stopping with everything else.

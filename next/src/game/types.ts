@@ -367,7 +367,8 @@ export interface World {
   /** Enemy definitions not yet streamed in. Drained by the spawn window each step. */
   pending: PendingEnemy[];
   /**
-   * Remaining lives, seeded from `dc.lives` (createWorld) and decremented by
+   * Remaining lives, seeded from `dc.lives` on a fresh run or from what the last level
+   * ended with on a continuing one (`createWorld`'s `start` argument), and decremented by
    * `playerDie` on every death — pit or contact alike (index.html:1647's `lives--`).
    * A plain `number`, not an integer count: `dc.lives` is `Infinity` on super_easy
    * (difficulty.ts), and `Infinity - 1 === Infinity` in IEEE-754, so infinite lives
@@ -376,31 +377,31 @@ export interface World {
    */
   lives: number;
   /**
-   * Counts down from 90 while `dead` (index.html:1348's `stateTimer--`), independent
-   * of `frame`/`animFrame`. While `dead`, `stepWorld`'s dead branch is the sole reader.
-   * `checkRescue` also sets it to 200 on a win (index.html:1631), matching the live
-   * `stateTimer=200` a level-complete assigns — but nothing in this slice counts it
-   * down from THAT branch; see `won` below for why.
+   * The frozen world's clock, independent of `frame`/`animFrame`, and shared by the two
+   * states that freeze it. It counts down from 90 while `dead` (index.html:1348's
+   * `stateTimer--`) and from the 200 `checkRescue` sets while `won` (:1631, counted down by
+   * :1350) — one field for both because the live game has one global for both, and the two
+   * are never running at once.
    */
   stateTimer: number;
   /**
    * Set once `stateTimer` runs out with no lives left (index.html:1348's
-   * `else{gameState='gameover';...}`). This slice has no game-over SCREEN — no title
-   * transition, no further countdown, nothing a child would ever see — so this is
-   * simply a terminal marker: once true, `stepWorld`'s dead branch returns
-   * immediately every frame after, freezing the world forever, same as a bare `dead`
-   * alone did before respawn existed.
+   * `else{gameState='gameover';...}`). The live game moves to its `gameover` STATE at that
+   * moment; here the scene holding this World reads the flag and starts GameOverScene
+   * (SliceScene's `leaveIfRunOver`). Until it does — and it does on the very next frame —
+   * `stepWorld`'s dead branch returns immediately, so the world stays exactly as the death
+   * left it rather than counting anything further down.
    */
   gameOver: boolean;
   /**
    * Set by `checkRescue` (world.ts) once the player overlaps the rescue box
-   * (index.html:1631's `gameState='levelcomplete'`). A terminal marker, same idea as
-   * `gameOver` above rather than a mirror of `dead`: the live `levelcomplete` state
-   * itself counts `stateTimer` down and then either advances to the next level or, on
-   * the last one, to a 'win' screen (index.html:1350) — level advancement is out of
-   * scope for this plan, so none of that is reproduced here. Once true, `stepWorld`
-   * returns immediately every frame after, freezing the world exactly like `dead`
-   * does, just with no respawn (or anything else) waiting on the other side of it.
+   * (index.html:1631's `gameState='levelcomplete'`), along with `stateTimer = 200`.
+   *
+   * Not terminal, and no longer a mirror of `gameOver`: `stepWorld`'s `won` branch freezes
+   * everything but keeps counting `stateTimer` down, exactly as the live `levelcomplete`
+   * state does, and when it reaches zero the scene advances the run — the next level, or
+   * the win screen if this was the last one (index.html:1350; game/run.ts's `finishLevel`).
+   * What this flag means is "this level is over and was WON", not "the game has stopped".
    */
   won: boolean;
   /**
