@@ -1,7 +1,86 @@
-// Drives the LIVE game's real physics in a Node VM, so the port can be compared against
-// the running original rather than against a description of it. The whole inline script
-// evaluates under a DOM shim (the same trick scripts/run-tests.js uses), initLevel() sets
-// up a level, and update() can then be stepped with key state injected.
+// Drives the LIVE game's real physics in a Node VM, so the original can be asked what it
+// does rather than argued about. The whole inline script evaluates under a DOM shim (the
+// same trick scripts/run-tests.js uses), initLevel() sets up a level, and update() can
+// then be stepped with key state injected.
+//
+// ---------------------------------------------------------------------------------
+// WHAT THIS IS FOR NOW (plan 7). It used to be a GATE: trace.test.ts drove scripted
+// input through this and through the port and diffed every field of every frame to the
+// decimal, and six real bugs turned up that way. The player is on an Arcade body from
+// plan 7 on, so that comparison is over for the player — Arcade does not reproduce the
+// hand-rolled sweep's `+1` snap or its 2px/3px probe insets, and is not supposed to.
+//
+// It is kept, working, as a REFERENCE. When a child says the jump feels wrong, or a
+// landing looks off, or something about the original is simply not remembered correctly,
+// this is how to ask it. Three test files still use it as a gate for the parts of the
+// simulation Arcade never touched — enemy.test.ts (the enemies are still hand-rolled),
+// world.test.ts (the level spawn tables) and liveGame.test.ts (this driver itself) — and
+// those are real comparisons, not habit. Do not delete it when they eventually go.
+//
+// The hooks are the point: `mutateMap` edits the generated map before the level starts,
+// `beforeRun` hands back the live `player`/`camera` objects themselves (mutate them and
+// the real thing moves), `onFrame` reads anything the shared Sample shape does not carry
+// (`getGameState`, `getEnemies`, the cat, the arrows), and `suppressEnemies` empties the
+// spawn queue.
+//
+// ---------------------------------------------------------------------------------
+// WHAT THE RETIRED TRACES ALREADY ESTABLISHED. Twenty-seven of them, all measured against
+// the original, all deleted with plan 7 rather than rewritten. Their scenarios are the
+// expensive part and they are recorded here so the next question does not have to
+// rediscover them. (Every one is a fact about index.html, not about the port.)
+//
+// LEVEL 1's GEOMETRY, all derived from the real generated map at 'normal':
+//   - Gaps at columns 20-22, 45-46, 75-77 and 98-99 (`addGaps [[20,3],[45,2],[75,3],
+//     [98,2]]` at gapWidth 1.0). Running right from spawn, the ground runs out under the
+//     player at frame 116 and the first gap is 320px from spawn.
+//   - Platforms at [10,19,5], [18,17,4], [25,20,3], [30,16,5], [38,19,4], [42,15,3],
+//     [50,18,6], [58,14,4], [63,19,3], [70,17,5], [78,20,4], [82,15,4], [88,18,5],
+//     [95,16,4], [100,19,6], [108,17,4]. A standing jump clears about 68px, i.e. four
+//     tile rows, which is what makes [10,19,5] reachable from the floor.
+//   - `?` blocks at [12,16] [32,13] [55,15] [72,14] [90,15] [102,16]; the one rainbow
+//     block at [43,12]. Both sit three rows above a platform, so a plain standing jump
+//     from that platform reaches the underside on the second frame of the rise.
+//     `buildLevelState` scans the map row by row, so `questionBlocks[0]` is [32,13] —
+//     look blocks up by column, never by index.
+//   - `bowPositions:[35,70]` resolves the first bow to (560,352), resting on the base
+//     ground, and the second onto the platform at [70,17,5]. `superPositions:[22,85]` puts
+//     the first super INSIDE the first pit — column 22 has no solid tile at all, so
+//     `findGroundY` takes its bottom-row fallback and the pickup hangs over the hole. It
+//     is still collectable from the right-hand lip, which is a few pixels wide.
+//   - The cat pickup at column 50 is the LEFT EDGE of the platform at [50,18,6] and can
+//     only be collected from that platform: its box is 262-284 and a player on the base
+//     ground below occupies 344-368.
+//   - The rescue is at tile (115,20), i.e. (1840,344) for a 24-tall rescued sprite.
+//   - doll@15 patrols the whole stretch between spawn and the first gap, so it kills a
+//     hold-right script by contact at frame 60 and a stand-still one at frame ~240. That
+//     single fact shaped nearly every script: most of them teleport rather than walk.
+//   - A death respawns the level exactly 90 frames later, and `hasCape:dc.startWithCape`
+//     runs on every respawn, not just the first.
+//
+// WHAT THE ORIGINAL DOES, mechanic by mechanic, as measured:
+//   - The fart jump is `dc.jumpForce*1.5` applied at the assignment and nowhere else, so
+//     the variable-height cut still measures against the UNMULTIPLIED `jumpForce*0.4`.
+//   - The stink cloud adds 120 frames of stun to every living enemy within 50px, every
+//     frame, unbounded — and a stunned doll is frozen whole, walked through unharmed.
+//   - A big head widens the stomp box by 8px a side (doll@15 stomped on frame 58 instead
+//     of 60 on the same script) and overwrites `squashTimer` from 30 to 45.
+//   - A `?` block pays out one star, one tile above itself, and turns into a brick; a
+//     second hit gives nothing; a respawn gives the block back. The star leaves at -2,
+//     decelerates 0.1 a frame for about twenty frames, and then hangs there forever.
+//   - The rainbow block freezes the ENTIRE world for 120 frames — player, camera and
+//     enemies — and under a stubbed `Math.random` of 0.5 always grants the big head.
+//   - The bow: 15 frames between shots (a press at +6 does nothing, a press at exactly
+//     +15 fires), and an arrow that hits nothing lives 60 frames.
+//   - The chicken ray wins over the bow whenever a charge is left, spends its own counter
+//     and not the bow's, and converts a bat in place — 12.6x10.8 becomes 14.4x12.6,
+//     `noGravity` goes false and the bird falls and walks.
+//   - The cat scratches three times, 30 frames apart, and disappears the frame after the
+//     third.
+//   - A cape absorbs a contact hit, opens `dc.invincibleTime||60` frames of invincibility
+//     (120 on super_easy) and lets the player walk clean through the enemy that hit it.
+//     Surviving a pit with a cape is a different branch with a HARDCODED 60, and it
+//     teleports to `lvl.height*TILE - 32` with vy -10 — back into the same hole, two
+//     tiles higher, so the second fall follows almost immediately and kills.
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';

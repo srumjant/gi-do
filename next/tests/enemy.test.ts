@@ -5,6 +5,7 @@
 // for where they are recognised and skipped rather than half-simulated.
 import { afterEach, describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
+import { testMove } from './helpers/testMove';
 import { spawnEnemy, stepEnemy } from '../src/game/enemy';
 import { setRandom } from '../src/game/random';
 import { createWorld, spawnEnemiesInView, stepEnemies, stepWorld } from '../src/game/world';
@@ -385,6 +386,17 @@ describe('stepWorld wiring', () => {
   });
 });
 
+// THESE COMPARISONS SURVIVE PLAN 7, and it is worth saying why, since the player's own
+// traces did not. Arcade took the player and nothing else: the enemies are still on the
+// hand-rolled physics this port ported from index.html, line for line, so comparing them
+// against the original is still comparing like with like. It stops being true the day
+// they get bodies of their own (plan 7, task 3), and these tests should be read again
+// then rather than patched.
+//
+// What is NOT compared any more is the player's own x/y/vx/vy inside these traces. The
+// player is driven here by `testMove` (tests/helpers/testMove.ts), which exists to get it
+// onto the ground and out of the way — asserting a position it resolved would be
+// asserting what that helper does.
 describe('enemies vs. the live game', () => {
   it('spawns and patrols identically to the real update(), while the player holds still', () => {
     const FRAMES = 90;
@@ -396,7 +408,7 @@ describe('enemies vs. the live game', () => {
     const world = createWorld(0, 'normal');
     const port: EnemyState[][] = [];
     for (let i = 0; i < FRAMES; i++) {
-      stepWorld(world, held(script()));
+      stepWorld(world, held(script()), testMove);
       port.push(world.enemies.map((e) => ({ ...e })));
     }
 
@@ -467,7 +479,7 @@ describe('bat and bouncer vs. the live game', () => {
     world.camera.x = 700;
     const port: typeof live = [];
     for (let f = 0; f < FRAMES; f++) {
-      stepWorld(world, held(script()));
+      stepWorld(world, held(script()), testMove);
       const p = world.player;
       port.push({
         x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
@@ -482,13 +494,10 @@ describe('bat and bouncer vs. the live game', () => {
     }
 
     for (let f = 0; f < FRAMES; f++) {
-      expect(port[f].x).toBe(live[f].x);
-      expect(port[f].y).toBe(live[f].y);
-      expect(port[f].vx).toBe(live[f].vx);
-      expect(port[f].vy).toBe(live[f].vy);
-      expect(port[f].onGround).toBe(live[f].onGround);
-      expect(port[f].camera).toEqual(live[f].camera);
-
+      // The player's own x/y/vx/vy/onGround and the camera that follows them used to be
+      // compared here too, and retired with plan 7 — see the note above this describe.
+      // The player holds still at spawn (x=32) throughout either way, 600px west of the
+      // nearest thing this window streams in, so nothing it does reaches these enemies.
       expect(port[f].enemies.map((e) => e.type)).toEqual(live[f].enemies.map((e) => e.type));
       for (let i = 0; i < port[f].enemies.length; i++) {
         expect(port[f].enemies[i].x).toBe(live[f].enemies[i].x);

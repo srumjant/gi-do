@@ -305,6 +305,12 @@ output as it lands:
 - **Player controller** — golden traces. Feed a fixed input sequence, record position and
   velocity per step, compare against the old implementation. This is the one place where
   "it feels wrong" bugs hide, and bug-compatibility makes the comparison exact.
+  > **Retired, 2026-09-22 (Plan 7, task 4),** along with the contract above. The player is
+  > on an Arcade body and no longer moves frame-for-frame like `index.html`, so the traces
+  > were deleted rather than loosened. What replaces them: the children, unit tests of the
+  > feel logic that Arcade never touched (`tests/player.test.ts`), invariants checked in a
+  > browser, and `tests/helpers/liveGame.ts` kept working as a reference — it still gates
+  > the enemies, which are still hand-rolled.
 - **Audio scheduler** — fake clock, assert note scheduling order and timing.
 - **Rendering** — not unit tested. Visual A/B checkpoints against the current build,
   especially for felt parity.

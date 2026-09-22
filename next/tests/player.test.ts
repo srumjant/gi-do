@@ -1,18 +1,34 @@
 // Port of index.html:1361-1423 (player movement) plus the construction at
 // index.html:1166-1171. Pinned to level 0 ("Doll Garden") and 'normal' difficulty
 // throughout, per the task: gap positions shift with difficulty, so nothing here
-// hardcodes a tile-x for the gap — tests either derive it by walking the real
-// generated map, or (for the wall test, where no real wall exists at player height)
-// build one into a copy of that map.
+// hardcodes a tile-x for the gap — tests derive it by walking the real generated map.
+//
+// WHAT IS AND IS NOT TESTED HERE, since plan 7 put the player on an Arcade body.
+//
+// Everything below is `stepPlayer`'s own arithmetic: acceleration and deceleration, the
+// jump force, the variable-height cut, coyote time, the jump buffer, the pit threshold,
+// the walk cycle, the ammunition, the power-up timers and the popup freeze. None of it
+// is Arcade's and none of it changed. What DID change is the four lines in the middle of
+// that function — the X sweep, the Y sweep, the left clamp and the block bump — which
+// are now injected as a `PlayerMove` and, in the shipping game, are a real Arcade body
+// against a real tilemap layer.
+//
+// Arcade cannot be constructed under Vitest (tests/physics.test.ts says why), so the
+// tests that need the player to actually get somewhere inject `testMove` instead — plain
+// integration and trivial AABB resolution, deliberately NOT Arcade, deliberately not the
+// old hand-rolled sweep either. Read tests/helpers/testMove.ts before trusting any
+// position in this file: a resolved position here is that helper's answer, not the
+// game's. The three tests that asserted the hand-rolled sweep's own results — two about
+// the wall, one about the left clamp — are retired below rather than re-pointed at it.
 import { afterEach, describe, expect, it } from 'vitest';
-import { driveLiveGame } from './helpers/liveGame';
 import {
   createPlayer, giveRandomSillyPowerup, stepPlayer, GRND_DECEL,
 } from '../src/game/player';
+import { testMove } from './helpers/testMove';
 import { setRandom } from '../src/game/random';
 import { createWorld, respawnLevel, stepWorld } from '../src/game/world';
 import { emptyInput, type InputState } from '../src/input/actions';
-import { LEVELS, TILE_GROUND } from '../src/data/levels';
+import { LEVELS } from '../src/data/levels';
 import { GIGI_SKINS, DODO_SKINS } from '../src/data/sprites';
 import { TILE, GRAVITY } from '../src/config/constants';
 import { DIFFICULTY_CONFIG, DIFF_KEYS } from '../src/config/difficulty';
@@ -83,7 +99,7 @@ describe('horizontal movement', () => {
     const world = makeWorld();
     const seen: number[] = [];
     for (let i = 0; i < 30; i++) {
-      stepPlayer(world, held({ right: true }));
+      stepPlayer(world, held({ right: true }), testMove);
       seen.push(world.player.vx);
     }
     expect(seen.every((v) => v <= world.dc.playerSpeed)).toBe(true);
@@ -94,16 +110,18 @@ describe('horizontal movement', () => {
     const world = makeWorld();
     // Holding right from spawn caps vx well before it lands (confirmed against the
     // live game while developing this port); 10 frames lands it on the ground with
-    // vx already at the cap, so deceleration below is the grounded rate (0.72).
-    for (let i = 0; i < 10; i++) stepPlayer(world, held({ right: true }));
+    // vx already at the cap, so deceleration below is the grounded rate (0.72). The
+    // landing is all `testMove` contributes — which rate applies, and the snap to
+    // exactly zero, are stepPlayer's.
+    for (let i = 0; i < 10; i++) stepPlayer(world, held({ right: true }), testMove);
     expect(world.player.onGround).toBe(true);
     expect(world.player.vx).toBe(world.dc.playerSpeed);
 
     const before = world.player.vx;
-    stepPlayer(world, emptyInput());
+    stepPlayer(world, emptyInput(), testMove);
     expect(world.player.vx).toBeCloseTo(before * GRND_DECEL, 10);
 
-    for (let i = 0; i < 30; i++) stepPlayer(world, emptyInput());
+    for (let i = 0; i < 30; i++) stepPlayer(world, emptyInput(), testMove);
     expect(world.player.vx).toBe(0);
   });
 });
@@ -111,25 +129,25 @@ describe('horizontal movement', () => {
 describe('jump', () => {
   function landedWorld(): World {
     const world = makeWorld();
-    for (let i = 0; i < 10; i++) stepPlayer(world, emptyInput());
+    for (let i = 0; i < 10; i++) stepPlayer(world, emptyInput(), testMove);
     expect(world.player.onGround).toBe(true); // sanity: the setup itself landed
     return world;
   }
 
   it('opens at dc.jumpForce + 0.4 (jump force plus one frame of gravity) and leaves the ground', () => {
     const world = landedWorld();
-    stepPlayer(world, held({ jump: true, jumpPressed: true }));
+    stepPlayer(world, held({ jump: true, jumpPressed: true }), testMove);
     expect(world.player.onGround).toBe(false);
     expect(world.player.vy).toBeCloseTo(world.dc.jumpForce + GRAVITY, 10);
   });
 
   it('releasing early cuts the rise to dc.jumpForce * 0.4', () => {
     const world = landedWorld();
-    stepPlayer(world, held({ jump: true, jumpPressed: true }));
+    stepPlayer(world, held({ jump: true, jumpPressed: true }), testMove);
     // Released on the very next frame. The cut lands at jumpForce*0.4 mid-frame, and
     // that same frame's gravity still applies on top of it — isApex is false here
     // because |jumpForce*0.4| (3.0) is not under the 1.5 apex threshold.
-    stepPlayer(world, emptyInput());
+    stepPlayer(world, emptyInput(), testMove);
     expect(world.player.vy).toBeCloseTo(world.dc.jumpForce * 0.4 + GRAVITY, 10);
   });
 });
@@ -138,11 +156,20 @@ describe('coyote time', () => {
   // Walks right off the real gap in level 1's generated map, so onGround flips
   // true -> false because the ground disappeared underfoot, not because of a jump
   // (a jump zeroes coyoteTime itself, which would defeat this test).
+  //
+  // WHICH frame the ground runs out under the player is the mover's business, and the
+  // three implementations disagree by a frame or two: the live game's floor probes are
+  // inset 3px from each edge, so three pixels of overhang had already fallen (frame 116
+  // holding right from spawn); Arcade grounds a body on any overlap at all, so a
+  // one-pixel toe-hold holds; `testMove` sits between them and leaves at 117. None of
+  // that is what this tests. Coyote time is a counter in `stepPlayer` — armed to 6 while
+  // grounded, decremented once an airborne frame, read before the jump — and it behaves
+  // the same however the ledge was left.
   function walkOffLedge(): World {
     const world = makeWorld();
     let wasGrounded = false;
     for (let i = 0; i < 200; i++) {
-      stepPlayer(world, held({ right: true }));
+      stepPlayer(world, held({ right: true }), testMove);
       if (wasGrounded && !world.player.onGround) return world;
       wasGrounded = world.player.onGround;
     }
@@ -153,7 +180,7 @@ describe('coyote time', () => {
     const world = walkOffLedge();
     expect(world.player.coyoteTime).toBeGreaterThan(0);
     const vyBefore = world.player.vy;
-    stepPlayer(world, held({ right: true, jump: true, jumpPressed: true }));
+    stepPlayer(world, held({ right: true, jump: true, jumpPressed: true }), testMove);
     expect(world.player.vy).toBeLessThan(vyBefore); // overwritten by a jump, not just gravity
     expect(world.player.vy).toBeCloseTo(world.dc.jumpForce + GRAVITY, 10);
   });
@@ -164,10 +191,10 @@ describe('coyote time', () => {
     // the decrement) on every airborne frame since: 6,5,4,3,2,1,0 over frames
     // 0..6 after leaving. 5 filler frames land on "1"; the 6th (the jump attempt
     // itself) decrements it to 0 before canJump is checked, so it just misses.
-    for (let i = 0; i < 5; i++) stepPlayer(world, held({ right: true }));
+    for (let i = 0; i < 5; i++) stepPlayer(world, held({ right: true }), testMove);
     expect(world.player.coyoteTime).toBe(1);
     const vyBefore = world.player.vy;
-    stepPlayer(world, held({ right: true, jump: true, jumpPressed: true }));
+    stepPlayer(world, held({ right: true, jump: true, jumpPressed: true }), testMove);
     expect(world.player.coyoteTime).toBe(0);
     expect(world.player.vy).toBeGreaterThan(vyBefore); // gravity only, no jump happened
   });
@@ -177,7 +204,7 @@ describe('jump buffer', () => {
   function framesToLand(): number {
     const world = makeWorld();
     for (let calls = 1; calls <= 60; calls++) {
-      stepPlayer(world, emptyInput());
+      stepPlayer(world, emptyInput(), testMove);
       if (world.player.onGround) return calls;
     }
     throw new Error('never landed within 60 frames');
@@ -199,11 +226,11 @@ describe('jump buffer', () => {
     // carries through to landing is 5 frames before the landing call, not 8.
     const pressCall = landingCall - 5;
     for (let call = 1; call <= landingCall; call++) {
-      stepPlayer(world, held({ jump: call >= pressCall, jumpPressed: call === pressCall }));
+      stepPlayer(world, held({ jump: call >= pressCall, jumpPressed: call === pressCall }), testMove);
     }
     expect(world.player.onGround).toBe(true); // landed as expected
 
-    stepPlayer(world, held({ jump: true })); // still held: first grounded frame, buffer fires
+    stepPlayer(world, held({ jump: true }), testMove); // still held: first grounded frame, buffer fires
     expect(world.player.onGround).toBe(false);
     expect(world.player.vy).toBeCloseTo(world.dc.jumpForce + GRAVITY, 10);
   });
@@ -213,106 +240,61 @@ describe('jump buffer', () => {
     const world = makeWorld();
     const pressCall = landingCall - 6;
     for (let call = 1; call <= landingCall; call++) {
-      stepPlayer(world, held({ jump: call >= pressCall, jumpPressed: call === pressCall }));
+      stepPlayer(world, held({ jump: call >= pressCall, jumpPressed: call === pressCall }), testMove);
     }
     expect(world.player.onGround).toBe(true);
 
-    stepPlayer(world, held({ jump: true }));
+    stepPlayer(world, held({ jump: true }), testMove);
     expect(world.player.onGround).toBe(true); // no rebound: the buffer had expired
   });
 });
 
-describe('wall collision', () => {
-  // No real level has a vertical wall at player height: makeGround only writes the
-  // bottom two rows and addPlats writes a single row, so nothing stacks into something
-  // the player could run into. One is injected — into the live game as well as the
-  // port, so this is a real comparison rather than a test of the port against itself.
-  const WALL_TX = 6; // ahead of spawn (tile 2), well short of the tile-20 gap
-  const buildWall = (map: number[][]): void => {
-    for (let ty = 0; ty < map.length; ty++) map[ty][WALL_TX] = TILE_GROUND;
-  };
-
-  it('holds the player against the wall exactly as the live game does', () => {
-    const FRAMES = 45;
-    const live = driveLiveGame({
-      level: 0, difficulty: 'normal', character: 'gigi', frames: FRAMES,
-      input: () => ({ left: false, right: true, jump: false, fire: false }),
-      mutateMap: buildWall,
-    });
-
-    const world = makeWorld();
-    world.map = world.map.map((row) => row.slice());
-    buildWall(world.map);
-
-    const port = [];
-    for (let i = 0; i < FRAMES; i++) {
-      // The live update() does a whole frame every call — camera lerp and enemy
-      // spawn/step included, not just player movement — and driveLiveGame's Sample now
-      // carries camera and enemies too. stepWorld (rather than stepPlayer alone) is
-      // what keeps the port side comparable to that frame for frame: doll@15, doll@28
-      // and car@40 (level 0's enemyDefs) all spawn during this run, but stay far from
-      // the player, who never leaves the wall's neighbourhood near spawn, so they do
-      // not perturb the player physics this test is actually about.
-      stepWorld(world, held({ right: true }));
-      const p = world.player;
-      port.push({
-        x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
-        frame: p.frame, frameTimer: p.frameTimer, animFrame: world.animFrame,
-        camera: { x: world.camera.x, y: world.camera.y },
-        enemies: world.enemies.map((e) => ({
-          type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
-          frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
-        })),
-        score: world.score,
-      });
-    }
-
-    expect(port).toEqual(live);
-  });
-
-  // Holding right against a wall does NOT settle at rest. The snap leaves the player
-  // one pixel clear (the +1 at index.html:1406), so the next frame's 0.6 of
-  // acceleration does not quite reach the wall, and the frame after that does — giving
-  // a two-frame cycle where x alternates by 0.6px and vx alternates 0 / 0.6. Verified
-  // against the live game, which jitters identically. It is preserved, not fixed.
-  it('oscillates against the wall rather than coming to rest', () => {
-    const world = makeWorld();
-    world.map = world.map.map((row) => row.slice());
-    buildWall(world.map);
-
-    for (let i = 0; i < 30; i++) stepPlayer(world, held({ right: true }));
-
-    const snapped = WALL_TX * TILE - world.player.w + 1;
-    const xs = new Set<number>();
-    const vxs = new Set<number>();
-    for (let i = 0; i < 12; i++) {
-      stepPlayer(world, held({ right: true }));
-      xs.add(world.player.x);
-      vxs.add(world.player.vx);
-      // Whatever the phase, the player never penetrates the wall.
-      expect(world.player.x + world.player.w - 2).toBeLessThan(WALL_TX * TILE);
-    }
-    expect([...xs].sort((a, b) => a - b)).toEqual([snapped, snapped + 0.6]);
-    expect([...vxs].sort((a, b) => a - b)).toEqual([0, 0.6]);
-  });
-});
-
-describe('left clamp', () => {
-  it('the player cannot go left of x = 0', () => {
-    const world = makeWorld();
-    for (let i = 0; i < 40; i++) stepPlayer(world, held({ left: true }));
-    expect(world.player.x).toBe(0);
-    for (let i = 0; i < 10; i++) stepPlayer(world, held({ left: true }));
-    expect(world.player.x).toBe(0); // stays clamped, never negative
-  });
-});
+// RETIRED with plan 7: the wall, and the left clamp below it.
+//
+// Two tests lived here and both asserted the hand-rolled sweep's own arithmetic, which
+// Arcade does not reproduce and is not meant to. Neither is re-pointed at `testMove`,
+// because a position resolved by a test helper is a fact about the test helper. What
+// they knew is worth keeping, so here it is, with the live lines it came from:
+//
+//   - THE SETUP. No real level has a vertical wall at player height — `makeGround` writes
+//     the bottom two rows and `addPlats` writes a single row, so nothing stacks into
+//     anything the player could run into. Both tests built one: column 6 of level 1,
+//     floor to ceiling, ahead of spawn at column 2 and well short of the gap at column
+//     20. The same trick still works if the question ever needs asking again, and
+//     `driveLiveGame`'s `mutateMap` puts the same wall into the original.
+//
+//   - WHAT THE ORIGINAL DID. Holding right into that wall never came to rest. The
+//     rightward snap is `Math.floor(pR/TILE)*TILE - p.w + 1` (index.html:1406), and that
+//     `+1` leaves a one-pixel gap, so the next frame's 0.6 of acceleration does not quite
+//     reach the wall and the frame after that does: a two-frame cycle, x alternating
+//     81 <-> 81.6 and vx alternating 0 <-> 0.6, forever. Measured on both sides; the port
+//     reproduced it exactly, on purpose, for as long as it was bug-compatible.
+//
+//   - WHAT ARCADE DOES INSTEAD. It separates against the body's real edges, with no `+1`
+//     and no inset probes, so the player stops flush and stays stopped. A defect fixed
+//     rather than a behaviour ported — and still a change the children can feel.
+//
+//   - THE LEFT CLAMP, index.html:1422's `if(p.x<0)p.x=0`, is now a left-edge world bound
+//     (src/physics/player.ts sets left only: the live game has no right bound, no ceiling
+//     and above all no floor, since the pit needs the player to fall through). One
+//     difference worth knowing: pinned at x=0 the live game leaves `vx` NEGATIVE, and
+//     Arcade zeroes it. Nothing downstream has been found to care, but that is where to
+//     look if the left edge ever feels sticky.
+//
+// Both are checked in a browser now, against the real body — see the commit for plan 7,
+// task 2, and PLAYTEST.md's list of what Arcade changed.
 
 describe('pit death', () => {
+  // The threshold is `p.y > level.height*TILE + 32` (index.html:1423), hand-written in
+  // stepPlayer and untouched by Arcade — which is exactly why the world has no floor
+  // bound: the player has to be able to fall out of it. What gets the player over the
+  // edge of the real gap at column 20 is `testMove`; what happens once it is past the
+  // threshold is the code under test.
   it('falling past the pit threshold sets world.dead and then freezes position and velocity', () => {
     const world = makeWorld();
     let died = false;
     for (let i = 0; i < 400; i++) {
-      stepPlayer(world, held({ right: true }));
+      stepPlayer(world, held({ right: true }), testMove);
       if (world.dead) { died = true; break; }
     }
     expect(died).toBe(true);
@@ -321,7 +303,7 @@ describe('pit death', () => {
     const frozen = {
       x: world.player.x, y: world.player.y, vx: world.player.vx, vy: world.player.vy,
     };
-    for (let i = 0; i < 15; i++) stepPlayer(world, held({ right: true }));
+    for (let i = 0; i < 15; i++) stepPlayer(world, held({ right: true }), testMove);
     expect(world.player.x).toBe(frozen.x);
     expect(world.player.y).toBe(frozen.y);
     expect(world.player.vx).toBe(frozen.vx);
@@ -414,14 +396,27 @@ describe('the power-up popup freezes the whole world', () => {
     // world — so: enemies streamed in, and a camera actually mid-lerp. The camera only
     // leaves 0 once the player passes VIEW_W/2 - p.w/2 (~205px), and doll@15 kills a
     // hold-right player at frame 60 while it is still short of that, so this teleports
-    // rather than walks — the same trick trace.test.ts's pickup and rescue traces use.
-    // Column 45 is clear ground well past doll@15, doll@28 and car@40, all three of
-    // which spawn behind it and walk away from it.
-    const START_TILE = 45;
+    // rather than walks.
+    //
+    // Column 67: base ground, no platform above it, clear of all four gaps (20-22,
+    // 45-46, 75-77, 98-99 at normal's gapWidth of 1.0), clear of the bow at 70 and the
+    // cat at 50, and between doll@65 and bouncer@73 — both of which patrol away from it
+    // on a platform row, not this one.
+    //
+    // It used to be column 45, which is INSIDE the second gap (`addGaps` carves [45,2]).
+    // `findGroundY` has no solid tile to find in that column and falls through to its
+    // `(height-2)*TILE` fallback — the same number the real ground's top happens to be —
+    // so the teleport looked like it was standing on ground and was in fact hanging over
+    // a hole. It passed anyway, because the live sweep probed 2px inside the player's
+    // edges: falling between the lips of a two-column gap it touched nothing, kept
+    // drifting right, and satisfied "the 121st frame moves again" while dropping. Found
+    // when this test was re-pointed at a mover that separates on the real edges and
+    // caught the player on the lip instead. A wrong premise, green for two whole plans.
+    const START_TILE = 67;
     world.player.x = START_TILE * TILE;
     world.player.y = findGroundY(world.map, START_TILE) - world.player.h;
     world.player.onGround = true;
-    for (let i = 0; i < 10; i++) stepWorld(world, held({ right: true }));
+    for (let i = 0; i < 10; i++) stepWorld(world, held({ right: true }), testMove);
     expect(world.dead).toBe(false);
     expect(world.enemies.length).toBeGreaterThan(0);
     expect(world.camera.x).toBeGreaterThan(0);
@@ -432,7 +427,7 @@ describe('the power-up popup freezes the whole world', () => {
     const xAtGrant = world.player.x;
 
     // 119 frames of held input that would otherwise walk, spawn and scroll.
-    for (let i = 0; i < 119; i++) stepWorld(world, held({ right: true }));
+    for (let i = 0; i < 119; i++) stepWorld(world, held({ right: true }), testMove);
     expect(snapshot(world)).toBe(frozen);
     // animFrame keeps counting through the freeze — it is incremented ABOVE the gate,
     // which is why the drawn scene behind the popup still animates.
@@ -440,12 +435,12 @@ describe('the power-up popup freezes the whole world', () => {
     expect(world.powerupPopup).toEqual({ type: 'bighead', timer: 1, maxTimer: 120 });
 
     // The 120th frame is the last frozen one; it is also the one that clears the popup.
-    stepWorld(world, held({ right: true }));
+    stepWorld(world, held({ right: true }), testMove);
     expect(world.powerupPopup).toBeNull();
     expect(snapshot(world)).toBe(frozen);
 
     // ...and the 121st moves again.
-    stepWorld(world, held({ right: true }));
+    stepWorld(world, held({ right: true }), testMove);
     expect(world.player.x).toBeGreaterThan(xAtGrant);
   });
 
