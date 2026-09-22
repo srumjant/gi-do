@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import Phaser from 'phaser';
 import { BASE_W, BASE_H, STEP_HZ } from './config/constants';
+import { installDefaultGlyphs } from './config/glyphs';
 import { BetweenScene } from './scenes/BetweenScene';
 import { CharacterScene } from './scenes/CharacterScene';
 import { DifficultyScene } from './scenes/DifficultyScene';
@@ -10,6 +11,10 @@ import { LevelOverlayScene } from './scenes/LevelOverlayScene';
 import { PowerupPopupScene } from './scenes/PowerupPopupScene';
 import { SliceScene } from './scenes/SliceScene';
 import { WinScene } from './scenes/WinScene';
+
+// Before any scene builds a string: four translations carry a {A}-style placeholder and
+// would otherwise render it literally. See config/glyphs.ts.
+installDefaultGlyphs();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
