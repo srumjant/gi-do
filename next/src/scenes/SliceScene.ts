@@ -139,6 +139,14 @@ const DEPTH_RESCUE = 14;
 /** The bars, and the cry over them (index.html:1752, :1755). */
 const DEPTH_RESCUE_FRONT = 15;
 const DEPTH_ENEMY = 16;
+/**
+ * The cannon's muzzle flash (index.html:1764), which the live source draws inside the
+ * enemy loop right after each enemy's own sprite. A Graphics has one depth for everything
+ * on it, so all the flashes share this band just above the enemies — which differs from
+ * the live order only if a cannon is ever drawn on top of another enemy's flash, and
+ * nothing in the level data places two enemies in the same few pixels.
+ */
+const DEPTH_ENEMY_FX = 16.5;
 /** The boss, after every ordinary enemy (index.html:1768) and in front of all of them. */
 const DEPTH_BOSS = 17;
 /**
@@ -168,6 +176,28 @@ const CHICKEN_TRAIL = { color: 0xffff64, alpha: 0.3 };
 const ARROW_TRAIL = { color: 0xffc864, alpha: 0.4 };
 /** A fireball's own trail (index.html:1828), 4x4 behind the direction of travel. */
 const FIREBALL_TRAIL = { color: 0xff6400, alpha: 0.3 };
+
+/**
+ * The cannon's flash (index.html:1764's `rgba(255,150,0,0.5)`), a 5px disc 10px to the
+ * side of its centre.
+ *
+ * IT IS NOT A WARNING, whatever "telegraph" suggests. The live condition is
+ * `shootTimer > shootInterval - 5` and `shootTimer` counts DOWN, reloading to
+ * `shootInterval` on the frame it fires — so the five frames it covers are the firing
+ * frame and the four after it. A muzzle flash, drawn behind a fireball that has already
+ * left. Read it as a warning and you would draw it before the shot, which would make the
+ * cannon a fairer enemy than the original's.
+ *
+ * (One live quirk rides along with that and is reproduced by simply following the rule: a
+ * cannon's randomised first `shootTimer` is 60-119, so on any difficulty whose interval is
+ * below about 120 — every one but super_easy's 200 — a freshly spawned cannon may already
+ * satisfy the test and flash once before it has fired anything at all.)
+ */
+const CANNON_FLASH = { color: 0xff9600, alpha: 0.5 };
+const CANNON_FLASH_RADIUS = 5;
+const CANNON_FLASH_OFFSET_X = 10;
+/** The five frames the flash covers, counting from the shot (index.html:1764). */
+const CANNON_FLASH_FRAMES = 5;
 
 /**
  * The angry glow behind the boss's eyes once it is down to half health
@@ -291,9 +321,10 @@ export class SliceScene extends Phaser.Scene {
   private cageBarsGraphics!: Phaser.GameObjects.Graphics;
   private rescueCryText!: Phaser.GameObjects.Text;
   private rescueCallText!: Phaser.GameObjects.Text;
-  /** The pickup haloes and the arrow trails: shapes, not sprites, redrawn each frame. */
+  /** The pickup haloes, the arrow trails and the cannons' flashes: shapes, redrawn each frame. */
   private glowGraphics!: Phaser.GameObjects.Graphics;
   private arrowTrailGraphics!: Phaser.GameObjects.Graphics;
+  private enemyFxGraphics!: Phaser.GameObjects.Graphics;
   /** The two kinds of block that can be bumped from below, and the bricks they become. */
   private questionBlocks: BlockView[] = [];
   private rainbowBlocks: BlockView[] = [];
@@ -374,6 +405,7 @@ export class SliceScene extends Phaser.Scene {
 
     this.glowGraphics = this.add.graphics().setDepth(DEPTH_PICKUP_GLOW);
     this.arrowTrailGraphics = this.add.graphics().setDepth(DEPTH_ARROW_TRAIL);
+    this.enemyFxGraphics = this.add.graphics().setDepth(DEPTH_ENEMY_FX);
 
     // Built on every level, not only the last one. `world.boss` is null on the other five
     // and `syncBoss` simply hides all four objects — which costs one `setVisible(false)`
@@ -769,11 +801,15 @@ export class SliceScene extends Phaser.Scene {
     this.syncArrows();
     this.syncPlayer();
 
+    // Cleared here and filled from inside the loop below, exactly as the live draw code
+    // paints each cannon's flash from inside its own `enemies.forEach`.
+    this.enemyFxGraphics.clear();
     for (let i = 0; i < enemies.length; i++) {
       const enemy = enemies[i];
       const image = this.enemyImages[i] ?? this.createEnemyImage(enemy);
       this.enemyImages[i] = image;
       this.syncEnemyImage(image, enemy, animFrame);
+      this.drawCannonFlash(enemy);
     }
     // `world.enemies` only ever grows WITHIN a level, but a respawn replaces it with
     // an empty array (world.ts's respawnLevel) — and without this, every enemy from
@@ -1118,9 +1154,8 @@ export class SliceScene extends Phaser.Scene {
   }
 
   /**
-   * Fireballs (index.html:1827-1828) — the boss's today, the cannon's when that type
-   * lands, drawn by the same pool either way because the live draw code does not
-   * distinguish them.
+   * Fireballs (index.html:1827-1828) — the boss's and the cannon's, drawn by the same
+   * pool because the live draw code does not distinguish them.
    *
    * NEVER FLIPPED, unlike every other projectile in the game: the live call passes a
    * literal `false` for the flip, so a fireball travelling left draws the same way round
@@ -1275,10 +1310,9 @@ export class SliceScene extends Phaser.Scene {
   /**
    * Port of the enemy branch of index.html:1759-1763. `fl = e.vx>0` — enemy sprites
    * face left by default (the opposite of the player's convention above), so the
-   * flip is on moving RIGHT, not left. Ghost transparency
-   * (`.6+Math.sin(animFrame*.08)*.2`, index.html:1761) is skipped: `spawnEnemy`
-   * (game/enemy.ts) never creates a 'ghost' in this slice, so there is none to apply
-   * it to.
+   * flip is on moving RIGHT, not left. For a GHOST that flip is the only thing `vx`
+   * is for: the simulation writes it ±0.1 every frame purely so this line turns the
+   * sprite toward the player (game/enemy.ts).
    */
   private syncEnemyImage(image: Phaser.GameObjects.Image, enemy: EnemyState, animFrame: number): void {
     // Re-resolved every frame, not set once at creation, because an enemy's TYPE can
@@ -1314,8 +1348,36 @@ export class SliceScene extends Phaser.Scene {
     const wobble = Math.sin(animFrame * 0.15 + enemy.x);
     image.setVisible(true);
     image.setScale(1, 1);
-    image.setAlpha(1);
+    // A living GHOST is translucent and breathes (index.html:1761): `.6 + sin(f*.08)*.2`,
+    // so it runs between 0.4 and 0.8 and never reaches solid. Off the SHARED animFrame
+    // with no per-ghost offset, exactly like its drift, so every ghost on screen pulses
+    // together. Everything else draws at 1.
+    image.setAlpha(enemy.type === 'ghost' ? 0.6 + Math.sin(animFrame * 0.08) * 0.2 : 1);
     image.setPosition(enemy.x, enemy.y + wobble);
+  }
+
+  /**
+   * The cannon's muzzle flash (index.html:1764) — see CANNON_FLASH above for why it is a
+   * flash and not a warning, and for the live quirk that can make a newly spawned cannon
+   * show one before its first shot.
+   *
+   * Aimed at the PLAYER's current side, re-evaluated every frame it is drawn, not at the
+   * side the shot actually went: the live line reads `player.x > e.x` here, independently
+   * of the `dir` the simulation used when it fired. Walk past a cannon in the four frames
+   * after it shoots and its flash swaps sides while the fireball carries on the other way.
+   * Faithful, and quite visible if you look for it.
+   */
+  private drawCannonFlash(enemy: EnemyState): void {
+    if (enemy.type !== 'cannon' || !enemy.alive) return;
+    if (enemy.shootTimer <= enemy.shootInterval - CANNON_FLASH_FRAMES) return;
+    const dir = this.world.player.x > enemy.x ? 1 : -1;
+    fillCircle(
+      this.enemyFxGraphics,
+      CANNON_FLASH,
+      enemy.x + enemy.w / 2 + dir * CANNON_FLASH_OFFSET_X,
+      enemy.y + enemy.h / 2,
+      CANNON_FLASH_RADIUS,
+    );
   }
 }
 

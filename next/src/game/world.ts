@@ -601,11 +601,11 @@ export function stepArrows(world: World): void {
 
 /**
  * Port of index.html:1550-1556 — everything an ENEMY has fired, moved and resolved in one
- * pass. The mirror image of `stepArrows` above, and deliberately built for BOTH shooters
- * that fill the list rather than only for the one that exists today: the boss's fireballs
- * (game/boss.ts) now, and the cannon's single shot (index.html:1534-1535) when that enemy
- * type is ported. The cannon needs nothing here — it only has to push onto
- * `world.enemyProjectiles`, exactly as the boss does, and this pass will fly it.
+ * pass. The mirror image of `stepArrows` above, and it carries BOTH shooters: the boss's
+ * pair of rising fireballs (game/boss.ts) and the cannon's single flat one
+ * (game/enemy.ts). It was written for both while only the boss existed, and the cannon
+ * landing needed not one line changed here — it only pushes onto
+ * `world.enemyProjectiles`, exactly as the boss does, and this pass flies it.
  *
  * NO GRAVITY, anywhere. `y` gains `vy` and `vy` gains nothing, so every projectile in
  * this game travels a perfectly straight line for its whole life: the cannon's at

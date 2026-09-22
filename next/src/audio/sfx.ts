@@ -63,9 +63,9 @@ export function sfxWin(): void {
 // in the middle of game logic, which is why a search for `sfx` — the obvious way to find
 // every sound in index.html, and the way this port's first pass over the audio went —
 // misses all three. There are ten such calls live; these are the three in code this port
-// ran when they were found. Of the other seven, the boss's three are named further down
-// this file now that the fight is ported; what is left is the cannon's shot and learn
-// mode's.
+// ran when they were found. Of the other seven, the boss's three and the cannon's shot
+// are named further down this file now that both are ported; what is left is learn
+// mode's, which this port does not have.
 //
 // Named here, rather than left inline at the call sites, so that the port has one file
 // that answers "what noises can this game make?".
@@ -106,13 +106,27 @@ export function sfxCatVanish(): void {
  * A fireball leaving the boss (index.html:1572). 150Hz sawtooth sliding down to 80 over a
  * fifth of a second.
  *
- * Not the same sound as the CANNON's shot, which is also a 150Hz sawtooth at the same
- * volume (index.html:1535) but half as long and sliding to 300 rather than 80 — it ends
- * ABOVE where it started rather than well below. Two tones a careless reading would fold
- * into one; when the cannon lands it wants a second function here, not a call to this one.
+ * Not the same sound as the CANNON's shot below, which is also a 150Hz sawtooth at the
+ * same volume (index.html:1535) but half as long and sliding to 300 rather than 80 — it
+ * ends ABOVE where it started rather than well below. Two tones a careless reading would
+ * fold into one.
  */
 export function sfxBossFire(): void {
   playTone(150, 0.2, 'sawtooth', 0.08, 80);
+}
+
+/**
+ * A cannon spitting a fireball (index.html:1535) — the last bare `playTone` in anything
+ * this port simulates, and the one the note above `sfxBossFire` asked for by name rather
+ * than folding into it.
+ *
+ * 150Hz sawtooth sliding UP to 300 over a tenth of a second. Same wave and same volume as
+ * the boss's shot, half the length, and the slide goes the other way: a spit against a
+ * belch. A level with five cannons on it (level 4) would sound like a boss room if these
+ * shared one function.
+ */
+export function sfxCannonFire(): void {
+  playTone(150, 0.1, 'sawtooth', 0.08, 300);
 }
 
 /** The boss committing to a charge (index.html:1583): a short, hard 100Hz square down to 60. */

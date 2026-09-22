@@ -144,10 +144,11 @@ function registerPlayerTextures(scene: Phaser.Scene): void {
 /**
  * Every enemy type getEnemySpriteInfo (game/run.ts) can resolve: the nine named
  * cases plus 'dino', which reaches its sprite through that function's default
- * branch rather than a case of its own. Streamed types this slice's simulation does
- * not spawn yet — ghost, bat, cannon, bouncer (see enemy.ts) — still get a texture
- * here: the art already exists in data/sprites.ts, and there's no reason the GPU
- * side should wait for the simulation to catch up.
+ * branch rather than a case of its own. Every one of them is spawned by the simulation
+ * now — ghost and cannon were the last two to land — but the list was complete before
+ * that was true, on the grounds that the art already existed in data/sprites.ts and
+ * there was no reason the GPU side should wait for the simulation to catch up. That
+ * turned out to be the right call: neither of them needed a texture change.
  */
 const ENEMY_TYPES = [
   'car', 'doll', 'dino', 'ghost', 'bat', 'cannon', 'bouncer', 'penguin', 'icebat', 'chicken',
@@ -241,7 +242,7 @@ export const CHICKEN_ARROW_TEXTURE = 'chicken-arrow';
 /** The cape, drawn behind the player while `hasCape` (index.html:1839). */
 export const CAPE_TEXTURE = 'cape';
 /**
- * A fireball in flight (index.html:1828) — the boss's today, the cannon's later. Both
+ * A fireball in flight (index.html:1828) — the boss's and the cannon's alike. Both
  * shooters' shots draw this one sprite at this one scale: the live draw code renders
  * FIREBALL_S for every entry in `enemyProjectiles` without ever looking at the `type`
  * tag the cannon sets on its own (see EnemyProjectile in game/types.ts).

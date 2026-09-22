@@ -122,9 +122,9 @@ export interface EnemySpriteInfo {
  *
  * The same default branch also catches every type this switch does not name — still
  * DINO_S/DINO_P. That is a *different* decision from `spawnEnemy` in enemy.ts, which
- * returns `undefined` for a type its simulation does not implement (ghost, bat,
- * cannon, bouncer) so its caller can skip spawning it rather than create a half-
- * simulated enemy. The two must not be unified into one mapping: this function
+ * returns `undefined` for a type its simulation does not know rather than pushing a
+ * half-simulated enemy (nothing in the level data takes that path any more, now that
+ * ghost and cannon are in). The two must not be unified into one mapping: this function
  * answers "what does that enemy look like on screen", and always has an answer;
  * `spawnEnemy` answers "should this exist in the simulation at all", and sometimes
  * the answer is no. Defaulting here is not a substitute for the `undefined` there.

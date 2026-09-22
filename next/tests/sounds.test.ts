@@ -50,6 +50,7 @@ function enemyAt(x: number, y: number, over: Partial<EnemyState> = {}): EnemySta
     type: 'doll', x, y, vx: 0, vy: 0, w: 14.4, h: 16.2, alive: true,
     frame: 0, frameTimer: 0, squashTimer: 0,
     noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+    shootTimer: 0, shootInterval: 0, noStomp: false,
     isChicken: false,
   };
 }
@@ -398,7 +399,7 @@ describe('every cue reaches the audio stack', () => {
   const EFFECTS: SoundCue[] = [
     'jump', 'fart', 'shoot', 'cluck', 'block', 'pickup', 'coin',
     'stomp', 'boing', 'hurt', 'win', 'cape', 'cat-arrive', 'cat-vanish',
-    'boss-fire', 'boss-charge', 'boss-roar',
+    'boss-fire', 'boss-charge', 'boss-roar', 'cannon-fire',
   ];
 
   // A cue the switch does not answer is silence with no error anywhere — exactly the

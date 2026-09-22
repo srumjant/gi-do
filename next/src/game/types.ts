@@ -250,18 +250,23 @@ export interface EnemyState {
    */
   squashTimer: number;
   /**
-   * True for a flyer that writes its own `y` every frame instead of falling — bat and
-   * icebat (ghost too, live, but this slice never spawns one). stepEnemy's
-   * gravity/floor-snap block is skipped entirely while this is true (index.html:1527's
-   * `if(!e.noGravity){...}`). False for every ground patroller, exactly like the live
-   * source, which only ever ADDS this field for the types that need it.
+   * True for a flyer that writes its own `y` every frame instead of falling — bat,
+   * icebat and ghost. stepEnemy's gravity/floor-snap block is skipped entirely while
+   * this is true (index.html:1527's `if(!e.noGravity){...}`). False for every ground
+   * patroller AND for the cannon, which never moves but is still gravity-bound and
+   * still floor-snapped every frame, exactly like the live source — which only ever
+   * ADDS this field for the types that need it.
    */
   noGravity: boolean;
   /**
-   * The fixed height a bat/icebat's sine flight is centred on — set once at spawn,
-   * 60px above where it would otherwise have stood on the ground (index.html:1217),
-   * and never touched again; stepEnemy reads it fresh every frame rather than
-   * integrating position, so nothing here ever drifts. Inert (0) for every other type.
+   * The fixed height a sine-flying enemy hangs at — set once at spawn and never touched
+   * again; stepEnemy reads it fresh every frame rather than integrating position, so
+   * nothing here ever drifts. Inert (0) for every type that does not fly.
+   *
+   * Two types set it, at two different heights: a bat/icebat 60px above where it would
+   * otherwise have stood (index.html:1217) and a ghost 40px (index.html:1216). A ghost
+   * only returns to it when the player is OUT of aggro range; inside it, `y` is written
+   * by the homing instead and `originY` is simply not read.
    */
   originY: number;
   /**
@@ -301,6 +306,34 @@ export interface EnemyState {
    * ray turns an enemy into a chicken, the next one kills the chicken.
    */
   isChicken: boolean;
+  /**
+   * Frames until a cannon's next shot (index.html:1218, 1534). Inert (0) for every
+   * other type.
+   *
+   * It counts DOWN to zero and is then reloaded to `shootInterval` — the opposite of
+   * the boss's field of the same name, which counts UP to it (BossState below). Two
+   * shooters, two directions; do not fold them together.
+   *
+   * It starts RANDOMISED, at `60 + floor(random()*60)`, so a row of cannons placed a
+   * few tiles apart does not fire in lockstep even though every one of them shares the
+   * same interval. Drawn through random.ts's seam, like the bat's sineOffset.
+   */
+  shootTimer: number;
+  /**
+   * What a cannon reloads `shootTimer` to — `dc.enemyShootInterval` flat, unlike the
+   * boss's `* 1.2` (index.html:1218 against :1204). Inert (0) for every other type.
+   */
+  shootInterval: number;
+  /**
+   * Cannot be killed by jumping on it (index.html:1218, 1545). Set by the CANNON alone:
+   * it is the one enemy in the game a child cannot stomp, and a jump onto its head is
+   * an ordinary contact hit instead — which is what makes it a hazard to shoot round
+   * rather than a step to bounce off.
+   *
+   * Cleared by `chickenify` (index.html:1508), so a chicken ray is the one thing that
+   * makes a cannon stompable: it stops being a cannon.
+   */
+  noStomp: boolean;
 }
 
 /**
@@ -331,8 +364,8 @@ export interface Arrow {
 
 /**
  * Something an ENEMY fired at the player (index.html:993, 1535, 1570-1571) — the boss's
- * fireballs today, and the cannon's when that type lands. One list, one pass, both
- * shooters; see world.ts's stepEnemyProjectiles.
+ * two fireballs and the cannon's single flat one. One list, one pass, both shooters;
+ * see world.ts's stepEnemyProjectiles.
  *
  * `vy` IS NEVER ACCELERATED. There is no gravity anywhere in the pass — `ep.y += ep.vy`
  * and nothing else — so a projectile launched at `vy: -1` rises at exactly one pixel a
@@ -341,8 +374,8 @@ export interface Arrow {
  * contract: preserved deliberately, not an arc someone forgot to finish.
  *
  * It is also why these must never be handed to Arcade (Plan 7 says so explicitly): a
- * body in a world with gravity would drop, and the spread would become the arc the
- * original never had.
+ * body in a world with gravity would drop, the spread would become the arc the original
+ * never had, and the cannon's dead-flat shot would sag into the floor.
  */
 export interface EnemyProjectile {
   x: number;
@@ -356,7 +389,8 @@ export interface EnemyProjectile {
    * everything not still above zero at the end of it.
    *
    * The boss fires two at once with DIFFERENT lifetimes — 120 for the flatter one, 100
-   * for the steeper (index.html:1570-1571) — so the pair does not vanish together.
+   * for the steeper (index.html:1570-1571) — so the pair does not vanish together. The
+   * cannon's one shot lives 120 (index.html:1535).
    */
   life: number;
   /**
@@ -364,8 +398,8 @@ export interface EnemyProjectile {
    * `type:'fireball'` (index.html:1535) and the boss tags neither of its two; nothing
    * anywhere reads the field, and the draw code renders FIREBALL_S for everything in
    * the list regardless (index.html:1828). Kept so the field set stays the live
-   * object's, exactly like CatState.vx and PowerupPopup.maxTimer, and so the cannon can
-   * be ported without touching this shape.
+   * object's, exactly like CatState.vx and PowerupPopup.maxTimer — and the cannon,
+   * now ported, really does set it, on a field that still nothing reads.
    */
   type?: string;
 }
@@ -495,6 +529,11 @@ export interface BossState {
  *     and reports the sound work finished. `boss-roar` is two tones, the second scheduled
  *     150ms behind the first. Named in audio/sfx.ts for the same reason the cape and the
  *     cat were.
+ *   - `cannon-fire` (:1535) is the last bare `playTone` in anything this port simulates.
+ *     It is NOT `boss-fire`: both are a 150Hz sawtooth at 0.08, but the cannon's is half
+ *     as long and slides UP to 300 where the boss's slides down to 80 — a spit rather
+ *     than a belch. Folding the two into one cue would make a level of cannons sound
+ *     like a room of bosses.
  *   - `music-level` is the level's own theme, restarted by a respawn. Which theme that is
  *     is the SCENE's business — a World does not know its own level index — so the cue
  *     carries no argument and the scene supplies it.
@@ -517,6 +556,7 @@ export type SoundCue =
   | 'boss-fire'
   | 'boss-charge'
   | 'boss-roar'
+  | 'cannon-fire'
   | 'music-level'
   | 'music-stop';
 

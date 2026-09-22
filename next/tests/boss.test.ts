@@ -659,5 +659,6 @@ function enemyAt(world: World, x: number, y: number): EnemyState {
     type: 'doll', x, y, vx: 0, vy: 0, w: 14.4, h: 16.2, alive: true,
     frame: 0, frameTimer: 0, squashTimer: 0, noGravity: true, originY: 0,
     sineOffset: 0, bounceTimer: 0, stunTimer: 0, isChicken: false,
+    shootTimer: 0, shootInterval: 0, noStomp: false,
   };
 }
