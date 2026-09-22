@@ -8,7 +8,7 @@ If it fails, walking away is still cheap — which is the whole reason it comes 
 | | Where | What it is |
 |---|---|---|
 | **Old** | `https://srumjant.github.io/gi-do/` | the real game, unchanged |
-| **New** | `https://srumjant.github.io/gi-do/next/` | level 1 only, on Phaser, drawn as coloured rectangles |
+| **New** | `https://srumjant.github.io/gi-do/next/` | all six levels, on Phaser |
 
 Both work on the iPad and on the laptop. Keyboard only for the new one — arrows or WASD to
 move, space to jump.
@@ -17,14 +17,20 @@ move, space to jump.
 
 Say this up front or the first thirty seconds are just them listing it:
 
-no music, no sounds, one level, no hearts, no score, no menus, no cat, no bow, no
-power-ups, and **the enemies cannot hurt you** — you can jump on them, but walking into
-one does nothing.
+**no music and no sounds at all**, no title screen (it starts on the difficulty screen),
+no pause, and no learn mode. Two enemies are missing — the **ghost** and the **cannon** —
+so levels 2, 3, 4 and 6 are emptier than they should be. There is **no boss**, so level 6
+ends like any other level.
 
-It does now look like the game: the real characters, the real enemies, the tile grid with
-its grass edge and brick mortar, the `?` and rainbow blocks, and the parallax sky. The
-felt style is not there — but that is off by default in the real game too, so unless
-someone has turned it on with `F`, both should look the same.
+Everything else is there now: all six levels, difficulty and character choice, hearts,
+score, the cat, the bow, the chicken ray, the silly power-ups, the cape, and the
+between-level cutscene. Level 5, the ice one, is complete — every penguin and icebat it
+is supposed to have.
+
+The felt style is not there, but that is off by default in the real game too, so unless
+someone has turned it on with `F`, both should look the same. A couple of visual extras
+are missing: the sparkles when you pick something up, and the coloured border that flashes
+round the screen while a power-up is running.
 
 ## What to ask
 

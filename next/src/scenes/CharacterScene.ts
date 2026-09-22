@@ -117,6 +117,10 @@ export class CharacterScene extends Phaser.Scene {
   }
 
   create(): void {
+    // index.html:1334 — confirming a difficulty sets `selectIndex=0`. Same reason as
+    // DifficultyScene's: the field initialiser runs once per instance, and Phaser reuses
+    // instances, so re-entering would otherwise keep the previous choice's cursor.
+    this.index = 0;
     registerMenuTextures(this);
     this.cameras.main.setBackgroundColor(BACKGROUND);
 

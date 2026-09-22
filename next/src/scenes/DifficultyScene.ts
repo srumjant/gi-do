@@ -94,6 +94,11 @@ export class DifficultyScene extends Phaser.Scene {
   }
 
   create(): void {
+    // index.html:1324 — entering this state sets `diffIndex=0`. The field initialiser
+    // above runs once per scene INSTANCE, and Phaser reuses instances across restarts,
+    // so without this a finished run returns to the last difficulty picked rather than
+    // to the first card.
+    this.index = 0;
     registerMenuTextures(this);
     this.cameras.main.setBackgroundColor(BACKGROUND);
 
