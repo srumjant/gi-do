@@ -51,7 +51,8 @@ import {
   SUPER_TEXTURE,
 } from '../gfx/textures';
 import type { InputState } from '../input/actions';
-import { createKeyboardInput, type KeyboardInput } from '../input/keyboard';
+import { createControls, type Controls } from '../input/controls';
+import { playRumbles } from '../input/gamepad';
 import { createEnemyBodies, type EnemyBodies } from '../physics/enemy';
 import { createPlayerMove } from '../physics/player';
 import { createCollisionLayer, syncCollisionLayer } from '../physics/tiles';
@@ -252,7 +253,7 @@ interface CloudView {
  */
 export class SliceScene extends Phaser.Scene {
   private world!: World;
-  private controls!: KeyboardInput;
+  private controls!: Controls;
   private playerImage!: Phaser.GameObjects.Image;
   /** The two halves the player splits into while a big head is running. */
   private headImage!: Phaser.GameObjects.Image;
@@ -424,7 +425,10 @@ export class SliceScene extends Phaser.Scene {
 
     this.cameras.main.setZoom(ZOOM);
 
-    this.controls = createKeyboardInput(this);
+    // Keyboard and controller, read as one value per fixed step. Made HERE, in create(),
+    // and not earlier: the pad half seeds itself from what is held the moment it is built,
+    // which is what stops the Ⓐ that confirmed the character screen from also jumping.
+    this.controls = createControls(this);
 
     // The numbers, on a scene of their own, running alongside this one. `launch` rather
     // than `start`: this scene keeps running. It draws on top because main.ts lists it
@@ -660,6 +664,10 @@ export class SliceScene extends Phaser.Scene {
       // frozen frame honest — a dead or won step raises nothing and clears anything left,
       // so a death cannot bank up a burst of stomps to fire on the respawn.
       playSounds(this.world, this.levelIndex);
+      // The same arrangement for the other device, drained in the same place and for the
+      // same reason: a slow rendered frame that takes three steps should buzz for each
+      // star, and a frozen step should leave nothing banked up. See World.rumbles.
+      playRumbles(this.world);
       // Also INSIDE the loop. A death inside this step replaces `world.enemies` with an
       // empty array (world.ts's respawnLevel), and the bodies of the enemies that were in
       // it are still in Arcade's world, still being stepped and still separating against

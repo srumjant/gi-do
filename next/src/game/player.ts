@@ -4,7 +4,7 @@ import { TILE_BRICK, type Level } from '../data/levels';
 import { GIGI_SKINS, DODO_SKINS } from '../data/sprites';
 import type { InputState } from '../input/actions';
 import { random } from './random';
-import type { PlayerState, PowerupType, World } from './types';
+import { PICKUP_RUMBLE, type PlayerState, type PowerupType, type World } from './types';
 
 export type Character = 'gigi' | 'dodo';
 
@@ -117,8 +117,9 @@ export function createPlayer(level: Level, dc: DifficultyRecord, character: Char
  *     long as it exists, so granting a power-up stops the world for 120 frames. See
  *     PowerupPopup in types.ts and the gate at the top of stepWorld.
  *
- * The live function's trailing `padRumble(...)` is haptics, which src/game/ does not own.
- * Its `sfxPickup();sfxWin();` DOES land here, as two cues — see World.sounds in types.ts.
+ * All three of the live function's last line land here as values rather than as calls:
+ * `sfxPickup();sfxWin();` as two sound cues and `padRumble(...)` as one rumble cue. The
+ * devices stay outside — see World.sounds and World.rumbles in types.ts.
  */
 export function giveRandomSillyPowerup(world: World): void {
   const types: PowerupType[] = ['fart', 'bighead', 'chicken'];
@@ -137,6 +138,9 @@ export function giveRandomSillyPowerup(world: World): void {
   // raised on the frame the world FREEZES, and the freeze lasts 120 frames — so these two
   // play over a still picture, exactly as they do live.
   world.sounds.push('pickup', 'win');
+  // And the `padRumble(0,0.35,80)` that closes the same line — the ordinary pickup buzz,
+  // not a bigger one, however loud the two sounds are together. See World.rumbles.
+  world.rumbles.push(PICKUP_RUMBLE);
 }
 
 /**
