@@ -7,7 +7,7 @@ import url from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
 import { testEnemyMove, testMove } from './helpers/testMove';
-import { checkRescue, createWorld, stepArrows, stepCamera, stepWorld } from '../src/game/world';
+import { checkRescue, createWorld, rescueSpot, stepArrows, stepCamera, stepWorld } from '../src/game/world';
 import { findGroundY } from '../src/game/tiles';
 import { getRescueSprites, setSelectedChar } from '../src/game/run';
 import { emptyInput, type InputState } from '../src/input/actions';
@@ -326,6 +326,50 @@ describe('checkRescue', () => {
     world.player.y = rY;
     checkRescue(world);
     expect(world.won).toBe(true);
+  });
+
+  // `rescueSpot` is the same derivation, named and exported so the scene can DRAW the
+  // sibling there. Nothing above can catch it drifting from the box the check uses —
+  // the check would go on working perfectly while the sibling stood somewhere else, so
+  // a child would walk up to a picture that does nothing and win on empty air a little
+  // further along. That is a worse bug than the missing sprite it replaced, and it is
+  // the only part of the drawing worth a unit test.
+  describe('rescueSpot', () => {
+    it('is the top-left corner of the box checkRescue wins on', () => {
+      const world = createWorld(0, 'normal', 'gigi');
+      const spot = rescueSpot(world);
+
+      // A 1x1 probe in the spot's own corner wins...
+      world.player.w = 1;
+      world.player.h = 1;
+      world.player.x = spot.x;
+      world.player.y = spot.y;
+      checkRescue(world);
+      expect(world.won).toBe(true);
+
+      // ...and the same probe one pixel above the spot's top edge does not, so the y
+      // really is where the box starts rather than anywhere inside it.
+      const above = createWorld(0, 'normal', 'gigi');
+      above.player.w = 1;
+      above.player.h = 1;
+      above.player.x = spot.x;
+      above.player.y = spot.y - 1;
+      checkRescue(above);
+      expect(above.won).toBe(false);
+    });
+
+    it('stands in the rescue column on the ground, as tall as the RESCUED character', () => {
+      // Playing gigi rescues Dodo (12-row stand, 24 at scale 2) and playing dodo
+      // rescues Gigi (14 rows, 28) — the same column and the same ground either way,
+      // so the taller sibling simply starts 4px higher up.
+      const rescuingDodo = rescueSpot(createWorld(0, 'normal', 'gigi'));
+      const ground = findGroundY(createWorld(0, 'normal', 'gigi').map, RESCUE_TX);
+      expect(rescuingDodo).toEqual({ x: RESCUE_TX * TILE, y: ground - 24, h: 24 });
+
+      setSelectedChar('dodo');
+      const rescuingGigi = rescueSpot(createWorld(0, 'normal', 'dodo'));
+      expect(rescuingGigi).toEqual({ x: RESCUE_TX * TILE, y: ground - 28, h: 28 });
+    });
   });
 });
 

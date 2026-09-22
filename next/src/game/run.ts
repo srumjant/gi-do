@@ -169,6 +169,16 @@ export function getPlayerSprites(): PlayerSprites {
 }
 
 export interface RescueSprites {
+  /**
+   * WHICH character is being rescued, as the Character the rest of the port names them
+   * by. The live source has no such field — it carries only the display `name` below —
+   * and this is not it lower-cased: a scene needs the identity to look up the pre-baked
+   * texture for the right character and skin (gfx/textures.ts), and pulling that out of
+   * a label meant for a sentence would be the fragile version of the same thing. It is
+   * reported here rather than re-derived at the use site so that "the sibling is the
+   * OTHER one" is written down exactly once.
+   */
+  character: Character;
   sprite: SpriteData;
   jump: SpriteData;
   palette: Palette;
@@ -183,10 +193,10 @@ export interface RescueSprites {
 export function getRescueSprites(): RescueSprites {
   if (selectedChar === 'dodo') {
     const sk = GIGI_SKINS[gigiSkin] || GIGI_SKINS[0];
-    return { sprite: sk.stand, jump: sk.jump, palette: sk.palette, name: 'Gigi' };
+    return { character: 'gigi', sprite: sk.stand, jump: sk.jump, palette: sk.palette, name: 'Gigi' };
   }
   const sk = DODO_SKINS[dodoSkin] || DODO_SKINS[0];
-  return { sprite: sk.stand, jump: sk.jump, palette: sk.palette, name: 'Dodo' };
+  return { character: 'dodo', sprite: sk.stand, jump: sk.jump, palette: sk.palette, name: 'Dodo' };
 }
 
 /** One entry of the live `KIDNAPPERS` table (index.html:817-824): art, palette, colour. */

@@ -701,32 +701,61 @@ export function stepStars(world: World): void {
   }
 }
 
+/** Where the sibling stands: the top-left of their sprite, and how tall it draws. */
+export interface RescueSpot {
+  readonly x: number;
+  readonly y: number;
+  /** `spriteH(rs.sprite,2)` — the drawn height, which is also the overlap box's. */
+  readonly h: number;
+}
+
+/**
+ * The one derivation of where the sibling is, written out twice in the live source —
+ * once for the check (index.html:1629) and once, character for character, for the draw
+ * (:1734). Both of those lines are the same expression, so here they are one function
+ * that `checkRescue` below and the scene that draws the sibling both call. A sibling
+ * painted anywhere other than where walking into them wins the level would be a far more
+ * confusing bug than one that is simply missing.
+ *
+ * `rescuePos[1]` — the row in the level record — is deliberately unread: the live game
+ * takes only the COLUMN and drops the sibling onto whatever `findGroundY` finds there,
+ * so a record whose row disagrees with its terrain changes nothing. Do not "fix" that by
+ * reading the second element.
+ *
+ * The height comes from the RESCUED character's sprite, not the player's — the other
+ * character from whichever the player picked (Gigi is rescued playing as Dodo, and vice
+ * versa; `getRescueSprites`, ported in run.ts, already resolves that), at scale 2, same
+ * as the live `spriteH(rs.sprite,2)`. Gigi and Dodo are different heights (28 and 24 at
+ * that scale), so which one is being rescued genuinely changes this.
+ *
+ * Resolved on every call rather than cached on the World, exactly like the live lines
+ * that call `getRescueSprites()` fresh each frame: the skin it reads is module state in
+ * run.ts, and a value frozen into the World at `createWorld` would be the stale one.
+ */
+export function rescueSpot(world: World): RescueSpot {
+  const { level: lvl, map } = world;
+  const rTX = lvl.rescuePos[0];
+  const rDH = getRescueSprites().sprite.length * 2;
+  return { x: rTX * TILE, y: findGroundY(map, rTX) - rDH, h: rDH };
+}
+
 /**
  * Port of the rescue check at index.html:1629-1631, run after the enemies step and
  * before the camera lerp — exactly where the live source has it (see stepWorld's own
  * comment on why that placement, inside the same `!world.dead` guard, matters).
  *
- * The overlap box's HEIGHT comes from the RESCUED character's sprite, not the
- * player's — the other character from whichever the player picked (Gigi is rescued
- * playing as Dodo, and vice versa; `getRescueSprites`, ported in run.ts, already
- * resolves that), at scale 2, same as the live `spriteH(rs.sprite,2)`. Gigi and Dodo
- * are different heights (28 and 24 at that scale), so which one is being rescued
- * genuinely changes this box, unlike its WIDTH, which is a flat, hardcoded 16
- * (index.html:1631's literal `w:16`) independent of either character's actual sprite
- * width — reproduced as a literal here too, not "fixed" to use the sprite.
+ * The box is `rescueSpot` above in every dimension but one: its WIDTH is a flat,
+ * hardcoded 16 (index.html:1631's literal `w:16`), independent of either character's
+ * actual sprite width — reproduced as a literal here too, not "fixed" to use the sprite,
+ * and deliberately NOT part of the spot, which is about where the sibling is DRAWN.
  *
  * The player's own box here is the FULL hitbox `{x,y,w,h}` — NOT the +2/-4 inset box
  * stepEnemy's stomp check uses. Two different boxes, deliberately, exactly as the
  * live source calls rectOverlap with two different insets in the same update().
  */
 export function checkRescue(world: World): void {
-  const { player: p, level: lvl, map } = world;
-  const rescue = getRescueSprites();
-  const rTX = lvl.rescuePos[0];
-  const rGY = findGroundY(map, rTX);
-  const rDH = rescue.sprite.length * 2;
-  const rX = rTX * TILE;
-  const rY = rGY - rDH;
+  const { player: p } = world;
+  const { x: rX, y: rY, h: rDH } = rescueSpot(world);
   // index.html:1630, and the whole reason the boss exists: until it falls, walking into
   // your sibling does nothing at all. On the five levels with no boss the left half is
   // true and this is a no-op, exactly as it is in the live game.
