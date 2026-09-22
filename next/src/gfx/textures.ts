@@ -10,6 +10,7 @@ import {
   CLOUD_P, CLOUD_S,
   DODO_SKINS,
   GIGI_SKINS,
+  HEART_P, HEART_S,
   type Palette,
   type Skin,
   type SpriteData,
@@ -34,8 +35,8 @@ import { rasterise } from './rasterise';
  * see the per-category functions below for scale and naming. The rescue NPC draws
  * these same player textures, just for the other character (getRescueSprites in
  * game/run.ts always returns the opposite skin set), so it gets no registration of
- * its own. The heart is still missing, and only the heart: it is HUD-only, and there
- * is no HUD yet.
+ * its own. What the HUD draws is NOT in here — see `registerHudTextures` at the
+ * bottom of this file, which HudScene calls for itself.
  *
  * Touches Phaser (a live TextureManager) and a real canvas (via rasterise), so unlike
  * rasterise.ts's pure half, this is not unit tested. It gets verified in the browser
@@ -215,6 +216,48 @@ const ITEM_TEXTURES: readonly [string, SpriteData, Palette, number][] = [
 
 function registerItemTextures(scene: Phaser.Scene): void {
   for (const [key, sprite, palette, scale] of ITEM_TEXTURES) {
+    scene.textures.addCanvas(key, rasterise(sprite, palette, scale));
+  }
+}
+
+/**
+ * A life, as a heart (index.html:1855-1856). Scale 2, and that number belongs to this
+ * draw site and nowhere else: the win screen draws the very same HEART_S at 1.5
+ * (index.html:2458), so a shared `heart` texture would be wrong for one of them.
+ */
+export const HUD_HEART_TEXTURE = 'hud-heart';
+/** The cat companion's remaining-scratches icon (index.html:1860). */
+export const HUD_CAT_TEXTURE = 'hud-cat';
+/** The cape you are wearing (index.html:1861) — SUPER_S, the pickup's own sprite. */
+export const HUD_SUPER_TEXTURE = 'hud-super';
+/** The bow you are carrying (index.html:1862). */
+export const HUD_BOW_TEXTURE = 'hud-bow';
+
+/**
+ * The HUD's own four sprites, at the HUD's own scales.
+ *
+ * Three of them — cat, super and bow — are sprites `ITEM_TEXTURES` above ALREADY
+ * registers, and they are registered a second time here rather than reused, because
+ * the HUD draws them at 1.5 where the world draws them at 2. Scale is per draw site,
+ * not per sprite; sharing `cat` between the pickup lying on a platform and the icon
+ * in the corner would silently resize one of them. Only the heart is new: nothing
+ * outside the HUD draws one yet.
+ */
+const HUD_TEXTURES: readonly [string, SpriteData, Palette, number][] = [
+  [HUD_HEART_TEXTURE, HEART_S, HEART_P, 2],
+  [HUD_CAT_TEXTURE, CAT_S, CAT_P, 1.5],
+  [HUD_SUPER_TEXTURE, SUPER_S, SUPER_P, 1.5],
+  [HUD_BOW_TEXTURE, BOW_S, BOW_P, 1.5],
+];
+
+/**
+ * Called by HudScene rather than from `registerTextures` above, so the HUD scene owns
+ * everything it needs to draw and does not depend on the game scene having booted
+ * first. Phaser's TextureManager is per-GAME, not per-scene, so which scene registers
+ * a texture only decides the ordering, never who can see it.
+ */
+export function registerHudTextures(scene: Phaser.Scene): void {
+  for (const [key, sprite, palette, scale] of HUD_TEXTURES) {
     scene.textures.addCanvas(key, rasterise(sprite, palette, scale));
   }
 }

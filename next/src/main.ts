@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import Phaser from 'phaser';
 import { BASE_W, BASE_H, STEP_HZ } from './config/constants';
+import { HudScene } from './scenes/HudScene';
 import { SliceScene } from './scenes/SliceScene';
 
 const game = new Phaser.Game({
@@ -44,7 +45,13 @@ const game = new Phaser.Game({
       debug: false,
     },
   },
-  scene: [SliceScene],
+  /**
+   * Order is load-bearing, twice over. Phaser auto-starts only the FIRST scene in this
+   * array, so SliceScene boots and launches the HUD itself once it has a World to hand
+   * it; and Phaser renders the scenes in this same order, so listing the HUD second is
+   * what puts it in front of the game rather than behind it.
+   */
+  scene: [SliceScene, HudScene],
 });
 
 /**

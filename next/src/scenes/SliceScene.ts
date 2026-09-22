@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BASE_H, BASE_W, STEP_MS, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
+import type { DifficultyKey } from '../config/difficulty';
 import { TStr } from '../config/i18n';
 import { PARALLAX, type ParallaxLayer } from '../data/parallax';
 import type { SpriteData } from '../data/sprites';
@@ -38,6 +39,7 @@ import type { InputState } from '../input/actions';
 import { createKeyboardInput, type KeyboardInput } from '../input/keyboard';
 import { createPlayerMove } from '../physics/player';
 import { createCollisionLayer, syncCollisionLayer } from '../physics/tiles';
+import { HUD_SCENE_KEY, type HudData } from './HudScene';
 
 /**
  * Half the difference between the canvas and the zoomed view. See setScroll below —
@@ -173,7 +175,12 @@ export class SliceScene extends Phaser.Scene {
 
   create(): void {
     const levelIndex = 0;
-    this.world = createWorld(levelIndex, 'normal');
+    // Named rather than inlined into createWorld because the HUD needs the same two
+    // values to label itself, and a HUD that said 'Normal' over a world built on some
+    // other record would be worse than no HUD at all. A difficulty SCREEN is a later
+    // task in this plan; until it exists, this is where the choice is made.
+    const difficulty: DifficultyKey = 'normal';
+    this.world = createWorld(levelIndex, difficulty);
 
     registerTextures(this);
 
@@ -223,6 +230,17 @@ export class SliceScene extends Phaser.Scene {
     this.cameras.main.setZoom(ZOOM);
 
     this.controls = createKeyboardInput(this);
+
+    // The numbers, on a scene of their own, running alongside this one. `launch` rather
+    // than `start`: this scene keeps running. It draws on top because main.ts lists it
+    // after this one and Phaser renders scenes in that order — launching does not
+    // reorder them — and it escapes the `setZoom` above because a scene's camera is its
+    // own. `world` goes across as a live reference; the HUD only ever reads it.
+    this.scene.launch(HUD_SCENE_KEY, {
+      world: this.world,
+      levelIndex,
+      difficulty,
+    } satisfies HudData);
   }
 
   /**
