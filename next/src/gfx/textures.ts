@@ -1,6 +1,21 @@
 import Phaser from 'phaser';
 import { ENEMY_SCALE } from '../config/constants';
-import { CLOUD_P, CLOUD_S, DODO_SKINS, GIGI_SKINS, type Skin } from '../data/sprites';
+import {
+  ARROW_P, ARROW_S,
+  BOW_P, BOW_S,
+  CAPE_P, CAPE_S,
+  CAT_P, CAT_S,
+  CAT_SCRATCH_P, CAT_SCRATCH_S,
+  CHICKEN_P, CHICKEN_S,
+  CLOUD_P, CLOUD_S,
+  DODO_SKINS,
+  GIGI_SKINS,
+  type Palette,
+  type Skin,
+  type SpriteData,
+  STAR_P, STAR_S,
+  SUPER_P, SUPER_S,
+} from '../data/sprites';
 import type { Character } from '../game/player';
 import { getEnemySpriteInfo } from '../game/run';
 import { rasterise } from './rasterise';
@@ -14,12 +29,13 @@ import { rasterise } from './rasterise';
  * holds the result for the life of the game. There is no repeated work to memoise,
  * so there is no cache to build.
  *
- * Registers the player (both characters, every skin, all three poses), enemies and
- * clouds — see the per-category functions below for scale and naming. The rescue
- * NPC draws these same player textures, just for the other character (getRescueSprites
- * in game/run.ts always returns the opposite skin set), so it gets no registration of
- * its own. HUD items (star, heart, bow, cape/super) are not registered: nothing
- * draws them yet, and a texture nobody binds is just dead memory.
+ * Registers the player (both characters, every skin, all three poses, plus each
+ * pose's two big-head halves), enemies, clouds and the loose items the world draws —
+ * see the per-category functions below for scale and naming. The rescue NPC draws
+ * these same player textures, just for the other character (getRescueSprites in
+ * game/run.ts always returns the opposite skin set), so it gets no registration of
+ * its own. The heart is still missing, and only the heart: it is HUD-only, and there
+ * is no HUD yet.
  *
  * Touches Phaser (a live TextureManager) and a real canvas (via rasterise), so unlike
  * rasterise.ts's pure half, this is not unit tested. It gets verified in the browser
@@ -29,10 +45,19 @@ export function registerTextures(scene: Phaser.Scene): void {
   registerPlayerTextures(scene);
   registerEnemyTextures(scene);
   registerCloudTextures(scene);
+  registerItemTextures(scene);
 }
 
-/** Player and rescue-NPC sprites draw at this scale (index.html:1838). */
-const PLAYER_SCALE = 2;
+/** Player and rescue-NPC sprites draw at this scale (index.html:1848). */
+export const PLAYER_SCALE = 2;
+
+/**
+ * The scale the TOP HALF of the player draws at while a big head is running
+ * (index.html:1843's `headScale=5`). The bottom half stays at PLAYER_SCALE, which is
+ * the whole trick: it is not one sprite scaled up, it is two sprites at different
+ * scales stacked back into one body. See `bigHeadRows` below.
+ */
+export const BIG_HEAD_SCALE = 5;
 
 const POSES = ['stand', 'run', 'jump'] as const;
 type Pose = typeof POSES[number];
@@ -47,13 +72,57 @@ export function playerTextureKey(character: Character, skinIndex: number, pose: 
   return `player-${character}-${skinIndex}-${pose}`;
 }
 
+/** The big head's top half: the same pose, first `bigHeadRows` rows, at BIG_HEAD_SCALE. */
+export function playerHeadTextureKey(character: Character, skinIndex: number, pose: Pose): string {
+  return `${playerTextureKey(character, skinIndex, pose)}-head`;
+}
+
+/** The big head's bottom half: the rest of the pose, still at PLAYER_SCALE. */
+export function playerBodyTextureKey(character: Character, skinIndex: number, pose: Pose): string {
+  return `${playerTextureKey(character, skinIndex, pose)}-body`;
+}
+
+/**
+ * How many rows of a sprite the big head takes (index.html:1842's
+ * `Math.floor(spr.length*0.5)`) — 7 of Gigi's 14, 6 of Dodo's 12. The scene needs
+ * this number as well as the textures, to place the two halves, so the split rule
+ * lives here rather than being written out twice.
+ */
+export function bigHeadRows(sprite: SpriteData): number {
+  return Math.floor(sprite.length * 0.5);
+}
+
+/**
+ * Both halves of every pose are baked HERE, at boot, and not sliced per frame.
+ *
+ * The live game slices the sprite fresh on every big-head frame
+ * (index.html:1842's two `spr.slice(...)` calls) and gets away with it because its
+ * sprite cache is keyed by the sprite's CONTENT — `spriteBits(d)` joins the grid into
+ * a string (index.html:618-620) — so two arrays with the same rows in them hit the
+ * same entry however many times they are re-allocated. Its WeakMap memo is only a
+ * shortcut for that serialisation, and its comment says as much: "Fresh arrays miss
+ * and pay exactly what they always paid". Nothing here is keyed at all: there are
+ * only named textures, registered once. Slicing per frame would therefore mean
+ * rasterising per frame, so the split is done once, up front, and the frame loop just
+ * picks a key.
+ */
 function registerPlayerTextures(scene: Phaser.Scene): void {
   (Object.keys(SKINS_BY_CHARACTER) as Character[]).forEach((character) => {
     SKINS_BY_CHARACTER[character].forEach((skin, skinIndex) => {
       for (const pose of POSES) {
+        const sprite = skin[pose];
+        const headRows = bigHeadRows(sprite);
         scene.textures.addCanvas(
           playerTextureKey(character, skinIndex, pose),
-          rasterise(skin[pose], skin.palette, PLAYER_SCALE),
+          rasterise(sprite, skin.palette, PLAYER_SCALE),
+        );
+        scene.textures.addCanvas(
+          playerHeadTextureKey(character, skinIndex, pose),
+          rasterise(sprite.slice(0, headRows), skin.palette, BIG_HEAD_SCALE),
+        );
+        scene.textures.addCanvas(
+          playerBodyTextureKey(character, skinIndex, pose),
+          rasterise(sprite.slice(headRows), skin.palette, PLAYER_SCALE),
         );
       }
     });
@@ -86,7 +155,7 @@ function registerEnemyTextures(scene: Phaser.Scene): void {
 
 /**
  * Clouds draw at one of two scales, picked per-cloud by `cx % 3`
- * (index.html:1676: `cx%3?6:5`). Both are registered here; which one a given cloud
+ * (index.html:1682: `cx%3?6:5`). Both are registered here; which one a given cloud
  * uses is a rendering decision for later, not a reason to skip either texture now.
  */
 const CLOUD_SCALES = [5, 6];
@@ -99,5 +168,53 @@ export function cloudTextureKey(scale: number): string {
 function registerCloudTextures(scene: Phaser.Scene): void {
   for (const scale of CLOUD_SCALES) {
     scene.textures.addCanvas(cloudTextureKey(scale), rasterise(CLOUD_S, CLOUD_P, scale));
+  }
+}
+
+/** A star popped out of a question block. 1.5, not 2 (index.html:1700). */
+export const STAR_TEXTURE = 'star';
+/** The bow pickup (index.html:1705). */
+export const BOW_TEXTURE = 'bow';
+/** The super (cape) pickup (index.html:1711). */
+export const SUPER_TEXTURE = 'super';
+/**
+ * Shared by the cat pickup (index.html:1718) and the cat companion it turns into
+ * (index.html:1724) — the same sprite at the same scale, so the same texture. The
+ * companion faces with setFlipX; the pickup never flips.
+ */
+export const CAT_TEXTURE = 'cat';
+/** The claw mark the cat leaves on whatever it scratched (index.html:1729). */
+export const CAT_SCRATCH_TEXTURE = 'cat-scratch';
+/** An arrow in flight (index.html:1833). */
+export const ARROW_TEXTURE = 'arrow';
+/**
+ * A chicken RAY in flight (index.html:1832) — the chicken sprite at 1.5, which is a
+ * different scale from the 1.8 an enemy turned INTO a chicken renders at, so it needs
+ * a texture of its own rather than borrowing `enemy-chicken`.
+ */
+export const CHICKEN_ARROW_TEXTURE = 'chicken-arrow';
+/** The cape, drawn behind the player while `hasCape` (index.html:1839). */
+export const CAPE_TEXTURE = 'cape';
+
+/**
+ * Everything the world draws that is not a player, an enemy or a cloud: the pickups,
+ * the star, the cat and its claw mark, the two kinds of projectile, and the cape.
+ * Each is one fixed sprite at one fixed scale — none of them animate, flip aside —
+ * so one texture apiece covers every frame they will ever be drawn on.
+ */
+const ITEM_TEXTURES: readonly [string, SpriteData, Palette, number][] = [
+  [STAR_TEXTURE, STAR_S, STAR_P, 1.5],
+  [BOW_TEXTURE, BOW_S, BOW_P, 2],
+  [SUPER_TEXTURE, SUPER_S, SUPER_P, 2],
+  [CAT_TEXTURE, CAT_S, CAT_P, 2],
+  [CAT_SCRATCH_TEXTURE, CAT_SCRATCH_S, CAT_SCRATCH_P, 2],
+  [ARROW_TEXTURE, ARROW_S, ARROW_P, 2],
+  [CHICKEN_ARROW_TEXTURE, CHICKEN_S, CHICKEN_P, 1.5],
+  [CAPE_TEXTURE, CAPE_S, CAPE_P, 2],
+];
+
+function registerItemTextures(scene: Phaser.Scene): void {
+  for (const [key, sprite, palette, scale] of ITEM_TEXTURES) {
+    scene.textures.addCanvas(key, rasterise(sprite, palette, scale));
   }
 }

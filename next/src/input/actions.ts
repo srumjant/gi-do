@@ -10,8 +10,16 @@ export interface InputState {
   jump: boolean;
   /** Rising edge — true only on the step the button went down. */
   jumpPressed: boolean;
+  /**
+   * Rising edge of the fire keys (index.html:1392). There is no held `fire` beside it,
+   * on purpose: the live game reads the fire keys through `justPressed` and NEVER
+   * through `keys`, so holding the button down fires exactly one arrow. Jump is the
+   * other way round — it needs both, because the variable-height cut reads the HELD
+   * state — which is why that one has two fields here and this one has a single field.
+   */
+  firePressed: boolean;
 }
 
 export function emptyInput(): InputState {
-  return { left: false, right: false, jump: false, jumpPressed: false };
+  return { left: false, right: false, jump: false, jumpPressed: false, firePressed: false };
 }

@@ -14,7 +14,7 @@ export interface ParallaxLayer {
   color: string;
   /**
    * Scroll factor, smaller being further away. Note the live renderer applies a
-   * further 0.5 (`scrollX * 0.5`, index.html:1060), so the on-screen offset is
+   * further 0.5 (`scrollX * 0.5`, index.html:1061), so the on-screen offset is
    * `camera.x * speed * 0.5`.
    */
   speed: number;

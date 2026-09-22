@@ -1,11 +1,12 @@
 // Port of the streaming enemy spawn (index.html:1212-1222, 1358) and the per-enemy step
-// (index.html:1524-1547), restricted to ground patrollers (doll, car, dino, penguin).
-// Ghost, bat/icebat, cannon and bouncer are streamed types this slice does not
-// implement; see enemy.ts for where they are recognised and skipped rather than
-// half-simulated.
-import { describe, expect, it } from 'vitest';
+// (index.html:1524-1547): ground patrollers (doll, car, dino, penguin), plus bat/icebat
+// (sine-wave flight) and bouncer (hops) — every type level 1 actually spawns. Ghost and
+// cannon are the two streamed types this slice still does not implement; see enemy.ts
+// for where they are recognised and skipped rather than half-simulated.
+import { afterEach, describe, expect, it } from 'vitest';
 import { driveLiveGame } from './helpers/liveGame';
 import { spawnEnemy, stepEnemy } from '../src/game/enemy';
+import { setRandom } from '../src/game/random';
 import { createWorld, spawnEnemiesInView, stepEnemies, stepWorld } from '../src/game/world';
 import { createPlayer } from '../src/game/player';
 import { LEVELS, makeGround, TILE_GROUND } from '../src/data/levels';
@@ -16,6 +17,60 @@ import type { EnemyState, World } from '../src/game/types';
 function held(overrides: Partial<InputState>): InputState {
   return { ...emptyInput(), ...overrides };
 }
+
+describe('spawnEnemy', () => {
+  afterEach(() => setRandom(Math.random)); // never leak a stub into an unrelated test
+
+  it('returns undefined for streamed types this slice still does not implement', () => {
+    const world = createWorld(0, 'normal');
+    // ghost and cannon are the two types left out after this task (see enemy.ts's
+    // ENEMY_SPRITES) — neither appears in level 0's own enemyDefs, so this is the only
+    // remaining coverage of the skip path at all; everything level 0 actually streams
+    // (doll, car, dino, bat, bouncer) is a real spawn now, exercised below instead.
+    expect(spawnEnemy(world.map, world.dc, { type: 'ghost', x: 10 })).toBeUndefined();
+    expect(spawnEnemy(world.map, world.dc, { type: 'cannon', x: 10 })).toBeUndefined();
+  });
+
+  it('spawns a bat 60px above the ground, sized off the sprite, sine-offset from the injected random source', () => {
+    const world = createWorld(0, 'normal');
+    setRandom(() => 0.5); // the live driver's own stubbed Math.random (tests/helpers/liveGame.ts)
+    const bat = spawnEnemy(world.map, world.dc, { type: 'bat', x: 48 })!;
+
+    // Column 48 is flat ground on level 0's real map (no platform covers it — see the
+    // level's own addPlats list), so findGroundY there is the plain ground row (23),
+    // i.e. gy=368: originY = 368 - h(10.8) - 60 = 297.2.
+    expect(bat).toMatchObject({
+      type: 'bat', x: 48 * TILE, y: 297.2, w: 12.6, h: 10.8, vx: -1.2, vy: 0,
+      alive: true, noGravity: true, originY: 297.2, sineOffset: Math.PI, bounceTimer: 0,
+    });
+  });
+
+  it('spawns an icebat identically to a bat, just with its own sprite size', () => {
+    const world = createWorld(0, 'normal');
+    setRandom(() => 0.5);
+    const icebat = spawnEnemy(world.map, world.dc, { type: 'icebat', x: 48 })!;
+
+    // ICEBAT_S is the same 6x7 grid as BAT_S, so this is the exact same box and
+    // origin — icebat does not appear in level 1, but shares bat's branch verbatim.
+    expect(icebat).toMatchObject({
+      type: 'icebat', x: 48 * TILE, y: 297.2, w: 12.6, h: 10.8, vx: -1.2, vy: 0,
+      alive: true, noGravity: true, originY: 297.2, sineOffset: Math.PI, bounceTimer: 0,
+    });
+  });
+
+  it('spawns a bouncer resting on the ground under it, gravity-bound, hop timer at zero', () => {
+    const world = createWorld(0, 'normal');
+    // Column 73 sits under the real platform at columns 70-74, row 17 (level 0's own
+    // addPlats) — a ledge spawn, same idea as car@40's in the window test below —
+    // so gy=272: y = 272 - h(14.4) = 257.6.
+    const bouncer = spawnEnemy(world.map, world.dc, { type: 'bouncer', x: 73 })!;
+
+    expect(bouncer).toMatchObject({
+      type: 'bouncer', x: 73 * TILE, y: 257.6, w: 12.6, h: 14.4, vx: -1.0, vy: 0,
+      alive: true, noGravity: false, bounceTimer: 0,
+    });
+  });
+});
 
 describe('spawnEnemiesInView', () => {
   it('spawns exactly the three in-window patrollers at frame 0, sized and angled off the sprite data', () => {
@@ -43,16 +98,20 @@ describe('spawnEnemiesInView', () => {
     expect(world.pending.filter((d) => d.spawned)).toHaveLength(3);
   });
 
-  it('marks streamed types this slice does not implement as spawned, without ever spawning them', () => {
+  it('spawns every def in a mid-level window, bat and bouncer included', () => {
     const world = createWorld(0, 'normal');
-    // Window [42,84]: bat@48, dino@55, doll@65, bouncer@73, car@80 (level 0's defs).
+    // Window [42,84]: bat@48, dino@55, doll@65, bouncer@73, car@80 (level 0's defs) —
+    // every one of these five is a type this slice implements after this task (see
+    // enemy.ts's ENEMY_SPRITES), so all five spawn now, not just the ground
+    // patrollers among them.
     world.camera.x = 700;
     spawnEnemiesInView(world);
 
     const inWindow = world.pending.filter((d) => d.x >= 42 && d.x <= 84);
     expect(inWindow.every((d) => d.spawned)).toBe(true);
-    expect(world.enemies.map((e) => e.type).sort()).toEqual(['car', 'dino', 'doll']);
-    expect(world.enemies.some((e) => e.type === 'bat' || e.type === 'bouncer')).toBe(false);
+    expect(world.enemies.map((e) => e.type).sort()).toEqual(
+      ['bat', 'bouncer', 'car', 'dino', 'doll'],
+    );
   });
 
   it('never spawns the same def twice', () => {
@@ -136,6 +195,73 @@ describe('stepEnemy', () => {
     expect(enemy.x).toBeGreaterThan(LEDGE_TX * TILE - enemy.w); // never walked past the edge
   });
 
+  it('bat/icebat ignore walls entirely and flip only at the world edges', () => {
+    const world = createWorld(0, 'normal');
+    const map = makeGround(10, 10);
+    for (let ty = 0; ty < map.length; ty++) map[ty][3] = TILE_GROUND; // a wall a ground patroller would turn at
+    world.map = map;
+    const bat = spawnEnemy(map, world.dc, { type: 'bat', x: 5 })!; // x=80, heading left (default vx=-1.2)
+
+    let flippedAtX: number | null = null;
+    for (let i = 0; i < 80 && flippedAtX === null; i++) {
+      stepEnemy(world, bat);
+      if (bat.vx > 0) flippedAtX = bat.x;
+    }
+
+    // It does eventually turn — but only once x itself goes negative, past the
+    // world's own left edge (index.html:1533's `e.x<0`), having sailed straight
+    // through the wall at column 3 (x=48) around frame 27 completely untouched.
+    // There is no tile read anywhere in this branch to have caught it there.
+    expect(flippedAtX).not.toBeNull();
+    expect(flippedAtX!).toBeLessThan(0);
+    expect(flippedAtX!).toBeGreaterThan(-1.2); // caught within one frame's travel of 0
+  });
+
+  it('bouncer turns around at a wall, same as a ground patroller', () => {
+    const WALL_TX = 5;
+    const world = createWorld(0, 'normal');
+    const map = makeGround(20, 10);
+    for (let ty = 0; ty < map.length; ty++) map[ty][WALL_TX] = TILE_GROUND;
+    world.map = map;
+    // world.player stays at its default spawn (x=32, from createPlayer) for both this
+    // test and the ledge one below — well left of both the wall (x=80) and the drop
+    // (x=160), so `p.x>e.x` reads false throughout and every re-aimed hop keeps
+    // pointing the bouncer leftward, into whichever of the two it is testing.
+    const bouncer = spawnEnemy(map, world.dc, { type: 'bouncer', x: 10 })!; // heading left (default vx)
+
+    let minX = bouncer.x;
+    for (let i = 0; i < 150; i++) {
+      stepEnemy(world, bouncer);
+      minX = Math.min(minX, bouncer.x);
+    }
+
+    expect(bouncer.vx).toBeGreaterThan(0); // turned away from the wall
+    expect(minX).toBeGreaterThan(WALL_TX * TILE);
+  });
+
+  it('bouncer hops off a ledge into a pit instead of turning around', () => {
+    const LEDGE_TX = 10; // solid ground for x >= 10, open air (a cliff) for x < 10
+    const world = createWorld(0, 'normal');
+    const map = makeGround(20, 10);
+    for (let ty = 0; ty < map.length; ty++) {
+      for (let x = 0; x < LEDGE_TX; x++) map[ty][x] = 0;
+    }
+    world.map = map;
+    const bouncer = spawnEnemy(map, world.dc, { type: 'bouncer', x: 12 })!; // heading left, toward the drop
+    const groundY = bouncer.y;
+
+    for (let i = 0; i < 150; i++) stepEnemy(world, bouncer);
+
+    // Unlike the ground patroller above, the bouncer's own movement branch never
+    // reads a ledge probe at all — it hops straight off the edge and keeps falling,
+    // never turning around and never getting snapped back to a floor that, on this
+    // side of the ledge, does not exist. That is live behaviour (index.html:1537 has
+    // no ledge check for this type), not a bug to guard against.
+    expect(bouncer.vx).toBeLessThan(0); // never turned around
+    expect(bouncer.alive).toBe(true); // falling is not itself death in this slice
+    expect(bouncer.y).toBeGreaterThan(groundY + 100); // well past the ground, still falling
+  });
+
   describe('stomp', () => {
     function stompSetup(): { world: World; enemy: EnemyState } {
       const world = createWorld(0, 'normal');
@@ -143,8 +269,10 @@ describe('stepEnemy', () => {
       const enemy: EnemyState = {
         type: 'doll', x: 100, y: 150, vx: -0.8, vy: 0, w: 14.4, h: 16.2, alive: true,
         frame: 0, frameTimer: 0, squashTimer: 0,
+        noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+      isChicken: false,
       };
-      world.player = createPlayer(LEVELS[0], 'gigi'); // w=16, h=24
+      world.player = createPlayer(LEVELS[0], world.dc, 'gigi'); // w=16, h=24
       world.player.x = 98;
       // Enemy gravity runs before the stomp check even on this first step, so its y by
       // the time the check happens is 150 + GRAVITY, i.e. 150.4 — this places the
@@ -171,9 +299,12 @@ describe('stepEnemy', () => {
       stepEnemy(world, enemy);
 
       expect(enemy.alive).toBe(true);
-      // Side/rising contact does nothing yet (no playerHit in this slice) — vy is
-      // simply untouched by stepEnemy.
+      // Side/rising contact calls playerHit, and this world is at normal difficulty with
+      // no cape, so that is a death — but playerDie only touches world.dead/lives/
+      // stateTimer, never player.vy, so vy stays exactly what it was going in. (With a
+      // cape it WOULD be touched: the absorb branch sets vy to -4.)
       expect(world.player.vy).toBe(-3);
+      expect(world.dead).toBe(true);
       expect(enemy.squashTimer).toBe(0); // never stomped, so never started counting down
     });
 
@@ -208,8 +339,10 @@ describe('stepEnemy', () => {
       // squashTimer already expired: this is testing that a long-dead enemy stays
       // fully inert, not the countdown itself (see the 'stomp' tests above for that).
       frame: 0, frameTimer: 0, squashTimer: 0,
+      noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+      isChicken: false,
     };
-    world.player = createPlayer(LEVELS[0], 'gigi');
+    world.player = createPlayer(LEVELS[0], world.dc, 'gigi');
     world.player.x = 98;
     world.player.y = 140;
     world.player.vy = 3; // would stomp a live enemy at this position
@@ -255,7 +388,7 @@ describe('stepWorld wiring', () => {
 describe('enemies vs. the live game', () => {
   it('spawns and patrols identically to the real update(), while the player holds still', () => {
     const FRAMES = 90;
-    const script = () => ({ left: false, right: false, jump: false });
+    const script = () => ({ left: false, right: false, jump: false, fire: false });
     const live = driveLiveGame({
       level: 0, difficulty: 'normal', character: 'gigi', frames: FRAMES, input: script,
     });
@@ -292,5 +425,174 @@ describe('enemies vs. the live game', () => {
     // nothing about `e.frameTimer++;if(e.frameTimer>15){e.frame=1-e.frame;...}`.
     const doll15Frames = port.map((frame) => frame[0]?.frame).filter((f) => f !== undefined);
     expect(new Set(doll15Frames).size).toBeGreaterThan(1);
+  });
+});
+
+describe('bat and bouncer vs. the live game', () => {
+  afterEach(() => setRandom(Math.random));
+
+  // A hold-right script reaching bat@48 or bouncer@73 would have to survive doll@15
+  // first (it kills a hold-right script by contact around frame 60 — see
+  // trace.test.ts's own comment on this exact problem), long before the camera's
+  // spawn window even reaches column 42. Choreographing a script around it is a
+  // detour with nothing to do with bats or bouncers, so this instead forces the
+  // camera straight to x=700 before the first frame — precisely the same trick
+  // enemy.test.ts's own "spawns every def in a mid-level window" test above uses on
+  // world.camera.x, just on the live side too, via the new DriveOptions.beforeRun
+  // hook (tests/helpers/liveGame.ts): `getCamera()` returns the live script's actual
+  // `camera` object, not a copy, so setting `.x` on it moves the real thing.
+  //
+  // At camera.x=700 the spawn window is [42,84] (see that same test's own comment for
+  // the arithmetic), which streams in car@40, bat@48, dino@55, doll@65, bouncer@73
+  // and car@80 all on frame 0. The player never moves (held input is empty
+  // throughout — this trace is not about the player), so the camera then lerps
+  // straight back toward it every following frame, exactly as stepCamera/the live
+  // lerp both do unprompted; that retreat is what later brings doll@28 (~frame 4) and
+  // doll@15 (~frame 8) into the window too, from the far side. All eight enemies —
+  // every type level 1 spawns, now — end up in play without a single scripted input.
+  it('matches frame by frame once the camera brings them into the spawn window, with no script at all', () => {
+    const FRAMES = 200; // comfortably short of frame 250, where doll@15 reaches the
+    // stationary player by contact (measured against this exact scenario) — this
+    // trace is about the bat and the bouncer, not that death, which trace.test.ts and
+    // world.test.ts already cover on their own terms.
+    const script = () => ({ left: false, right: false, jump: false, fire: false });
+    setRandom(() => 0.5); // matches the live driver's own stubbed Math.random exactly
+
+    const live = driveLiveGame({
+      level: 0, difficulty: 'normal', character: 'gigi', frames: FRAMES, input: script,
+      beforeRun: (d) => { d.getCamera().x = 700; },
+    });
+
+    const world = createWorld(0, 'normal');
+    world.camera.x = 700;
+    const port: typeof live = [];
+    for (let f = 0; f < FRAMES; f++) {
+      stepWorld(world, held(script()));
+      const p = world.player;
+      port.push({
+        x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.onGround,
+        frame: p.frame, frameTimer: p.frameTimer, animFrame: world.animFrame,
+        camera: { x: world.camera.x, y: world.camera.y },
+        enemies: world.enemies.map((e) => ({
+          type: e.type, x: e.x, y: e.y, vx: e.vx, vy: e.vy, alive: e.alive,
+          frame: e.frame, frameTimer: e.frameTimer, squashTimer: e.squashTimer,
+        })),
+        score: world.score,
+      });
+    }
+
+    for (let f = 0; f < FRAMES; f++) {
+      expect(port[f].x).toBe(live[f].x);
+      expect(port[f].y).toBe(live[f].y);
+      expect(port[f].vx).toBe(live[f].vx);
+      expect(port[f].vy).toBe(live[f].vy);
+      expect(port[f].onGround).toBe(live[f].onGround);
+      expect(port[f].camera).toEqual(live[f].camera);
+
+      expect(port[f].enemies.map((e) => e.type)).toEqual(live[f].enemies.map((e) => e.type));
+      for (let i = 0; i < port[f].enemies.length; i++) {
+        expect(port[f].enemies[i].x).toBe(live[f].enemies[i].x);
+        expect(port[f].enemies[i].y).toBe(live[f].enemies[i].y);
+        expect(port[f].enemies[i].vx).toBe(live[f].enemies[i].vx);
+        expect(port[f].enemies[i].alive).toBe(live[f].enemies[i].alive);
+        expect(port[f].enemies[i].frame).toBe(live[f].enemies[i].frame);
+        expect(port[f].enemies[i].frameTimer).toBe(live[f].enemies[i].frameTimer);
+        expect(port[f].enemies[i].squashTimer).toBe(live[f].enemies[i].squashTimer);
+        // enemy vy is deliberately NOT compared: a noGravity flyer (bat/icebat) never
+        // has its vy touched on the live side (index.html's gravity block, the only
+        // place that ever assigns it, is skipped entirely for one), so it stays
+        // `undefined` there forever — while this port's EnemyState always carries a
+        // real number (0) for a field a type does not use, same as every other
+        // ground patroller already does for fields it does not need either. A
+        // representational difference between an ad-hoc live object and a uniformly
+        // shaped one, not a physics difference; verified directly (not assumed) while
+        // building this test, and trace.test.ts's own STOMP_SCRIPT comparison omits
+        // enemy vy for the same reason.
+      }
+    }
+
+    // Sanity: both new behaviours actually happened here, or the equality checks
+    // above prove nothing about them specifically.
+    const batYs = port.flatMap((f) => f.enemies.filter((e) => e.type === 'bat').map((e) => e.y));
+    expect(batYs.length).toBe(FRAMES); // bat@48 was in view from frame 0 onward
+    expect(Math.max(...batYs) - Math.min(...batYs)).toBeGreaterThan(50); // a real sine sweep, not a held constant
+    const bouncerVys = port.flatMap((f) => f.enemies.filter((e) => e.type === 'bouncer').map((e) => e.vy));
+    expect(bouncerVys.some((vy) => vy < 0)).toBe(true); // it hopped at least once
+    expect(bouncerVys.some((vy) => vy === 0)).toBe(true); // and rested between hops, too
+    expect(world.dead).toBe(false); // see the FRAMES budget comment above
+  });
+});
+
+// index.html:1542's `const shm=(dc.stompHitbox||1)*(p.bigHeadTimer>0?1.5:1)`. The two
+// factors COMPOUND, and neither the fallback nor the multiplication can be seen from
+// the traces this suite drives: `stompHitbox` exists on super_easy alone
+// (difficulty.ts), and reaching it from a trace would mean walking a super_easy player
+// into an enemy at an exact sub-pixel height, which no input script arranges. So this
+// is port-side only, and deliberately so; the big head's OTHER two effects (the widened
+// box and the 45-frame squash) are pinned against the live game in trace.test.ts, where
+// normal difficulty can reach them.
+describe('the big-head stomp multiplier compounds with dc.stompHitbox', () => {
+  /**
+   * One fixed geometry, three difficulties-and-timers. The player is placed so that its
+   * stomp line (`p.y+p.h-4`, i.e. 170) falls in the narrow band that only the LARGEST
+   * of the three reaches — the enemy's own box ends at 166.6 — while the overlap box
+   * itself is satisfied in every case, so the only thing that varies is `shm`:
+   *
+   *   normal     + big head -> 1 * 1.5 = 1.5 -> line must clear 150.4 + 12.15 = 162.55
+   *   super_easy no big head -> 2.0       -> ... 150.4 + 16.20 = 166.60
+   *   super_easy + big head  -> 2.0 * 1.5 = 3.0 -> ... 150.4 + 24.30 = 174.70
+   */
+  function setup(difficulty: 'normal' | 'super_easy', bigHead: boolean) {
+    const world = createWorld(0, difficulty);
+    world.map = makeGround(20, 20); // ground far below; both actors float clear of it
+    const enemy: EnemyState = {
+      type: 'doll', x: 100, y: 150, vx: -0.8, vy: 0, w: 14.4, h: 16.2, alive: true,
+      frame: 0, frameTimer: 0, squashTimer: 0,
+      noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
+      isChicken: false,
+    };
+    world.player = createPlayer(LEVELS[0], world.dc, 'gigi'); // w=16, h=24
+    world.player.x = 98; // overlaps horizontally with AND without the 8px big-head widening
+    world.player.y = 150; // stomp line at 170, between the 2.0 and 3.0 thresholds
+    world.player.vy = 3; // falling — the stomp branch needs it
+    if (bigHead) world.player.bigHeadTimer = 1200;
+    return { world, enemy };
+  }
+
+  it('needs BOTH factors to reach this enemy — neither one alone is enough', () => {
+    // 1.5 alone (big head at normal): too short — this is a hit, not a stomp.
+    const a = setup('normal', true);
+    // Read off the real records, so this fails loudly if the difficulty table ever
+    // moves rather than quietly testing arithmetic against a stale assumption. normal
+    // having NO stompHitbox at all is the whole reason the `||1` fallback is load-bearing.
+    expect(a.world.dc.stompHitbox).toBeUndefined();
+    stepEnemy(a.world, a.enemy);
+    expect(a.enemy.alive).toBe(true);
+    expect(a.world.dead).toBe(true);
+
+    // 2.0 alone (super_easy, no big head): also too short, by 3.4px. super_easy is the
+    // one difficulty whose players spawn already wearing a cape (`startWithCape`), so
+    // the hit this case takes is ABSORBED rather than fatal — the point of the case is
+    // that the enemy survives, and it still does. The cape is spent for super_easy's
+    // own 120-frame window, which is `dc.invincibleTime`, NOT the 60 a pit save gives.
+    const b = setup('super_easy', false);
+    expect(b.world.dc.stompHitbox).toBe(2);
+    stepEnemy(b.world, b.enemy);
+    expect(b.enemy.alive).toBe(true);
+    expect(b.world.dead).toBe(false);
+    expect(b.world.player.hasCape).toBe(false);
+    expect(b.world.player.invincible).toBe(120);
+
+    // 2.0 * 1.5: reaches. If the two were added, or if either replaced the other, this
+    // would be 3.5, 2.0 or 1.5 — and only the first of those also lands here, so the
+    // 45-frame squash below is what separates a compounded 3.0 from a mistaken sum.
+    const c = setup('super_easy', true);
+    stepEnemy(c.world, c.enemy);
+    expect(c.enemy.alive).toBe(false);
+    expect(c.world.dead).toBe(false);
+    expect(c.world.player.vy).toBe(-5);
+    expect(c.enemy.squashTimer).toBe(45); // index.html:1546, not :1545's 30
+    // super_easy's 0.5 multiplier, rounded at the award site like every other award.
+    expect(c.world.score).toBe(Math.round(200 * c.world.dc.scoreMultiplier));
   });
 });
