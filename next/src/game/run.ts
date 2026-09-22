@@ -13,6 +13,7 @@ import {
   ICEBAT_P, ICEBAT_S,
   PENGUIN_P, PENGUIN_S,
   type Palette,
+  type Skin,
   type SpriteData,
 } from '../data/sprites';
 
@@ -32,6 +33,24 @@ import {
  * Phaser-free by design: this is game state (what the kids picked), not rendering.
  * tests/world.test.ts enforces that nothing under src/game imports Phaser.
  */
+
+/**
+ * Both characters, in the order the character screen puts them in (index.html:2155-2159
+ * draws Gigi on the left, :2160-2164 Dodo on the right). The character select maps its
+ * cursor through this; everything that has to walk BOTH characters — baking their
+ * textures, say — iterates it rather than writing the pair out again.
+ */
+export const CHARACTERS: readonly Character[] = ['gigi', 'dodo'];
+
+/**
+ * A character's skins. The live game reaches for `GIGI_SKINS` or `DODO_SKINS` by hand
+ * at each of its four use sites (index.html:1340-1343, 2142, 2157, 2162); this is that
+ * choice, named once, so the menu's skin cursor and the texture bakery cannot drift
+ * apart about how many skins a character has.
+ */
+export function skinsOf(character: Character): readonly Skin[] {
+  return character === 'dodo' ? DODO_SKINS : GIGI_SKINS;
+}
 
 let selectedChar: Character = 'gigi';
 let gigiSkin = 0;
@@ -59,6 +78,23 @@ export function getDodoSkin(): number {
 
 export function setDodoSkin(skin: number): void {
   dodoSkin = skin;
+}
+
+/**
+ * The skin held for a character, whether or not they are the one being played. The
+ * live game keeps `gigiSkin` and `dodoSkin` as two separate globals and picks between
+ * them at every use site (index.html:1340-1343 cycles one or the other depending on
+ * which side of the character screen the cursor is on); these two collapse that pick
+ * into one place, so a caller that already knows WHICH character it means does not
+ * have to know which variable holds it.
+ */
+export function getSkinIndex(character: Character): number {
+  return character === 'dodo' ? dodoSkin : gigiSkin;
+}
+
+export function setSkinIndex(character: Character, skin: number): void {
+  if (character === 'dodo') dodoSkin = skin;
+  else gigiSkin = skin;
 }
 
 export interface EnemySpriteInfo {
