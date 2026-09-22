@@ -63,7 +63,9 @@ export function sfxWin(): void {
 // in the middle of game logic, which is why a search for `sfx` — the obvious way to find
 // every sound in index.html, and the way this port's first pass over the audio went —
 // misses all three. There are ten such calls live; these are the three in code this port
-// actually runs. The other seven belong to the boss, the cannon and learn mode.
+// ran when they were found. Of the other seven, the boss's three are named further down
+// this file now that the fight is ported; what is left is the cannon's shot and learn
+// mode's.
 //
 // Named here, rather than left inline at the call sites, so that the port has one file
 // that answers "what noises can this game make?".
@@ -87,4 +89,44 @@ export function sfxCatArrive(): void {
 /** The puff the cat goes out in after its third scratch (index.html:1494). */
 export function sfxCatVanish(): void {
   playTone(300, 0.1, 'sine', 0.05);
+}
+
+// ---------------------------------------------------------------------------------
+// The boss fight, which makes three noises and has a name for none of them. Every one is
+// a bare `playTone` buried in `update()` (index.html:1572, :1583, :1610), so the search
+// that found the three above — grep for `sfx` — finds a completely silent boss and says
+// the sound work is done. Named here for the same reason the cape and the cat were.
+//
+// All three live in the bottom two octaves the synth can reach, an octave below anything
+// else in the game: a 150Hz shot against the player's 600Hz bow, and a roar that bottoms
+// out at 40. That is the whole characterisation — the boss is the only thing in Gigi &
+// Dodo that is LOW.
+
+/**
+ * A fireball leaving the boss (index.html:1572). 150Hz sawtooth sliding down to 80 over a
+ * fifth of a second.
+ *
+ * Not the same sound as the CANNON's shot, which is also a 150Hz sawtooth at the same
+ * volume (index.html:1535) but half as long and sliding to 300 rather than 80 — it ends
+ * ABOVE where it started rather than well below. Two tones a careless reading would fold
+ * into one; when the cannon lands it wants a second function here, not a call to this one.
+ */
+export function sfxBossFire(): void {
+  playTone(150, 0.2, 'sawtooth', 0.08, 80);
+}
+
+/** The boss committing to a charge (index.html:1583): a short, hard 100Hz square down to 60. */
+export function sfxBossCharge(): void {
+  playTone(100, 0.3, 'square', 0.1, 60);
+}
+
+/**
+ * The roar at a health threshold (index.html:1610) — the loudest thing in the game at
+ * 0.15, and the only two-tone effect that goes DOWN: 80Hz sliding to 50, then 60 sliding
+ * to 40 a further 150ms later. The second tone starts below where the first one ended,
+ * so the pair reads as one long fall rather than as two notes.
+ */
+export function sfxBossRoar(): void {
+  playTone(80, 0.5, 'sawtooth', 0.15, 50);
+  setTimeout(() => playTone(60, 0.4, 'square', 0.12, 40), 150);
 }

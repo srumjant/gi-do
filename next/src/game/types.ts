@@ -330,6 +330,148 @@ export interface Arrow {
 }
 
 /**
+ * Something an ENEMY fired at the player (index.html:993, 1535, 1570-1571) — the boss's
+ * fireballs today, and the cannon's when that type lands. One list, one pass, both
+ * shooters; see world.ts's stepEnemyProjectiles.
+ *
+ * `vy` IS NEVER ACCELERATED. There is no gravity anywhere in the pass — `ep.y += ep.vy`
+ * and nothing else — so a projectile launched at `vy: -1` rises at exactly one pixel a
+ * frame until it expires. That is what makes the boss's two-fireball "spread" two
+ * straight lines rather than an arc, and it is item 4 of the spec's bug-compatibility
+ * contract: preserved deliberately, not an arc someone forgot to finish.
+ *
+ * It is also why these must never be handed to Arcade (Plan 7 says so explicitly): a
+ * body in a world with gravity would drop, and the spread would become the arc the
+ * original never had.
+ */
+export interface EnemyProjectile {
+  x: number;
+  y: number;
+  vx: number;
+  /** Constant for the whole flight. See the note above — nothing ever adds to it. */
+  vy: number;
+  /**
+   * Frames left, and the kill switch as well: a tile hit, a hit on the player or an
+   * arrow flying through it all set this straight to 0, and the pass filters out
+   * everything not still above zero at the end of it.
+   *
+   * The boss fires two at once with DIFFERENT lifetimes — 120 for the flatter one, 100
+   * for the steeper (index.html:1570-1571) — so the pair does not vanish together.
+   */
+  life: number;
+  /**
+   * Write-only in the live game, and carried anyway. The cannon tags its shot
+   * `type:'fireball'` (index.html:1535) and the boss tags neither of its two; nothing
+   * anywhere reads the field, and the draw code renders FIREBALL_S for everything in
+   * the list regardless (index.html:1828). Kept so the field set stays the live
+   * object's, exactly like CatState.vx and PowerupPopup.maxTimer, and so the cannon can
+   * be ported without touching this shape.
+   */
+  type?: string;
+}
+
+/**
+ * The boss of the final level (index.html:991, 1197-1208, 1559-1626). One per run, and
+ * only on the last level — `initLevel` builds it when `idx === LEVELS.length-1` and sets
+ * `boss = null` otherwise.
+ *
+ * IT IS NOT A PHYSICS BODY, and this is item 1 of the spec's bug-compatibility contract.
+ * There is no gravity on it, no tile collision, and `y` is written once at spawn and
+ * never again — it hangs at whatever height `findGroundY` put it, and a charge that
+ * carries it over a hole carries it straight across thin air. Its `x` is not separated
+ * against anything either; it is simply CLAMPED to a ten-tile window around the rescue
+ * (index.html:1597-1598). Do not give it an Arcade body: Plan 7's "explicitly NOT
+ * bodied" list names it for exactly this reason.
+ *
+ * HP scales with difficulty through `dc.enemySpeed` thresholds rather than a field of
+ * its own — 5 / 7 / 10 / 14 from super_easy to hard (index.html:1202) — so the same
+ * fight is a handful of stomps for a small child and a long haul for a grown-up.
+ */
+export interface BossState {
+  x: number;
+  /**
+   * Written once, by the spawn literal, and never integrated. See the note above: the
+   * whole fight happens on one horizontal line.
+   */
+  y: number;
+  /**
+   * Pacing speed. Assigned every frame the boss paces and zeroed when it roars or
+   * finishes a charge — but nothing ever adds it to `x`: the pacing branch does
+   * `b.vx = paceDir*0.3*enemySpeed; b.x += b.vx` in one breath (index.html:1592-1593)
+   * and the charge moves by `chargeVx` instead. So this is a record of the last pacing
+   * step rather than a velocity that is integrated, and the DRAW code is its only other
+   * reader: `Math.abs(boss.vx) > 0.1` is half of what picks the walk frame
+   * (index.html:1789).
+   */
+  vx: number;
+  w: number;
+  h: number;
+  /** Counts down to zero, from `maxHp`. Reaching zero is the end of the game. */
+  hp: number;
+  /** 5 / 7 / 10 / 14 by difficulty (index.html:1202). Also the health bar's divisor. */
+  maxHp: number;
+  /**
+   * Cleared by the killing blow. NOT the same thing as `World.bossDefeated`, which is
+   * set at the same moment and then outlives it: `alive` gates the fight and the health
+   * bar, `bossDefeated` gates the RESCUE and never goes false again.
+   */
+  alive: boolean;
+  /** Counts UP to `shootInterval`, then fires and resets (index.html:1566-1568). */
+  shootTimer: number;
+  /**
+   * `dc.enemyShootInterval * 1.2` (index.html:1204) — a fifth slower than the cannon's
+   * on the same difficulty, so the boss is the more deliberate of the two shooters.
+   */
+  shootInterval: number;
+  /**
+   * Doubles as the pacing clock and the charge clock, which is why the charge is HALF as
+   * long as it reads. It is incremented once per frame at the top of the movement block
+   * (index.html:1579) and then a SECOND time inside the charging branch (:1588), so a
+   * charge that tests `> 60` actually ends after about 30 frames. Faithfully reproduced
+   * in boss.ts — the two increments are written out separately there rather than folded
+   * into one, so that it stays obvious this is the original and not an off-by-one.
+   */
+  chargeTimer: number;
+  charging: boolean;
+  /**
+   * The charge's speed and direction, fixed at the moment the charge starts and not
+   * re-aimed while it runs: `(p.x > b.x ? 1 : -1) * 3 * dc.enemySpeed`. Sidestepping a
+   * committed charge is therefore the whole defensive skill of the fight.
+   */
+  chargeVx: number;
+  /**
+   * Frames of hurt flash left. Three different values write it, and they are three
+   * different lengths on purpose: 20 for a stomp (index.html:1604), 15 for an arrow
+   * (:1621) and 8 for a chicken ray that did no damage at all (:1620). Drawing only —
+   * `hurtTimer % 4 < 2` picks the flashing frames (:1772).
+   */
+  hurtTimer: number;
+  /**
+   * Written once, by the spawn literal, and never read or assigned again anywhere in the
+   * live source. Carried for the same reason CatState.vx is: the field set stays the
+   * live object's.
+   */
+  phase: number;
+  /** Drawing flip, re-aimed at the player every frame (index.html:1564). */
+  facing: 1 | -1;
+  /** Which of the two frames to draw, flipped every 13th frame (index.html:1561). */
+  frame: number;
+  /** Counts up to 12 and resets; `> 12` not `>= 12`, so the flip is every 13 frames. */
+  frameTimer: number;
+  /**
+   * Frames of roar left, from 50. While it runs the boss stands still — the movement
+   * block is skipped entirely and `vx` is pinned to 0 (index.html:1575) — so a roar is a
+   * free window to get a hit in, not a threat.
+   */
+  roarTimer: number;
+  /**
+   * Frames until another roar is allowed, from 120. Counted down only on the frames the
+   * boss is NOT roaring (index.html:1576's `else if`), so the 120 starts after the 50.
+   */
+  roarCooldown: number;
+}
+
+/**
  * One thing the world just did that makes a noise, pushed at exactly the point the live
  * game calls the matching `sfx*()` — see `World.sounds` below for why it is a value in a
  * list rather than a call.
@@ -347,6 +489,12 @@ export interface Arrow {
  *   - `cat-arrive` (:1454) and `cat-vanish` (:1494) are bare `playTone` calls too. They are
  *     easy to miss when grepping for `sfx`, and the port went without them until they were
  *     found; see audio/sfx.ts.
+ *   - `boss-fire` (:1572), `boss-charge` (:1583) and `boss-roar` (:1610) are the same trap
+ *     a third time, and the biggest instance of it: the whole boss fight makes bare
+ *     `playTone` calls and not one named effect, so a search for `sfx` finds a silent boss
+ *     and reports the sound work finished. `boss-roar` is two tones, the second scheduled
+ *     150ms behind the first. Named in audio/sfx.ts for the same reason the cape and the
+ *     cat were.
  *   - `music-level` is the level's own theme, restarted by a respawn. Which theme that is
  *     is the SCENE's business — a World does not know its own level index — so the cue
  *     carries no argument and the scene supplies it.
@@ -366,6 +514,9 @@ export type SoundCue =
   | 'cape'
   | 'cat-arrive'
   | 'cat-vanish'
+  | 'boss-fire'
+  | 'boss-charge'
+  | 'boss-roar'
   | 'music-level'
   | 'music-stop';
 
@@ -501,6 +652,34 @@ export interface World {
    * its own pass.
    */
   arrows: Arrow[];
+  /**
+   * index.html:993, 1188. Fireballs in flight, in firing order — the boss's today, the
+   * cannon's when that type lands. Emptied by `initLevel` exactly like `arrows`, so a
+   * death clears the air as well as resetting the boss.
+   *
+   * REPLACED every step rather than spliced, like `arrows` (see stepEnemyProjectiles in
+   * world.ts), so a projectile that has already hit something still sits in the list,
+   * with `life` 0, for the rest of its own pass.
+   */
+  enemyProjectiles: EnemyProjectile[];
+  /**
+   * index.html:991, 1197-1208. The final level's boss, and `null` on every other level —
+   * which is also what makes `checkRescue`'s `!boss || bossDefeated` a no-op for the
+   * first five levels and a real gate for the sixth.
+   *
+   * Rebuilt by `buildLevelState` at every level build, so a death hands the boss its
+   * health back along with the question blocks. Not a bug to fix: `initLevel` IS the
+   * respawn path and it rebuilds the boss unconditionally (index.html:1196-1208).
+   */
+  boss: BossState | null;
+  /**
+   * index.html:991, 1196. Set by the killing blow (:1613 or :1624) and cleared only by a
+   * level build. It outlives `boss.alive`, which is the point of having both: the fight
+   * reads `alive`, the RESCUE reads this, and the celebration banner reads this too — so
+   * the sibling stays out of reach until the boss goes down, and then stays reachable
+   * even though the boss is no longer being stepped.
+   */
+  bossDefeated: boolean;
   /** index.html:1189-1190. Scanned off the freshly generated map, in tile coordinates. */
   questionBlocks: BlockState[];
   /** index.html:1189, 1191. Same scan, tile code 5. */

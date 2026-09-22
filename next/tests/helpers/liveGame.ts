@@ -166,6 +166,45 @@ export interface Sample {
   score: number;
 }
 
+/**
+ * The live boss object (index.html:1203-1207), minus `phase`, which the live source
+ * writes once and never reads again.
+ *
+ * Every field here is one the fight actually moves, so a comparison over this shape is a
+ * comparison of the whole fight. `y` is in it deliberately even though nothing integrates
+ * it: that it does NOT move is the thing worth asserting (bug-compatibility item 1).
+ */
+export interface BossSample {
+  x: number;
+  y: number;
+  vx: number;
+  w: number;
+  h: number;
+  hp: number;
+  maxHp: number;
+  alive: boolean;
+  shootTimer: number;
+  shootInterval: number;
+  chargeTimer: number;
+  charging: boolean;
+  chargeVx: number;
+  hurtTimer: number;
+  facing: number;
+  frame: number;
+  frameTimer: number;
+  roarTimer: number;
+  roarCooldown: number;
+}
+
+/** One fireball in flight (index.html:1570-1571, and the cannon's at :1535). */
+export interface EnemyProjectileSample {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+}
+
 export interface DriveOptions {
   level: number;
   difficulty: 'super_easy' | 'easy' | 'normal' | 'hard';
@@ -338,6 +377,25 @@ export interface Driver {
   // trace comparison for why originY/sineOffset/bounceTimer specifically stay out of
   // EnemySample even though this port now has them on its own EnemyState.
   getEnemies: () => Array<EnemySample & Record<string, unknown>>;
+  /**
+   * The final level's boss, or null on every other level — a LIVE reference to the
+   * script's own `boss`, like `getPlayer` and unlike `getArrows`. The binding is
+   * reassigned only by `initLevel`, which has already run by the time any hook can call
+   * this, so the object handed back stays the one the fight mutates: writing
+   * `d.getBoss().hp = 1` really does put the live boss one stomp from death, which is how
+   * a test reaches the end of a fourteen-hit fight without simulating it.
+   */
+  getBoss: () => (BossSample & Record<string, unknown>) | null;
+  /** The live `bossDefeated` flag (index.html:991) — read through a closure, since it is
+   * a plain `let` the fight reassigns. */
+  getBossDefeated: () => boolean;
+  /**
+   * Fireballs in flight, as a fresh snapshot rather than a live reference — the live pass
+   * REASSIGNS the `enemyProjectiles` binding every frame (index.html:1556's
+   * `enemyProjectiles=enemyProjectiles.filter(...)`), exactly like `arrows`, so a
+   * reference captured once would go stale the first time one expired.
+   */
+  getEnemyProjectiles: () => EnemyProjectileSample[];
   setDifficulty: (d: string) => void;
   setChar: (c: string) => void;
   /**
@@ -407,6 +465,10 @@ function bootLiveGame(): Driver {
     hitsLeft: cat.hitsLeft, bounceDir: cat.bounceDir, baseY: cat.baseY, onGround: !!cat.onGround }),
   resetAnimFrame: () => { animFrame = 0; },
   getEnemies: () => enemies,
+  getBoss: () => boss,
+  getBossDefeated: () => bossDefeated,
+  getEnemyProjectiles: () => enemyProjectiles.map(
+    ep => ({ x: ep.x, y: ep.y, vx: ep.vx, vy: ep.vy, life: ep.life })),
   clearEnemies: () => { pendingEnemies.length = 0; enemies.length = 0; },
   setDifficulty: (d) => { selectedDifficulty = d; },
   setChar: (c) => { selectedChar = c; },
