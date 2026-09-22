@@ -148,7 +148,7 @@ by hand.
 After: one Phaser Scene per state. Two things survive because they are the good parts:
 
 - **`BACK_TARGET`** (`:1231`) becomes a scene-key table. It is the one declarative
-  construct in the current code and it already has tests (`testBackNav`, `:3223`).
+  construct in the current code and it already has tests (`testBackNav`, `:3232`).
 - **State-dependent input mapping** — gamepad button 3 (△/Y) and 5 (R1/RB) are menu-only
   on purpose, because kids hit them mid-run.
 
