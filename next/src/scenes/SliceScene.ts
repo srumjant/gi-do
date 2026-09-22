@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
 import { BASE_H, BASE_W, STEP_MS, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
-import type { DifficultyKey } from '../config/difficulty';
+import { getDifficulty, type DifficultyKey } from '../config/difficulty';
 import { TStr } from '../config/i18n';
 import { PARALLAX, type ParallaxLayer } from '../data/parallax';
 import type { SpriteData } from '../data/sprites';
 import type { Character, PlayerMove } from '../game/player';
-import { getDodoSkin, getGigiSkin, getPlayerSprites, getSelectedChar } from '../game/run';
+import { getPlayerSprites, getSelectedChar, getSkinIndex } from '../game/run';
 import { createWorld, stepWorld } from '../game/world';
 import type { EnemyState, World } from '../game/types';
 import { cloudPosition, cloudScale, drawRidges, drawSky } from '../gfx/parallax';
@@ -40,6 +40,9 @@ import { createKeyboardInput, type KeyboardInput } from '../input/keyboard';
 import { createPlayerMove } from '../physics/player';
 import { createCollisionLayer, syncCollisionLayer } from '../physics/tiles';
 import { HUD_SCENE_KEY, type HudData } from './HudScene';
+import { POWERUP_POPUP_SCENE_KEY, type PowerupPopupData } from './PowerupPopupScene';
+
+export const SLICE_SCENE_KEY = 'Slice';
 
 /**
  * Half the difference between the canvas and the zoomed view. See setScroll below —
@@ -170,17 +173,20 @@ export class SliceScene extends Phaser.Scene {
   private accumulator = 0;
 
   constructor() {
-    super('Slice');
+    super(SLICE_SCENE_KEY);
   }
 
   create(): void {
     const levelIndex = 0;
-    // Named rather than inlined into createWorld because the HUD needs the same two
-    // values to label itself, and a HUD that said 'Normal' over a world built on some
-    // other record would be worse than no HUD at all. A difficulty SCREEN is a later
-    // task in this plan; until it exists, this is where the choice is made.
-    const difficulty: DifficultyKey = 'normal';
-    this.world = createWorld(levelIndex, difficulty);
+    // What the two choice screens decided, read back out of the run state they wrote
+    // to — the port's equivalents of the live game's `selectedDifficulty`
+    // (index.html:161) and `selectedChar` (:988), which is where the live game reads
+    // them from too. Named rather than inlined into createWorld because the HUD needs
+    // the difficulty to label itself, and a HUD that said 'Normal' over a world built
+    // on some other record would be worse than no HUD at all.
+    const difficulty: DifficultyKey = getDifficulty();
+    const character: Character = getSelectedChar();
+    this.world = createWorld(levelIndex, difficulty, character);
 
     registerTextures(this);
 
@@ -241,6 +247,14 @@ export class SliceScene extends Phaser.Scene {
       levelIndex,
       difficulty,
     } satisfies HudData);
+
+    // And the power-up announcement, in front of even the HUD — see main.ts's scene list
+    // and PowerupPopupScene itself. Launched here rather than when a rainbow block is hit
+    // because it is the world it watches, not an event it is sent: bumping the block sets
+    // `world.powerupPopup` deep inside the simulation, which knows nothing of scenes.
+    this.scene.launch(POWERUP_POPUP_SCENE_KEY, {
+      world: this.world,
+    } satisfies PowerupPopupData);
   }
 
   /**
@@ -736,7 +750,7 @@ function resolvePlayerTextureKey(frame: number): string {
 /** Who is being played and in which skin — the lookup the keys above are built from. */
 function currentSkin(): [Character, number] {
   const character = getSelectedChar();
-  return [character, character === 'dodo' ? getDodoSkin() : getGigiSkin()];
+  return [character, getSkinIndex(character)];
 }
 
 /**

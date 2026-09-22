@@ -8,17 +8,14 @@ import {
   CAT_SCRATCH_P, CAT_SCRATCH_S,
   CHICKEN_P, CHICKEN_S,
   CLOUD_P, CLOUD_S,
-  DODO_SKINS,
-  GIGI_SKINS,
   HEART_P, HEART_S,
   type Palette,
-  type Skin,
   type SpriteData,
   STAR_P, STAR_S,
   SUPER_P, SUPER_S,
 } from '../data/sprites';
 import type { Character } from '../game/player';
-import { getEnemySpriteInfo } from '../game/run';
+import { CHARACTERS, getEnemySpriteInfo, skinsOf } from '../game/run';
 import { rasterise } from './rasterise';
 
 /**
@@ -63,11 +60,6 @@ export const BIG_HEAD_SCALE = 5;
 const POSES = ['stand', 'run', 'jump'] as const;
 type Pose = typeof POSES[number];
 
-const SKINS_BY_CHARACTER: Record<Character, readonly Skin[]> = {
-  gigi: GIGI_SKINS,
-  dodo: DODO_SKINS,
-};
-
 /** `player-<character>-<skinIndex>-<pose>`, e.g. `player-gigi-0-stand`. */
 export function playerTextureKey(character: Character, skinIndex: number, pose: Pose): string {
   return `player-${character}-${skinIndex}-${pose}`;
@@ -108,8 +100,8 @@ export function bigHeadRows(sprite: SpriteData): number {
  * picks a key.
  */
 function registerPlayerTextures(scene: Phaser.Scene): void {
-  (Object.keys(SKINS_BY_CHARACTER) as Character[]).forEach((character) => {
-    SKINS_BY_CHARACTER[character].forEach((skin, skinIndex) => {
+  CHARACTERS.forEach((character) => {
+    skinsOf(character).forEach((skin, skinIndex) => {
       for (const pose of POSES) {
         const sprite = skin[pose];
         const headRows = bigHeadRows(sprite);
@@ -259,5 +251,53 @@ const HUD_TEXTURES: readonly [string, SpriteData, Palette, number][] = [
 export function registerHudTextures(scene: Phaser.Scene): void {
   for (const [key, sprite, palette, scale] of HUD_TEXTURES) {
     scene.textures.addCanvas(key, rasterise(sprite, palette, scale));
+  }
+}
+
+/**
+ * The small Gigi under the highlighted difficulty card (index.html:2142's `sc=2`).
+ * Nominally the same number as PLAYER_SCALE, and kept separate all the same: they are
+ * two draw sites that happen to agree today, and the menu has no business moving if
+ * someone retunes how big the player draws in the world.
+ */
+export const MENU_PREVIEW_SCALE = 2;
+/** The two big portraits on the character screen (index.html:2158, 2163: scale 4). */
+export const MENU_PORTRAIT_SCALE = 4;
+
+const MENU_SCALES = [MENU_PREVIEW_SCALE, MENU_PORTRAIT_SCALE];
+
+/** `menu-<character>-<skinIndex>-<scale>`, e.g. `menu-dodo-1-4`. */
+export function menuPlayerTextureKey(
+  character: Character,
+  skinIndex: number,
+  scale: number,
+): string {
+  return `menu-${character}-${skinIndex}-${scale}`;
+}
+
+/**
+ * Standing portraits of both characters in every skin, at the two sizes the choice
+ * screens draw them. Only the `stand` pose: the menus never animate anybody.
+ *
+ * Registered here rather than reused from `registerPlayerTextures` for the same reason
+ * the HUD's four are — scale belongs to the draw site, and the character screen draws
+ * at 4 where the world draws at 2 — and because the menus must not depend on the game
+ * scene having booted first. They run BEFORE it now, so they could not borrow its
+ * textures even if the scales agreed.
+ *
+ * The `exists` guard is load-bearing, unlike anywhere else in this file. Both menu
+ * scenes call this, and backing out of the character screen re-runs the difficulty
+ * screen's `create`, so this is the one registration in the port that really can be
+ * reached twice.
+ */
+export function registerMenuTextures(scene: Phaser.Scene): void {
+  for (const character of CHARACTERS) {
+    skinsOf(character).forEach((skin, skinIndex) => {
+      for (const scale of MENU_SCALES) {
+        const key = menuPlayerTextureKey(character, skinIndex, scale);
+        if (scene.textures.exists(key)) continue;
+        scene.textures.addCanvas(key, rasterise(skin.stand, skin.palette, scale));
+      }
+    });
   }
 }

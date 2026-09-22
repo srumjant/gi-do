@@ -1,7 +1,10 @@
 /// <reference types="vite/client" />
 import Phaser from 'phaser';
 import { BASE_W, BASE_H, STEP_HZ } from './config/constants';
+import { CharacterScene } from './scenes/CharacterScene';
+import { DifficultyScene } from './scenes/DifficultyScene';
 import { HudScene } from './scenes/HudScene';
+import { PowerupPopupScene } from './scenes/PowerupPopupScene';
 import { SliceScene } from './scenes/SliceScene';
 
 const game = new Phaser.Game({
@@ -46,12 +49,25 @@ const game = new Phaser.Game({
     },
   },
   /**
-   * Order is load-bearing, twice over. Phaser auto-starts only the FIRST scene in this
-   * array, so SliceScene boots and launches the HUD itself once it has a World to hand
-   * it; and Phaser renders the scenes in this same order, so listing the HUD second is
-   * what puts it in front of the game rather than behind it.
+   * Order is load-bearing, twice over.
+   *
+   * Phaser auto-starts only the FIRST scene in this array, so the game now boots into
+   * the difficulty screen rather than mid-level on a difficulty nobody chose. From
+   * there each screen starts the next by hand — difficulty, character, then the level,
+   * which launches the HUD alongside itself once it has a World to hand it. Title and
+   * mode select land in front of DifficultyScene in a later task and will take over
+   * being first.
+   *
+   * Phaser also RENDERS the scenes in this same order, which is why the HUD is listed
+   * after the level: that is what puts it in front of the game rather than behind it. The
+   * two menu screens are stopped long before either of those runs, so where they sit only
+   * decides which one boots.
+   *
+   * The power-up announcement comes last of all, and that is the live draw order too:
+   * index.html:3455 is `update();draw();drawPowerupPopup();`, and the HUD is drawn inside
+   * `draw()` (:1854-1867). So its dim falls over the hearts and the score as well.
    */
-  scene: [SliceScene, HudScene],
+  scene: [DifficultyScene, CharacterScene, SliceScene, HudScene, PowerupPopupScene],
 });
 
 /**

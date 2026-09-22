@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { InputState } from './actions';
+import { isRightDown, pollAll, trackKey } from './edges';
 
 const { LEFT, RIGHT, UP, SPACE, A, D, W, X, Z, SHIFT, CTRL } = Phaser.Input.Keyboard.KeyCodes;
 
@@ -26,6 +27,15 @@ export interface KeyboardInput {
  * step rather than once per rendered frame. One mechanism, used twice — a second way
  * of detecting a press would be a second way for it to land on the wrong step.
  *
+ * That comparison is made per KEY and the results ORed, which is how the live game reads
+ * it too: `justPressed['Space']||justPressed['ArrowUp']||justPressed['KeyW']`
+ * (index.html:1377), with the held flag beside it the same OR over `keys` (:1376).
+ *
+ * An edge has to survive one more test, `isCarriedHold` in edges.ts: a key already held
+ * when this scene started must not read as a press. That is not a nicety — it is why the
+ * level used to open with the player jumping by itself, having been started by a Space
+ * that was still down. The argument is in that file.
+ *
  * Fire is the only edge the simulation gets for the four fire keys: the live game
  * consults them through `justPressed` alone, never `keys`, so leaning on the button
  * fires one arrow and no more (see InputState.firePressed).
@@ -39,42 +49,26 @@ export interface KeyboardInput {
  */
 export function createKeyboardInput(scene: Phaser.Scene): KeyboardInput {
   const kb = scene.input.keyboard;
-  const left = kb?.addKey(LEFT);
-  const altLeft = kb?.addKey(A);
-  const right = kb?.addKey(RIGHT);
-  const altRight = kb?.addKey(D);
-  const jumpSpace = kb?.addKey(SPACE);
-  const jumpUp = kb?.addKey(UP);
-  const jumpW = kb?.addKey(W);
-  const fireX = kb?.addKey(X);
-  const fireZ = kb?.addKey(Z);
-  const fireShift = kb?.addKey(SHIFT);
-  const fireCtrl = kb?.addKey(CTRL);
-
-  let wasJumpHeld = false;
-  let wasFireHeld = false;
+  const left = [trackKey(kb?.addKey(LEFT)), trackKey(kb?.addKey(A))];
+  const right = [trackKey(kb?.addKey(RIGHT)), trackKey(kb?.addKey(D))];
+  const jump = [trackKey(kb?.addKey(SPACE)), trackKey(kb?.addKey(UP)), trackKey(kb?.addKey(W))];
+  const fire = [
+    trackKey(kb?.addKey(X)),
+    trackKey(kb?.addKey(Z)),
+    trackKey(kb?.addKey(SHIFT), isRightDown),
+    trackKey(kb?.addKey(CTRL), isRightDown),
+  ];
 
   return {
     read(): InputState {
-      const leftHeld = isDown(left) || isDown(altLeft);
-      const rightHeld = isDown(right) || isDown(altRight);
-      const jumpHeld = isDown(jumpSpace) || isDown(jumpUp) || isDown(jumpW);
-      const jumpPressed = jumpHeld && !wasJumpHeld;
-      wasJumpHeld = jumpHeld;
-      const fireHeld = isDown(fireX) || isDown(fireZ)
-        || isRightDown(fireShift) || isRightDown(fireCtrl);
-      const firePressed = fireHeld && !wasFireHeld;
-      wasFireHeld = fireHeld;
-      return { left: leftHeld, right: rightHeld, jump: jumpHeld, jumpPressed, firePressed };
+      const jumpRead = pollAll(jump);
+      return {
+        left: pollAll(left).down,
+        right: pollAll(right).down,
+        jump: jumpRead.down,
+        jumpPressed: jumpRead.pressed,
+        firePressed: pollAll(fire).pressed,
+      };
     },
   };
-}
-
-function isDown(key: Phaser.Input.Keyboard.Key | undefined): boolean {
-  return key !== undefined && key.isDown;
-}
-
-/** `location` 2 is the right-hand copy of a modifier key; see createKeyboardInput. */
-function isRightDown(key: Phaser.Input.Keyboard.Key | undefined): boolean {
-  return isDown(key) && key!.location === 2;
 }
