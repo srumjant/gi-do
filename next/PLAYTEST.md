@@ -10,9 +10,17 @@ If it fails, walking away is still cheap — which is the whole reason it comes 
 | **Old** | `https://srumjant.github.io/gi-do/` | the real game, unchanged |
 | **New** | `https://srumjant.github.io/gi-do/next/` | all six levels, on Phaser |
 
-**The new one needs a keyboard, so it does not work on the iPad at all.** The real game has
-on-screen buttons; the port has none yet, so it is laptop-only for now. Arrows or WASD to
-move, space to jump, X to shoot.
+**The new one needs a keyboard or a controller, so it does not work on the iPad at all.**
+The real game has on-screen buttons; the port has none yet, so it is laptop-only for now.
+Arrows or WASD to move, space to jump, X to shoot.
+
+**A controller works as of 2026-09-22**, and it works on the menus too — a child who picks
+one up can choose a difficulty and a hero with it, not just run and jump. Xbox, PlayStation
+and Switch pads are all recognised, and the button prompts on screen change to match
+whichever one is plugged in. Ⓐ (✕ on a DualSense) jumps and confirms, Ⓑ (○) shoots during
+a level and goes back in a menu, Ⓧ (□) shoots, and the d-pad and the left stick both move.
+Pickups buzz the pad. What does not buzz yet is landing on an enemy's head, because that is
+the screen shake, and the screen shake is still missing.
 
 ## What the new one deliberately does not have
 

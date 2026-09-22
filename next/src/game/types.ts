@@ -520,6 +520,33 @@ export type SoundCue =
   | 'music-level'
   | 'music-stop';
 
+/**
+ * One buzz of a controller's motors, raised by the world exactly where the live game calls
+ * `padRumble` — see `World.rumbles` below for why haptics gets a list of its own rather
+ * than riding `sounds`.
+ *
+ * The three fields are `playEffect`'s own: two motor magnitudes in [0,1] and a duration in
+ * MILLISECONDS. Milliseconds, in a file where everything else is counted in frames,
+ * because the Gamepad API is the only consumer and it takes milliseconds — the conversion
+ * from frames lives in `shakeToRumble` (input/gamepad.ts), on the far side of the cue.
+ */
+export interface RumbleCue {
+  strong: number;
+  weak: number;
+  dur: number;
+}
+
+/**
+ * index.html's `padRumble(0,0.35,80)`: a short buzz on the light motor only, which is what
+ * every pickup in the live game does — the bow (:1447), the cape (:1448), the cat (:1453),
+ * a star (:1521) and a rainbow block's silly power-up (:1155). Identical arguments at all
+ * five, so one constant covers them.
+ *
+ * Here rather than in input/gamepad.ts because src/game/ raises it, and src/game/ is not
+ * allowed to know that a controller exists.
+ */
+export const PICKUP_RUMBLE: RumbleCue = { strong: 0, weak: 0.35, dur: 80 };
+
 export interface World {
   level: Level;
   map: TileMap;
@@ -716,6 +743,30 @@ export interface World {
    * burst when play resumes.
    */
   sounds: SoundCue[];
+  /**
+   * What the step just did that a controller should be felt to do — same arrangement as
+   * `sounds` above, same emptying at the top of every step, drained by the scene inside
+   * the fixed-step loop.
+   *
+   * ## Why this is not just another `SoundCue`
+   *
+   * It is tempting, because today every rumble the live game raises happens to sit beside
+   * a `pickup` or a `coin` — all five of them — so the scene could buzz off the sound list
+   * and this field could not exist. Three reasons it does anyway:
+   *
+   *   1. A sound cue is a NAME and a rumble is three NUMBERS. Widening `SoundCue` to carry
+   *      parameters would change what every existing push means.
+   *   2. The coincidence is a coincidence. The live game calls `sfxPickup()` without a
+   *      rumble too (index.html:1269, backing out of a menu), so "a pickup noise implies a
+   *      buzz" is a fact about five call sites, not a rule.
+   *   3. Screen shake is coming, and its rumbles are per-event — `shakeToRumble(3,8)` for a
+   *      stomp against `shakeToRumble(8,20)` for the boss going down (index.html:1545,
+   *      :1613). A channel that carries numbers can say that; a cue name cannot.
+   *
+   * And the device is a different device. `sounds` is drained by src/audio/; routing a
+   * motor through there would put the gamepad inside the sound engine.
+   */
+  rumbles: RumbleCue[];
 }
 
 export interface PendingEnemy {

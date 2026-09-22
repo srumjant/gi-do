@@ -81,7 +81,16 @@ export function trackKey(
   key: ReadableKey | undefined,
   held: (key: ReadableKey | undefined) => boolean = isDown,
 ): TrackedKey {
-  let wasDown = false;
+  // Seeded from the key ITSELF rather than from `false`, which is the gamepad's whole
+  // answer to the carried-hold problem above.
+  //
+  // For a Phaser Key this changes nothing and cannot: a Key made moments ago in `create()`
+  // reports `isDown === false` however hard the key is being held, which is precisely why
+  // `isCarriedHold` has to exist for the keyboard. For a pad button it is the entire fix —
+  // `navigator.getGamepads()` answers what is held right now, so a button still down from
+  // the screen before starts out already down here and produces no edge. See
+  // `createPadSource` in gamepad.ts.
+  let wasDown = held(key);
   return {
     poll(): KeyRead {
       const down = held(key);

@@ -9,8 +9,10 @@ import { createPlayer, playerHit, stepPlayer, type Character, type PlayerMove } 
 import { random } from './random';
 import { getRescueSprites, type RunTotals } from './run';
 import { findGroundY, getTile, isSolid, rectOverlap } from './tiles';
-import type {
-  Arrow, BlockState, BossState, CatState, EnemyProjectile, Pickup, Star, World,
+import {
+  PICKUP_RUMBLE,
+  type Arrow, type BlockState, type BossState, type CatState, type EnemyProjectile,
+  type Pickup, type Star, type World,
 } from './types';
 
 /**
@@ -178,6 +180,7 @@ export function createWorld(
     powerupPopup: null,
     // Empty, and emptied again at the top of every step. See World.sounds in types.ts.
     sounds: [],
+    rumbles: [],
     ...buildLevelState(level, dc, map),
   };
 }
@@ -248,6 +251,8 @@ export function stepWorld(
   // audible — a frozen step cannot bank cues up behind a death and fire them in a burst
   // when play resumes, because a frozen step still runs this line before it returns.
   world.sounds.length = 0;
+  // And last step's buzz is last step's, for every one of those reasons. See World.rumbles.
+  world.rumbles.length = 0;
 
   // index.html:1275 — the very first line of update(), before every other state check
   // (including the live game's own dead-state branch), so it advances even while dead,
@@ -396,6 +401,7 @@ export function collectPickups(world: World): void {
       p.hasBow = true;
       p.bowCharges = world.dc.bowCharges;
       world.sounds.push('pickup'); // index.html:1447
+      world.rumbles.push(PICKUP_RUMBLE); // the `padRumble(0,0.35,80)` on the same line
     }
   }
   for (const s of world.superPickups) {
@@ -403,6 +409,7 @@ export function collectPickups(world: World): void {
       s.collected = true;
       p.hasCape = true;
       world.sounds.push('pickup'); // index.html:1448
+      world.rumbles.push(PICKUP_RUMBLE);
     }
   }
   // index.html:1450-1455. The companion spawns 20px LEFT of the player whichever way
@@ -425,6 +432,7 @@ export function collectPickups(world: World): void {
     // bare `playTone` calls rather than as a named effect — which is exactly why it went
     // missing from the first pass over this file. See audio/sfx.ts's sfxCatArrive.
     world.sounds.push('pickup', 'cat-arrive');
+    world.rumbles.push(PICKUP_RUMBLE); // index.html:1453, once — two noises, one buzz
   }
 }
 
@@ -697,6 +705,7 @@ export function stepStars(world: World): void {
       // rounded once at the end. Keep every award site shaped exactly like this one.
       world.score += Math.round(100 * world.dc.scoreMultiplier);
       world.sounds.push('coin'); // index.html:1521
+      world.rumbles.push(PICKUP_RUMBLE);
     }
   }
 }
