@@ -113,9 +113,11 @@ Measured by replaying the port's movement at super_easy numbers frame by frame, 
 - A missed hop drops you onto a plank or the floor below. The floor is solid, so a fall never
   leaves the storey.
 
-A perfect held jump rises just over two hops (98.4px against 96px), so skipping a plank
-straight up is possible where one sits directly above the plank below it. That is harmless
-and not prevented.
+A full held jump rises just over two hops (98.4px against 96px), so it can carry you past a
+plank. The usual case is the last one: from the plank below it, a big jump lands straight on
+the full-width letter floor, and in a one-plank storey a big jump from the floor does the
+same. That is harmless (the child reaches the letters sooner, and the bump rule still counts
+from the letter floor) and is not prevented.
 
 ### The gate
 
@@ -313,7 +315,8 @@ gentlest adventure feel. The hero is the last selected character and skin, Gigi 
   code is split out.
 
 **In a browser, before calling it done:**
-- A *tapped* jump under the right letter still springs you through.
+- Jump into the right letter and let go the moment your head hits it: the spring still
+  carries you through. (A tap alone cannot reach the letters; that is deliberate.)
 - Both characters and all three modes work. A long storey scrolls and a short one sits whole.
 - Walking between the three letters is easy, a wrong answer costs nothing, and the glow
   appears after two misses.
@@ -328,7 +331,7 @@ gentlest adventure feel. The hero is the last selected character and skin, Gigi 
    jump checks.
 3. **A playable tower on plain tiles.** The tilemap, one-way planks, the camera, the
    trapdoor and the spring. Settle the collision-callback risk (below) first. Then the first
-   browser check: the tapped spring.
+   browser check: the spring with jump let go the moment the letter is hit.
 4. **The learning around it.** HUD, voice, sounds, buzzes, effects, the result screen and
    the learn menu.
 5. **The castle.** Tileset, back wall, windows, torches, banners, sky and roof.
