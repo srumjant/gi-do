@@ -22,7 +22,8 @@
 // the wall, one about the left clamp — are retired below rather than re-pointed at it.
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-  createPlayer, giveRandomSillyPowerup, stepPlayer, GRND_DECEL,
+  createPlayer, giveRandomSillyPowerup, playerSize, stepMotion, stepPlayer, stepWalkCycle,
+  GRND_DECEL,
 } from '../src/game/player';
 import { testMove } from './helpers/testMove';
 import { setRandom } from '../src/game/random';
@@ -33,7 +34,7 @@ import { GIGI_SKINS, DODO_SKINS } from '../src/data/sprites';
 import { TILE, GRAVITY } from '../src/config/constants';
 import { DIFFICULTY_CONFIG, DIFF_KEYS } from '../src/config/difficulty';
 import { findGroundY } from '../src/game/tiles';
-import type { World } from '../src/game/types';
+import type { PlayerState, SoundCue, World } from '../src/game/types';
 
 function held(overrides: Partial<InputState>): InputState {
   return { ...emptyInput(), ...overrides };
@@ -485,5 +486,74 @@ describe('running out of ammunition', () => {
     // And an empty bow fires nothing, however long the button is held.
     for (let i = 0; i < 60; i++) stepPlayer(world, held({ firePressed: true }));
     expect(world.arrows).toHaveLength(2);
+  });
+});
+
+describe('the movement learn mode shares', () => {
+  const LEARN = {
+    playerSpeed: DIFFICULTY_CONFIG.super_easy.playerSpeed,
+    jumpForce: DIFFICULTY_CONFIG.super_easy.jumpForce,
+  };
+  const jumpHeld = (f: number): InputState => held({ jump: true, jumpPressed: f === 0 });
+  const jumpTapped = (f: number): InputState => held({ jump: f === 0, jumpPressed: f === 0 });
+
+  function standing(): PlayerState {
+    const { w, h } = playerSize('gigi');
+    return {
+      x: 0, y: -h, vx: 0, vy: 0, w, h, onGround: true, facing: 1,
+      coyoteTime: 0, jumpBuffer: 0, frame: 0, frameTimer: 0, invincible: 0,
+      hasBow: false, bowCharges: 0, arrowCooldown: 0, hasCape: false,
+      fartTimer: 0, bigHeadTimer: 0, chickenRayCharges: 0,
+    };
+  }
+
+  // Integrates y by hand with no floor: only the top of the arc matters here.
+  function riseOf(input: (f: number) => InputState, options = {}): { rise: number; sounds: SoundCue[] } {
+    const p = standing();
+    const startY = p.y;
+    const sounds: SoundCue[] = [];
+    let top = p.y;
+    for (let f = 0; f < 200; f++) {
+      stepMotion(p, input(f), LEARN, sounds, options);
+      p.y += p.vy;
+      p.onGround = false;
+      top = Math.min(top, p.y);
+      if (p.vy > 0) break;
+    }
+    return { rise: startY - top, sounds };
+  }
+
+  it('rises 98.4px on a held jump at the learn numbers', () => {
+    expect(riseOf(jumpHeld).rise).toBeCloseTo(98.4, 6);
+  });
+
+  it('cuts a tapped jump to a 24.2px hop', () => {
+    expect(riseOf(jumpTapped).rise).toBeCloseTo(24.2, 6);
+  });
+
+  it('keeps a tapped jump at full height while noJumpCut is set', () => {
+    expect(riseOf(jumpTapped, { noJumpCut: true }).rise).toBeCloseTo(98.4, 6);
+  });
+
+  it('raises the jump sound on the step the jump starts', () => {
+    expect(riseOf(jumpHeld).sounds).toEqual(['jump']);
+  });
+
+  it('shows the jump pose in the air and the stand pose at rest', () => {
+    const p = standing();
+    p.onGround = false;
+    stepWalkCycle(p);
+    expect(p.frame).toBe(2);
+    p.onGround = true;
+    p.vx = 0;
+    stepWalkCycle(p);
+    expect(p.frame).toBe(0);
+  });
+
+  it('sizes a character exactly as createPlayer does', () => {
+    for (const character of ['gigi', 'dodo'] as const) {
+      const p = createPlayer(LEVELS[0], DIFFICULTY_CONFIG.normal, character);
+      expect(playerSize(character)).toEqual({ w: p.w, h: p.h });
+    }
   });
 });

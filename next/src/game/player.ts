@@ -4,7 +4,7 @@ import { TILE_BRICK, type Level } from '../data/levels';
 import { GIGI_SKINS, DODO_SKINS } from '../data/sprites';
 import type { InputState } from '../input/actions';
 import { random } from './random';
-import { PICKUP_RUMBLE, type PlayerState, type PowerupType, type World } from './types';
+import { PICKUP_RUMBLE, type PlayerState, type PowerupType, type SoundCue, type World } from './types';
 
 export type Character = 'gigi' | 'dodo';
 
@@ -40,6 +40,16 @@ export const GRND_DECEL = 0.72;
 export const AIR_DECEL = 0.92;
 
 /**
+ * The hitbox of a character: the stand sprite at scale 2, inset by 4 each way
+ * (index.html:670, :1167) — 16x24 for Gigi, 16x20 for Dodo. `createPlayer` and learn
+ * mode's climber both size from here, so the two are the same body.
+ */
+export function playerSize(character: Character): { w: number; h: number } {
+  const stand = character === 'dodo' ? DODO_SKINS[0].stand : GIGI_SKINS[0].stand;
+  return { w: stand[0].length * 2 - 4, h: stand.length * 2 - 4 };
+}
+
+/**
  * Port of the player construction at index.html:1166-1171, sizing from the character's
  * stand frame rather than a hardcoded constant. `spriteW(s,sc) = s[0].length*sc`,
  * `spriteH(s,sc) = s.length*sc` (index.html:670), called with sc=2; the hitbox then
@@ -53,16 +63,14 @@ export const AIR_DECEL = 0.92;
  * absorb the first hit of the level, on every respawn as well as at the start.
  */
 export function createPlayer(level: Level, dc: DifficultyRecord, character: Character): PlayerState {
-  const stand = character === 'dodo' ? DODO_SKINS[0].stand : GIGI_SKINS[0].stand;
-  const pw = stand[0].length * 2;
-  const ph = stand.length * 2;
+  const { w, h } = playerSize(character);
   return {
     x: level.playerStart[0] * TILE,
     y: level.playerStart[1] * TILE,
     vx: 0,
     vy: 0,
-    w: pw - 4,
-    h: ph - 4,
+    w,
+    h,
     onGround: false,
     facing: 1,
     coyoteTime: 0,
@@ -275,39 +283,38 @@ function fireArrow(world: World, input: InputState): void {
 }
 
 /**
- * Port of index.html:1361-1423. Mutates `world.player` (and `world.dead`) in place, in
- * exactly the source's order — every step here is load-bearing; see the comments below
- * and the task notes on the jump buffer, apex hang, and the two collision insets.
- *
- * Out of scope, and simply absent below: landing dust particles, the fart trail's own
- * particles, sound, and score. Enemy collision is simulated (enemy.ts's stepEnemy), but
- * calls into this file's `playerHit` rather than living here — there is no
- * enemy-collision branch in THIS function because the live game's own equivalent isn't
- * in `update`'s player block either; it is in the enemies loop, ported alongside the
- * enemies themselves.
- *
- * RETURNS whether the rest of the frame should still run. The live pit branch's
- * `return` (index.html:1423) is a return from `update()` ITSELF, not from some player
- * sub-function, so a pit frame skips the pickups, the cat, the arrows, the enemies, the
- * rescue check and the camera lerp — and it does that whether the player DIED there or
- * was SAVED by a cape. `world.dead` alone cannot tell stepWorld which happened, because
- * a cape save takes that same `return` while leaving the player alive, so the answer is
- * reported here instead.
- *
- * `move` is the only part of the live player block this function no longer does itself:
- * the X sweep, the Y sweep, the left clamp and the head-first block bump, which are
- * Arcade's from this plan on. See PlayerMove above and the call site below.
+ * The two fields of a difficulty record that movement reads. Narrower than
+ * `DifficultyRecord` so learn mode can move a player without inventing lives, a gap width
+ * or a bow.
  */
-export function stepPlayer(world: World, input: InputState, move?: PlayerMove): boolean {
-  // index.html:1348 — the live update() checks its dead-state branch, and returns,
-  // before it ever reaches player movement. Reproduced by returning immediately: once
-  // dead, nothing below runs again, so position and velocity freeze on the death frame.
-  if (world.dead) return false;
+export type MotionRecord = Pick<DifficultyRecord, 'playerSpeed' | 'jumpForce'>;
 
-  const p = world.player;
-  const dc = world.dc;
-  const level = world.level;
+export interface MotionOptions {
+  /**
+   * Skip the variable-height cut this step. Learn mode sets it while a letter block's
+   * spring carries the player up through the ceiling: a child who taps rather than holds
+   * would otherwise rise 24px instead of 98px and be left under an open trapdoor. The
+   * adventure never sets it.
+   */
+  noJumpCut?: boolean;
+}
 
+/**
+ * The movement half of the player step (index.html:1362-1403): running, coyote time, the
+ * jump buffer, the jump, the variable-height cut, and gravity with its apex hang. Shared
+ * by `stepPlayer` below and learn mode's climb (game/learn/climb.ts), so a jump is the
+ * same jump in both.
+ *
+ * Mutates `p`, and pushes 'jump' or 'fart' onto `sounds` on the step a jump starts.
+ * Moves nothing: position is the mover's job, and runs after this.
+ */
+export function stepMotion(
+  p: PlayerState,
+  input: InputState,
+  dc: MotionRecord,
+  sounds: SoundCue[],
+  options: MotionOptions = {},
+): void {
   // Player movement — smooth acceleration with air control (index.html:1362-1370).
   const accel = p.onGround ? GRND_ACCEL : AIR_ACCEL;
   const decel = p.onGround ? GRND_DECEL : AIR_DECEL;
@@ -350,25 +357,18 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
     p.coyoteTime = 0;
     p.jumpBuffer = 0;
     // index.html:1384-1385. Reads the same `fartTimer` the force above just read, one
-    // line later and before the timer is decremented at the bottom of this function, so a
+    // line later and before the timer is decremented at the bottom of stepPlayer, so a
     // jump that got the 1.5x always gets the fart too. The live branch also spawns five
     // green particles; those are presentation and are not ported.
-    world.sounds.push(p.fartTimer > 0 ? 'fart' : 'jump');
+    sounds.push(p.fartTimer > 0 ? 'fart' : 'jump');
   }
 
   // Variable jump height — release early for a short hop (index.html:1387-1388). The
   // clamp target is negative (jumpForce is negative), and only applies while vy is
-  // still below (more negative than) it.
-  if (!jumpKey && p.vy < dc.jumpForce * 0.4) {
+  // still below (more negative than) it. Skipped while `noJumpCut` is set.
+  if (!options.noJumpCut && !jumpKey && p.vy < dc.jumpForce * 0.4) {
     p.vy = dc.jumpForce * 0.4;
   }
-
-  // Shooting (index.html:1390-1398), between the variable-height clamp above and
-  // gravity below — where the live source has it, and it matters: the arrow's own `y`
-  // is read off the player's position BEFORE this frame's gravity and movement, so an
-  // arrow fired mid-jump leaves from where the player was at the top of the frame, not
-  // from where it ends up.
-  fireArrow(world, input);
 
   // Gravity: apex hang (reduced gravity near the jump peak) + faster fall
   // (index.html:1400-1403). `vy > 0` is tested BEFORE `isApex` — apex hang applies only
@@ -377,6 +377,71 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
   const gMul = p.vy > 0 ? 1.2 : (isApex ? 0.6 : 1.0);
   p.vy += GRAVITY * gMul;
   if (p.vy > 8) p.vy = 8;
+}
+
+/**
+ * The walk cycle (index.html:1424-1429). Runs at the END of a step, after collision, so it
+ * reacts to this step's resolved `onGround` and `vx` rather than last step's. Shared with
+ * learn mode's climb.
+ */
+export function stepWalkCycle(p: PlayerState): void {
+  if (!p.onGround) {
+    p.frame = 2;
+  } else if (Math.abs(p.vx) > 0.3) {
+    const walkSpeed = Math.max(4, Math.round(12 - Math.abs(p.vx) * 3));
+    p.frameTimer++;
+    if (p.frameTimer > walkSpeed) {
+      p.frame = p.frame === 0 ? 1 : 0;
+      p.frameTimer = 0;
+    }
+  } else {
+    p.frame = 0;
+  }
+}
+
+/**
+ * Port of index.html:1361-1423. Mutates `world.player` (and `world.dead`) in place, in
+ * exactly the source's order — every step here is load-bearing; see the comments below
+ * and the task notes on the jump buffer, apex hang, and the two collision insets.
+ *
+ * Out of scope, and simply absent below: landing dust particles, the fart trail's own
+ * particles, sound, and score. Enemy collision is simulated (enemy.ts's stepEnemy), but
+ * calls into this file's `playerHit` rather than living here — there is no
+ * enemy-collision branch in THIS function because the live game's own equivalent isn't
+ * in `update`'s player block either; it is in the enemies loop, ported alongside the
+ * enemies themselves.
+ *
+ * RETURNS whether the rest of the frame should still run. The live pit branch's
+ * `return` (index.html:1423) is a return from `update()` ITSELF, not from some player
+ * sub-function, so a pit frame skips the pickups, the cat, the arrows, the enemies, the
+ * rescue check and the camera lerp — and it does that whether the player DIED there or
+ * was SAVED by a cape. `world.dead` alone cannot tell stepWorld which happened, because
+ * a cape save takes that same `return` while leaving the player alive, so the answer is
+ * reported here instead.
+ *
+ * `move` is the only part of the live player block this function no longer does itself:
+ * the X sweep, the Y sweep, the left clamp and the head-first block bump, which are
+ * Arcade's from this plan on. See PlayerMove above and the call site below.
+ */
+export function stepPlayer(world: World, input: InputState, move?: PlayerMove): boolean {
+  // index.html:1348 — the live update() checks its dead-state branch, and returns,
+  // before it ever reaches player movement. Reproduced by returning immediately: once
+  // dead, nothing below runs again, so position and velocity freeze on the death frame.
+  if (world.dead) return false;
+
+  const p = world.player;
+  const dc = world.dc;
+  const level = world.level;
+
+  // Running, coyote time, the jump buffer, the jump, the variable-height cut and gravity
+  // (index.html:1362-1403) — shared with learn mode, see stepMotion above.
+  stepMotion(p, input, dc, world.sounds);
+
+  // Shooting (index.html:1390-1398). The live source has it between the variable-height
+  // cut and gravity; here it runs after gravity, which reads exactly the same values:
+  // gravity only changes `vy`, and an arrow reads the player's x, y, size and facing. So an
+  // arrow fired mid-jump still leaves from where the player was at the top of the frame.
+  fireArrow(world, input);
 
   // Movement and collision (index.html:1404-1422): the X sweep, the Y sweep, the left
   // clamp and the block bump, all four of them now Arcade's — see PlayerMove at the top
@@ -447,21 +512,8 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
     return false;
   }
 
-  // Smooth animation — walk cycle speed matches player speed (index.html:1424-1429).
-  // Runs at the END of the player block, after collision resolution, so it reacts to
-  // this frame's already-resolved onGround/vx rather than last frame's.
-  if (!p.onGround) {
-    p.frame = 2;
-  } else if (Math.abs(p.vx) > 0.3) {
-    const walkSpeed = Math.max(4, Math.round(12 - Math.abs(p.vx) * 3));
-    p.frameTimer++;
-    if (p.frameTimer > walkSpeed) {
-      p.frame = p.frame === 0 ? 1 : 0;
-      p.frameTimer = 0;
-    }
-  } else {
-    p.frame = 0;
-  }
+  // The walk cycle (index.html:1424-1429), after collision — see stepWalkCycle above.
+  stepWalkCycle(p);
 
   // Invincibility (index.html:1430), between the animation above and the power-up
   // timers below — and, crucially, well before the enemies pass that can SET it. A
