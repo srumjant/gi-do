@@ -438,3 +438,47 @@ export const WIN_HEART_TEXTURE = 'win-heart';
 export function registerWinHeartTexture(scene: Phaser.Scene): void {
   addSprite(scene, WIN_HEART_TEXTURE, HEART_S, HEART_P, 1.5);
 }
+
+/**
+ * The scale the title screen's cast draws at (index.html:1948-1954) — 2, where the same
+ * creatures draw at 1.8 in a level (ENEMY_SCALE). Not a rounding of it and not worth
+ * unifying: the title is a poster, and the art is a touch larger on a poster.
+ */
+export const TITLE_SCALE = 2;
+
+/**
+ * The seven creatures loitering along the bottom of the title screen, in the order the live
+ * game draws them (index.html:1948-1954): a doll and a bouncer on the left with a ghost
+ * hovering over them, and a car, a cannon, a bat and a dinosaur on the right.
+ *
+ * Named as enemy TYPES rather than as sprites, so the art comes from `getEnemySpriteInfo` —
+ * the same lookup the level uses. A doll on the title screen that stopped matching the doll
+ * in the level would be a small lie told on the first screen of the game.
+ */
+const TITLE_CAST = ['doll', 'bouncer', 'ghost', 'car', 'cannon', 'bat', 'dino'] as const;
+
+export type TitleCastMember = typeof TITLE_CAST[number];
+
+/** The clouds across the top of the title (index.html:1940) draw at 6, as the biggest do. */
+export const TITLE_CLOUD_SCALE = 6;
+
+/** `title-<type>`, e.g. `title-bat`. */
+export function titleTextureKey(type: TitleCastMember): string {
+  return `title-${type}`;
+}
+
+/**
+ * Everything the title screen draws that is not a person: its seven creatures at their own
+ * scale, and the cloud, which it shares with the level at the scale both draw it.
+ *
+ * The two people are not here — they come from `registerScaledPlayerTextures`, because the
+ * title draws whichever Dodo skin was last chosen (index.html:1945) and the skins are that
+ * function's business.
+ */
+export function registerTitleTextures(scene: Phaser.Scene): void {
+  addSprite(scene, cloudTextureKey(TITLE_CLOUD_SCALE), CLOUD_S, CLOUD_P, TITLE_CLOUD_SCALE);
+  for (const type of TITLE_CAST) {
+    const { sprite, palette } = getEnemySpriteInfo(type);
+    addSprite(scene, titleTextureKey(type), sprite, palette, TITLE_SCALE);
+  }
+}

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
+import { type GameState, isMenuState } from '../game/navigation';
 import { isCarriedHold, type TrackedKey, trackKey } from './edges';
-import { createPadSource, type PadCode, type PadSource } from './gamepad';
+import { createPadSource, type PadCode, type PadContext, type PadSource } from './gamepad';
 
 /**
  * The keys a menu reads, as opposed to the keys the game reads.
@@ -52,12 +53,48 @@ export interface MenuKeys {
   back: MenuKey;
 }
 
-export function bindMenuKeys(scene: Phaser.Scene): MenuKeys {
+/**
+ * Which pad mapping a screen reads in, decided by the live game's own `isMenuState`
+ * (index.html:1254-1257, ported in game/navigation.ts) rather than by each screen's opinion
+ * of itself.
+ *
+ * It matters on exactly three buttons. In a menu, Ⓑ cancels and Start confirms; mid-run, Ⓑ
+ * shoots and Start pauses. The between-level cutscene is the case that shows why this is a
+ * lookup and not a habit: it looks like a menu — one button, one thing to do — and the live
+ * game does not treat it as one, so Start pauses the eight seconds rather than skipping
+ * them, and Ⓑ does nothing at all.
+ */
+export function padContextFor(state: GameState): PadContext {
+  return isMenuState(state) ? 'menu' : 'play';
+}
+
+/**
+ * Escape, and the pad buttons that synthesise it, on their own.
+ *
+ * For the level scene, which wants back and nothing else from this module: it reads
+ * movement and jump through `createControls`, on a fixed step, and needs one more key read
+ * once per rendered frame. Binding the other ten would work and would be a lie about what
+ * the screen listens to.
+ *
+ * The context is not a detail here. In the play mapping Escape comes from buttons 8 and 9 —
+ * Select and Start — and button 1 (Ⓑ) is the fire button; in the menu mapping Ⓑ is Escape
+ * too. Bind a level's pause key in the menu mapping and shooting pauses the game.
+ */
+export function bindBackKey(scene: Phaser.Scene, context: PadContext = 'menu'): MenuKey {
+  const pad = createPadSource(context);
+  return menuKey(
+    scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC),
+    pad,
+    trackKey(pad.key('Escape')),
+  );
+}
+
+export function bindMenuKeys(scene: Phaser.Scene, context: PadContext = 'menu'): MenuKeys {
   const kb = scene.input.keyboard;
   const { LEFT, RIGHT, UP, DOWN, A, D, W, S, SPACE, ENTER, ESC } = Phaser.Input.Keyboard.KeyCodes;
   // One source per screen, made here: it refreshes as it is built, which is what stops a
   // button held through a screen change from confirming the next screen. See gamepad.ts.
-  const pad = createPadSource('menu');
+  const pad = createPadSource(context);
   const bind = (keyCode: number, code?: PadCode): MenuKey =>
     menuKey(kb?.addKey(keyCode), pad, code && trackKey(pad.key(code)));
 

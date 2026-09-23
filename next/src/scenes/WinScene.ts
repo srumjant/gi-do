@@ -17,12 +17,12 @@ import {
   WIN_HEART_TEXTURE,
 } from '../gfx/textures';
 import { bindMenuKeys, type MenuKeys, justDown } from '../input/menuKeys';
-import { WIN_SCENE_KEY } from './keys';
+import { TITLE_SCENE_KEY, WIN_SCENE_KEY } from './keys';
+import { takeBack } from './navigate';
 
-/** The finished run's score, and where to go afterwards. See GameOverData. */
+/** The finished run's score. See GameOverData. */
 export interface WinData {
   score: number;
-  next: string;
 }
 
 /** index.html:1352. Five seconds, or Space. */
@@ -101,13 +101,12 @@ interface Confetto {
  *
  * ## Where it goes afterwards
  *
- * The same answer as GameOverScene, for the same reason: `title` on Space (:1352) and
- * `modeselect` on Escape (:1235), neither of which exists here yet, so `next` is the
- * difficulty screen and is passed in rather than imported.
+ * The same answer as GameOverScene, and now the same two answers: `title` on Space or on the
+ * timer (:1352), `modeselect` on Escape (:1235). Both used to lead to the difficulty screen
+ * because neither of those screens existed in this port.
  */
 export class WinScene extends Phaser.Scene {
   private score = 0;
-  private next = '';
   private clock!: FrameClock;
   private keys!: MenuKeys;
   private leaving = false;
@@ -123,7 +122,6 @@ export class WinScene extends Phaser.Scene {
 
   init(data: WinData): void {
     this.score = data.score;
-    this.next = data.next;
     this.leaving = false;
     this.lastFrame = 0;
     this.confetti = [];
@@ -204,7 +202,14 @@ export class WinScene extends Phaser.Scene {
     if (t >= AUTO_EXIT || justDown(this.keys.confirm)) {
       this.leaving = true;
       stopBGM(); // index.html:1352, the same exit GameOverScene takes
-      this.scene.start(this.next);
+      this.scene.start(TITLE_SCENE_KEY);
+      return;
+    }
+    // index.html:1235, and no `stopBGM` with it — `handleBack` touches no audio, so the win
+    // theme carries on over the mode select. See GameOverScene and navigate.ts.
+    if (justDown(this.keys.back)) {
+      this.leaving = true;
+      takeBack(this, 'win');
     }
   }
 

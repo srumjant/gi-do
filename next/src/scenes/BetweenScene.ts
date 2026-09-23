@@ -22,8 +22,11 @@ import {
   registerScaledPlayerTextures,
   scaledPlayerTextureKey,
 } from '../gfx/textures';
-import { bindMenuKeys, type MenuKeys, pressedAny } from '../input/menuKeys';
+import {
+  bindMenuKeys, justDown, type MenuKeys, padContextFor, pressedAny,
+} from '../input/menuKeys';
 import { BETWEEN_SCENE_KEY } from './keys';
+import { takeBack } from './navigate';
 
 /**
  * Where to go when the cutscene is over. Passed in rather than imported, the same
@@ -184,7 +187,12 @@ export class BetweenScene extends Phaser.Scene {
     registerKidnapperTextures(this);
 
     this.clock = createFrameClock();
-    this.keys = bindMenuKeys(this);
+    // The PLAY mapping, not the menu one, and that is the live game's own answer: `between`
+    // is not in `isMenuState` (index.html:1254-1257, ported as MENU_STATES). It reads like a
+    // menu — one button, one thing to do — and it is a cutscene inside a run, so Ⓑ does
+    // nothing rather than backing out, and Start pauses instead of skipping. Ⓐ still skips,
+    // because button 0 synthesises Space in both mappings.
+    this.keys = bindMenuKeys(this, padContextFor('between'));
     this.levelIndex = getCurrentLevel();
     this.kidnapper = getKidnapper(this.levelIndex);
 
@@ -296,6 +304,22 @@ export class BetweenScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (this.leaving) return;
+
+    /**
+     * Pause, before the clock is advanced.
+     *
+     * `between` is in `PAUSABLE` (index.html:1240), which is easy to read as an oddity and is
+     * not one: this is the longest stretch of the game with nothing to do in it, eight
+     * seconds of someone else's story, and it is exactly when a small hand goes looking for
+     * a button. `takeBack` freezes this scene and puts the menu over it, and because the
+     * clock has not been advanced yet, the cutscene resumes on the frame it stopped on
+     * rather than eight seconds further along.
+     */
+    if (justDown(this.keys.back)) {
+      takeBack(this, 'between');
+      return;
+    }
+
     const t = this.clock.advance(delta);
 
     // index.html:1351. Eight seconds, or two seconds in with Space or Enter — and Enter as

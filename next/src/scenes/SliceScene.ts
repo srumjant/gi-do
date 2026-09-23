@@ -7,6 +7,7 @@ import { T, TStr } from '../config/i18n';
 import { PARALLAX, type ParallaxLayer } from '../data/parallax';
 import type { SpriteData } from '../data/sprites';
 import { isFinalLevel } from '../game/boss';
+import type { GameState } from '../game/navigation';
 import type { Character, PlayerMove } from '../game/player';
 import {
   finishLevel,
@@ -52,6 +53,7 @@ import {
 } from '../gfx/textures';
 import type { InputState } from '../input/actions';
 import { createControls, type Controls } from '../input/controls';
+import { bindBackKey, justDown, type MenuKey, padContextFor } from '../input/menuKeys';
 import { playRumbles } from '../input/gamepad';
 import { createEnemyBodies, type EnemyBodies } from '../physics/enemy';
 import { createPlayerMove } from '../physics/player';
@@ -61,7 +63,6 @@ import type { GameOverData } from './GameOverScene';
 import type { HudData } from './HudScene';
 import {
   BETWEEN_SCENE_KEY,
-  DIFFICULTY_SCENE_KEY,
   GAME_OVER_SCENE_KEY,
   HUD_SCENE_KEY,
   LEVEL_OVERLAY_SCENE_KEY,
@@ -70,20 +71,9 @@ import {
   WIN_SCENE_KEY,
 } from './keys';
 import type { LevelOverlayData } from './LevelOverlayScene';
+import { takeBack } from './navigate';
 import type { PowerupPopupData } from './PowerupPopupScene';
 import type { WinData } from './WinScene';
-
-/**
- * Where a finished run goes back to — won or lost.
- *
- * The live game sends both endings to `title` on the key press or the timer running out
- * (index.html:1349, :1352) and to `modeselect` on Escape (`BACK_TARGET`, :1233-1236).
- * Neither of those two screens is ported yet, so both routes lead to the difficulty screen,
- * which is this port's root: the first scene in main.ts's list and the one Escape already
- * has nowhere to go back from. When the title and mode select land, this is what they
- * replace.
- */
-const AFTER_RUN = DIFFICULTY_SCENE_KEY;
 
 /**
  * Half the difference between the canvas and the zoomed view. See setScroll below —
@@ -284,6 +274,8 @@ interface CloudView {
 export class SliceScene extends Phaser.Scene {
   private world!: World;
   private controls!: Controls;
+  /** Escape, Select and Start: the one key this scene reads per rendered frame, not per step. */
+  private pauseKey!: MenuKey;
   private playerImage!: Phaser.GameObjects.Image;
   /** The two halves the player splits into while a big head is running. */
   private headImage!: Phaser.GameObjects.Image;
@@ -462,6 +454,33 @@ export class SliceScene extends Phaser.Scene {
     // which is what stops the Ⓐ that confirmed the character screen from also jumping.
     this.controls = createControls(this);
 
+    /**
+     * And again on the way back from a pause, for the same reason one screen later.
+     *
+     * Confirming CONTINUE with Ⓐ leaves that button held while this scene starts reading the
+     * pad again, and Ⓐ is the jump button. The keyboard cannot produce this — a held key's
+     * only evidence after the pause is an auto-repeat, which `isCarriedHold` (input/edges.ts)
+     * already rejects — but a pad has no repeat flag and no events, so the ONLY defence is
+     * seeding each tracked button from what is held at the moment of seeding, which is what
+     * building the controls does. Same fix, same place, as the one that stopped the Ⓐ that
+     * confirmed the character screen from opening the level with a jump.
+     */
+    const reseedControls = (): void => {
+      this.controls = createControls(this);
+    };
+    this.events.on(Phaser.Scenes.Events.RESUME, reseedControls);
+
+    /**
+     * Escape, and the pad buttons that mean it mid-run — Select and Start, buttons 8 and 9
+     * (input/gamepad.ts's `buttonCode`). In the PLAY mapping, deliberately: the menu mapping
+     * would put Escape on Ⓑ as well, and Ⓑ is the fire button in a level.
+     *
+     * It needs no re-seeding across a pause, unlike the controls above: whichever button
+     * opened the pause menu is a button this key already knows is down, so it produces no
+     * second edge until it has been released.
+     */
+    this.pauseKey = bindBackKey(this, padContextFor('playing'));
+
     // The numbers, on a scene of their own, running alongside this one. `launch` rather
     // than `start`: this scene keeps running. It draws on top because main.ts lists it
     // after this one and Phaser renders scenes in that order — launching does not
@@ -511,6 +530,11 @@ export class SliceScene extends Phaser.Scene {
       this.scene.stop(HUD_SCENE_KEY);
       this.scene.stop(LEVEL_OVERLAY_SCENE_KEY);
       this.scene.stop(POWERUP_POPUP_SCENE_KEY);
+      // And the RESUME listener above, which is the one thing here that does NOT go by
+      // itself: Phaser removes a scene's listeners on destroy, not on shutdown, so an `on`
+      // added in `create` would be added again by the next level's `create` and again by the
+      // one after that. `once` is not an option — a level can be paused more than once.
+      this.events.off(Phaser.Scenes.Events.RESUME, reseedControls);
     });
   }
 
@@ -685,6 +709,25 @@ export class SliceScene extends Phaser.Scene {
    * of leaving the player coasting behind the popup.
    */
   update(_time: number, delta: number): void {
+    /**
+     * Pause, first and outside the fixed-step loop.
+     *
+     * Outside because it is a rendered-frame key, not a simulation input: `pressed()` is
+     * consumed by reading it, and reading it inside a loop that can run five times would
+     * report the press on whichever iteration got there first and nothing on the rest.
+     *
+     * First because the whole point is that the step does not happen. `takeBack` asks the
+     * navigation table what back means here and gets `pause` for all three of this scene's
+     * states — `playing`, `dead` and `levelcomplete` are all in `PAUSABLE`
+     * (index.html:1240) — which pauses this scene and launches the menu over it. Returning
+     * without touching the accumulator is what leaves the world exactly where it was: the
+     * time spent in the menu is never accumulated, because a paused scene's `update` is not
+     * called at all.
+     */
+    if (justDown(this.pauseKey)) {
+      takeBack(this, this.liveState());
+      return;
+    }
     // Clamp so a backgrounded tab does not produce a hundred catch-up steps at once.
     this.accumulator = Math.min(this.accumulator + delta, STEP_MS * 5);
     while (this.accumulator >= STEP_MS) {
@@ -753,7 +796,7 @@ export class SliceScene extends Phaser.Scene {
       if (outcome === 'next-level') {
         this.scene.start(BETWEEN_SCENE_KEY, { next: SLICE_SCENE_KEY } satisfies BetweenData);
       } else {
-        this.scene.start(WIN_SCENE_KEY, { score, next: AFTER_RUN } satisfies WinData);
+        this.scene.start(WIN_SCENE_KEY, { score } satisfies WinData);
       }
       return true;
     }
@@ -762,7 +805,7 @@ export class SliceScene extends Phaser.Scene {
       this.leaving = true;
       // Nothing is banked: the run is over, and the next one starts from `startRun`. The
       // score goes across as a number because the World it came off is about to be dropped.
-      this.scene.start(GAME_OVER_SCENE_KEY, { score, next: AFTER_RUN } satisfies GameOverData);
+      this.scene.start(GAME_OVER_SCENE_KEY, { score } satisfies GameOverData);
       return true;
     }
 
@@ -771,6 +814,26 @@ export class SliceScene extends Phaser.Scene {
 
   private readInput(): InputState {
     return this.controls.read();
+  }
+
+  /**
+   * Which of the live game's states this scene is in right now.
+   *
+   * One Phaser scene covers three of them, because in the live game they are one screen with
+   * the simulation stopped: `dead` is the ninety frames after a death (index.html:1348) and
+   * `levelcomplete` the two hundred after a rescue (:1631), both drawn as the frozen world
+   * with a label over it — which in this port is LevelOverlayScene, running alongside.
+   *
+   * All three are pausable, so asking the table is strictly speaking unnecessary today. It is
+   * asked anyway, and with the real answer rather than a hardcoded `'playing'`, because the
+   * table is meant to be the thing that decides: take `dead` out of `PAUSABLE` and this scene
+   * stops offering a pause menu over a death without anybody having to remember that it
+   * should.
+   */
+  private liveState(): GameState {
+    if (this.world.won) return 'levelcomplete';
+    if (this.world.dead) return 'dead';
+    return 'playing';
   }
 
   /**
