@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import { sfxPickup } from '../audio/sfx';
 import { BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
 import type { Character } from '../game/player';
@@ -9,16 +8,7 @@ import { createStarField, type StarField, type StarFieldSpec } from '../gfx/star
 import { menuPlayerTextureKey, MENU_PORTRAIT_SCALE, registerMenuTextures } from '../gfx/textures';
 import { bindMenuKeys, type MenuKeys, justDown, pressedAny } from '../input/menuKeys';
 import { CHARACTER_SCENE_KEY, SLICE_SCENE_KEY } from './keys';
-
-/**
- * Where Escape goes. Passed in rather than imported, so this scene knows nothing about
- * what comes before it: `BACK_TARGET` maps `select` to `difficulty` today
- * (index.html:1234), and when the full navigation table lands it will be the table
- * deciding, not this file.
- */
-export interface CharacterData {
-  back: string;
-}
+import { takeBack } from './navigate';
 
 /** index.html:2152. */
 const BACKGROUND = '#2a2a5a';
@@ -101,7 +91,6 @@ const RESCUE_FONT = { fontFamily: 'monospace', fontSize: '12px', color: '#ffaacc
  */
 export class CharacterScene extends Phaser.Scene {
   private index = 0;
-  private back = '';
   private stars!: StarField;
   private highlight!: Phaser.GameObjects.Graphics;
   private portraits: Phaser.GameObjects.Image[] = [];
@@ -111,10 +100,6 @@ export class CharacterScene extends Phaser.Scene {
 
   constructor() {
     super(CHARACTER_SCENE_KEY);
-  }
-
-  init(data: CharacterData): void {
-    this.back = data.back;
   }
 
   create(): void {
@@ -168,17 +153,13 @@ export class CharacterScene extends Phaser.Scene {
     if (pressedAny(this.keys.up, this.keys.altUp)) this.cycleSkin(-1);
     if (pressedAny(this.keys.down, this.keys.altDown)) this.cycleSkin(1);
     if (pressedAny(this.keys.confirm, this.keys.enter)) this.confirm();
-    if (justDown(this.keys.back)) this.goBack();
-  }
-
-  /**
-   * index.html:1269 — `handleBack` plays `sfxPickup()` on its way to the previous screen.
-   * This is the port's only back navigation (the difficulty screen is the root and has
-   * nowhere further to go), so it is the one place that live line is reachable from.
-   */
-  private goBack(): void {
-    sfxPickup();
-    this.scene.start(this.back);
+    // `BACK_TARGET` maps `select` to `difficulty` (index.html:1234), and `takeBack` plays
+    // the `sfxPickup` the live `handleBack` plays on its way (:1269).
+    //
+    // This is the screen the table was written for. The live comment above it
+    // (index.html:1230-1232) records that picking a character used to lock a child into the
+    // adventure with no exit at all on a controller — this screen, this key.
+    if (justDown(this.keys.back)) takeBack(this, 'select');
   }
 
   private select(index: number): void {

@@ -1,6 +1,4 @@
 import Phaser from 'phaser';
-import { startBGM } from '../audio/bgm';
-import { ensureAudio } from '../audio/context';
 import { BASE_W } from '../config/constants';
 import { DIFFICULTY_CONFIG, DIFF_KEYS, setDifficulty } from '../config/difficulty';
 import { TDiff, TStr } from '../config/i18n';
@@ -8,10 +6,9 @@ import { clampIndex, difficultyAt, difficultyLines } from '../game/menu';
 import { getSkinIndex } from '../game/run';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
 import { menuPlayerTextureKey, MENU_PREVIEW_SCALE, registerMenuTextures } from '../gfx/textures';
-import { BGM_TITLE } from '../data/bgmThemes';
-import { bindMenuKeys, type MenuKeys, pressedAny } from '../input/menuKeys';
-import type { CharacterData } from './CharacterScene';
+import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
 import { CHARACTER_SCENE_KEY, DIFFICULTY_SCENE_KEY } from './keys';
+import { takeBack } from './navigate';
 
 /** index.html:2122. */
 const BACKGROUND = '#1a1a3a';
@@ -75,9 +72,9 @@ const HINT_FONT = { fontFamily: 'monospace', fontSize: '12px', color: '#aaaacc' 
  * `SliceScene` named 'normal' in its own source. Almost nothing below is new behaviour.
  * It is a way in.
  *
- * Boots first, for now. The title and mode select are Task 4 of this plan and land in
- * front of it; until then this is where the game starts, which is a step up from
- * starting mid-level on a difficulty nobody chose.
+ * It booted the port for one plan, until the title screen and mode select landed in front
+ * of it. It is now the third screen a child sees and the first one that decides anything
+ * about the run.
  *
  * Same discipline as HudScene: every object is built once in `create()`, and the frame
  * loop only re-positions and re-styles. The cards' text never changes — only the
@@ -135,19 +132,15 @@ export class DifficultyScene extends Phaser.Scene {
     this.drawChoice();
   }
 
-  /**
-   * No `back` here, deliberately. `BACK_TARGET` sends `difficulty` to `modeselect`
-   * (index.html:1234) and mode select does not exist yet — so Escape on this screen has
-   * nowhere to go, exactly as Escape on the live title screen has nowhere to go.
-   * `handleBack` returning false for a state with no target is the live game's own
-   * answer to that (index.html:1267). The screen after this one CAN come back here,
-   * which is the half of the table that matters while this is the root.
-   */
   update(): void {
     this.stars.update();
     if (pressedAny(this.keys.left, this.keys.altLeft)) this.move(-1);
     if (pressedAny(this.keys.right, this.keys.altRight)) this.move(1);
     if (pressedAny(this.keys.confirm, this.keys.enter)) this.confirm();
+    // `BACK_TARGET` sends `difficulty` to `modeselect` (index.html:1234). This screen was
+    // the root of the port until the title landed and had nowhere to go back to; now it has
+    // two screens in front of it and the table is what knows that.
+    if (justDown(this.keys.back)) takeBack(this, 'difficulty');
   }
 
   private move(delta: number): void {
@@ -162,31 +155,21 @@ export class DifficultyScene extends Phaser.Scene {
    * the live game keeps in `selectedDifficulty` — `SliceScene` reads it back out when it
    * builds the world, and hands it to the HUD for its label.
    *
-   * ## This is also where the game stops being silent
+   * ## Where the audio unlock went
    *
-   * A browser will not start an AudioContext outside a user gesture, so every sound in
-   * the port — the jump, the coin, all six level themes — is waiting on one keypress.
-   * The live game spends it on the title screen's confirm (index.html:1313's
-   * `ensureAudio();startBGM(BGM_TITLE);`); this port has no title screen yet, so the
-   * first confirm a child can possibly make is this one, and that is what makes it the
-   * unlock point. When the title screen lands it takes these two lines with it.
+   * This confirm used to carry `ensureAudio(); startBGM(BGM_TITLE);`, because a browser will
+   * not start an AudioContext outside a user gesture and this was the first confirm a child
+   * could make in a port that booted here. The live game spends that gesture on the title
+   * screen's confirm (index.html:1313) and so, now, does this port — TitleScene has those
+   * two lines, and this screen's comment for them was always written as a loan.
    *
-   * Both of them, in this order, and they are the live pair: the context is opened, and
-   * the menu theme starts over it. BGM_TITLE is what the live game plays across mode
-   * select, the difficulty screen and the character screen alike — so the music that
-   * begins here is heard on the screen after this one, and is replaced by the level's own
-   * theme when the level starts (SliceScene, index.html:1209). There is no equivalent of
-   * the live intro's BGM_INTRO (:1344): the intro is not ported, and starting a theme for
-   * a screen that does not exist would only be replaced a moment later.
-   *
-   * Note what is NOT here: a confirm sound. index.html:1334 is silent, unlike the mode
-   * select above it (:1323's `ensureAudio();sfxPickup();`). Kept silent to match.
+   * Which leaves this line silent, and that is live too: index.html:1334 plays no confirm
+   * sound, unlike the mode select before it (:1323's `ensureAudio();sfxPickup();`). The
+   * menu theme that started at the title is still playing over this screen.
    */
   private confirm(): void {
-    ensureAudio();
-    startBGM(BGM_TITLE);
     setDifficulty(difficultyAt(this.index));
-    this.scene.start(CHARACTER_SCENE_KEY, { back: DIFFICULTY_SCENE_KEY } satisfies CharacterData);
+    this.scene.start(CHARACTER_SCENE_KEY);
   }
 
   /** The two things on this screen that depend on which card is chosen. */

@@ -5,17 +5,16 @@ import { TStr } from '../config/i18n';
 import { BGM_GAMEOVER } from '../data/bgmThemes';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { bindMenuKeys, type MenuKeys, justDown } from '../input/menuKeys';
-import { GAME_OVER_SCENE_KEY } from './keys';
+import { GAME_OVER_SCENE_KEY, TITLE_SCENE_KEY } from './keys';
+import { takeBack } from './navigate';
 
 /**
- * The run's final score, and where to go when the screen is done with. Both handed over by
- * the scene that ran the level: the World it read the score off is gone by the time this
- * screen is up, which is exactly why a results screen should be given a number rather than
- * hold a reference to something still moving.
+ * The run's final score, handed over by the scene that ran the level: the World it was read
+ * off is gone by the time this screen is up, which is exactly why a results screen should be
+ * given a number rather than hold a reference to something still moving.
  */
 export interface GameOverData {
   score: number;
-  next: string;
 }
 
 /** index.html:1349. Three seconds, or Space — whichever comes first. */
@@ -44,20 +43,14 @@ const HINT_FONT = { fontFamily: 'monospace', fontSize: '12px', color: '#ffffff' 
  *
  * ## Where it goes afterwards
  *
- * The live game goes to `title` on Space or on the timer running out (:1349), and to
- * `modeselect` on Escape (`BACK_TARGET`, :1235). Neither screen exists in this port yet, so
- * both routes lead to the difficulty screen instead, which is this port's root — the first
- * screen in main.ts's scene list and the one with nowhere further back to go. `next` is
- * passed in rather than imported so that when the title and mode select land, the
- * navigation table decides this and not this file.
- *
- * Escape is not bound at all here, for the same reason DifficultyScene does not bind it:
- * both exits would go to the same place, and a second way to do the one thing the timer
- * already does on its own is not worth the line.
+ * Two different places, which is new. Space and the timer both go to the TITLE
+ * (index.html:1349), and Escape goes to mode select (`BACK_TARGET`, :1235) — one screen
+ * further in, past the title's press-start. Both of those used to lead to the difficulty
+ * screen because neither destination existed in this port, and the scene was handed a
+ * `next` to hide that; now the table knows, so it is asked.
  */
 export class GameOverScene extends Phaser.Scene {
   private score = 0;
-  private next = '';
   private clock!: FrameClock;
   private keys!: MenuKeys;
   private leaving = false;
@@ -68,7 +61,6 @@ export class GameOverScene extends Phaser.Scene {
 
   init(data: GameOverData): void {
     this.score = data.score;
-    this.next = data.next;
     this.leaving = false;
   }
 
@@ -103,11 +95,23 @@ export class GameOverScene extends Phaser.Scene {
     // else. The between-level cutscene takes both; these two end screens take one.
     if (this.clock.advance(delta) >= AUTO_EXIT || justDown(this.keys.confirm)) {
       this.leaving = true;
-      // index.html:1349's `gameState='title';stopBGM();`. The screen this returns to is
-      // silent until the next confirm unlocks and starts the menu theme again
-      // (DifficultyScene) — exactly as the live title screen is.
+      // index.html:1349's `gameState='title';stopBGM();`. The title is silent until its own
+      // confirm starts the menu theme again, which is exactly how the live one sounds.
       stopBGM();
-      this.scene.start(this.next);
+      this.scene.start(TITLE_SCENE_KEY);
+      return;
+    }
+    // index.html:1235 — Escape goes to mode select rather than to the title, so a child who
+    // wants another go immediately can skip the press-start. Worth binding now that the two
+    // exits lead to different screens; while both landed on the difficulty screen it was a
+    // second way to do one thing.
+    //
+    // No `stopBGM` on this one, and that is the live game: `handleBack` (index.html:1259)
+    // touches no audio, so the game-over jingle follows you onto the mode select for as long
+    // as it takes to start a level. See navigate.ts.
+    if (justDown(this.keys.back)) {
+      this.leaving = true;
+      takeBack(this, 'gameover');
     }
   }
 }

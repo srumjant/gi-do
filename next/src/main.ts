@@ -7,9 +7,13 @@ import { CharacterScene } from './scenes/CharacterScene';
 import { DifficultyScene } from './scenes/DifficultyScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { HudScene } from './scenes/HudScene';
+import { LearnScene } from './scenes/LearnScene';
 import { LevelOverlayScene } from './scenes/LevelOverlayScene';
+import { ModeSelectScene } from './scenes/ModeSelectScene';
+import { PauseScene } from './scenes/PauseScene';
 import { PowerupPopupScene } from './scenes/PowerupPopupScene';
 import { SliceScene } from './scenes/SliceScene';
+import { TitleScene } from './scenes/TitleScene';
 import { WinScene } from './scenes/WinScene';
 
 // Before any scene builds a string: two translations carry a {A}-style placeholder and
@@ -62,29 +66,36 @@ const game = new Phaser.Game({
   /**
    * Order is load-bearing, twice over.
    *
-   * Phaser auto-starts only the FIRST scene in this array, so the game now boots into
-   * the difficulty screen rather than mid-level on a difficulty nobody chose. From
-   * there each screen starts the next by hand — difficulty, character, then the level,
-   * which launches the HUD alongside itself once it has a World to hand it. Title and
-   * mode select land in front of DifficultyScene in a later task and will take over
-   * being first.
+   * Phaser auto-starts only the FIRST scene in this array, so the game boots into the TITLE —
+   * which it did not, for two plans: first it opened mid-level on a difficulty nobody chose,
+   * then on the difficulty screen itself. From there each screen starts the next by hand:
+   * title, mode select, difficulty, character, then the level, which launches the HUD
+   * alongside itself once it has a World to hand it.
    *
-   * Phaser also RENDERS the scenes in this same order, which is why the HUD is listed
-   * after the level: that is what puts it in front of the game rather than behind it. The
-   * two menu screens are stopped long before either of those runs, so where they sit only
-   * decides which one boots.
+   * Phaser also RENDERS the scenes in this same order, which is why the HUD is listed after
+   * the level: that is what puts it in front of the game rather than behind it. The menu
+   * screens are stopped long before either of those runs, so where they sit only decides
+   * which one boots.
    *
-   * The power-up announcement comes last of all, and that is the live draw order too:
-   * index.html:3455 is `update();draw();drawPowerupPopup();`, and the HUD is drawn inside
-   * `draw()` (:1854-1867). So its dim falls over the hearts and the score as well. The
-   * frozen-world overlays sit between the two for the same reason and by the same rule:
-   * :1898-1899 are the last lines of `draw()`, after the HUD, before the popup.
+   * The power-up announcement comes last of the level's own scenes, and that is the live
+   * draw order too: index.html:3455 is `update();draw();drawPowerupPopup();`, and the HUD is
+   * drawn inside `draw()` (:1854-1867). So its dim falls over the hearts and the score as
+   * well. The frozen-world overlays sit between the two for the same reason and by the same
+   * rule: :1898-1899 are the last lines of `draw()`, after the HUD, before the popup.
    *
-   * The last three run the level loop rather than the level, and none of them is ever on
-   * screen at the same time as another scene, so where they sit in this list decides
-   * nothing at all — except that they must not be first, because first is what boots.
+   * PauseScene is last of everything, and that is the second place this order decides
+   * something real. It is the only scene that runs over another one that is still on screen,
+   * and it has to cover ALL of it — the level, the HUD, both overlays and the popup — which
+   * is what the live game gets by drawing its overlay after `drawWorldFrame` (:1653-1658).
+   *
+   * The run-loop screens in between are never on screen at the same time as another scene,
+   * so where they sit decides nothing at all — except that they must not be first, because
+   * first is what boots.
    */
   scene: [
+    TitleScene,
+    ModeSelectScene,
+    LearnScene,
     DifficultyScene,
     CharacterScene,
     SliceScene,
@@ -94,6 +105,7 @@ const game = new Phaser.Game({
     BetweenScene,
     GameOverScene,
     WinScene,
+    PauseScene,
   ],
 });
 

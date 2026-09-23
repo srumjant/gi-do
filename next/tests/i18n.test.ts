@@ -11,6 +11,17 @@ const legacy = loadLegacySection({
   expose: ['TRANSLATIONS', 'LANG_KEYS'],
 });
 
+/**
+ * The strings this port has and the live game does not, named here so that the parity check
+ * below stays a parity check. Every one of them exists because the port is missing something
+ * the original has, and each should leave with whichever plan supplies it: these three say
+ * that learn mode is not built yet.
+ *
+ * An unlisted extra key fails the same assertion a missing live key does, which is the point
+ * — the list is a short, deliberate exception, not a hole.
+ */
+const PORT_ONLY_KEYS = ['learn_soon', 'learn_soon_d', 'back_hint'];
+
 describe('translations match the live game', () => {
   beforeEach(() => {
     setLang('et');
@@ -21,9 +32,13 @@ describe('translations match the live game', () => {
     expect(LANG_KEYS).toEqual(legacy.LANG_KEYS);
   });
 
-  it('has the same keys', () => {
-    expect(Object.keys(TRANSLATIONS).sort())
+  it('has the same keys, bar the port-only ones', () => {
+    expect(Object.keys(TRANSLATIONS).filter((key) => !PORT_ONLY_KEYS.includes(key)).sort())
       .toEqual(Object.keys(legacy.TRANSLATIONS).sort());
+  });
+
+  it('has every port-only key it claims to have', () => {
+    expect(PORT_ONLY_KEYS.filter((key) => !TRANSLATIONS[key])).toEqual([]);
   });
 
   it('has identical values for every key', () => {
