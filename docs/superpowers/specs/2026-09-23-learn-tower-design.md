@@ -36,7 +36,7 @@ both animated side by side. Its voice rules, four-gate pacing and hint rule carr
 | Shape | A tower, climbed storey by storey | The complaints are about how it is built, not about climbing. |
 | Gate | Letter blocks set into a solid brick ceiling; bump the one you hear | A gate you can see. All three answers hang over one flat floor, so none is harder to reach. Bumping from below is the `?` block move the kids already know. |
 | Right answer | The block springs you up through the ceiling, which shuts behind you | A ceiling low enough to jump through afterwards is low enough to bump your head on while climbing onto the letter floor (see *The gate*). |
-| Hops | 3 tiles up; gaps of 2, 3, 4, 4 tiles by storey | The owner's pick: gentle first, a little bolder each storey, capped near two-thirds of a jump. |
+| Hops | 3 tiles up; gaps of 2, 3, 4, 4 tiles by storey; planks in three lengths, the shortest near the top | The owner's pick: gentle first, a little bolder each storey, capped near two-thirds of a jump; and planks "shorter, multiple varieties". |
 | Storey length | 1 to 5 planks; the first storey short; at least one long | The owner: "somewhere more jumps, somewhere less, out of screen, fully visible." |
 | Look | Castle tower | The owner's pick over an open-air tower and a toy-block tower. |
 | Engine | Phaser features first | The owner's direction: Phaser is the engine; write our own only for a strong reason. |
@@ -88,10 +88,23 @@ Measured by replaying the port's movement at super_easy numbers frame by frame, 
 - Every hop rises exactly **3 tiles** (48px), about half a jump.
 - The gap between consecutive planks is **2, 3, 4, 4** tiles in storeys 1 to 4.
 - Consecutive planks never overlap horizontally, so the climb zig-zags instead of stacking.
-- **Plank width is 8 tiles minus the gap:** 6, 5, 4, 4. This is what makes a hop neither too
-  short nor too long. Jumping from the edge of a plank and holding the direction for the whole
-  jump always lands on the next plank, from a standing or a running start. With a narrower
-  plank that stops being true: at a 2-tile gap, a running jump sails past a 4-tile plank.
+- **Planks come in three lengths, set by the gap in front of them.** A plank's length is
+  what decides whether a jump that holds the direction all the way lands on it or sails past
+  it. That is the old "too far" in reverse, and the owner asked for shorter planks in several
+  varieties. Measured, jumping from the edge of the plank below and holding the direction for
+  the whole jump:
+
+  | Length | Lands you when you jump |
+  |---|---|
+  | Long: 8 minus the gap | always, standing or running, even from the very lip |
+  | Medium: 7 minus the gap | always, except a running jump from the very lip |
+  | Short: 6 minus the gap | from a standing start; otherwise ease off the direction |
+
+  Anything shorter than 6 minus the gap is missed by most held jumps, so that is the floor.
+- **Which lengths appear where.** Storey 1 uses only long and medium planks (6 and 5 tiles),
+  so the first climb stays gentle. Storey 2 mixes all three (5, 4, 3). Storeys 3 and 4 mix all
+  three (4, 3, 2), so the shortest planks sit near the top. Each plank's length is picked at
+  random from its storey's set.
 - Planks stay inside the tower walls. The first plank's near edge is 2 to 6 tiles to the
   side of where you arrive (away from the nearer wall), so even the first hop moves you
   across rather than straight up.
@@ -274,7 +287,8 @@ gentlest adventure feel. The hero is the last selected character and skin, Gigi 
 
 **Vitest, no Phaser:**
 - **Tower rules**, across many seeds and all three modes:
-  - every hop rises 3 tiles; gaps are 2, 3, 4, 4; plank width is 8 minus the gap;
+  - every hop rises 3 tiles; gaps are 2, 3, 4, 4; every plank's length is in its storey's
+    set (storey 1: 6 or 5; later storeys: 8, 7 or 6 minus the gap);
   - consecutive planks never overlap, and planks stay inside the walls;
   - storeys have 1 to 5 planks, the first 1 or 2, and at least one other has 4 or 5;
   - the letter floor is full width, the ceiling is solid except for the blocks, and the
@@ -282,8 +296,8 @@ gentlest adventure feel. The hero is the last selected character and skin, Gigi 
   - there are four gates, each with exactly one right block and no repeated options, and
     every word has four letters.
 - **Jump checks** through the real movement function, for both Gigi and Dodo:
-  - from the edge of every plank, holding the direction lands on the next one, from a
-    standing and from a running start;
+  - from the edge of every plank, a standing-start jump that holds the direction lands on
+    the next one; onto a long plank, a running jump from the very lip lands too;
   - no plank's jump reaches the letter ceiling;
   - a held jump from the letter floor reaches the blocks, and a tap does not;
   - the spring clears the ceiling top with jump released on the first frame;
