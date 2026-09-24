@@ -50,7 +50,8 @@ export interface MoveReport {
   /**
    * The tile row a rising head was stopped under this step, or null. Which cells of that
    * row it hit is the caller's rule — the adventure's is bumpBlocksAbove's two probe
-   * columns (game/player.ts).
+   * columns (game/player.ts). A top world edge (`edges.up`) stops a head too, and then this
+   * names the row just above the world, which holds no tile; no mover has one today.
    */
   headHitRow: number | null;
 }
@@ -81,7 +82,7 @@ export type BodyMover = (p: PlayerState) => MoveReport;
  * or a sideways scrape. There is no tile callback, because Arcade's collider callback
  * cannot say which tiles a head hit: it visits tiles left to right, and once it has snapped
  * the body under the first, the next one along no longer overlaps the body and is never
- * reported. A head under a brick and a letter would report the brick alone.
+ * reported. A head under a brick with a letter to its right would report the brick alone.
  *
  * **A standalone body**, with no Game Object, for two reasons. A body with one re-reads its
  * position from it every step, which would make the drawn image an input to the physics;
