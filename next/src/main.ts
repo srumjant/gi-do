@@ -57,7 +57,7 @@ const game = new Phaser.Game({
       /**
        * Arcade's own fixed delta, and therefore the length of one of our frames. It is
        * already the default; stated here because `PX_PER_FRAME_TO_PX_PER_SECOND` in
-       * physics/player.ts is the same number, and the two must not drift apart.
+       * physics/body.ts is the same number, and the two must not drift apart.
        */
       fps: STEP_HZ,
       debug: false,
