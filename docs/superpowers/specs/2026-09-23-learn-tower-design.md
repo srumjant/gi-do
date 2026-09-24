@@ -227,7 +227,6 @@ Vertically the camera is bounded to the current storey:
 | Tiles, drawn and collided | A real tilemap with a castle tileset generated at boot. One visible layer, which Arcade also collides against. |
 | Jump-through planks | Per-side tile collision: the top face only. |
 | Trapdoor | Removing and replacing tiles through the tilemap API, with a tween for the swing. |
-| Which block was hit | Arcade's tile collision callback. |
 | Camera | Follow, per-storey bounds, follow offset, and a pan between storeys. |
 | Effects | Tweens for the pop, wobble, glow, star bob and banner sway. Particle emitters for sparkles, brick chunks and confetti. A sprite animation for the torch flames. |
 | Delays | Phaser time events. |
@@ -244,6 +243,7 @@ Moving the adventure onto Phaser features is separate, later work.
 |---|---|
 | Movement feel: acceleration, coyote time, jump buffer, variable jump, apex-hang gravity | Arcade's gravity is constant and it has no coyote time or buffer. This is the feel the kids approved, and it is shared with the adventure, not copied. |
 | The fixed 60 Hz step for the player | The adventure's accumulator and single-body Arcade step, so the jump is exactly the adventure's. |
+| Which block a head hit | Arcade's tile collision callback reports only the first tile along a head, so a head under a brick and a letter would report the brick. The mover reports `blocked.up` and the row instead, and the gate rules probe two columns 3px in from each side: the adventure's `?` block rule, the same from either edge, and testable under Vitest. |
 | Tower building and the gate rules | Game rules, not engine features. Keeping them free of Phaser lets Vitest test them; Phaser cannot be imported under Vitest. |
 | Voice | Phaser has no speech synthesis. |
 | Sound effects | The existing procedural synth. |
@@ -263,11 +263,13 @@ Moving the adventure onto Phaser features is separate, later work.
 **Changed, with adventure behaviour unchanged:**
 - `game/player.ts`: the movement part of `stepPlayer` and the walk animation become
   functions that both `stepPlayer` and the tower call. The movement function takes a switch
-  that skips the variable-jump cut; the adventure never sets it.
+  that skips the variable-jump cut; the adventure never sets it. The two columns a head
+  probes, 3px in from each side, become one too, shared by the `?` block bump and the gate
+  rules.
 - `physics/tiles.ts`: collision is described per tile side, so a plank collides only from
   above. The layer is built from a plain tile map instead of the adventure's `World`.
-- `physics/player.ts`: the Arcade mover takes the player, the bounds and an optional tile
-  collision callback. The adventure keeps its `?` block bump.
+- `physics/player.ts`: the Arcade mover takes the player, the layer and optional bounds, and
+  reports the row a rising head was stopped under. The adventure keeps its `?` block bump.
 
 **New, with Phaser:**
 - `scenes/LearnMenuScene.ts`, replacing the `LearnScene` "coming soon" placeholder;
@@ -305,7 +307,8 @@ gentlest adventure feel. The hero is the last selected character and skin, Gigi 
   - the spring clears the ceiling top with jump released on the first frame;
   - without the cut exemption it would not. This test records why the switch exists.
 - **Gate rules:**
-  - which block a bump hits, and that bumps from below the letter floor are ignored;
+  - which block a bump hits (a head a little way under either edge of a block counts, one
+    just outside does not), and that bumps from below the letter floor are ignored;
   - right and wrong effects, and the glow after two misses;
   - the trapdoor shuts once the player is above it;
   - a solved gate cannot be answered again, and the star ends the tower.
@@ -320,6 +323,7 @@ gentlest adventure feel. The hero is the last selected character and skin, Gigi 
 - Both characters and all three modes work. A long storey scrolls and a short one sits whole.
 - Walking between the three letters is easy, a wrong answer costs nothing, and the glow
   appears after two misses.
+- A head a little way under a letter's left or right edge bumps it, from either side alike.
 - Back works from the tower and from the result screen, and X replays the voice.
 - On a machine with no Estonian voice, the game is silent and fully playable.
 
@@ -330,8 +334,8 @@ gentlest adventure feel. The hero is the last selected character and skin, Gigi 
 2. **The rules.** `content.ts`, `tower.ts` and `gate.ts`, with their tests, including the
    jump checks.
 3. **A playable tower on plain tiles.** The tilemap, one-way planks, the camera, the
-   trapdoor and the spring. Settle the collision-callback risk (below) first. Then the first
-   browser check: the spring with jump let go the moment the letter is hit.
+   trapdoor and the spring. Then the first browser check: the spring with jump let go the
+   moment the letter is hit.
 4. **The learning around it.** HUD, voice, sounds, buzzes, effects, the result screen and
    the learn menu.
 5. **The castle.** Tileset, back wall, windows, torches, banners, sky and roof.
@@ -348,11 +352,12 @@ gentlest adventure feel. The hero is the last selected character and skin, Gigi 
 
 ## Risks
 
-- **Arcade's tile collision callback with a standalone body.** The port's player body has no
-  Game Object, and we don't yet know the callback's exact arguments or whether `blocked.up`
-  is set when it fires. The plan must verify this first. The fallback is the mover's
-  `blocked.up` plus the head's tile row, which is how the adventure's `?` block bump already
-  works.
+- **Arcade's tile collision callback** (settled: not used). It works for the port's
+  standalone body and fires after separation, but it reports only the first tile along a
+  head: once Arcade has snapped the body under one tile, the next no longer overlaps it. A
+  head under a brick and a letter would report the brick. So the tower uses the fallback
+  this risk named: the mover's `blocked.up` plus the head's tile row, with the adventure's
+  two 3px probes choosing the columns.
 - **Thin head clearance.** Under the letter ceiling it is 5.6px for Gigi. Any change to
   super_easy's jump or to the player's size breaks it, which is why the jump checks test it
   instead of trusting it.

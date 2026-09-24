@@ -9,8 +9,8 @@ decoration, voice and result screen come in Part 2.
 
 **Architecture:** Game rules live in `next/src/game/learn/` with no Phaser import, so Vitest
 can pin every spacing guarantee from the spec. Phaser does the engine work: a real tilemap
-with a generated tileset, per-side tile collision for the planks, Arcade's collision callback
-for head bumps, camera follow, bounds and pan, and tweens. The player's movement is the
+with a generated tileset, per-side tile collision for the planks, Arcade's `blocked.up` for
+head bumps, camera follow, bounds and pan, and tweens. The player's movement is the
 adventure's own code, split out of `stepPlayer` so both modes share it.
 
 **Tech Stack:** Phaser 4.2.1, TypeScript 7 (strict, `noUnusedLocals`), Vite 8, Vitest 4.
@@ -56,9 +56,16 @@ These facts shape the code below; do not re-derive them, but do not contradict t
 - **Tile bias.** A falling body whose bottom is up to `TILE_BIAS` (16px) below a tile's top is
   put back on top of it. Near misses onto a plank therefore count as landings, with a small
   pop. The test mover in Task 6 copies this.
-- **The collision callback.** `physics.add.collider(body, layer, cb)` calls `cb(body, tile)`
-  AFTER separating that tile, and it works for the port's standalone body (`sprite.isBody`).
-  So `body.blocked.up` is already set when a head hits a letter block.
+- **Which tiles a head hit: not the collision callback.** `physics.add.collider(body, layer,
+  cb)` calls `cb(body, tile)` AFTER separating that tile, and it works for the port's
+  standalone body (`sprite.isBody`). But it reports only the FIRST tile along a head: Arcade
+  visits tiles left to right, and once it has snapped the body under one, the next no longer
+  overlaps the body (`TileIntersectsBody`) and is never reported. A head under a brick and a
+  letter reports the brick alone. So the mover reports the row a rising head was stopped
+  under (`blocked.up` plus `headTileRow`), and the climb picks the cells with the adventure's
+  two probes, 3px in from each side (`headColumns`): the spec's named fallback, and the rule
+  the `?` blocks already use. Task 3's review found this by running Phaser's own separation
+  code under Node.
 - **Empty tiles.** Phaser's 2D-array parser treats `-1` as empty and `0` as a real tile
   index. The tower's rules use `0` for empty; the scene converts `0` to `-1` for Phaser.
 - **Camera.** When bounds are shorter than the view, `clampY` pins the view's top to the top
@@ -70,9 +77,9 @@ These facts shape the code below; do not re-derive them, but do not contradict t
 
 | File | Responsibility | Task |
 |---|---|---|
-| `next/src/game/player.ts` | Modify: split `stepMotion`, `stepWalkCycle`, `playerSize` out of the adventure's player step | 1 |
+| `next/src/game/player.ts` | Modify: split `stepMotion`, `stepWalkCycle`, `playerSize` out of the adventure's player step; share the head's probe columns (`headColumns`) | 1, 6 |
 | `next/src/physics/tiles.ts` | Modify: per-side tile collision (`TileFaces`, `collisionSides`, `applyTileFaces`, `applyTileFacesAt`) | 2 |
-| `next/src/physics/player.ts` | Modify: `createBodyMover` (general Arcade mover with a tile callback); `createPlayerMove` becomes a thin adventure wrapper | 3 |
+| `next/src/physics/player.ts` | Modify: `createBodyMover` (general Arcade mover that reports the row a head hit); `createPlayerMove` becomes a thin adventure wrapper | 3 |
 | `next/src/game/learn/content.ts` | Create: the letter, syllable and word pools; targets and distractors | 4 |
 | `next/src/game/learn/tower.ts` | Create: tile codes, geometry, `buildTower`, camera view rectangles | 5 |
 | `next/src/game/learn/types.ts` | Create: `Climb`, `GateState`, `ClimbEvent`, `ClimbMove`, cells | 6 |
@@ -584,8 +591,12 @@ git commit -m "feat: tiles that only stop you from above" -m "A tile's collision
 ### Task 3: A general Arcade mover, with the adventure's as a wrapper
 
 The tower needs the same body mechanics as the adventure's player — sync in, one Arcade step,
-read back — with a callback for the tile a head hit. `createBodyMover` is that; the
-adventure's `createPlayerMove` becomes a wrapper that adds the `?` block bump.
+read back — and to know when a rising head was stopped, and under which row. `createBodyMover`
+is that; the adventure's `createPlayerMove` becomes a wrapper that adds the `?` block bump.
+
+This task was carried out as two commits. The first gave the mover a tile callback; review
+found that the callback reports only the first tile along a head (see *Verified facts*). The
+code below is the file after the second.
 
 **Files:**
 - Modify (full replacement): `next/src/physics/player.ts`
@@ -621,7 +632,11 @@ export function headTileRow(bodyTop: number): number {
   return Math.floor(bodyTop / TILE) - 1;
 }
 
-/** The world's size, and which of its four edges stop the body. */
+/**
+ * The world's size, and which of its four edges stop the body. The edges belong to the
+ * world (`setBoundsCollision`), not to this body: every body in the scene that collides
+ * with the world's bounds meets the same ones.
+ */
 export interface WorldEdges {
   width: number;
   height: number;
@@ -636,17 +651,16 @@ export interface BodyMoverOptions {
   layer: Phaser.Tilemaps.TilemapLayer;
   /** World bounds to set; left out, the world's bounds are not touched and not used. */
   edges?: WorldEdges;
-  /**
-   * Called for every tile Arcade separated the body from during the step, with that tile.
-   * Arcade calls it AFTER the separation, so `blocked.*` already says which way.
-   */
-  onTile?: (tile: Phaser.Tilemaps.Tile) => void;
 }
 
 /** What one step found out that the player state cannot hold. */
 export interface MoveReport {
-  /** Stopped from above this step: a head hit. */
-  blockedUp: boolean;
+  /**
+   * The tile row a rising head was stopped under this step, or null. Which cells of that
+   * row it hit is the caller's rule — the adventure's is bumpBlocksAbove's two probe
+   * columns (game/player.ts).
+   */
+  headHitRow: number | null;
 }
 
 export type BodyMover = (p: PlayerState) => MoveReport;
@@ -664,16 +678,28 @@ export type BodyMover = (p: PlayerState) => MoveReport;
  * `allowGravity` is off as well as the world's gravity being zero, to say out loud that
  * the absence is deliberate.
  *
- * **`onGround` comes from `blocked.down`.** Phaser 4 sets `touching.*` only in the
- * body-versus-body separator; a body standing on a TILEMAP has `touching.down` false
- * forever. `blocked.down` also covers world bounds.
+ * **`onGround` comes from `blocked.down`, and it has to.** Phaser 4 sets `touching.*` only
+ * in the body-versus-body separator; a body standing on a TILEMAP has `touching.down` false
+ * forever. Reading it would leave `onGround` false for good — coyote time would never arm,
+ * the jump buffer would never fire, and the player could not jump at all. `blocked.down`
+ * also covers world bounds.
  *
- * **A standalone body**, with no Game Object: a body with one re-reads its position from it
- * every step, which would make the drawn image an input to the physics. The body IS the
- * hitbox, so `body.position` is `p.x, p.y` with no offset.
+ * **A head hit is `blocked.up`, plus the row it was stopped under** (headTileRow). The tile
+ * separator sets `blocked.up` only when the body was RISING, so it cannot fire on a landing
+ * or a sideways scrape. There is no tile callback, because Arcade's collider callback
+ * cannot say which tiles a head hit: it visits tiles left to right, and once it has snapped
+ * the body under the first, the next one along no longer overlaps the body and is never
+ * reported. A head under a brick and a letter would report the brick alone.
+ *
+ * **A standalone body**, with no Game Object, for two reasons. A body with one re-reads its
+ * position from it every step, which would make the drawn image an input to the physics;
+ * and a player can be drawn by more than one image (SliceScene's syncPlayer swaps three),
+ * none of which is the hitbox. The body IS the hitbox, so `body.position` is `p.x, p.y`
+ * with no offset: the sprite's 2px margin is SliceScene's PLAYER_DRAW_INSET, where the
+ * drawing is, and does not belong here.
  *
  * **It rests disabled** and is switched on for exactly its own step (physics/body.ts's
- * stepBodyAlone), so no other body in the world moves with it.
+ * stepBodyAlone), so no other body's step moves it.
  */
 export function createBodyMover(
   scene: Phaser.Scene,
@@ -681,11 +707,13 @@ export function createBodyMover(
   options: BodyMoverOptions,
 ): BodyMover {
   const physics = scene.physics;
-  const { edges, onTile } = options;
+  const { edges } = options;
 
   // Before the body: its custom bounds rectangle is captured from world.bounds when it is
   // built. setBounds mutates that same Rectangle, so the order does not strictly matter —
-  // but a body built against the canvas's 640x400 default is a trap for later.
+  // but a body built against the canvas's 640x400 default is a trap for later. Without
+  // `edges` the body is built against exactly that default, which is harmless only because
+  // it then never collides with the world's bounds.
   if (edges) {
     physics.world.setBounds(0, 0, edges.width, edges.height, edges.left, edges.right, edges.up, edges.down);
   }
@@ -696,11 +724,7 @@ export function createBodyMover(
 
   // A persistent collider rather than a per-step physics.collide call, so that it runs
   // INSIDE the Arcade step, between the body moving and the step ending.
-  physics.add.collider(
-    body,
-    options.layer,
-    onTile ? (_body, tile) => onTile(tile as Phaser.Tilemaps.Tile) : undefined,
-  );
+  physics.add.collider(body, options.layer);
 
   body.enable = false;
 
@@ -722,7 +746,7 @@ export function createBodyMover(
     p.vx = body.velocity.x / PX_PER_FRAME_TO_PX_PER_SECOND;
     p.vy = body.velocity.y / PX_PER_FRAME_TO_PX_PER_SECOND;
     p.onGround = body.blocked.down;
-    return { blockedUp: body.blocked.up };
+    return { headHitRow: body.blocked.up ? headTileRow(body.y) : null };
   };
 }
 
@@ -732,10 +756,8 @@ export function createBodyMover(
  * ceiling and, above all, no floor: the pit is a `y` threshold the player must be able to
  * fall through — plus the head-first `?` block bump (index.html:1417-1420).
  *
- * `blocked.up` is set by the tile separator only when the body was RISING, so the bump
- * cannot fire on a landing or a sideways scrape. `player.x` is already written back when
- * bumpBlocksAbove reads its two probe columns, as the live source reads them off its
- * already-swept x.
+ * `player.x` is already written back when bumpBlocksAbove reads its two probe columns, as
+ * the live source reads them off its already-swept x.
  */
 export function createPlayerMove(
   scene: Phaser.Scene,
@@ -754,8 +776,9 @@ export function createPlayerMove(
     },
   });
   return (w: World): void => {
-    if (mover(w.player).blockedUp) {
-      bumpBlocksAbove(w, headTileRow(w.player.y));
+    const { headHitRow } = mover(w.player);
+    if (headHitRow !== null) {
+      bumpBlocksAbove(w, headHitRow);
     }
   };
 }
@@ -1506,20 +1529,98 @@ git commit -m "feat: a learn tower, built to the spacing rules" -m "buildTower l
 ### Task 6: The climb — gate rules and one fixed step
 
 **Files:**
+- Modify: `next/src/game/player.ts`
 - Create: `next/src/game/learn/types.ts`
 - Create: `next/src/game/learn/gate.ts`
 - Create: `next/src/game/learn/climb.ts`
 - Create: `next/tests/helpers/towerMove.ts`
 - Test: `next/tests/learnGate.test.ts`
 
-- [ ] **Step 1: Add the test mover**
+- [ ] **Step 1: Share the head's probe columns**
+
+A head bumps a block the way the adventure's `?` blocks always have: at two columns probed
+3px in from each side of the player, so a head a little way under either edge of a block
+bumps it. Arcade's tile callback cannot give this (see *Verified facts*), so the rule moves
+out of `bumpBlocksAbove` into a function the climb shares.
+
+In `next/src/game/player.ts`, insert directly above the doc comment of `bumpBlocksAbove`
+(the comment that begins `Port of index.html:1418-1420`):
+
+```ts
+/**
+ * The two columns a head-first hit probes, 3px in from each side of the player
+ * (index.html:1417-1418): a head must be a little way under a block to bump it, the same
+ * from either side. The adventure's `?` and rainbow blocks (bumpBlocksAbove, below) and
+ * learn mode's letters (game/learn/climb.ts) are bumped by this one rule. The two are the
+ * same column when the player is inside one.
+ */
+export function headColumns(p: PlayerState): [number, number] {
+  return [Math.floor((p.x + 3) / TILE), Math.floor((p.x + p.w - 3) / TILE)];
+}
+```
+
+In `bumpBlocksAbove`, replace:
+
+```ts
+  const p = world.player;
+  const h1 = Math.floor((p.x + 3) / TILE);
+  const h2 = Math.floor((p.x + p.w - 3) / TILE);
+  const hy = headTileY;
+```
+
+with:
+
+```ts
+  const [h1, h2] = headColumns(world.player);
+  const hy = headTileY;
+```
+
+In the same function's doc comment, replace:
+
+```
+ * The two probe columns are read off `p.x` here rather than passed in. The live source
+ * computes them once for the whole Y sweep and reuses them (`pL2`, `pR2`), but they are
+ * a function of `p.x` alone and the snap only ever touches `y`, so deriving them is the
+ * same two numbers — and it keeps the 3px inset, which is part of the bump RULE, in the
+ * same place as the rest of the rule.
+```
+
+with:
+
+```
+ * The two probe columns come from `p.x` (headColumns, above) rather than being passed in.
+ * The live source computes them once for the whole Y sweep and reuses them (`pL2`,
+ * `pR2`), but they are a function of `p.x` alone and the snap only ever touches `y`, so
+ * deriving them is the same two numbers — and it keeps the 3px inset, which is part of
+ * the bump RULE, with the rules rather than with the collision.
+```
+
+And in `stepPlayer`'s note on what went away, replace:
+
+```
+  //     The 3px pair survives in bumpBlocksAbove, where it decides which COLUMNS a head
+  //     hit can pop, which is a rule about blocks rather than about collision.
+```
+
+with:
+
+```
+  //     The 3px pair survives in headColumns, where it decides which COLUMNS a head hit
+  //     can pop, which is a rule about blocks rather than about collision.
+```
+
+Run: `npm test`
+Expected: all pass, the same count as before. The adventure's bump tests (physics, gamepad
+and sounds) drive `bumpBlocksAbove` and see the same two columns.
+
+- [ ] **Step 2: Add the test mover**
 
 Create `next/tests/helpers/towerMove.ts`:
 
 ```ts
 import { TILE } from '../../src/config/constants';
 import { towerTileFaces } from '../../src/game/learn/tower';
-import type { ClimbMove, HeadHit } from '../../src/game/learn/types';
+import type { ClimbMove } from '../../src/game/learn/types';
 
 /** Arcade's TILE_BIAS: how deep a falling body may sink into a tile top and be put back on it. */
 const TILE_BIAS = 16;
@@ -1529,8 +1630,8 @@ const TILE_BIAS = 16;
  * under Vitest. Plain integration, then separation against the tower's map with the same
  * per-side rule the scene gives Arcade — solid tiles stop you from every side, planks only
  * from above, and a falling body up to TILE_BIAS deep in a tile top is put back on it, as
- * Arcade's TileCheckY does. Reports the solid tiles a rising head hit, which is what the
- * scene's collider callback reports.
+ * Arcade's TileCheckY does. Reports the row a rising head was stopped under, as the scene's
+ * mover does (physics/player.ts's MoveReport).
  *
  * It reads `map` live, so trapdoors the gate rules open and shut are seen at once.
  */
@@ -1540,7 +1641,7 @@ export function towerMove(map: number[][]): ClimbMove {
     [Math.floor(from / TILE), Math.ceil((from + size) / TILE) - 1];
 
   return (p) => {
-    const headHits: HeadHit[] = [];
+    let headHitRow: number | null = null;
 
     p.x += p.vx;
     const [r0, r1] = span(p.y, p.h);
@@ -1563,9 +1664,9 @@ export function towerMove(map: number[][]): ClimbMove {
     if (p.vy < 0) {
       const row = Math.floor(p.y / TILE);
       for (let c = c0; c <= c1; c++) {
-        if (faces(c, row) === 'all') headHits.push({ col: c, row });
+        if (faces(c, row) === 'all') headHitRow = row;
       }
-      if (headHits.length > 0) {
+      if (headHitRow !== null) {
         p.y = (row + 1) * TILE;
         p.vy = 0;
       }
@@ -1586,12 +1687,12 @@ export function towerMove(map: number[][]): ClimbMove {
         }
       }
     }
-    return { headHits };
+    return { headHitRow };
   };
 }
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [ ] **Step 3: Write the failing tests**
 
 Create `next/tests/learnGate.test.ts`:
 
@@ -1685,6 +1786,25 @@ describe('a letter gate', () => {
     expect(c.events).toContainEqual({ type: 'hint', storey: 0, block: answerOf(c, 0) });
   });
 
+  it('counts a head a little way under either edge of a letter, and not one just outside', () => {
+    // The adventure's two probes, 3px in from each side (game/player.ts's headColumns), so
+    // the reach is the same from the left as from the right.
+    const missesJumpingFrom = (x: (left: number, right: number, w: number) => number): number => {
+      const c = climb();
+      const block = wrongOf(c, 0);
+      standUnder(c, 0, block);
+      const b = c.layout.storeys[0].blocks[block];
+      const left = (b.col + WALL) * TILE;
+      c.player.x = x(left, left + b.width * TILE, c.player.w);
+      run(c, 40, held, () => false);
+      return c.gates[0].mistakes;
+    };
+    expect(missesJumpingFrom((left, _right, w) => left - w + 4)).toBe(1); // 4px under the left edge
+    expect(missesJumpingFrom((_left, right) => right - 4)).toBe(1); // 4px under the right edge
+    expect(missesJumpingFrom((left, _right, w) => left - w + 2)).toBe(0); // 2px: both probes on brick
+    expect(missesJumpingFrom((_left, right) => right - 2)).toBe(0);
+  });
+
   it('counts a bump only from its own letter floor', () => {
     const c = climb();
     standUnder(c, 0, answerOf(c, 0));
@@ -1736,12 +1856,12 @@ describe('the roof', () => {
 });
 ```
 
-- [ ] **Step 3: Run to see it fail**
+- [ ] **Step 4: Run to see it fail**
 
 Run: `npx vitest run tests/learnGate.test.ts`
 Expected: FAIL — cannot resolve `../src/game/learn/climb` (or `types`).
 
-- [ ] **Step 4: Implement the types**
+- [ ] **Step 5: Implement the types**
 
 Create `next/src/game/learn/types.ts`:
 
@@ -1758,9 +1878,6 @@ export interface Cell {
 export interface TileEdit extends Cell {
   code: number;
 }
-
-/** A tile a rising head hit. */
-export type HeadHit = Cell;
 
 export interface GateState {
   /** Answered right at least once. Scores once. */
@@ -1806,18 +1923,23 @@ export interface Climb {
   events: ClimbEvent[];
 }
 
-/** Moves the hero one step and reports the tiles its head hit. The scene's is an Arcade body. */
-export type ClimbMove = (p: PlayerState) => { headHits: HeadHit[] };
+/**
+ * Moves the hero one step and reports the tile row a rising head was stopped under, or
+ * null. The scene's is its Arcade body (physics/player.ts's createBodyMover); the tests'
+ * is tests/helpers/towerMove.ts. Which cells of that row the head hit is the climb's own
+ * rule (climb.ts).
+ */
+export type ClimbMove = (p: PlayerState) => { headHitRow: number | null };
 ```
 
-- [ ] **Step 5: Implement the gate rules**
+- [ ] **Step 6: Implement the gate rules**
 
 Create `next/src/game/learn/gate.ts`:
 
 ```ts
 import { TILE } from '../../config/constants';
 import { INSIDE, T_BRICK, T_EMPTY, T_LETTER, type TowerLayout, WALL } from './tower';
-import type { Cell, Climb, HeadHit } from './types';
+import type { Cell, Climb } from './types';
 
 /** Which gate and block a map cell belongs to, or null. */
 export function blockAt(layout: TowerLayout, col: number, row: number): { storey: number; block: number } | null {
@@ -1852,12 +1974,12 @@ export function trapdoorCells(layout: TowerLayout, storey: number): Cell[] {
 export type BumpOutcome = 'right' | 'wrong' | null;
 
 /**
- * A rising head hit tile `hit`. Counts only for an armed gate, and only if the jump began on
+ * A rising head hit cell `hit`. Counts only for an armed gate, and only if the jump began on
  * that gate's own letter floor. Right: the gate is solved (scoring once) and its trapdoor
  * opens; the caller springs the hero (climb.ts). Wrong: a miss, and after two the right
  * block glows. Returns what happened, or null for a bump that does not count.
  */
-export function headBump(c: Climb, hit: HeadHit): BumpOutcome {
+export function headBump(c: Climb, hit: Cell): BumpOutcome {
   const found = blockAt(c.layout, hit.col, hit.row);
   if (!found) return null;
   const { storey, block } = found;
@@ -1926,7 +2048,7 @@ function setCells(c: Climb, cells: Cell[], code: number): void {
 }
 ```
 
-- [ ] **Step 6: Implement the climb**
+- [ ] **Step 7: Implement the climb**
 
 Create `next/src/game/learn/climb.ts`:
 
@@ -1934,7 +2056,9 @@ Create `next/src/game/learn/climb.ts`:
 import { TILE } from '../../config/constants';
 import { DIFFICULTY_CONFIG } from '../../config/difficulty';
 import type { InputState } from '../../input/actions';
-import { type Character, type MotionRecord, playerSize, stepMotion, stepWalkCycle } from '../player';
+import {
+  type Character, headColumns, type MotionRecord, playerSize, stepMotion, stepWalkCycle,
+} from '../player';
 import { random } from '../random';
 import type { PlayerState } from '../types';
 import { type LearnMode, pickTargets, type Rand } from './content';
@@ -2001,18 +2125,23 @@ export function stepClimb(c: Climb, input: InputState, move?: ClimbMove): void {
   stepMotion(p, input, LEARN_MOTION, c.sounds, { noJumpCut: c.sprung });
   if (c.sprung && p.vy >= 0) c.sprung = false;
 
-  const { headHits } = move ? move(p) : { headHits: [] };
-  for (const hit of headHits) {
-    const outcome = headBump(c, hit);
-    if (outcome === 'right') {
-      // The spring: a jump's worth of speed from where the head met the block, exempt from
-      // the jump cut until the apex. It clears the ceiling top by 42px even if the child
-      // lets go of jump at once (tests/learnJumps.test.ts).
-      p.vy = LEARN_MOTION.jumpForce;
-      c.sprung = true;
-      c.sounds.push('boing');
+  const { headHitRow } = move ? move(p) : { headHitRow: null };
+  if (headHitRow !== null) {
+    // Which cells of that row the head hit: the adventure's two probes, 3px in from each
+    // side (game/player.ts's headColumns), so a head a little way under either edge of a
+    // letter bumps it. A probe on plain brick is not a bump; only a counted one ends this.
+    for (const col of headColumns(p)) {
+      const outcome = headBump(c, { col, row: headHitRow });
+      if (outcome === 'right') {
+        // The spring: a jump's worth of speed from where the head met the block, exempt
+        // from the jump cut until the apex. It clears the ceiling top by 42px even if the
+        // child lets go of jump at once (tests/learnJumps.test.ts).
+        p.vy = LEARN_MOTION.jumpForce;
+        c.sprung = true;
+        c.sounds.push('boing');
+      }
+      if (outcome) break;
     }
-    if (outcome) break;
   }
 
   closeTrapdoors(c);
@@ -2056,7 +2185,7 @@ function checkStar(c: Climb): void {
 }
 ```
 
-- [ ] **Step 7: Run the tests**
+- [ ] **Step 8: Run the tests**
 
 Run: `npx vitest run tests/learnGate.test.ts`
 Expected: PASS.
@@ -2065,13 +2194,16 @@ If "carries you through" fails with the hero back on the letter floor, the sprin
 trapdoor is wrong: check that `headBump` empties the trapdoor cells before the next step,
 and that `stepClimb` passes `noJumpCut: c.sprung`.
 
-- [ ] **Step 8: Run everything, type-check, commit**
+If the edge test finds no miss at 4px, `stepClimb` stopped at the first probe: a probe on
+plain brick returns null, and only a counted bump may end the loop.
+
+- [ ] **Step 9: Run everything, type-check, commit**
 
 Run: `npm test && npm run build`
 
 ```bash
-git add src/game/learn/types.ts src/game/learn/gate.ts src/game/learn/climb.ts tests/helpers/towerMove.ts tests/learnGate.test.ts
-git commit -m "feat: the letter gate, and one step of the climb" -m "A bump counts only from the gate's own letter floor. The right letter scores once, opens a trapdoor the width of the block and one tile either side, and springs the hero with a jump's worth of speed exempt from the jump cut; the trapdoor shuts as brick once the hero's feet are above it, and the rest of the letters go with it. A wrong letter is a miss and nothing else, and two make the right one glow. If the hero ever lands back under an open trapdoor, the block comes back to spring them again. stepClimb runs the adventure's movement, a mover, and these rules, one fixed step at a time."
+git add src/game/player.ts src/game/learn/types.ts src/game/learn/gate.ts src/game/learn/climb.ts tests/helpers/towerMove.ts tests/learnGate.test.ts
+git commit -m "feat: the letter gate, and one step of the climb" -m "A head bumps a letter by the adventure's own rule, two probes 3px in from each side (now shared as headColumns), so a head a little way under either edge counts; and a bump counts only from the gate's own letter floor. The right letter scores once, opens a trapdoor the width of the block and one tile either side, and springs the hero with a jump's worth of speed exempt from the jump cut; the trapdoor shuts as brick once the hero's feet are above it, and the rest of the letters go with it. A wrong letter is a miss and nothing else, and two make the right one glow. If the hero ever lands back under an open trapdoor, the block comes back to spring them again. stepClimb runs the adventure's movement, a mover, and these rules, one fixed step at a time."
 ```
 
 ---
@@ -2125,7 +2257,8 @@ interface Outcome {
   x: number;
   minHead: number;
   minFeet: number;
-  headHits: number;
+  /** Steps on which the hero's rising head was stopped by a tile. */
+  headStops: number;
 }
 
 /** Runs the real movement against the tower until the hero lands (or 4 seconds pass). */
@@ -2134,16 +2267,16 @@ function jump(map: number[][], p: PlayerState, input: (f: number) => InputState,
   let exempt = spring;
   let minHead = p.y;
   let minFeet = p.y + p.h;
-  let headHits = 0;
+  let headStops = 0;
   for (let f = 0; f < 240; f++) {
     stepMotion(p, input(f), LEARN_MOTION, [], { noJumpCut: exempt });
     if (exempt && p.vy >= 0) exempt = false;
-    headHits += move(p).headHits.length;
+    if (move(p).headHitRow !== null) headStops++;
     minHead = Math.min(minHead, p.y);
     minFeet = Math.min(minFeet, p.y + p.h);
-    if (f > 2 && p.onGround) return { landedRow: (p.y + p.h) / TILE, x: p.x, minHead, minFeet, headHits };
+    if (f > 2 && p.onGround) return { landedRow: (p.y + p.h) / TILE, x: p.x, minHead, minFeet, headStops };
   }
-  return { landedRow: null, x: p.x, minHead, minFeet, headHits };
+  return { landedRow: null, x: p.x, minHead, minFeet, headStops };
 }
 
 const held = (dir: number) => (f: number): InputState =>
@@ -2217,7 +2350,7 @@ describe('the letter ceiling', () => {
         const underside = (st.ceilingRows[1] + 1) * TILE;
         st.planks.forEach((pl, k) => {
           const out = jump(t.map, standing(character, centredUnder(character, pl), pl.row * TILE), held(0));
-          if (out.headHits > 0 || out.minHead <= underside) reached.push(`tower ${ti} storey ${s} plank ${k}`);
+          if (out.headStops > 0 || out.minHead <= underside) reached.push(`tower ${ti} storey ${s} plank ${k}`);
         });
       }));
       expect(reached).toEqual([]);
@@ -2227,8 +2360,8 @@ describe('the letter ceiling', () => {
       TOWERS.forEach((t) => t.storeys.forEach((st) => st.blocks.forEach((b) => {
         const x = centredUnder(character, b);
         const feet = st.letterFloorRow * TILE;
-        expect(jump(t.map, standing(character, x, feet), held(0)).headHits).toBeGreaterThan(0);
-        expect(jump(t.map, standing(character, x, feet), tap).headHits).toBe(0);
+        expect(jump(t.map, standing(character, x, feet), held(0)).headStops).toBeGreaterThan(0);
+        expect(jump(t.map, standing(character, x, feet), tap).headStops).toBe(0);
       })));
     });
   }
@@ -2691,9 +2824,9 @@ import { STEP_MS, TILE } from '../config/constants';
 import { createClimb, stepClimb } from '../game/learn/climb';
 import type { LearnMode } from '../game/learn/content';
 import {
-  LEARN_ZOOM, settleCenter, starBox, storeyView, T_EMPTY, T_LETTER, towerTileFaces, WALL,
+  LEARN_ZOOM, settleCenter, starBox, storeyView, T_EMPTY, towerTileFaces, WALL,
 } from '../game/learn/tower';
-import type { Climb, ClimbEvent, ClimbMove, HeadHit } from '../game/learn/types';
+import type { Climb, ClimbEvent, ClimbMove } from '../game/learn/types';
 import type { Character } from '../game/player';
 import { getSelectedChar, getSkinIndex } from '../game/run';
 import { blockTextureKey, LEARN_TILES_KEY, registerLearnTiles, toPhaserData } from '../gfx/learnTiles';
@@ -2737,8 +2870,8 @@ const LETTER_RESOLUTION = 3;
 /**
  * One learn tower. The rules are game/learn/ (tested there); this scene is the engine side:
  * a real tilemap drawn from the tower's own tileset, which Arcade also collides against,
- * with planks colliding only from above; the adventure's Arcade mover, with Arcade's tile
- * callback reporting the letter a head hit; the same fixed 60Hz step as SliceScene; and a
+ * with planks colliding only from above; the adventure's Arcade mover, which reports the row
+ * a head hit for the climb to pick the letter; the same fixed 60Hz step as SliceScene; and a
  * camera that follows the hero inside the current storey's bounds and pans to the next.
  *
  * Back goes to the learn menu (game/navigation.ts: `learnletters` is not pausable).
@@ -2751,8 +2884,6 @@ export class LearnTowerScene extends Phaser.Scene {
   private climb!: Climb;
   private layer!: Phaser.Tilemaps.TilemapLayer;
   private move!: ClimbMove;
-  /** Letter tiles Arcade separated the body from during the current step. */
-  private hits: HeadHit[] = [];
   /** One container per block (picture + letter), per storey. */
   private blocks: Phaser.GameObjects.Container[][] = [];
   private playerImage!: Phaser.GameObjects.Image;
@@ -2770,7 +2901,6 @@ export class LearnTowerScene extends Phaser.Scene {
   init(data: LearnTowerData): void {
     this.mode = data?.mode ?? 'letters';
     this.used = data?.used ?? [];
-    this.hits = [];
     this.blocks = [];
     this.accumulator = 0;
     this.leaving = false;
@@ -2786,7 +2916,7 @@ export class LearnTowerScene extends Phaser.Scene {
     this.climb = createClimb(this.mode, this.used, this.character);
 
     this.layer = this.buildLayer();
-    this.move = this.buildMove();
+    this.move = createBodyMover(this, this.climb.player, { layer: this.layer });
     this.buildBlocks();
     this.buildStar();
     this.playerImage = this.add.image(0, 0, this.poseKey()).setOrigin(0, 0).setDepth(DEPTH_PLAYER);
@@ -2840,22 +2970,6 @@ export class LearnTowerScene extends Phaser.Scene {
     if (!layer || !('culledTiles' in layer)) throw new Error('the tower tilemap has no layer 0');
     applyTileFaces(layer, towerTileFaces);
     return layer;
-  }
-
-  private buildMove(): ClimbMove {
-    const mover = createBodyMover(this, this.climb.player, {
-      layer: this.layer,
-      onTile: (tile) => {
-        if (tile.index === T_LETTER) this.hits.push({ col: tile.x, row: tile.y });
-      },
-    });
-    return (p) => {
-      this.hits = [];
-      const report = mover(p);
-      // Letter tiles are only in the ceiling, but a hero standing on a closed gate's floor
-      // above also touches them; only a hit from below is a bump.
-      return { headHits: report.blockedUp ? this.hits : [] };
-    };
   }
 
   private buildBlocks(): void {
@@ -3008,17 +3122,21 @@ Click the canvas so it has focus, then check, in this order:
 2. Walk and jump up the first storey. You pass UP through planks and land ON them.
 3. On the letter floor, walk under a WRONG letter and jump: it shakes, you bonk and fall back.
 4. Do it once more: the right block starts to pulse.
-5. Walk under the RIGHT letter, jump into it, and **let go of jump the moment your head
+5. Stand under a WRONG letter with the hero only a little way under the block's LEFT edge,
+   most of the body under the brick beside it, and jump: it still shakes. The same at its
+   right edge. A head fully under the brick beside a letter just bonks.
+6. Walk under the RIGHT letter, jump into it, and **let go of jump the moment your head
    hits it**. The block vanishes and the spring carries you up through the gap anyway, onto
    the floor above; the camera pans up and the first star in the HUD turns gold. (A tap on
    its own cannot reach the letters: they hang 5 tiles up so that only a real jump answers.)
-6. Climb a storey with 3 or more planks: the camera follows. A storey with 1 or 2 planks
+7. Climb a storey with 3 or more planks: the camera follows. A storey with 1 or 2 planks
    sits whole on screen.
-7. Solve all four gates, walk to the star on the roof: after two seconds a new tower starts.
-8. Press Escape: the learn menu's placeholder screen appears (its key is still `Learn`).
+8. Solve all four gates, walk to the star on the roof: after two seconds a new tower starts.
+9. Press Escape: the learn menu's placeholder screen appears (its key is still `Learn`).
 
-Expected: all eight. If 2 fails (you bonk on planks), the per-side collision is not applied;
-if 5 fails, check the collider callback reaches `this.hits` and that `blockedUp` is true.
+Expected: all nine. If 2 fails (you bonk on planks), the per-side collision is not applied;
+if 5 or 6 fails, check that the mover's `headHitRow` is the ceiling's lower row when a head
+stops under it (physics/player.ts), and that `stepClimb` tries both probe columns.
 
 If you drive the browser by automation and the page reports `document.hidden === true`, the
 game is frozen, not broken: a hidden tab gets no `requestAnimationFrame`. Step it by hand from
@@ -3035,7 +3153,7 @@ key('keydown'); tick(10); key('keyup'); tick(90);
 
 ```bash
 git add src/scenes/LearnHudScene.ts src/scenes/LearnTowerScene.ts src/scenes/keys.ts src/main.ts tests/navigation.test.ts
-git commit -m "feat: the learn tower, playable" -m "A real Phaser tilemap from the tower's own tileset, which Arcade collides against too, planks from above only. The adventure's mover with Arcade's tile callback reporting the letter a head hit, the same fixed step as the level, and a camera that follows inside the current storey — holding still when the storey fits — and pans to the next. Wrong letters shake and the right one pulses after two; the star starts a new tower. The HUD asks what to find and fills a star per gate. Checked in the browser, including a spring with jump let go the instant the head hits the letter."
+git commit -m "feat: the learn tower, playable" -m "A real Phaser tilemap from the tower's own tileset, which Arcade collides against too, planks from above only. The adventure's mover, reporting the row a head hit so the climb can pick the letter, the same fixed step as the level, and a camera that follows inside the current storey — holding still when the storey fits — and pans to the next. Wrong letters shake and the right one pulses after two; the star starts a new tower. The HUD asks what to find and fills a star per gate. Checked in the browser, including a spring with jump let go the instant the head hits the letter."
 ```
 
 ---
@@ -3310,6 +3428,8 @@ differs:
   harmless.
 - Walking between the three letters on the letter floor is easy; nothing to fall off.
 - A wrong answer costs nothing; after two misses the right block pulses.
+- A head a little way under the left or right edge of a letter bumps it, from either side
+  alike; a head fully under the brick beside it just bonks.
 - Arriving on the letter floor from the plank below never bumps your head.
 - Both characters: choose Dodo in the adventure's character screen first (the tower uses
   the last selected hero), then climb.
@@ -3337,12 +3457,13 @@ Spec coverage for Part 1 (steps 1-3 of the spec's build order):
 |---|---|
 | Movement shared with the adventure, jump-cut switch | 1 |
 | Per-side collision, planks from above only | 2, 10 |
-| Arcade mover with a tile callback; adventure unchanged | 3 |
+| Arcade mover reporting the row a head hit; adventure unchanged | 3 |
 | Pools, targets without repeats, distractors | 4 |
 | Storeys: 3-tile hops, gaps 2/3/4/4, three plank lengths, 1-5 planks, first short, one long | 5 |
 | Letter floor full width; ceiling 2 thick, letters 5 above; blocks 2 or 3 wide | 5 |
 | Short storeys fit at zoom 1.25; camera bounds per storey | 5, 10 |
 | Bump counts only from its own letter floor; right/wrong; glow after two | 6 |
+| Which block a head hit: the row from `blocked.up`, the adventure's 3px probes for the columns | 3, 6 |
 | Trapdoor opens, spring exempt from the cut, shuts as brick behind | 6, 7 |
 | Nobody stuck under an open trapdoor | 6 |
 | Jump checks for Gigi and Dodo | 7 |
