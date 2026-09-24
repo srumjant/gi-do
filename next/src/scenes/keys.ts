@@ -13,7 +13,7 @@ import type { GameState } from '../game/navigation';
  * writes a `const TARGETS = { ... }` at the top of a file and gets `undefined` for one entry
  * on a Tuesday.
  *
- * A name is not behaviour and does not belong to a class. Keeping the thirteen of them here
+ * A name is not behaviour and does not belong to a class. Keeping all of them here
  * costs one import per scene and makes the cycle impossible rather than merely unlikely.
  *
  * The navigation table itself is NOT here, and that is the one thing this file's earlier
@@ -29,6 +29,12 @@ export const TITLE_SCENE_KEY = 'Title';
 export const MODE_SELECT_SCENE_KEY = 'ModeSelect';
 /** Learn mode, which is not ported: a screen that says so (stands in for `learnmenu`). */
 export const LEARN_SCENE_KEY = 'Learn';
+/** The learn menu: letters, syllables or words (`learnmenu`). */
+export const LEARN_MENU_SCENE_KEY = 'LearnMenu';
+/** One learn tower, climbed gate by gate (`learnletters`). */
+export const LEARN_TOWER_SCENE_KEY = 'LearnTower';
+/** What to find and how many gates are done. Runs alongside the tower. */
+export const LEARN_HUD_SCENE_KEY = 'LearnHud';
 /** Pick a difficulty (`difficulty`). */
 export const DIFFICULTY_SCENE_KEY = 'Difficulty';
 /** Pick a character and a skin (`select`). */
