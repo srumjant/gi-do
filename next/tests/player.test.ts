@@ -23,7 +23,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createPlayer, giveRandomSillyPowerup, playerSize, stepMotion, stepPlayer, stepWalkCycle,
-  GRND_DECEL,
+  GRND_DECEL, type MotionOptions,
 } from '../src/game/player';
 import { testMove } from './helpers/testMove';
 import { setRandom } from '../src/game/random';
@@ -508,7 +508,10 @@ describe('the movement learn mode shares', () => {
   }
 
   // Integrates y by hand with no floor: only the top of the arc matters here.
-  function riseOf(input: (f: number) => InputState, options = {}): { rise: number; sounds: SoundCue[] } {
+  function riseOf(
+    input: (f: number) => InputState,
+    options: MotionOptions = {},
+  ): { rise: number; sounds: SoundCue[] } {
     const p = standing();
     const startY = p.y;
     const sounds: SoundCue[] = [];
@@ -536,7 +539,12 @@ describe('the movement learn mode shares', () => {
   });
 
   it('raises the jump sound on the step the jump starts', () => {
-    expect(riseOf(jumpHeld).sounds).toEqual(['jump']);
+    const p = standing();
+    const sounds: SoundCue[] = [];
+    stepMotion(p, jumpHeld(0), LEARN, sounds);
+    expect(sounds).toEqual(['jump']);
+    stepMotion(p, jumpHeld(1), LEARN, sounds);
+    expect(sounds).toEqual(['jump']);
   });
 
   it('shows the jump pose in the air and the stand pose at rest', () => {
@@ -550,10 +558,37 @@ describe('the movement learn mode shares', () => {
     expect(p.frame).toBe(0);
   });
 
+  it('toggles the walk frame at the pace the speed sets', () => {
+    const p = standing();
+    p.vx = 3; // walkSpeed = max(4, round(12 - 3 * 3)) = 4
+    for (let i = 0; i < 4; i++) {
+      stepWalkCycle(p);
+      expect(p.frame).toBe(0);
+    }
+    stepWalkCycle(p);
+    expect(p.frame).toBe(1);
+  });
+
   it('sizes a character exactly as createPlayer does', () => {
     for (const character of ['gigi', 'dodo'] as const) {
       const p = createPlayer(LEVELS[0], DIFFICULTY_CONFIG.normal, character);
       expect(playerSize(character)).toEqual({ w: p.w, h: p.h });
     }
+  });
+});
+
+describe('stepPlayer after the movement split', () => {
+  it("fires from the top-of-frame position, this frame's facing, after the jump sound", () => {
+    const world = makeWorld();
+    for (let i = 0; i < 30; i++) stepPlayer(world, emptyInput(), testMove);
+    expect(world.player.onGround).toBe(true);
+    world.player.hasBow = true;
+    world.player.bowCharges = 3;
+    const { x, y, h } = world.player;
+    world.sounds.length = 0;
+    stepPlayer(world, held({ left: true, jump: true, jumpPressed: true, firePressed: true }), testMove);
+    expect(world.player.y).toBeLessThan(y);
+    expect(world.arrows[0]).toMatchObject({ x: x - 12, y: y + h / 2 - 2, vx: -6 });
+    expect(world.sounds).toEqual(['jump', 'shoot']);
   });
 });

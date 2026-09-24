@@ -230,8 +230,9 @@ export function bumpBlocksAbove(world: World, headTileY: number): void {
 
 /**
  * Port of index.html:1390-1398 — the bow, and the chicken ray that rides the same
- * trigger. Called from the middle of `stepPlayer`, exactly where the live source has
- * it; see the call site.
+ * trigger. Called from `stepPlayer` right after `stepMotion` — one step later than the
+ * live source, which fires the arrow before gravity rather than after; the values it
+ * reads are exactly the same either way. See the call site.
  *
  * Five things here are easy to get subtly wrong:
  *
@@ -300,10 +301,10 @@ export interface MotionOptions {
 }
 
 /**
- * The movement half of the player step (index.html:1362-1403): running, coyote time, the
- * jump buffer, the jump, the variable-height cut, and gravity with its apex hang. Shared
- * by `stepPlayer` below and learn mode's climb (game/learn/climb.ts), so a jump is the
- * same jump in both.
+ * The movement half of the player step (index.html:1362-1388 and 1400-1403): running,
+ * coyote time, the jump buffer, the jump, the variable-height cut, and gravity with its
+ * apex hang. Shared by `stepPlayer` below and learn mode's climb (game/learn/climb.ts),
+ * so a jump is the same jump in both.
  *
  * Mutates `p`, and pushes 'jump' or 'fart' onto `sounds` on the step a jump starts.
  * Moves nothing: position is the mover's job, and runs after this.
@@ -401,8 +402,10 @@ export function stepWalkCycle(p: PlayerState): void {
 
 /**
  * Port of index.html:1361-1423. Mutates `world.player` (and `world.dead`) in place, in
- * exactly the source's order — every step here is load-bearing; see the comments below
- * and the task notes on the jump buffer, apex hang, and the two collision insets.
+ * the source's order, except that the arrow fires after gravity rather than before it
+ * (the same values either way; see the call site) — every step here is load-bearing;
+ * see the comments below and the task notes on the jump buffer, apex hang, and the two
+ * collision insets.
  *
  * Out of scope, and simply absent below: landing dust particles, the fart trail's own
  * particles, sound, and score. Enemy collision is simulated (enemy.ts's stepEnemy), but
@@ -434,7 +437,7 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
   const level = world.level;
 
   // Running, coyote time, the jump buffer, the jump, the variable-height cut and gravity
-  // (index.html:1362-1403) — shared with learn mode, see stepMotion above.
+  // (index.html:1362-1388 and 1400-1403) — shared with learn mode, see stepMotion above.
   stepMotion(p, input, dc, world.sounds);
 
   // Shooting (index.html:1390-1398). The live source has it between the variable-height
