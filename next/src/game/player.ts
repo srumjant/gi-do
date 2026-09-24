@@ -152,6 +152,17 @@ export function giveRandomSillyPowerup(world: World): void {
 }
 
 /**
+ * The two columns a head-first hit probes, 3px in from each side of the player
+ * (index.html:1417-1418): a head must be a little way under a block to bump it, the same
+ * from either side. The adventure's `?` and rainbow blocks (bumpBlocksAbove, below) and
+ * learn mode's letters (game/learn/climb.ts) are bumped by this one rule. The two are the
+ * same column when the player is inside one.
+ */
+export function headColumns(p: PlayerState): [number, number] {
+  return [Math.floor((p.x + 3) / TILE), Math.floor((p.x + p.w - 3) / TILE)];
+}
+
+/**
  * Port of index.html:1418-1420 — what a head-first collision does to the two blocks it
  * could have landed on. Called by the Arcade mover (physics/player.ts) on the step the
  * body was blocked from above, which is the equivalent of the live source's head-hit
@@ -165,11 +176,11 @@ export function giveRandomSillyPowerup(world: World): void {
  * arithmetic lives and is tested. What must not happen, either way, is flooring the
  * SNAPPED position: that names the row below the block and every lookup here misses.
  *
- * The two probe columns are read off `p.x` here rather than passed in. The live source
- * computes them once for the whole Y sweep and reuses them (`pL2`, `pR2`), but they are
- * a function of `p.x` alone and the snap only ever touches `y`, so deriving them is the
- * same two numbers — and it keeps the 3px inset, which is part of the bump RULE, in the
- * same place as the rest of the rule.
+ * The two probe columns come from `p.x` (headColumns, above) rather than being passed in.
+ * The live source computes them once for the whole Y sweep and reuses them (`pL2`,
+ * `pR2`), but they are a function of `p.x` alone and the snap only ever touches `y`, so
+ * deriving them is the same two numbers — and it keeps the 3px inset, which is part of
+ * the bump RULE, with the rules rather than with the collision.
  *
  * Two columns and two lists, four sweeps in total, in exactly this order:
  *
@@ -196,9 +207,7 @@ export function giveRandomSillyPowerup(world: World): void {
  * blocks popped by one jump really do knock twice.
  */
 export function bumpBlocksAbove(world: World, headTileY: number): void {
-  const p = world.player;
-  const h1 = Math.floor((p.x + 3) / TILE);
-  const h2 = Math.floor((p.x + p.w - 3) / TILE);
+  const [h1, h2] = headColumns(world.player);
   const hy = headTileY;
 
   for (const hx of [h1, h2]) {
@@ -456,8 +465,8 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
   //
   //   - The 2px X probes and the 3px Y probes (index.html:1405, 1409). Arcade separates
   //     against the body's real edges, so an inset would be a second, competing hitbox.
-  //     The 3px pair survives in bumpBlocksAbove, where it decides which COLUMNS a head
-  //     hit can pop, which is a rule about blocks rather than about collision.
+  //     The 3px pair survives in headColumns, where it decides which COLUMNS a head hit
+  //     can pop, which is a rule about blocks rather than about collision.
   //   - The `+1` in the rightward snap (index.html:1406). It left a 1px gap between the
   //     player and the wall, so holding right against one oscillated on a two-frame
   //     cycle forever: step in, snap out, step in. Arcade puts the body flush and it
