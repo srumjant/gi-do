@@ -38,8 +38,6 @@ export const ROOF_SKY = 8;
 export const GAPS: readonly number[] = [2, 3, 4, 4];
 /** Inside column the hero starts on, beside the tower's door. */
 export const START_COL = 4;
-/** The star is two tiles wide, on columns 11-12: the middle of the tower. */
-export const STAR_COL = 11;
 
 /** The tower's camera zoom: a one- or two-plank storey fits whole at this zoom. */
 export const LEARN_ZOOM = 1.25;
@@ -90,6 +88,16 @@ export interface TowerLayout {
   start: { col: number; row: number };
   /** The star's inside column, standing on the top of `row`. */
   star: { col: number; row: number };
+}
+
+/**
+ * The star's inside column (it is two tiles wide), three tiles in from the wall on the far
+ * side of the roof from `arrivalCol`, where the last spring comes up. So the spring lands
+ * you on the roof, clear of the star, and you walk to it, rather than springing straight
+ * into it and ending the tower in mid-air.
+ */
+export function starCol(arrivalCol: number): number {
+  return arrivalCol < INSIDE / 2 ? INSIDE - 5 : 3;
 }
 
 /** A storey with `planks` planks, floor to ceiling top, in tiles. */
@@ -226,7 +234,7 @@ export function buildTower(
   return {
     mode, word, map, rows, storeys, roofRow,
     start: { col: START_COL, row: rows - BASE_ROWS },
-    star: { col: STAR_COL, row: roofRow },
+    star: { col: starCol(arrivalCol), row: roofRow },
   };
 }
 

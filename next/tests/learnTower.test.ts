@@ -142,6 +142,17 @@ describe('a learn tower', () => {
     })).toEqual([]);
   });
 
+  it('keeps the star clear of the columns the last spring comes up through', () => {
+    expect(problems((t) => {
+      const last = t.storeys[t.storeys.length - 1];
+      const answer = last.blocks.find((b) => b.correct) ?? last.blocks[0];
+      // The trapdoor is the block and a column either side; one more for the hero's width.
+      const from = answer.col - 2;
+      const to = answer.col + answer.width + 1;
+      return t.star.col + 1 < from || t.star.col > to ? [] : [`star at ${t.star.col}, spring through ${from}-${to}`];
+    })).toEqual([]);
+  });
+
   it('draws exactly what its storeys describe, and nothing else', () => {
     expect(problems((t) => {
       const want = t.map.map((row) => row.map(() => T_EMPTY));
