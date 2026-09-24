@@ -133,8 +133,12 @@ describe('a learn tower', () => {
       const box = starBox(t);
       const view = storeyView(t, t.storeys.length);
       const out: string[] = [];
+      if (t.star.col < 0 || t.star.col + 2 > INSIDE) out.push(`star at ${t.star.col} is not inside the walls`);
       for (let c = t.star.col; c < t.star.col + 2; c++) {
         if (towerTileFaces(t.map[t.roofRow][c + WALL]) !== 'all') out.push(`col ${c} is not on solid roof`);
+        if (t.map[t.roofRow - 1][c + WALL] !== T_EMPTY || t.map[t.roofRow - 2][c + WALL] !== T_EMPTY) {
+          out.push(`col ${c} is not clear above the roof`);
+        }
       }
       if (box.y + box.h !== t.roofRow * TILE) out.push('not standing on the roof');
       if (box.y < view.y + HUD_ROOM || box.y + box.h > view.y + LEARN_VIEW_H) out.push('out of view');
