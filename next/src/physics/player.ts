@@ -1,15 +1,10 @@
-// A TYPE import, exactly as in physics/tiles.ts next door, and for the same reason:
-// everything below hangs off objects the scene hands us (`scene.physics.add.body`,
-// `world.singleStep`, `body.velocity`), so nothing here needs a Phaser VALUE and the
-// import erases at compile time. That is what keeps the pure helper at the top of
-// this file — the head-bump row — reachable from tests/physics.test.ts, because
-// `import Phaser from 'phaser'` throws outright under Vitest's node environment (Phaser
-// reads `navigator`, then `window`, then a canvas, while its module body runs; shimming
-// that far means the shim is what is under test).
+// A TYPE import, as in physics/tiles.ts: everything here hangs off objects the scene hands
+// us, so nothing needs a Phaser VALUE, and headTileRow below stays reachable from
+// tests/physics.test.ts (Phaser cannot be imported under Vitest at all).
 import type Phaser from 'phaser';
 import { TILE } from '../config/constants';
 import { bumpBlocksAbove, type PlayerMove } from '../game/player';
-import type { World } from '../game/types';
+import type { PlayerState, World } from '../game/types';
 import { PX_PER_FRAME_TO_PX_PER_SECOND, stepBodyAlone } from './body';
 
 /**
@@ -17,150 +12,153 @@ import { PX_PER_FRAME_TO_PX_PER_SECOND, stepBodyAlone } from './body';
  * separated it.
  *
  * The live game reads the block row off the head's position BEFORE the snap
- * (index.html:1417-1418: `hY` is captured, then `p.y` is moved down to the tile's bottom
- * edge, and `hy` is floored from the OLD value). Arcade has no equivalent: separation has
- * already happened by the time we see the body, and `ProcessTileSeparationY` leaves
- * `body.y` exactly on the tile's bottom edge — an exact multiple of TILE, since the
- * collision layer sits at the origin at scale 1. That edge floors to the row BELOW the
- * block, so the block is one row up.
+ * (index.html:1417-1418). Arcade has already separated the body by the time we see it, and
+ * `ProcessTileSeparationY` leaves `body.y` exactly on the tile's bottom edge — an exact
+ * multiple of TILE, since the layer sits at the origin at scale 1. That edge floors to the
+ * row BELOW the block, so the block is one row up.
  *
- * Kept as a named function with its own test rather than inlined, because an off-by-one
- * here does not crash or even look wrong: the blocks simply stop paying out.
+ * Kept as a named function with its own test, because an off-by-one here does not crash
+ * or even look wrong: the blocks simply stop paying out.
  */
 export function headTileRow(bodyTop: number): number {
   return Math.floor(bodyTop / TILE) - 1;
 }
 
+/** The world's size, and which of its four edges stop the body. */
+export interface WorldEdges {
+  width: number;
+  height: number;
+  left: boolean;
+  right: boolean;
+  up: boolean;
+  down: boolean;
+}
+
+export interface BodyMoverOptions {
+  /** The layer the body collides with. The only thing it collides with. */
+  layer: Phaser.Tilemaps.TilemapLayer;
+  /** World bounds to set; left out, the world's bounds are not touched and not used. */
+  edges?: WorldEdges;
+  /**
+   * Called for every tile Arcade separated the body from during the step, with that tile.
+   * Arcade calls it AFTER the separation, so `blocked.*` already says which way.
+   */
+  onTile?: (tile: Phaser.Tilemaps.Tile) => void;
+}
+
+/** What one step found out that the player state cannot hold. */
+export interface MoveReport {
+  /** Stopped from above this step: a head hit. */
+  blockedUp: boolean;
+}
+
+export type BodyMover = (p: PlayerState) => MoveReport;
+
 /**
- * Puts the player on an Arcade body and hands back the `move` that `stepPlayer` calls in
- * place of the hand-rolled X and Y sweeps it used to run (index.html:1404-1422).
+ * Puts a player on an Arcade body and returns the function that moves it one fixed step.
  *
- * **The body is a separator, not a home.** `world.player` stays the single source of
- * truth for everything — position included. Every step pushes `p.x/p.y/p.vx/p.vy` INTO
- * the body, takes one Arcade step, and reads the resolved values back out. That is one
- * assignment more than strictly necessary, and it buys the property that makes the rest
- * of the port keep working: anything that writes the player's position or velocity
- * outside this function is picked up automatically. The cape's pit rescue teleports `p.y`
- * and sets `p.vy = -10` (player.ts); `playerHit` kicks `p.vy` to -4 (enemy contact);
- * `respawnLevel` throws the whole `PlayerState` away and builds a new one at the level's
- * start. None of those know a body exists, and none of them has to.
+ * **The body is a separator, not a home.** The player state stays the single source of
+ * truth: every step pushes `x/y/vx/vy` INTO the body, takes one Arcade step, and reads the
+ * resolved values back. Anything that writes the player's position or velocity elsewhere —
+ * a respawn, a cape's pit rescue, a learn-mode spring — is picked up automatically.
  *
- * **World gravity is off and `vy` is integrated by hand.** The apex hang applies 0.6
- * gravity while rising and 1.2 while falling (index.html:1400-1403), which is a per-frame
- * multiplier; Arcade's gravity is a constant and cannot express it. `stepPlayer` still
- * runs that arithmetic and this function only carries the answer across. `allowGravity`
- * is turned off as well as the world's gravity being zero — belt and braces, and it says
- * out loud that the absence is deliberate rather than a value nobody got round to setting.
+ * **World gravity is off and `vy` is integrated by hand** (game/player.ts's stepMotion):
+ * the apex hang is a per-frame multiplier Arcade's constant gravity cannot express.
+ * `allowGravity` is off as well as the world's gravity being zero, to say out loud that
+ * the absence is deliberate.
  *
- * **`onGround` comes from `blocked.down`, and it has to.** Phaser 4 sets `touching.*` in
- * the body-versus-body separator (`SeparateY`) and `blocked.*` in the tile separator
- * (`ProcessTileSeparationY`) — a body standing on a TILEMAP therefore has `touching.down`
- * false forever. Reading `touching.down` here would leave `onGround` permanently false,
- * which is not a subtle breakage: coyote time would never arm, the jump buffer would
- * never fire, and the player could not jump at all. `blocked.down` also covers the world
- * bounds, which is the right answer for the same reason.
+ * **`onGround` comes from `blocked.down`.** Phaser 4 sets `touching.*` only in the
+ * body-versus-body separator; a body standing on a TILEMAP has `touching.down` false
+ * forever. `blocked.down` also covers world bounds.
  *
- * **The left clamp is Arcade's.** index.html:1422's `if(p.x<0)p.x=0` becomes a
- * left-edge-only world bound. The other three edges are explicitly off: there is no
- * right-hand bound in the live game, no ceiling, and above all no floor — the pit is a
- * `y` threshold that the player has to be able to fall through (index.html:1423, still
- * hand-written in `stepPlayer`).
+ * **A standalone body**, with no Game Object: a body with one re-reads its position from it
+ * every step, which would make the drawn image an input to the physics. The body IS the
+ * hitbox, so `body.position` is `p.x, p.y` with no offset.
+ *
+ * **It rests disabled** and is switched on for exactly its own step (physics/body.ts's
+ * stepBodyAlone), so no other body in the world moves with it.
+ */
+export function createBodyMover(
+  scene: Phaser.Scene,
+  player: PlayerState,
+  options: BodyMoverOptions,
+): BodyMover {
+  const physics = scene.physics;
+  const { edges, onTile } = options;
+
+  // Before the body: its custom bounds rectangle is captured from world.bounds when it is
+  // built. setBounds mutates that same Rectangle, so the order does not strictly matter —
+  // but a body built against the canvas's 640x400 default is a trap for later.
+  if (edges) {
+    physics.world.setBounds(0, 0, edges.width, edges.height, edges.left, edges.right, edges.up, edges.down);
+  }
+
+  const body = physics.add.body(player.x, player.y, player.w, player.h);
+  body.allowGravity = false;
+  body.setCollideWorldBounds(edges !== undefined);
+
+  // A persistent collider rather than a per-step physics.collide call, so that it runs
+  // INSIDE the Arcade step, between the body moving and the step ending.
+  physics.add.collider(
+    body,
+    options.layer,
+    onTile ? (_body, tile) => onTile(tile as Phaser.Tilemaps.Tile) : undefined,
+  );
+
+  body.enable = false;
+
+  return (p: PlayerState): MoveReport => {
+    // A respawn can replace the player wholesale; a hitbox that kept the old size would be
+    // a horrible bug to find.
+    if (body.width !== p.w || body.height !== p.h) {
+      body.setSize(p.w, p.h, false);
+    }
+    body.position.set(p.x, p.y);
+    body.velocity.set(p.vx * PX_PER_FRAME_TO_PX_PER_SECOND, p.vy * PX_PER_FRAME_TO_PX_PER_SECOND);
+
+    stepBodyAlone(physics.world, body);
+
+    p.x = body.x;
+    p.y = body.y;
+    // Arcade only ever zeroes these (bounce, drag and acceleration are all off), so this is
+    // reading back the separation, not a new velocity.
+    p.vx = body.velocity.x / PX_PER_FRAME_TO_PX_PER_SECOND;
+    p.vy = body.velocity.y / PX_PER_FRAME_TO_PX_PER_SECOND;
+    p.onGround = body.blocked.down;
+    return { blockedUp: body.blocked.up };
+  };
+}
+
+/**
+ * The adventure's mover: `createBodyMover` with the level's bounds — the left edge only,
+ * because the live game clamps `p.x` at 0 (index.html:1422) and has no right edge, no
+ * ceiling and, above all, no floor: the pit is a `y` threshold the player must be able to
+ * fall through — plus the head-first `?` block bump (index.html:1417-1420).
+ *
+ * `blocked.up` is set by the tile separator only when the body was RISING, so the bump
+ * cannot fire on a landing or a sideways scrape. `player.x` is already written back when
+ * bumpBlocksAbove reads its two probe columns, as the live source reads them off its
+ * already-swept x.
  */
 export function createPlayerMove(
   scene: Phaser.Scene,
   world: World,
   collisionLayer: Phaser.Tilemaps.TilemapLayer,
 ): PlayerMove {
-  const physics = scene.physics;
-  const p = world.player;
-
-  // Before the body: `Body#customBoundsRectangle` is captured from `world.bounds` when
-  // the body is built. `setBounds` mutates that same Rectangle rather than replacing it,
-  // so the order does not strictly matter — but a body built against bounds that are
-  // still the canvas's 640x400 default is a trap waiting for the day that changes.
-  physics.world.setBounds(
-    0,
-    0,
-    world.level.width * TILE,
-    world.level.height * TILE,
-    // left, right, up, down. Left alone — see the note above.
-    true,
-    false,
-    false,
-    false,
-  );
-
-  // A STANDALONE body: no Game Object, no sprite, nothing drawn. Phaser 4 supports this
-  // (`Body#isBody` is checked all the way down the collide path, including
-  // `collideSpriteVsTilemapLayer`), and it is the right shape here for two reasons. A
-  // body with a Game Object re-reads its position FROM that object every step
-  // (`Body#preUpdate` -> `updateFromGameObject`), which would make the drawn image an
-  // input to the physics instead of an output of it; and the player is drawn by three
-  // different images depending on the frame and whether a big head is running
-  // (SliceScene's syncPlayer), none of which is the hitbox.
-  //
-  // The size is the player's own `w`/`h` — 16x24 for Gigi, 16x20 for Dodo, derived in
-  // createPlayer from the character's stand sprite (player.ts) — so the body IS the
-  // hitbox and `body.position` is `p.x, p.y` with no offset to remember. The sprite is
-  // 2px larger on every side; that inset lives in SliceScene's PLAYER_DRAW_INSET, where
-  // the drawing is, and deliberately does not appear here.
-  const body = physics.add.body(p.x, p.y, p.w, p.h);
-  body.allowGravity = false;
-  body.setCollideWorldBounds(true);
-
-  // The layer built in physics/tiles.ts, and the only thing the player collides with.
-  // Registered as a persistent collider rather than a per-step `physics.collide` call so
-  // that it runs INSIDE the Arcade step, between the body moving and the step ending —
-  // which is where separation has to happen.
-  physics.add.collider(body, collisionLayer);
-
-  // `physics.add.body` hands the body to the world, and the world switches it on. Off
-  // again, immediately: a body in this port rests disabled and is switched on for the one
-  // step that belongs to it, or the enemies' own steps (physics/enemy.ts) would drag the
-  // player along with them. See stepBodyAlone.
-  body.enable = false;
-
+  const mover = createBodyMover(scene, world.player, {
+    layer: collisionLayer,
+    edges: {
+      width: world.level.width * TILE,
+      height: world.level.height * TILE,
+      left: true,
+      right: false,
+      up: false,
+      down: false,
+    },
+  });
   return (w: World): void => {
-    const player = w.player;
-
-    // A respawn replaces `world.player` wholesale. Same character, so the same size in
-    // practice — but the body is the hitbox, and a hitbox that silently kept a previous
-    // character's height would be a genuinely horrible bug to find.
-    if (body.width !== player.w || body.height !== player.h) {
-      body.setSize(player.w, player.h, false);
-    }
-
-    body.position.set(player.x, player.y);
-    body.velocity.set(
-      player.vx * PX_PER_FRAME_TO_PX_PER_SECOND,
-      player.vy * PX_PER_FRAME_TO_PX_PER_SECOND,
-    );
-
-    // Exactly one Arcade step, for this body and no other. Underneath it is
-    // `singleStep` — `update(0, oneFrameInMs)` followed by `postUpdate` — so the body
-    // integrates once, its collider runs once, and the accumulated time comes back out to
-    // zero. See the fixed-step note in SliceScene.update, which is the whole reason this
-    // is called from here rather than left to run itself once per RENDERED frame, and
-    // stepBodyAlone in physics/body.ts for why the other bodies have to sit it out.
-    stepBodyAlone(physics.world, body);
-
-    player.x = body.x;
-    player.y = body.y;
-    // Arcade only ever zeroes these (bounce, drag and acceleration are all off), so this
-    // is reading back the separation, not a new velocity.
-    player.vx = body.velocity.x / PX_PER_FRAME_TO_PX_PER_SECOND;
-    player.vy = body.velocity.y / PX_PER_FRAME_TO_PX_PER_SECOND;
-    player.onGround = body.blocked.down;
-
-    // The head-first block bump (index.html:1417-1420). It used to be a branch of the
-    // hand-rolled Y sweep; with Arcade doing the separating, `blocked.up` is the
-    // equivalent signal — the tile separator sets it only when the body was RISING
-    // (`TileCheckY` tests `deltaY() < 0`), so this cannot fire on a landing or on a
-    // sideways scrape. `player.x` is assigned above first, on purpose: bumpBlocksAbove
-    // reads the two probe columns off the already-separated x, exactly as the live
-    // source reads them off its already-swept x.
-    if (body.blocked.up) {
-      bumpBlocksAbove(w, headTileRow(body.y));
+    if (mover(w.player).blockedUp) {
+      bumpBlocksAbove(w, headTileRow(w.player.y));
     }
   };
 }
