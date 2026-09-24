@@ -817,10 +817,9 @@ git commit -m "refactor: one Arcade mover for any player, the adventure's wrappe
 - Modify: `next/tests/world.test.ts`
 - Test: `next/tests/learnContent.test.ts`
 
-This task was carried out as two commits. Review found that nothing reset `used` once the
-pool ran out, so every later tower drew from the whole pool and most repeated something
-from the tower before; the second commit starts a new round there. The code below is the
-result.
+Review found that nothing reset `used` once the pool ran out, so every later tower drew
+from the whole pool and most repeated something from the tower before. Follow-up commits
+start a new round there. The code below is the result.
 
 - [ ] **Step 1: Let the Phaser-free check see into subfolders**
 
@@ -951,6 +950,7 @@ describe("a tower's targets", () => {
     const { word } = pickTargets('words', used, seq(9));
     expect(LEARN_WORDS).toContain(word);
     expect(used).toEqual([word]);
+    expect(pickTargets('words', used, seq(10)).word).not.toBe(word);
   });
 });
 
@@ -1023,11 +1023,11 @@ export interface TowerTargets {
 }
 
 /**
- * A tower's four questions, avoiding what this session has already asked (`used`, which
- * this appends to) and never repeating one inside a tower. In words mode the four are the
+ * A tower's four questions, avoiding what this round has already asked (`used`, which this
+ * appends to) and never repeating one inside a tower. In words mode the four are the
  * letters of one word, and it is the word that is not repeated. The tower that uses up the
- * pool starts a new round: `used` is emptied and keeps only that tower's own questions, so
- * the next tower still avoids them.
+ * pool ends the round: `used` is emptied and keeps only that tower's own questions, so
+ * they are not asked again until the round after.
  */
 export function pickTargets(mode: LearnMode, used: string[], rand: Rand = random): TowerTargets {
   if (mode === 'words') {
@@ -2887,7 +2887,7 @@ import { takeBack } from './navigate';
 
 export interface LearnTowerData {
   mode: LearnMode;
-  /** What the session has asked so far: the same array from tower to tower, so nothing repeats early. */
+  /** What this round has asked: the same array from tower to tower, emptied by pickTargets when a round ends. */
   used: string[];
 }
 
