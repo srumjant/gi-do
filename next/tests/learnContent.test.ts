@@ -35,7 +35,7 @@ describe("a tower's targets", () => {
     expect(used).toEqual(targets);
   });
 
-  it('avoid what this session has already asked', () => {
+  it('avoid what this round has already asked', () => {
     const used = LEARN_SYLLABLES.slice(0, LEARN_SYLLABLES.length - GATES_PER_TOWER);
     const { targets } = pickTargets('syllables', used, seeded(2));
     expect(targets.sort()).toEqual(LEARN_SYLLABLES.slice(-GATES_PER_TOWER).sort());

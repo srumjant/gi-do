@@ -56,3 +56,13 @@ export function findGroundY(map: TileMap, tx: number): number {
 export function rectOverlap(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
+
+/**
+ * Which sides of a tile stop the player. `top` is a plank: land on it from above, jump up
+ * through it from below. The adventure only ever has `all` and `none`; learn mode's tower
+ * adds `top` (game/learn/tower.ts's `towerTileFaces`).
+ */
+export type TileFaces = 'none' | 'all' | 'top';
+
+/** A tile vocabulary's collision: one answer per tile code. */
+export type FacesRule = (code: number) => TileFaces;

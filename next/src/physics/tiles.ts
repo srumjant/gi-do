@@ -9,6 +9,7 @@
 import type Phaser from 'phaser';
 import { TILE } from '../config/constants';
 import { isSolid } from '../data/levels';
+import type { FacesRule, TileFaces } from '../game/tiles';
 import type { World } from '../game/types';
 
 /**
@@ -129,16 +130,6 @@ export function syncCollisionLayer(layer: Phaser.Tilemaps.TilemapLayer, world: W
     }
   }
 }
-
-/**
- * Which sides of a tile stop the player. `top` is a plank: land on it from above, jump up
- * through it from below. The adventure only ever has `all` and `none`; learn mode's tower
- * adds `top` (game/learn/tower.ts's `towerTileFaces`).
- */
-export type TileFaces = 'none' | 'all' | 'top';
-
-/** A tile vocabulary's collision: one answer per tile code. */
-export type FacesRule = (code: number) => TileFaces;
 
 /**
  * `Tile#setCollision`'s four sides — left, right, up, down — for each kind of tile.

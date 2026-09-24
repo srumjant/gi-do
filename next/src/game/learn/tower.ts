@@ -1,6 +1,6 @@
 import { BASE_H, BASE_W, TILE } from '../../config/constants';
-import type { TileFaces } from '../../physics/tiles';
 import { random } from '../random';
+import type { TileFaces } from '../tiles';
 import { GATES_PER_TOWER, type LearnMode, pickFrom, pickOptions, type Rand } from './content';
 
 /** The tower's own tile codes. They are also the frame numbers of its tileset (gfx/learnTiles.ts). */
@@ -29,7 +29,7 @@ export const LETTER_ROOM = 5;
 /** Letter ceiling thickness. */
 export const CEILING = 2;
 /** Rows of brick under the first storey. */
-export const BASE = 2;
+export const BASE_ROWS = 2;
 /** Wall rows above the roof. */
 export const BATTLEMENTS = 2;
 /** Rows of sky above the roof. */
@@ -43,8 +43,9 @@ export const STAR_COL = 11;
 
 /** The tower's camera zoom: a one- or two-plank storey fits whole at this zoom. */
 export const LEARN_ZOOM = 1.25;
-export const VIEW_W = BASE_W / LEARN_ZOOM;
-export const VIEW_H = BASE_H / LEARN_ZOOM;
+/** The tower's view in world px. Not config/constants.ts's VIEW_W/VIEW_H: the adventure zooms 1.5. */
+export const LEARN_VIEW_W = BASE_W / LEARN_ZOOM;
+export const LEARN_VIEW_H = BASE_H / LEARN_ZOOM;
 /** World px the 48px HUD covers at this zoom (48 / 1.25 = 38.4), rounded up. */
 export const HUD_ROOM = 40;
 
@@ -55,6 +56,7 @@ export interface Plank {
   row: number;
 }
 
+/** A letter block set into a letter ceiling. `col` counts inside the walls, as a plank's does. */
 export interface Block {
   col: number;
   width: number;
@@ -125,6 +127,11 @@ export function plankCounts(rand: Rand): number[] {
  * side of the arrival column, away from the nearer wall. Each next plank is the storey's gap
  * beyond the last one, carrying on in the same direction while it fits and turning back at
  * a wall. No plank can then overlap the one before it.
+ *
+ * Every plank fits without clamping. From any arrival column, a walk of at most 6 plus the
+ * longest plank stops short of the far wall. A turn-back always has room: both ways are
+ * blocked only if a plank, two gaps and two more planks need 26 columns or more, and with
+ * these gaps and lengths they need at most 22.
  */
 export function placePlanks(storey: number, count: number, arrivalCol: number, rand: Rand): Array<{ col: number; width: number }> {
   const lengths = plankLengths(storey);
@@ -133,7 +140,7 @@ export function placePlanks(storey: number, count: number, arrivalCol: number, r
   const first = pickFrom(lengths, rand);
   const walk = 2 + Math.floor(rand() * 5);
   const firstCol = dir > 0 ? arrivalCol + walk : arrivalCol - walk - (first - 1);
-  const planks = [{ col: Math.max(0, Math.min(INSIDE - first, firstCol)), width: first }];
+  const planks = [{ col: firstCol, width: first }];
   for (let k = 1; k < count; k++) {
     const width = pickFrom(lengths, rand);
     const prev = planks[k - 1];
@@ -162,14 +169,14 @@ export function buildTower(
 ): TowerLayout {
   const counts = plankCounts(rand);
   const roofHeight = counts.reduce((sum, n) => sum + storeyHeight(n), 0);
-  const rows = ROOF_SKY + roofHeight + BASE;
-  const rowAt = (height: number): number => rows - BASE - height;
+  const rows = ROOF_SKY + roofHeight + BASE_ROWS;
+  const rowAt = (height: number): number => rows - BASE_ROWS - height;
   const map = Array.from({ length: rows }, () => new Array<number>(MAP_COLS).fill(T_EMPTY));
   const fill = (row: number, col: number, width: number, code: number): void => {
     for (let c = col; c < col + width; c++) map[row][c + WALL] = code;
   };
 
-  for (let r = rows - BASE; r < rows; r++) fill(r, 0, INSIDE, T_BRICK);
+  for (let r = rows - BASE_ROWS; r < rows; r++) fill(r, 0, INSIDE, T_BRICK);
 
   const { cols: blockCols, width: blockWidth } = blockLayout(mode);
   const storeys: Storey[] = [];
@@ -218,7 +225,7 @@ export function buildTower(
   const roofRow = rowAt(floor);
   return {
     mode, word, map, rows, storeys, roofRow,
-    start: { col: START_COL, row: rows - BASE },
+    start: { col: START_COL, row: rows - BASE_ROWS },
     star: { col: STAR_COL, row: roofRow },
   };
 }
@@ -237,14 +244,14 @@ export interface ViewRect {
  * the view's width, centred on the tower, so the camera never scrolls sideways.
  */
 export function storeyView(layout: TowerLayout, s: number): ViewRect {
-  const x = (MAP_COLS * TILE - VIEW_W) / 2;
+  const x = (MAP_COLS * TILE - LEARN_VIEW_W) / 2;
   if (s >= layout.storeys.length) {
-    return { x, y: -HUD_ROOM, width: VIEW_W, height: (layout.roofRow + 1) * TILE + HUD_ROOM };
+    return { x, y: -HUD_ROOM, width: LEARN_VIEW_W, height: (layout.roofRow + 1) * TILE + HUD_ROOM };
   }
   const st = layout.storeys[s];
   const top = st.ceilingRows[0] * TILE - HUD_ROOM;
   const bottom = (st.floorRow + 1) * TILE;
-  return { x, y: top, width: VIEW_W, height: bottom - top };
+  return { x, y: top, width: LEARN_VIEW_W, height: bottom - top };
 }
 
 /**
@@ -255,7 +262,7 @@ export function storeyView(layout: TowerLayout, s: number): ViewRect {
 export function settleCenter(view: ViewRect): { x: number; y: number } {
   return {
     x: view.x + view.width / 2,
-    y: view.height <= VIEW_H ? view.y + VIEW_H / 2 : view.y + view.height - VIEW_H / 2,
+    y: view.height <= LEARN_VIEW_H ? view.y + LEARN_VIEW_H / 2 : view.y + view.height - LEARN_VIEW_H / 2,
   };
 }
 

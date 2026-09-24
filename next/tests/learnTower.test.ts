@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { TILE } from '../src/config/constants';
-import { LEARN_WORDS, pickTargets, type LearnMode } from '../src/game/learn/content';
+import { GATES_PER_TOWER, LEARN_WORDS, pickTargets, type LearnMode } from '../src/game/learn/content';
 import {
-  buildTower, GAPS, INSIDE, LETTER_ROOM, MAP_COLS, plankLengths, RISE, START_COL, storeyView,
-  T_BRICK, T_LETTER, T_PLANK, T_STONE, type TowerLayout, VIEW_H, WALL,
+  BATTLEMENTS, buildTower, GAPS, HUD_ROOM, INSIDE, LEARN_VIEW_H, LEARN_VIEW_W, LETTER_ROOM, MAP_COLS,
+  plankLengths, RISE, settleCenter, START_COL, starBox, storeyView, T_BRICK, T_EMPTY, T_LETTER,
+  T_PLANK, T_STONE, towerTileFaces, type TowerLayout, WALL,
 } from '../src/game/learn/tower';
 import { seeded } from './helpers/seeded';
 
@@ -122,16 +123,94 @@ describe('a learn tower', () => {
 
   it('fits a storey of one or two planks on screen, and scrolls the longer ones', () => {
     expect(problems((t) => t.storeys.flatMap((st, s) => {
-      const fits = storeyView(t, s).height <= VIEW_H;
+      const fits = storeyView(t, s).height <= LEARN_VIEW_H;
       return fits === (st.planks.length <= 2) ? [] : [`storey ${s} with ${st.planks.length} planks`];
     }))).toEqual([]);
   });
 
-  it('puts the star on the roof', () => {
-    for (const { layout } of BUILT) {
-      expect(layout.star.row).toBe(layout.roofRow);
-      expect(storeyView(layout, layout.storeys.length).y).toBeLessThan(layout.roofRow * TILE);
-    }
+  it('stands the star on the roof, in view below the HUD', () => {
+    expect(problems((t) => {
+      const box = starBox(t);
+      const view = storeyView(t, t.storeys.length);
+      const out: string[] = [];
+      for (let c = t.star.col; c < t.star.col + 2; c++) {
+        if (towerTileFaces(t.map[t.roofRow][c + WALL]) !== 'all') out.push(`col ${c} is not on solid roof`);
+      }
+      if (box.y + box.h !== t.roofRow * TILE) out.push('not standing on the roof');
+      if (box.y < view.y + HUD_ROOM || box.y + box.h > view.y + LEARN_VIEW_H) out.push('out of view');
+      return out;
+    })).toEqual([]);
+  });
+
+  it('draws exactly what its storeys describe, and nothing else', () => {
+    expect(problems((t) => {
+      const want = t.map.map((row) => row.map(() => T_EMPTY));
+      const fill = (row: number, col: number, width: number, code: number): void => {
+        for (let c = col; c < col + width; c++) want[row][c + WALL] = code;
+      };
+      for (let r = t.storeys[0].floorRow; r < t.rows; r++) fill(r, 0, INSIDE, T_BRICK);
+      for (const st of t.storeys) {
+        for (const p of st.planks) fill(p.row, p.col, p.width, T_PLANK);
+        fill(st.letterFloorRow, 0, INSIDE, T_PLANK);
+        for (const row of st.ceilingRows) {
+          fill(row, 0, INSIDE, T_BRICK);
+          for (const b of st.blocks) fill(row, b.col, b.width, T_LETTER);
+        }
+      }
+      for (let r = t.roofRow - BATTLEMENTS; r < t.rows; r++) {
+        want[r][1] = T_STONE;
+        want[r][MAP_COLS - 2] = T_STONE;
+        if (r > t.roofRow - BATTLEMENTS) {
+          want[r][0] = T_STONE;
+          want[r][MAP_COLS - 1] = T_STONE;
+        }
+      }
+      return t.map.flatMap((row, r) => row.flatMap((code, c) => (code === want[r][c] ? [] : [`row ${r} col ${c}`])));
+    })).toEqual([]);
+  });
+
+  it('sets the blocks where the spec puts them', () => {
+    expect(problems((t) => {
+      const want = t.mode === 'syllables' ? [[2, 3], [10, 3], [18, 3]] : [[3, 2], [11, 2], [19, 2]];
+      return t.storeys.flatMap((st, s) =>
+        JSON.stringify(st.blocks.map((b) => [b.col, b.width])) === JSON.stringify(want) ? [] : [`storey ${s}`]);
+    })).toEqual([]);
+  });
+
+  it('lets wood be jumped up through, and nothing else', () => {
+    expect(towerTileFaces(T_PLANK)).toBe('top');
+    for (const code of [T_BRICK, T_STONE, T_LETTER]) expect(towerTileFaces(code)).toBe('all');
+    expect(towerTileFaces(T_EMPTY)).toBe('none');
+  });
+
+  it('sends the first plank away from the nearer wall', () => {
+    expect(problems((t) => t.storeys.flatMap((st, s) => {
+      const p = st.planks[0];
+      const away = st.arrivalCol < INSIDE / 2 ? p.col > st.arrivalCol : p.col < st.arrivalCol;
+      return away ? [] : [`storey ${s}`];
+    }))).toEqual([]);
+  });
+
+  it('has four storeys, with a gap for each', () => {
+    expect(GAPS).toHaveLength(GATES_PER_TOWER);
+    expect(problems((t) => (t.storeys.length === GATES_PER_TOWER ? [] : [`${t.storeys.length} storeys`]))).toEqual([]);
+  });
+
+  it('starts the hero at the door, on the first storey floor', () => {
+    expect(problems((t) =>
+      t.start.col === START_COL && t.start.row === t.storeys[0].floorRow ? [] : ['start'])).toEqual([]);
+  });
+
+  it('settles a short view from its top and a tall one on its floor, centred on the tower', () => {
+    const middle = (MAP_COLS * TILE) / 2;
+    const short = { x: middle - LEARN_VIEW_W / 2, y: 100, width: LEARN_VIEW_W, height: LEARN_VIEW_H - 8 };
+    const tall = { x: middle - LEARN_VIEW_W / 2, y: 100, width: LEARN_VIEW_W, height: LEARN_VIEW_H + 88 };
+    expect(settleCenter(short)).toEqual({ x: middle, y: 100 + LEARN_VIEW_H / 2 });
+    expect(settleCenter(tall)).toEqual({ x: middle, y: 100 + LEARN_VIEW_H + 88 - LEARN_VIEW_H / 2 });
+    expect(problems((t) => {
+      const v = storeyView(t, 0);
+      return v.width === LEARN_VIEW_W && v.x + v.width / 2 === middle ? [] : ['off centre'];
+    })).toEqual([]);
   });
 });
 
