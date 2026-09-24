@@ -35,11 +35,11 @@ export interface TowerTargets {
 }
 
 /**
- * A tower's four questions, avoiding what this session has already asked (`used`, which
- * this appends to) and never repeating one inside a tower. In words mode the four are the
+ * A tower's four questions, avoiding what this round has already asked (`used`, which this
+ * appends to) and never repeating one inside a tower. In words mode the four are the
  * letters of one word, and it is the word that is not repeated. The tower that uses up the
- * pool starts a new round: `used` is emptied and keeps only that tower's own questions, so
- * the next tower still avoids them.
+ * pool ends the round: `used` is emptied and keeps only that tower's own questions, so
+ * they are not asked again until the round after.
  */
 export function pickTargets(mode: LearnMode, used: string[], rand: Rand = random): TowerTargets {
   if (mode === 'words') {

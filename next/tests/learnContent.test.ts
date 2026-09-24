@@ -87,6 +87,7 @@ describe("a tower's targets", () => {
     const { word } = pickTargets('words', used, seq(9));
     expect(LEARN_WORDS).toContain(word);
     expect(used).toEqual([word]);
+    expect(pickTargets('words', used, seq(10)).word).not.toBe(word);
   });
 });
 
