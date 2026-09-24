@@ -35,13 +35,17 @@ export interface TowerTargets {
 }
 
 /**
- * A tower's four questions, avoiding what this session has asked (`used`, which this
- * appends to). Once the pool is used up it starts again, but never repeats inside a tower.
+ * A tower's four questions, avoiding what this session has already asked (`used`, which
+ * this appends to) and never repeating one inside a tower. In words mode the four are the
+ * letters of one word, and it is the word that is not repeated. The tower that uses up the
+ * pool starts a new round: `used` is emptied and keeps only that tower's own questions, so
+ * the next tower still avoids them.
  */
 export function pickTargets(mode: LearnMode, used: string[], rand: Rand = random): TowerTargets {
   if (mode === 'words') {
     const fresh = LEARN_WORDS.filter((w) => !used.includes(w));
     const word = pickFrom(fresh.length > 0 ? fresh : LEARN_WORDS, rand);
+    if (fresh.length <= 1) used.length = 0;
     used.push(word);
     return { targets: word.split(''), word };
   }
@@ -51,6 +55,7 @@ export function pickTargets(mode: LearnMode, used: string[], rand: Rand = random
     const fresh = pool.filter((x) => !used.includes(x) && !targets.includes(x));
     targets.push(pickFrom(fresh.length > 0 ? fresh : pool.filter((x) => !targets.includes(x)), rand));
   }
+  if (pool.every((x) => used.includes(x) || targets.includes(x))) used.length = 0;
   used.push(...targets);
   return { targets, word: null };
 }
