@@ -24,7 +24,11 @@ export function headTileRow(bodyTop: number): number {
   return Math.floor(bodyTop / TILE) - 1;
 }
 
-/** The world's size, and which of its four edges stop the body. */
+/**
+ * The world's size, and which of its four edges stop the body. The edges belong to the
+ * world (`setBoundsCollision`), not to this body: every body in the scene that collides
+ * with the world's bounds meets the same ones.
+ */
 export interface WorldEdges {
   width: number;
   height: number;
@@ -39,17 +43,16 @@ export interface BodyMoverOptions {
   layer: Phaser.Tilemaps.TilemapLayer;
   /** World bounds to set; left out, the world's bounds are not touched and not used. */
   edges?: WorldEdges;
-  /**
-   * Called for every tile Arcade separated the body from during the step, with that tile.
-   * Arcade calls it AFTER the separation, so `blocked.*` already says which way.
-   */
-  onTile?: (tile: Phaser.Tilemaps.Tile) => void;
 }
 
 /** What one step found out that the player state cannot hold. */
 export interface MoveReport {
-  /** Stopped from above this step: a head hit. */
-  blockedUp: boolean;
+  /**
+   * The tile row a rising head was stopped under this step, or null. Which cells of that
+   * row it hit is the caller's rule — the adventure's is bumpBlocksAbove's two probe
+   * columns (game/player.ts).
+   */
+  headHitRow: number | null;
 }
 
 export type BodyMover = (p: PlayerState) => MoveReport;
@@ -67,16 +70,28 @@ export type BodyMover = (p: PlayerState) => MoveReport;
  * `allowGravity` is off as well as the world's gravity being zero, to say out loud that
  * the absence is deliberate.
  *
- * **`onGround` comes from `blocked.down`.** Phaser 4 sets `touching.*` only in the
- * body-versus-body separator; a body standing on a TILEMAP has `touching.down` false
- * forever. `blocked.down` also covers world bounds.
+ * **`onGround` comes from `blocked.down`, and it has to.** Phaser 4 sets `touching.*` only
+ * in the body-versus-body separator; a body standing on a TILEMAP has `touching.down` false
+ * forever. Reading it would leave `onGround` false for good — coyote time would never arm,
+ * the jump buffer would never fire, and the player could not jump at all. `blocked.down`
+ * also covers world bounds.
  *
- * **A standalone body**, with no Game Object: a body with one re-reads its position from it
- * every step, which would make the drawn image an input to the physics. The body IS the
- * hitbox, so `body.position` is `p.x, p.y` with no offset.
+ * **A head hit is `blocked.up`, plus the row it was stopped under** (headTileRow). The tile
+ * separator sets `blocked.up` only when the body was RISING, so it cannot fire on a landing
+ * or a sideways scrape. There is no tile callback, because Arcade's collider callback
+ * cannot say which tiles a head hit: it visits tiles left to right, and once it has snapped
+ * the body under the first, the next one along no longer overlaps the body and is never
+ * reported. A head under a brick and a letter would report the brick alone.
+ *
+ * **A standalone body**, with no Game Object, for two reasons. A body with one re-reads its
+ * position from it every step, which would make the drawn image an input to the physics;
+ * and a player can be drawn by more than one image (SliceScene's syncPlayer swaps three),
+ * none of which is the hitbox. The body IS the hitbox, so `body.position` is `p.x, p.y`
+ * with no offset: the sprite's 2px margin is SliceScene's PLAYER_DRAW_INSET, where the
+ * drawing is, and does not belong here.
  *
  * **It rests disabled** and is switched on for exactly its own step (physics/body.ts's
- * stepBodyAlone), so no other body in the world moves with it.
+ * stepBodyAlone), so no other body's step moves it.
  */
 export function createBodyMover(
   scene: Phaser.Scene,
@@ -84,11 +99,13 @@ export function createBodyMover(
   options: BodyMoverOptions,
 ): BodyMover {
   const physics = scene.physics;
-  const { edges, onTile } = options;
+  const { edges } = options;
 
   // Before the body: its custom bounds rectangle is captured from world.bounds when it is
   // built. setBounds mutates that same Rectangle, so the order does not strictly matter —
-  // but a body built against the canvas's 640x400 default is a trap for later.
+  // but a body built against the canvas's 640x400 default is a trap for later. Without
+  // `edges` the body is built against exactly that default, which is harmless only because
+  // it then never collides with the world's bounds.
   if (edges) {
     physics.world.setBounds(0, 0, edges.width, edges.height, edges.left, edges.right, edges.up, edges.down);
   }
@@ -99,11 +116,7 @@ export function createBodyMover(
 
   // A persistent collider rather than a per-step physics.collide call, so that it runs
   // INSIDE the Arcade step, between the body moving and the step ending.
-  physics.add.collider(
-    body,
-    options.layer,
-    onTile ? (_body, tile) => onTile(tile as Phaser.Tilemaps.Tile) : undefined,
-  );
+  physics.add.collider(body, options.layer);
 
   body.enable = false;
 
@@ -125,7 +138,7 @@ export function createBodyMover(
     p.vx = body.velocity.x / PX_PER_FRAME_TO_PX_PER_SECOND;
     p.vy = body.velocity.y / PX_PER_FRAME_TO_PX_PER_SECOND;
     p.onGround = body.blocked.down;
-    return { blockedUp: body.blocked.up };
+    return { headHitRow: body.blocked.up ? headTileRow(body.y) : null };
   };
 }
 
@@ -135,10 +148,8 @@ export function createBodyMover(
  * ceiling and, above all, no floor: the pit is a `y` threshold the player must be able to
  * fall through — plus the head-first `?` block bump (index.html:1417-1420).
  *
- * `blocked.up` is set by the tile separator only when the body was RISING, so the bump
- * cannot fire on a landing or a sideways scrape. `player.x` is already written back when
- * bumpBlocksAbove reads its two probe columns, as the live source reads them off its
- * already-swept x.
+ * `player.x` is already written back when bumpBlocksAbove reads its two probe columns, as
+ * the live source reads them off its already-swept x.
  */
 export function createPlayerMove(
   scene: Phaser.Scene,
@@ -157,8 +168,9 @@ export function createPlayerMove(
     },
   });
   return (w: World): void => {
-    if (mover(w.player).blockedUp) {
-      bumpBlocksAbove(w, headTileRow(w.player.y));
+    const { headHitRow } = mover(w.player);
+    if (headHitRow !== null) {
+      bumpBlocksAbove(w, headHitRow);
     }
   };
 }
