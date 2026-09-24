@@ -595,7 +595,7 @@ read back — and to know when a rising head was stopped, and under which row. `
 is that; the adventure's `createPlayerMove` becomes a wrapper that adds the `?` block bump.
 
 This task was carried out as two commits. The first gave the mover a tile callback; review
-found that the callback reports only the first tile along a head (see *Verified facts*). The
+found that the callback reports only the first tile along a head (see *What was checked in Phaser's source before writing this*). The
 code below is the file after the second.
 
 **Files:**
@@ -1090,6 +1090,12 @@ The whole storey geometry of the spec, as data. Every rule in the spec's *Hop ru
 - Modify: `next/tests/learnContent.test.ts`
 - Test: `next/tests/learnTower.test.ts`
 
+Review added tests for the whole map, the spec's block columns, the tile faces and the
+camera helpers. It renamed `VIEW_W`/`VIEW_H` and `BASE`, which sat too close to the
+adventure's names, and moved `TileFaces` to `game/tiles.ts` so the tower imports nothing
+from `physics/`. It also moved the star across the roof from the last spring, which could
+otherwise carry the hero straight into it. The code below is the result.
+
 - [ ] **Step 1: Add the seeded random helper**
 
 Create `next/tests/helpers/seeded.ts`:
@@ -1128,10 +1134,11 @@ Create `next/tests/learnTower.test.ts`:
 ```ts
 import { describe, expect, it } from 'vitest';
 import { TILE } from '../src/config/constants';
-import { LEARN_WORDS, pickTargets, type LearnMode } from '../src/game/learn/content';
+import { GATES_PER_TOWER, LEARN_WORDS, pickTargets, type LearnMode } from '../src/game/learn/content';
 import {
-  buildTower, GAPS, INSIDE, LETTER_ROOM, MAP_COLS, plankLengths, RISE, START_COL, storeyView,
-  T_BRICK, T_LETTER, T_PLANK, T_STONE, type TowerLayout, VIEW_H, WALL,
+  BATTLEMENTS, buildTower, GAPS, HUD_ROOM, INSIDE, LEARN_VIEW_H, LEARN_VIEW_W, LETTER_ROOM, MAP_COLS,
+  plankLengths, RISE, settleCenter, START_COL, starBox, storeyView, T_BRICK, T_EMPTY, T_LETTER,
+  T_PLANK, T_STONE, towerTileFaces, type TowerLayout, WALL,
 } from '../src/game/learn/tower';
 import { seeded } from './helpers/seeded';
 
@@ -1250,16 +1257,105 @@ describe('a learn tower', () => {
 
   it('fits a storey of one or two planks on screen, and scrolls the longer ones', () => {
     expect(problems((t) => t.storeys.flatMap((st, s) => {
-      const fits = storeyView(t, s).height <= VIEW_H;
+      const fits = storeyView(t, s).height <= LEARN_VIEW_H;
       return fits === (st.planks.length <= 2) ? [] : [`storey ${s} with ${st.planks.length} planks`];
     }))).toEqual([]);
   });
 
-  it('puts the star on the roof', () => {
-    for (const { layout } of BUILT) {
-      expect(layout.star.row).toBe(layout.roofRow);
-      expect(storeyView(layout, layout.storeys.length).y).toBeLessThan(layout.roofRow * TILE);
-    }
+  it('stands the star on the roof, in view below the HUD', () => {
+    expect(problems((t) => {
+      const box = starBox(t);
+      const view = storeyView(t, t.storeys.length);
+      const out: string[] = [];
+      for (let c = t.star.col; c < t.star.col + 2; c++) {
+        if (towerTileFaces(t.map[t.roofRow][c + WALL]) !== 'all') out.push(`col ${c} is not on solid roof`);
+      }
+      if (box.y + box.h !== t.roofRow * TILE) out.push('not standing on the roof');
+      if (box.y < view.y + HUD_ROOM || box.y + box.h > view.y + LEARN_VIEW_H) out.push('out of view');
+      return out;
+    })).toEqual([]);
+  });
+
+  it('keeps the star clear of the columns the last spring comes up through', () => {
+    expect(problems((t) => {
+      const last = t.storeys[t.storeys.length - 1];
+      const answer = last.blocks.find((b) => b.correct) ?? last.blocks[0];
+      // The trapdoor is the block and a column either side; one more for the hero's width.
+      const from = answer.col - 2;
+      const to = answer.col + answer.width + 1;
+      return t.star.col + 1 < from || t.star.col > to ? [] : [`star at ${t.star.col}, spring through ${from}-${to}`];
+    })).toEqual([]);
+  });
+
+  it('draws exactly what its storeys describe, and nothing else', () => {
+    expect(problems((t) => {
+      const want = t.map.map((row) => row.map(() => T_EMPTY));
+      const fill = (row: number, col: number, width: number, code: number): void => {
+        for (let c = col; c < col + width; c++) want[row][c + WALL] = code;
+      };
+      for (let r = t.storeys[0].floorRow; r < t.rows; r++) fill(r, 0, INSIDE, T_BRICK);
+      for (const st of t.storeys) {
+        for (const p of st.planks) fill(p.row, p.col, p.width, T_PLANK);
+        fill(st.letterFloorRow, 0, INSIDE, T_PLANK);
+        for (const row of st.ceilingRows) {
+          fill(row, 0, INSIDE, T_BRICK);
+          for (const b of st.blocks) fill(row, b.col, b.width, T_LETTER);
+        }
+      }
+      for (let r = t.roofRow - BATTLEMENTS; r < t.rows; r++) {
+        want[r][1] = T_STONE;
+        want[r][MAP_COLS - 2] = T_STONE;
+        if (r > t.roofRow - BATTLEMENTS) {
+          want[r][0] = T_STONE;
+          want[r][MAP_COLS - 1] = T_STONE;
+        }
+      }
+      return t.map.flatMap((row, r) => row.flatMap((code, c) => (code === want[r][c] ? [] : [`row ${r} col ${c}`])));
+    })).toEqual([]);
+  });
+
+  it('sets the blocks where the spec puts them', () => {
+    expect(problems((t) => {
+      const want = t.mode === 'syllables' ? [[2, 3], [10, 3], [18, 3]] : [[3, 2], [11, 2], [19, 2]];
+      return t.storeys.flatMap((st, s) =>
+        JSON.stringify(st.blocks.map((b) => [b.col, b.width])) === JSON.stringify(want) ? [] : [`storey ${s}`]);
+    })).toEqual([]);
+  });
+
+  it('lets wood be jumped up through, and nothing else', () => {
+    expect(towerTileFaces(T_PLANK)).toBe('top');
+    for (const code of [T_BRICK, T_STONE, T_LETTER]) expect(towerTileFaces(code)).toBe('all');
+    expect(towerTileFaces(T_EMPTY)).toBe('none');
+  });
+
+  it('sends the first plank away from the nearer wall', () => {
+    expect(problems((t) => t.storeys.flatMap((st, s) => {
+      const p = st.planks[0];
+      const away = st.arrivalCol < INSIDE / 2 ? p.col > st.arrivalCol : p.col < st.arrivalCol;
+      return away ? [] : [`storey ${s}`];
+    }))).toEqual([]);
+  });
+
+  it('has four storeys, with a gap for each', () => {
+    expect(GAPS).toHaveLength(GATES_PER_TOWER);
+    expect(problems((t) => (t.storeys.length === GATES_PER_TOWER ? [] : [`${t.storeys.length} storeys`]))).toEqual([]);
+  });
+
+  it('starts the hero at the door, on the first storey floor', () => {
+    expect(problems((t) =>
+      t.start.col === START_COL && t.start.row === t.storeys[0].floorRow ? [] : ['start'])).toEqual([]);
+  });
+
+  it('settles a short view from its top and a tall one on its floor, centred on the tower', () => {
+    const middle = (MAP_COLS * TILE) / 2;
+    const short = { x: middle - LEARN_VIEW_W / 2, y: 100, width: LEARN_VIEW_W, height: LEARN_VIEW_H - 8 };
+    const tall = { x: middle - LEARN_VIEW_W / 2, y: 100, width: LEARN_VIEW_W, height: LEARN_VIEW_H + 88 };
+    expect(settleCenter(short)).toEqual({ x: middle, y: 100 + LEARN_VIEW_H / 2 });
+    expect(settleCenter(tall)).toEqual({ x: middle, y: 100 + LEARN_VIEW_H + 88 - LEARN_VIEW_H / 2 });
+    expect(problems((t) => {
+      const v = storeyView(t, 0);
+      return v.width === LEARN_VIEW_W && v.x + v.width / 2 === middle ? [] : ['off centre'];
+    })).toEqual([]);
   });
 });
 
@@ -1284,8 +1380,8 @@ Create `next/src/game/learn/tower.ts`:
 
 ```ts
 import { BASE_H, BASE_W, TILE } from '../../config/constants';
-import type { TileFaces } from '../../physics/tiles';
 import { random } from '../random';
+import type { TileFaces } from '../tiles';
 import { GATES_PER_TOWER, type LearnMode, pickFrom, pickOptions, type Rand } from './content';
 
 /** The tower's own tile codes. They are also the frame numbers of its tileset (gfx/learnTiles.ts). */
@@ -1314,7 +1410,7 @@ export const LETTER_ROOM = 5;
 /** Letter ceiling thickness. */
 export const CEILING = 2;
 /** Rows of brick under the first storey. */
-export const BASE = 2;
+export const BASE_ROWS = 2;
 /** Wall rows above the roof. */
 export const BATTLEMENTS = 2;
 /** Rows of sky above the roof. */
@@ -1323,13 +1419,12 @@ export const ROOF_SKY = 8;
 export const GAPS: readonly number[] = [2, 3, 4, 4];
 /** Inside column the hero starts on, beside the tower's door. */
 export const START_COL = 4;
-/** The star is two tiles wide, on columns 11-12: the middle of the tower. */
-export const STAR_COL = 11;
 
 /** The tower's camera zoom: a one- or two-plank storey fits whole at this zoom. */
 export const LEARN_ZOOM = 1.25;
-export const VIEW_W = BASE_W / LEARN_ZOOM;
-export const VIEW_H = BASE_H / LEARN_ZOOM;
+/** The tower's view in world px. Not config/constants.ts's VIEW_W/VIEW_H: the adventure zooms 1.5. */
+export const LEARN_VIEW_W = BASE_W / LEARN_ZOOM;
+export const LEARN_VIEW_H = BASE_H / LEARN_ZOOM;
 /** World px the 48px HUD covers at this zoom (48 / 1.25 = 38.4), rounded up. */
 export const HUD_ROOM = 40;
 
@@ -1340,6 +1435,7 @@ export interface Plank {
   row: number;
 }
 
+/** A letter block set into a letter ceiling. `col` counts inside the walls, as a plank's does. */
 export interface Block {
   col: number;
   width: number;
@@ -1373,6 +1469,16 @@ export interface TowerLayout {
   start: { col: number; row: number };
   /** The star's inside column, standing on the top of `row`. */
   star: { col: number; row: number };
+}
+
+/**
+ * The star's inside column (it is two tiles wide), three tiles in from the wall on the far
+ * side of the roof from `arrivalCol`, where the last spring comes up. So the spring lands
+ * you on the roof, clear of the star, and you walk to it, rather than springing straight
+ * into it and ending the tower in mid-air.
+ */
+export function starCol(arrivalCol: number): number {
+  return arrivalCol < INSIDE / 2 ? INSIDE - 5 : 3;
 }
 
 /** A storey with `planks` planks, floor to ceiling top, in tiles. */
@@ -1410,6 +1516,11 @@ export function plankCounts(rand: Rand): number[] {
  * side of the arrival column, away from the nearer wall. Each next plank is the storey's gap
  * beyond the last one, carrying on in the same direction while it fits and turning back at
  * a wall. No plank can then overlap the one before it.
+ *
+ * Every plank fits without clamping. From any arrival column, a walk of at most 6 plus the
+ * longest plank stops short of the far wall. A turn-back always has room: both ways are
+ * blocked only if a plank, two gaps and two more planks need 26 columns or more, and with
+ * these gaps and lengths they need at most 22.
  */
 export function placePlanks(storey: number, count: number, arrivalCol: number, rand: Rand): Array<{ col: number; width: number }> {
   const lengths = plankLengths(storey);
@@ -1418,7 +1529,7 @@ export function placePlanks(storey: number, count: number, arrivalCol: number, r
   const first = pickFrom(lengths, rand);
   const walk = 2 + Math.floor(rand() * 5);
   const firstCol = dir > 0 ? arrivalCol + walk : arrivalCol - walk - (first - 1);
-  const planks = [{ col: Math.max(0, Math.min(INSIDE - first, firstCol)), width: first }];
+  const planks = [{ col: firstCol, width: first }];
   for (let k = 1; k < count; k++) {
     const width = pickFrom(lengths, rand);
     const prev = planks[k - 1];
@@ -1447,14 +1558,14 @@ export function buildTower(
 ): TowerLayout {
   const counts = plankCounts(rand);
   const roofHeight = counts.reduce((sum, n) => sum + storeyHeight(n), 0);
-  const rows = ROOF_SKY + roofHeight + BASE;
-  const rowAt = (height: number): number => rows - BASE - height;
+  const rows = ROOF_SKY + roofHeight + BASE_ROWS;
+  const rowAt = (height: number): number => rows - BASE_ROWS - height;
   const map = Array.from({ length: rows }, () => new Array<number>(MAP_COLS).fill(T_EMPTY));
   const fill = (row: number, col: number, width: number, code: number): void => {
     for (let c = col; c < col + width; c++) map[row][c + WALL] = code;
   };
 
-  for (let r = rows - BASE; r < rows; r++) fill(r, 0, INSIDE, T_BRICK);
+  for (let r = rows - BASE_ROWS; r < rows; r++) fill(r, 0, INSIDE, T_BRICK);
 
   const { cols: blockCols, width: blockWidth } = blockLayout(mode);
   const storeys: Storey[] = [];
@@ -1503,8 +1614,8 @@ export function buildTower(
   const roofRow = rowAt(floor);
   return {
     mode, word, map, rows, storeys, roofRow,
-    start: { col: START_COL, row: rows - BASE },
-    star: { col: STAR_COL, row: roofRow },
+    start: { col: START_COL, row: rows - BASE_ROWS },
+    star: { col: starCol(arrivalCol), row: roofRow },
   };
 }
 
@@ -1522,14 +1633,14 @@ export interface ViewRect {
  * the view's width, centred on the tower, so the camera never scrolls sideways.
  */
 export function storeyView(layout: TowerLayout, s: number): ViewRect {
-  const x = (MAP_COLS * TILE - VIEW_W) / 2;
+  const x = (MAP_COLS * TILE - LEARN_VIEW_W) / 2;
   if (s >= layout.storeys.length) {
-    return { x, y: -HUD_ROOM, width: VIEW_W, height: (layout.roofRow + 1) * TILE + HUD_ROOM };
+    return { x, y: -HUD_ROOM, width: LEARN_VIEW_W, height: (layout.roofRow + 1) * TILE + HUD_ROOM };
   }
   const st = layout.storeys[s];
   const top = st.ceilingRows[0] * TILE - HUD_ROOM;
   const bottom = (st.floorRow + 1) * TILE;
-  return { x, y: top, width: VIEW_W, height: bottom - top };
+  return { x, y: top, width: LEARN_VIEW_W, height: bottom - top };
 }
 
 /**
@@ -1540,7 +1651,7 @@ export function storeyView(layout: TowerLayout, s: number): ViewRect {
 export function settleCenter(view: ViewRect): { x: number; y: number } {
   return {
     x: view.x + view.width / 2,
-    y: view.height <= VIEW_H ? view.y + VIEW_H / 2 : view.y + view.height - VIEW_H / 2,
+    y: view.height <= LEARN_VIEW_H ? view.y + LEARN_VIEW_H / 2 : view.y + view.height - LEARN_VIEW_H / 2,
   };
 }
 
@@ -1586,7 +1697,7 @@ git commit -m "feat: a learn tower, built to the spacing rules" -m "buildTower l
 
 A head bumps a block the way the adventure's `?` blocks always have: at two columns probed
 3px in from each side of the player, so a head a little way under either edge of a block
-bumps it. Arcade's tile callback cannot give this (see *Verified facts*), so the rule moves
+bumps it. Arcade's tile callback cannot give this (see *What was checked in Phaser's source before writing this*), so the rule moves
 out of `bumpBlocksAbove` into a function the climb shares.
 
 In `next/src/game/player.ts`, insert directly above the doc comment of `bumpBlocksAbove`
@@ -2870,7 +2981,7 @@ import { STEP_MS, TILE } from '../config/constants';
 import { createClimb, stepClimb } from '../game/learn/climb';
 import type { LearnMode } from '../game/learn/content';
 import {
-  LEARN_ZOOM, settleCenter, starBox, storeyView, T_EMPTY, towerTileFaces, WALL,
+  LEARN_ZOOM, MAP_COLS, settleCenter, starBox, storeyView, T_EMPTY, towerTileFaces, WALL,
 } from '../game/learn/tower';
 import type { Climb, ClimbEvent, ClimbMove } from '../game/learn/types';
 import type { Character } from '../game/player';
@@ -2962,7 +3073,19 @@ export class LearnTowerScene extends Phaser.Scene {
     this.climb = createClimb(this.mode, this.used, this.character);
 
     this.layer = this.buildLayer();
-    this.move = createBodyMover(this, this.climb.player, { layer: this.layer });
+    // The side walls are world edges too: above the last storey they stand only BATTLEMENTS
+    // high, lower than a jump, and nothing else would keep the hero on the roof.
+    this.move = createBodyMover(this, this.climb.player, {
+      layer: this.layer,
+      edges: {
+        width: MAP_COLS * TILE,
+        height: this.climb.layout.rows * TILE,
+        left: true,
+        right: true,
+        up: false,
+        down: false,
+      },
+    });
     this.buildBlocks();
     this.buildStar();
     this.playerImage = this.add.image(0, 0, this.poseKey()).setOrigin(0, 0).setDepth(DEPTH_PLAYER);
@@ -3177,7 +3300,9 @@ Click the canvas so it has focus, then check, in this order:
    its own cannot reach the letters: they hang 5 tiles up so that only a real jump answers.)
 7. Climb a storey with 3 or more planks: the camera follows. A storey with 1 or 2 planks
    sits whole on screen.
-8. Solve all four gates, walk to the star on the roof: after two seconds a new tower starts.
+8. Solve all four gates. The last spring lands you on the roof, not in the star. Run at each
+   wall and jump: you stop at the tower's edge. Then walk to the star: after two seconds a
+   new tower starts.
 9. Press Escape: the learn menu's placeholder screen appears (its key is still `Learn`).
 
 Expected: all nine. If 2 fails (you bonk on planks), the per-side collision is not applied;
@@ -3483,6 +3608,8 @@ differs:
   whole and still.
 - Near-miss landings onto a plank snap you on top (Arcade's tile bias) and do not look
   broken.
+- On the roof, running at a wall and jumping stops you at the tower's edge, and the last
+  spring lands you on the roof rather than in the star.
 - Back works from the tower and from the menu.
 - On a 120Hz screen, if one is available, the climb is not faster than on 60Hz.
 

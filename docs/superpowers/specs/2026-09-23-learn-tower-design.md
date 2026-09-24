@@ -228,6 +228,7 @@ Vertically the camera is bounded to the current storey:
 | Jump-through planks | Per-side tile collision: the top face only. |
 | Trapdoor | Removing and replacing tiles through the tilemap API, with a tween for the swing. |
 | Camera | Follow, per-storey bounds, follow offset, and a pan between storeys. |
+| Keeping the hero in the tower | World bounds on both sides: above the last storey the walls are lower than a jump. |
 | Effects | Tweens for the pop, wobble, glow, star bob and banner sway. Particle emitters for sparkles, brick chunks and confetti. A sprite animation for the torch flames. |
 | Delays | Phaser time events. |
 | Sky through windows | A world-space gradient behind a back-wall layer with window openings. |
