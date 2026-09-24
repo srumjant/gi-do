@@ -817,6 +817,11 @@ git commit -m "refactor: one Arcade mover for any player, the adventure's wrappe
 - Modify: `next/tests/world.test.ts`
 - Test: `next/tests/learnContent.test.ts`
 
+This task was carried out as two commits. Review found that nothing reset `used` once the
+pool ran out, so every later tower drew from the whole pool and most repeated something
+from the tower before; the second commit starts a new round there. The code below is the
+result.
+
 - [ ] **Step 1: Let the Phaser-free check see into subfolders**
 
 `tests/world.test.ts` checks that nothing in `src/game/` imports Phaser by reading every
@@ -912,6 +917,7 @@ describe("a tower's targets", () => {
     const used = [...LEARN_LETTERS];
     const { targets } = pickTargets('letters', used, seq(3));
     expect(new Set(targets).size).toBe(GATES_PER_TOWER);
+    expect(targets.every((t) => LEARN_LETTERS.includes(t))).toBe(true);
   });
 
   it('spell one word, a letter per gate, in words mode', () => {
@@ -920,6 +926,30 @@ describe("a tower's targets", () => {
     expect(word).not.toBeNull();
     expect(LEARN_WORDS).toContain(word);
     expect(targets.join('')).toBe(word);
+    expect(used).toEqual([word]);
+  });
+
+  it('start a new round once the pool is used up, still avoiding the tower that used it up', () => {
+    const used = LEARN_LETTERS.slice(0, LEARN_LETTERS.length - GATES_PER_TOWER);
+    const { targets: last } = pickTargets('letters', used, seq(5));
+    expect(used).toEqual(last);
+    expect([...last].sort()).toEqual(LEARN_LETTERS.slice(-GATES_PER_TOWER).sort());
+    const { targets: next } = pickTargets('letters', used, seq(6));
+    expect(next.some((t) => last.includes(t))).toBe(false);
+  });
+
+  it('start a new round of words with the last fresh one, and not repeat it next', () => {
+    const used = LEARN_WORDS.slice(0, -1);
+    const { word } = pickTargets('words', used, seq(7));
+    expect(word).toBe(LEARN_WORDS[LEARN_WORDS.length - 1]);
+    expect(used).toEqual([word]);
+    expect(pickTargets('words', used, seq(8)).word).not.toBe(word);
+  });
+
+  it('still pick a word when every word has been spelled', () => {
+    const used = [...LEARN_WORDS];
+    const { word } = pickTargets('words', used, seq(9));
+    expect(LEARN_WORDS).toContain(word);
     expect(used).toEqual([word]);
   });
 });
@@ -993,13 +1023,17 @@ export interface TowerTargets {
 }
 
 /**
- * A tower's four questions, avoiding what this session has asked (`used`, which this
- * appends to). Once the pool is used up it starts again, but never repeats inside a tower.
+ * A tower's four questions, avoiding what this session has already asked (`used`, which
+ * this appends to) and never repeating one inside a tower. In words mode the four are the
+ * letters of one word, and it is the word that is not repeated. The tower that uses up the
+ * pool starts a new round: `used` is emptied and keeps only that tower's own questions, so
+ * the next tower still avoids them.
  */
 export function pickTargets(mode: LearnMode, used: string[], rand: Rand = random): TowerTargets {
   if (mode === 'words') {
     const fresh = LEARN_WORDS.filter((w) => !used.includes(w));
     const word = pickFrom(fresh.length > 0 ? fresh : LEARN_WORDS, rand);
+    if (fresh.length <= 1) used.length = 0;
     used.push(word);
     return { targets: word.split(''), word };
   }
@@ -1009,6 +1043,7 @@ export function pickTargets(mode: LearnMode, used: string[], rand: Rand = random
     const fresh = pool.filter((x) => !used.includes(x) && !targets.includes(x));
     targets.push(pickFrom(fresh.length > 0 ? fresh : pool.filter((x) => !targets.includes(x)), rand));
   }
+  if (pool.every((x) => used.includes(x) || targets.includes(x))) used.length = 0;
   used.push(...targets);
   return { targets, word: null };
 }
@@ -1052,6 +1087,7 @@ The whole storey geometry of the spec, as data. Every rule in the spec's *Hop ru
 **Files:**
 - Create: `next/src/game/learn/tower.ts`
 - Create: `next/tests/helpers/seeded.ts`
+- Modify: `next/tests/learnContent.test.ts`
 - Test: `next/tests/learnTower.test.ts`
 
 - [ ] **Step 1: Add the seeded random helper**
@@ -1074,6 +1110,16 @@ export function seeded(seed: number): () => number {
   };
 }
 ```
+
+Then move `next/tests/learnContent.test.ts` onto it, so the tests have one deterministic
+source (its local `seq`, a Park–Miller generator, starts every seed from 1 to 200 on a first
+draw below 0.0016):
+- delete that file's local `seq` function and the comment line above it;
+- add `import { seeded } from './helpers/seeded';` after its `loadLegacySection` import;
+- replace every `seq(` in the file with `seeded(`.
+
+Run: `npx vitest run tests/learnContent.test.ts`
+Expected: PASS. None of its assertions depends on which numbers come out.
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -1520,8 +1566,8 @@ in a scratch test from its seed to see why.
 Run: `npm test && npm run build`
 
 ```bash
-git add src/game/learn/tower.ts tests/learnTower.test.ts tests/helpers/seeded.ts
-git commit -m "feat: a learn tower, built to the spacing rules" -m "buildTower lays out four storeys bottom-up: planks 3 tiles apart with gaps of 2, 3, 4, 4 and three lengths per storey set by the gap, a full-width letter floor, and a two-tile brick ceiling with the letters five tiles above it. The first storey is short, every tower has a long climb, and a one- or two-plank storey fits on screen at the tower's 1.25 zoom. Every one of those is a test over 300 seeded towers."
+git add src/game/learn/tower.ts tests/learnTower.test.ts tests/helpers/seeded.ts tests/learnContent.test.ts
+git commit -m "feat: a learn tower, built to the spacing rules" -m "buildTower lays out four storeys bottom-up: planks 3 tiles apart with gaps of 2, 3, 4, 4 and three lengths per storey set by the gap, a full-width letter floor, and a two-tile brick ceiling with the letters five tiles above it. The first storey is short, every tower has a long climb, and a one- or two-plank storey fits on screen at the tower's 1.25 zoom. Every one of those is a test over 300 seeded towers. learnContent.test.ts moves onto the same seeded source."
 ```
 
 ---
