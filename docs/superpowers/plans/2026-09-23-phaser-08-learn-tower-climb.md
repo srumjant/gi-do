@@ -78,7 +78,8 @@ These facts shape the code below; do not re-derive them, but do not contradict t
 | File | Responsibility | Task |
 |---|---|---|
 | `next/src/game/player.ts` | Modify: split `stepMotion`, `stepWalkCycle`, `playerSize` out of the adventure's player step; share the head's probe columns (`headColumns`) | 1, 6 |
-| `next/src/physics/tiles.ts` | Modify: per-side tile collision (`TileFaces`, `collisionSides`, `applyTileFaces`, `applyTileFacesAt`) | 2 |
+| `next/src/physics/tiles.ts` | Modify: per-side tile collision (`collisionSides`, `applyTileFaces`, `applyTileFacesAt`); its `TileFaces` and `FacesRule` types move to `game/tiles.ts` in Task 5 | 2, 5 |
+| `next/src/game/tiles.ts` | Modify: the tile-faces types, `TileFaces` and `FacesRule`, so the tower's rules need nothing from `physics/` | 5 |
 | `next/src/physics/player.ts` | Modify: `createBodyMover` (general Arcade mover that reports the row a head hit); `createPlayerMove` becomes a thin adventure wrapper | 3 |
 | `next/src/game/learn/content.ts` | Create: the letter, syllable and word pools; targets and distractors | 4 |
 | `next/src/game/learn/tower.ts` | Create: tile codes, geometry, `buildTower`, camera view rectangles | 5 |
@@ -906,7 +907,7 @@ describe("a tower's targets", () => {
     expect(used).toEqual(targets);
   });
 
-  it('avoid what this session has already asked', () => {
+  it('avoid what this round has already asked', () => {
     const used = LEARN_SYLLABLES.slice(0, LEARN_SYLLABLES.length - GATES_PER_TOWER);
     const { targets } = pickTargets('syllables', used, seq(2));
     expect(targets.sort()).toEqual(LEARN_SYLLABLES.slice(-GATES_PER_TOWER).sort());
@@ -1087,6 +1088,7 @@ The whole storey geometry of the spec, as data. Every rule in the spec's *Hop ru
 **Files:**
 - Create: `next/src/game/learn/tower.ts`
 - Create: `next/tests/helpers/seeded.ts`
+- Modify: `next/src/game/tiles.ts`, `next/src/physics/tiles.ts` (the tile-faces types move)
 - Modify: `next/tests/learnContent.test.ts`
 - Test: `next/tests/learnTower.test.ts`
 
@@ -1267,8 +1269,12 @@ describe('a learn tower', () => {
       const box = starBox(t);
       const view = storeyView(t, t.storeys.length);
       const out: string[] = [];
+      if (t.star.col < 0 || t.star.col + 2 > INSIDE) out.push(`star at ${t.star.col} is not inside the walls`);
       for (let c = t.star.col; c < t.star.col + 2; c++) {
         if (towerTileFaces(t.map[t.roofRow][c + WALL]) !== 'all') out.push(`col ${c} is not on solid roof`);
+        if (t.map[t.roofRow - 1][c + WALL] !== T_EMPTY || t.map[t.roofRow - 2][c + WALL] !== T_EMPTY) {
+          out.push(`col ${c} is not clear above the roof`);
+        }
       }
       if (box.y + box.h !== t.roofRow * TILE) out.push('not standing on the roof');
       if (box.y < view.y + HUD_ROOM || box.y + box.h > view.y + LEARN_VIEW_H) out.push('out of view');
@@ -1376,6 +1382,26 @@ Expected: FAIL — cannot resolve `../src/game/learn/tower`.
 
 - [ ] **Step 4: Implement**
 
+First give the collision vocabulary a home among the game rules, so `tower.ts` needs nothing
+from `physics/` (everywhere else, physics depends on game). Move these two declarations,
+with their doc comments, from `next/src/physics/tiles.ts` to the end of
+`next/src/game/tiles.ts`:
+
+```ts
+/**
+ * Which sides of a tile stop the player. `top` is a plank: land on it from above, jump up
+ * through it from below. The adventure only ever has `all` and `none`; learn mode's tower
+ * adds `top` (game/learn/tower.ts's `towerTileFaces`).
+ */
+export type TileFaces = 'none' | 'all' | 'top';
+
+/** A tile vocabulary's collision: one answer per tile code. */
+export type FacesRule = (code: number) => TileFaces;
+```
+
+and add `import type { FacesRule, TileFaces } from '../game/tiles';` to `physics/tiles.ts`,
+just above its `import type { World } from '../game/types';`.
+
 Create `next/src/game/learn/tower.ts`:
 
 ```ts
@@ -1419,6 +1445,8 @@ export const ROOF_SKY = 8;
 export const GAPS: readonly number[] = [2, 3, 4, 4];
 /** Inside column the hero starts on, beside the tower's door. */
 export const START_COL = 4;
+/** How far in from either wall the star stands, in tiles. */
+export const STAR_INSET = 3;
 
 /** The tower's camera zoom: a one- or two-plank storey fits whole at this zoom. */
 export const LEARN_ZOOM = 1.25;
@@ -1472,13 +1500,13 @@ export interface TowerLayout {
 }
 
 /**
- * The star's inside column (it is two tiles wide), three tiles in from the wall on the far
- * side of the roof from `arrivalCol`, where the last spring comes up. So the spring lands
- * you on the roof, clear of the star, and you walk to it, rather than springing straight
- * into it and ending the tower in mid-air.
+ * The star's inside column (it is two tiles wide), STAR_INSET tiles in from the wall on the
+ * far side of the roof from `arrivalCol`, where the last spring comes up. So the spring
+ * lands you on the roof, clear of the star, and you walk to it, rather than springing
+ * straight into it and ending the tower in mid-air.
  */
 export function starCol(arrivalCol: number): number {
-  return arrivalCol < INSIDE / 2 ? INSIDE - 5 : 3;
+  return arrivalCol < INSIDE / 2 ? INSIDE - STAR_INSET - 2 : STAR_INSET;
 }
 
 /** A storey with `planks` planks, floor to ceiling top, in tiles. */
@@ -1615,6 +1643,7 @@ export function buildTower(
   return {
     mode, word, map, rows, storeys, roofRow,
     start: { col: START_COL, row: rows - BASE_ROWS },
+    // After the loop, arrivalCol is where the last spring comes up onto the roof.
     star: { col: starCol(arrivalCol), row: roofRow },
   };
 }
@@ -1677,7 +1706,7 @@ in a scratch test from its seed to see why.
 Run: `npm test && npm run build`
 
 ```bash
-git add src/game/learn/tower.ts tests/learnTower.test.ts tests/helpers/seeded.ts tests/learnContent.test.ts
+git add src/game/learn/tower.ts src/game/tiles.ts src/physics/tiles.ts tests/learnTower.test.ts tests/helpers/seeded.ts tests/learnContent.test.ts
 git commit -m "feat: a learn tower, built to the spacing rules" -m "buildTower lays out four storeys bottom-up: planks 3 tiles apart with gaps of 2, 3, 4, 4 and three lengths per storey set by the gap, a full-width letter floor, and a two-tile brick ceiling with the letters five tiles above it. The first storey is short, every tower has a long climb, and a one- or two-plank storey fits on screen at the tower's 1.25 zoom. Every one of those is a test over 300 seeded towers. learnContent.test.ts moves onto the same seeded source."
 ```
 
