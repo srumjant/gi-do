@@ -1408,6 +1408,7 @@ Create `next/src/game/learn/tower.ts`:
 import { BASE_H, BASE_W, TILE } from '../../config/constants';
 import { random } from '../random';
 import type { TileFaces } from '../tiles';
+import type { Rect } from '../types';
 import { GATES_PER_TOWER, type LearnMode, pickFrom, pickOptions, type Rand } from './content';
 
 /** The tower's own tile codes. They are also the frame numbers of its tileset (gfx/learnTiles.ts). */
@@ -1685,7 +1686,7 @@ export function settleCenter(view: ViewRect): { x: number; y: number } {
 }
 
 /** The star's box in world px: two tiles square, standing on the roof. */
-export function starBox(layout: TowerLayout): { x: number; y: number; w: number; h: number } {
+export function starBox(layout: TowerLayout): Rect {
   return {
     x: (layout.star.col + WALL) * TILE,
     y: (layout.star.row - 2) * TILE,
@@ -2320,6 +2321,7 @@ import {
   type Character, headColumns, type MotionRecord, playerSize, stepMotion, stepWalkCycle,
 } from '../player';
 import { random } from '../random';
+import { rectOverlap } from '../tiles';
 import type { PlayerState } from '../types';
 import { type LearnMode, pickTargets, type Rand } from './content';
 import { closeTrapdoors, headBump, rearmIfStranded } from './gate';
@@ -2378,14 +2380,14 @@ export function createClimb(mode: LearnMode, used: string[], character: Characte
  * One fixed step of the climb: the adventure's movement, the mover, then the gate rules on
  * what the head hit, the trapdoors, where the hero now stands, the walk cycle and the star.
  */
-export function stepClimb(c: Climb, input: InputState, move?: ClimbMove): void {
+export function stepClimb(c: Climb, input: InputState, move: ClimbMove): void {
   if (c.finished) return;
   const p = c.player;
 
   stepMotion(p, input, LEARN_MOTION, c.sounds, { noJumpCut: c.sprung });
   if (c.sprung && p.vy >= 0) c.sprung = false;
 
-  const { headHitRow } = move ? move(p) : { headHitRow: null };
+  const { headHitRow } = move(p);
   if (headHitRow !== null) {
     // Which cells of that row the head hit: the adventure's two probes, 3px in from each
     // side (game/player.ts's headColumns), so a head a little way under either edge of a
@@ -2434,10 +2436,7 @@ function trackStorey(c: Climb): void {
 /** On the roof, touching the star ends the tower. */
 function checkStar(c: Climb): void {
   if (c.storey < c.layout.storeys.length) return;
-  const star = starBox(c.layout);
-  const p = c.player;
-  const touching = p.x < star.x + star.w && p.x + p.w > star.x && p.y < star.y + star.h && p.y + p.h > star.y;
-  if (!touching) return;
+  if (!rectOverlap(c.player, starBox(c.layout))) return;
   c.finished = true;
   c.score += 100;
   c.sounds.push('win');
@@ -2475,6 +2474,9 @@ movement function against real generated towers.
 
 **Files:**
 - Test: `next/tests/learnJumps.test.ts`
+
+The final review had the plank-hop checks run for Dodo as well as Gigi, as the spec asks
+and as the ceiling and spring checks already did. The code below is the result.
 
 - [ ] **Step 1: Write the tests**
 
@@ -2564,42 +2566,44 @@ function centredUnder(character: Character, span: { col: number; width: number }
 }
 
 describe('every hop between planks', () => {
-  it('lands a standing jump from the edge that holds the direction', () => {
-    const misses: string[] = [];
-    TOWERS.forEach((t, ti) => t.storeys.forEach((st, s) => st.planks.slice(1).forEach((b, k) => {
-      const a = st.planks[k];
-      const dir = b.col > a.col ? 1 : -1;
-      const { w } = playerSize('gigi');
-      const x = dir > 0 ? (a.col + a.width + WALL) * TILE - w : (a.col + WALL) * TILE;
-      const out = jump(t.map, standing('gigi', x, a.row * TILE), held(dir));
-      if (!landedWell(st, k + 1, out, w)) misses.push(`tower ${ti} storey ${s} hop ${k + 1}`);
-    })));
-    expect(misses).toEqual([]);
-  });
+  for (const character of CHARACTERS) {
+    it(`lands a standing jump from the edge that holds the direction, for ${character}`, () => {
+      const misses: string[] = [];
+      TOWERS.forEach((t, ti) => t.storeys.forEach((st, s) => st.planks.slice(1).forEach((b, k) => {
+        const a = st.planks[k];
+        const dir = b.col > a.col ? 1 : -1;
+        const { w } = playerSize(character);
+        const x = dir > 0 ? (a.col + a.width + WALL) * TILE - w : (a.col + WALL) * TILE;
+        const out = jump(t.map, standing(character, x, a.row * TILE), held(dir));
+        if (!landedWell(st, k + 1, out, w)) misses.push(`tower ${ti} storey ${s} hop ${k + 1}`);
+      })));
+      expect(misses).toEqual([]);
+    });
 
-  it('lands even a running jump from the very lip onto a long plank', () => {
-    const misses: string[] = [];
-    TOWERS.forEach((t, ti) => t.storeys.forEach((st, s) => st.planks.slice(1).forEach((b, k) => {
-      if (b.width !== 8 - GAPS[s]) return;
-      const a = st.planks[k];
-      const dir = b.col > a.col ? 1 : -1;
-      const { w } = playerSize('gigi');
-      const x = dir > 0 ? (a.col + a.width + WALL) * TILE - 1 : (a.col + WALL) * TILE - w + 1;
-      const p = standing('gigi', x, a.row * TILE);
-      p.vx = dir * LEARN_MOTION.playerSpeed;
-      const out = jump(t.map, p, held(dir));
-      if (!landedWell(st, k + 1, out, w)) misses.push(`tower ${ti} storey ${s} hop ${k + 1}`);
-    })));
-    expect(misses).toEqual([]);
-  });
+    it(`lands even a running jump from the very lip onto a long plank, for ${character}`, () => {
+      const misses: string[] = [];
+      TOWERS.forEach((t, ti) => t.storeys.forEach((st, s) => st.planks.slice(1).forEach((b, k) => {
+        if (b.width !== 8 - GAPS[s]) return;
+        const a = st.planks[k];
+        const dir = b.col > a.col ? 1 : -1;
+        const { w } = playerSize(character);
+        const x = dir > 0 ? (a.col + a.width + WALL) * TILE - 1 : (a.col + WALL) * TILE - w + 1;
+        const p = standing(character, x, a.row * TILE);
+        p.vx = dir * LEARN_MOTION.playerSpeed;
+        const out = jump(t.map, p, held(dir));
+        if (!landedWell(st, k + 1, out, w)) misses.push(`tower ${ti} storey ${s} hop ${k + 1}`);
+      })));
+      expect(misses).toEqual([]);
+    });
 
-  it('lands a jump from the last plank on the letter floor', () => {
-    TOWERS.forEach((t) => t.storeys.forEach((st) => {
-      const last = st.planks[st.planks.length - 1];
-      expect(jump(t.map, standing('gigi', centredUnder('gigi', last), last.row * TILE), held(0)).landedRow)
-        .toBe(st.letterFloorRow);
-    }));
-  });
+    it(`lands a jump from the last plank on the letter floor, for ${character}`, () => {
+      TOWERS.forEach((t) => t.storeys.forEach((st) => {
+        const last = st.planks[st.planks.length - 1];
+        expect(jump(t.map, standing(character, centredUnder(character, last), last.row * TILE), held(0)).landedRow)
+          .toBe(st.letterFloorRow);
+      }));
+    });
+  }
 });
 
 describe('the letter ceiling', () => {

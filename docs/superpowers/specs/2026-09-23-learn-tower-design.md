@@ -254,12 +254,16 @@ Moving the adventure onto Phaser features is separate, later work.
 **New, with no Phaser import** (`next/src/game/learn/`):
 - `content.ts`: `LEARN_LETTERS`, `LEARN_SYLLABLES` and `LEARN_WORDS` (from
   `index.html:2466-2468`); picking targets without session repeats; picking distractors.
-- `tower.ts`: `buildTower(mode, targets, random)` returns the tile map (empty, brick, stone,
-  plank, letter block), the storeys with their planks, letter floor, ceiling and blocks, the
-  roof and star, and the start position. It enforces every hop rule above.
-- `gate.ts`: the rules. Which bumps count, right and wrong answers, the glow, the trapdoor
-  opening and shutting, the spring, the star, progress and score. It returns cues (sounds,
-  speech, buzzes, effects) as values, the way `World.sounds` does for the adventure.
+- `tower.ts`: `buildTower(mode, targets, word, rand)` returns the tile map (empty, brick,
+  stone, plank, letter block), the storeys with their planks, letter floor, ceiling and
+  blocks, the roof and star, and the start position. It enforces every hop rule above. It
+  also holds the camera's per-storey views.
+- `gate.ts`: the gate rules. Which bumps count, right and wrong answers, the glow, the
+  trapdoor opening and shutting, and the re-arm if the hero is ever stranded under one.
+- `climb.ts`: one fixed step of the climb: the shared movement, the mover, the gate rules on
+  what the head hit, the spring, the storey the hero is in, the star and the score.
+- `types.ts`: the climb's state, the events the scene draws from, and the mover's contract.
+  Cues (sounds, events) come back as values, the way `World.sounds` does for the adventure.
 
 **Changed, with adventure behaviour unchanged:**
 - `game/player.ts`: the movement part of `stepPlayer` and the walk animation become
@@ -268,14 +272,18 @@ Moving the adventure onto Phaser features is separate, later work.
   probes, 3px in from each side, become one too, shared by the `?` block bump and the gate
   rules.
 - `physics/tiles.ts`: collision is described per tile side, so a plank collides only from
-  above. The layer is built from a plain tile map instead of the adventure's `World`.
+  above. The tower builds its own visible layer from its tileset and gives it these sides;
+  the adventure's collision layer is built as before. The side vocabulary (`TileFaces`)
+  lives in `game/tiles.ts`, so the tower's rules need nothing from `physics/`.
 - `physics/player.ts`: the Arcade mover takes the player, the layer and optional bounds, and
   reports the row a rising head was stopped under. The adventure keeps its `?` block bump.
 
 **New, with Phaser:**
 - `scenes/LearnMenuScene.ts`, replacing the `LearnScene` "coming soon" placeholder;
   `scenes/LearnTowerScene.ts`; `scenes/LearnHudScene.ts`; `scenes/LearnResultScene.ts`.
-- `gfx/learnTower.ts`: the tileset, back wall, windows, torches, banners, sky and roof.
+- `gfx/learnTiles.ts`: the tileset and the letter-block pictures, baked with Phaser from the
+  adventure's own brick (Part 1). Part 2 adds the back wall, windows, torches, banners, sky
+  and roof.
 - `audio/voice.ts`: `pickVoiceFrom`, and speaking with the queueing rule above.
 
 **Also:**
