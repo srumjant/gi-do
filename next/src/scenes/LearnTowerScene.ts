@@ -49,12 +49,20 @@ const LETTER_RESOLUTION = 3;
 /** How white the right block's hint glow gets at its brightest. */
 const GLOW_ALPHA = 0.55;
 
+/** A letter block on screen: its container (picture, hint glow, letter), the glow, and where it rests. */
+interface BlockView {
+  box: Phaser.GameObjects.Container;
+  glow: Phaser.GameObjects.Rectangle;
+  restX: number;
+}
+
 /**
  * One learn tower. The rules are game/learn/ (tested there); this scene is the engine side:
  * a real tilemap drawn from the tower's own tileset, which Arcade also collides against,
- * with planks colliding only from above; the adventure's Arcade mover, which reports the row
- * a head hit for the climb to pick the letter; the same fixed 60Hz step as SliceScene; and a
- * camera that follows the hero inside the current storey's bounds and pans to the next.
+ * with planks colliding only from above; the general Arcade mover (physics/player.ts's
+ * createBodyMover), which reports the row a head hit for the climb to pick the letter; the
+ * same fixed 60Hz step as SliceScene; and a camera that follows the hero inside the current
+ * storey's bounds and pans to the next.
  *
  * Back goes to the learn menu (game/navigation.ts: `learnletters` is not pausable).
  */
@@ -66,8 +74,8 @@ export class LearnTowerScene extends Phaser.Scene {
   private climb!: Climb;
   private layer!: Phaser.Tilemaps.TilemapLayer;
   private move!: ClimbMove;
-  /** One container per block (picture + letter), per storey. */
-  private blocks: Phaser.GameObjects.Container[][] = [];
+  /** One view per block, per storey. */
+  private blocks: BlockView[][] = [];
   private playerImage!: Phaser.GameObjects.Image;
   /** The point the camera follows: the hero's centre. */
   private readonly follow = { x: 0, y: 0 };
@@ -119,8 +127,8 @@ export class LearnTowerScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setZoom(LEARN_ZOOM);
     this.boundToStorey(0);
-    const start = settleCenter(storeyView(this.climb.layout, 0));
-    cam.centerOn(start.x, start.y);
+    // startFollow snaps the scroll to the follow point and clamps it to the bounds, so this
+    // is also the first frame's position: storey 0 always fits, and its top is pinned.
     // lerpX 0: the camera never moves sideways; the bounds are exactly the view's width.
     cam.startFollow(this.follow, true, 0, FOLLOW_LERP, 0, FOLLOW_ABOVE);
 
@@ -178,10 +186,8 @@ export class LearnTowerScene extends Phaser.Scene {
         .text((b.width * TILE) / 2, TILE + 1, b.letter, LETTER_FONT)
         .setOrigin(0.5, 0.5)
         .setResolution(LETTER_RESOLUTION);
-      return this.add.container(x, y, [picture, glow, letter])
-        .setDepth(DEPTH_BLOCK)
-        .setData('x', x)
-        .setData('glow', glow);
+      const box = this.add.container(x, y, [picture, glow, letter]).setDepth(DEPTH_BLOCK);
+      return { box, glow, restX: x };
     }));
   }
 
@@ -200,23 +206,23 @@ export class LearnTowerScene extends Phaser.Scene {
         for (const cell of event.cells) this.setTile(cell.col, cell.row, cell.code);
         return;
       case 'bump-right':
-        this.blocks[event.storey][event.block].setVisible(false);
+        this.blocks[event.storey][event.block].box.setVisible(false);
         return;
       case 'bump-wrong':
         this.shake(this.blocks[event.storey][event.block]);
         return;
       case 'hint':
         this.tweens.add({
-          targets: this.blocks[event.storey][event.block].getData('glow'),
+          targets: this.blocks[event.storey][event.block].glow,
           alpha: GLOW_ALPHA, duration: 450, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
         });
         return;
       case 'rearm':
-        this.blocks[event.storey][event.block].setVisible(true);
+        this.blocks[event.storey][event.block].box.setVisible(true);
         return;
       case 'gate-closed':
-        for (const box of this.blocks[event.storey]) {
-          this.tweens.killTweensOf([box, box.getData('glow')]);
+        for (const { box, glow } of this.blocks[event.storey]) {
+          this.tweens.killTweensOf([box, glow]);
           box.setVisible(false);
         }
         return;
@@ -228,24 +234,31 @@ export class LearnTowerScene extends Phaser.Scene {
           this.scene.restart({ mode: this.mode, used: this.used } satisfies LearnTowerData);
         });
         return;
+      default:
+        // A ClimbEvent this switch does not know fails the build here, not silently in play.
+        event satisfies never;
     }
   }
 
-  /** Mirrors a map edit on the Phaser layer, collision included. */
+  /**
+   * Mirrors a map edit on the Phaser layer, collision included. Both calls are needed:
+   * putTileAt sets a tile's collision from the layer's collideIndexes, which this layer does
+   * not use (its collision is per tile and per side), so it leaves the tile colliding on no
+   * side; applyTileFacesAt then sets the tower's sides and recalculates the faces around it.
+   */
   private setTile(col: number, row: number, code: number): void {
     if (code === T_EMPTY) {
       this.layer.removeTileAt(col, row, true, true);
       return;
     }
-    this.layer.putTileAt(code, col, row, true);
+    this.layer.putTileAt(code, col, row, false);
     applyTileFacesAt(this.layer, col, row, towerTileFaces);
   }
 
-  private shake(box: Phaser.GameObjects.Container): void {
-    const x = box.getData('x') as number;
+  private shake({ box, restX }: BlockView): void {
     this.tweens.killTweensOf(box);
-    box.setX(x);
-    this.tweens.add({ targets: box, x: x + 3, duration: 40, yoyo: true, repeat: 3, onComplete: () => box.setX(x) });
+    box.setX(restX);
+    this.tweens.add({ targets: box, x: restX + 3, duration: 40, yoyo: true, repeat: 3, onComplete: () => box.setX(restX) });
   }
 
   /**

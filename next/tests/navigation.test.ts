@@ -192,8 +192,8 @@ describe('menu states and run states do not blur together', () => {
 
 /**
  * The port's own half. The live game cannot ask these: its states ARE its screens, drawn by
- * a dispatch that covers all of them. Here a state is a scene, six states have no scene
- * yet, and a back route into one of those six would be a button that leads nowhere.
+ * a dispatch that covers all of them. Here a state is a scene, three states have no scene
+ * yet, and a back route into one of those three would be a button that leads nowhere.
  */
 describe('every route this port can take leads to a screen that exists', () => {
   it('never sends a ported screen back to an unported one', () => {
