@@ -1,6 +1,7 @@
 import { BASE_H, BASE_W, TILE } from '../../config/constants';
 import { random } from '../random';
 import type { TileFaces } from '../tiles';
+import type { Rect } from '../types';
 import { GATES_PER_TOWER, type LearnMode, pickFrom, pickOptions, type Rand } from './content';
 
 /** The tower's own tile codes. They are also the frame numbers of its tileset (gfx/learnTiles.ts). */
@@ -278,7 +279,7 @@ export function settleCenter(view: ViewRect): { x: number; y: number } {
 }
 
 /** The star's box in world px: two tiles square, standing on the roof. */
-export function starBox(layout: TowerLayout): { x: number; y: number; w: number; h: number } {
+export function starBox(layout: TowerLayout): Rect {
   return {
     x: (layout.star.col + WALL) * TILE,
     y: (layout.star.row - 2) * TILE,

@@ -5,6 +5,7 @@ import {
   type Character, headColumns, type MotionRecord, playerSize, stepMotion, stepWalkCycle,
 } from '../player';
 import { random } from '../random';
+import { rectOverlap } from '../tiles';
 import type { PlayerState } from '../types';
 import { type LearnMode, pickTargets, type Rand } from './content';
 import { closeTrapdoors, headBump, rearmIfStranded } from './gate';
@@ -63,14 +64,14 @@ export function createClimb(mode: LearnMode, used: string[], character: Characte
  * One fixed step of the climb: the adventure's movement, the mover, then the gate rules on
  * what the head hit, the trapdoors, where the hero now stands, the walk cycle and the star.
  */
-export function stepClimb(c: Climb, input: InputState, move?: ClimbMove): void {
+export function stepClimb(c: Climb, input: InputState, move: ClimbMove): void {
   if (c.finished) return;
   const p = c.player;
 
   stepMotion(p, input, LEARN_MOTION, c.sounds, { noJumpCut: c.sprung });
   if (c.sprung && p.vy >= 0) c.sprung = false;
 
-  const { headHitRow } = move ? move(p) : { headHitRow: null };
+  const { headHitRow } = move(p);
   if (headHitRow !== null) {
     // Which cells of that row the head hit: the adventure's two probes, 3px in from each
     // side (game/player.ts's headColumns), so a head a little way under either edge of a
@@ -119,10 +120,7 @@ function trackStorey(c: Climb): void {
 /** On the roof, touching the star ends the tower. */
 function checkStar(c: Climb): void {
   if (c.storey < c.layout.storeys.length) return;
-  const star = starBox(c.layout);
-  const p = c.player;
-  const touching = p.x < star.x + star.w && p.x + p.w > star.x && p.y < star.y + star.h && p.y + p.h > star.y;
-  if (!touching) return;
+  if (!rectOverlap(c.player, starBox(c.layout))) return;
   c.finished = true;
   c.score += 100;
   c.sounds.push('win');

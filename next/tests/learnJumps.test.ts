@@ -81,42 +81,44 @@ function centredUnder(character: Character, span: { col: number; width: number }
 }
 
 describe('every hop between planks', () => {
-  it('lands a standing jump from the edge that holds the direction', () => {
-    const misses: string[] = [];
-    TOWERS.forEach((t, ti) => t.storeys.forEach((st, s) => st.planks.slice(1).forEach((b, k) => {
-      const a = st.planks[k];
-      const dir = b.col > a.col ? 1 : -1;
-      const { w } = playerSize('gigi');
-      const x = dir > 0 ? (a.col + a.width + WALL) * TILE - w : (a.col + WALL) * TILE;
-      const out = jump(t.map, standing('gigi', x, a.row * TILE), held(dir));
-      if (!landedWell(st, k + 1, out, w)) misses.push(`tower ${ti} storey ${s} hop ${k + 1}`);
-    })));
-    expect(misses).toEqual([]);
-  });
+  for (const character of CHARACTERS) {
+    it(`lands a standing jump from the edge that holds the direction, for ${character}`, () => {
+      const misses: string[] = [];
+      TOWERS.forEach((t, ti) => t.storeys.forEach((st, s) => st.planks.slice(1).forEach((b, k) => {
+        const a = st.planks[k];
+        const dir = b.col > a.col ? 1 : -1;
+        const { w } = playerSize(character);
+        const x = dir > 0 ? (a.col + a.width + WALL) * TILE - w : (a.col + WALL) * TILE;
+        const out = jump(t.map, standing(character, x, a.row * TILE), held(dir));
+        if (!landedWell(st, k + 1, out, w)) misses.push(`tower ${ti} storey ${s} hop ${k + 1}`);
+      })));
+      expect(misses).toEqual([]);
+    });
 
-  it('lands even a running jump from the very lip onto a long plank', () => {
-    const misses: string[] = [];
-    TOWERS.forEach((t, ti) => t.storeys.forEach((st, s) => st.planks.slice(1).forEach((b, k) => {
-      if (b.width !== 8 - GAPS[s]) return;
-      const a = st.planks[k];
-      const dir = b.col > a.col ? 1 : -1;
-      const { w } = playerSize('gigi');
-      const x = dir > 0 ? (a.col + a.width + WALL) * TILE - 1 : (a.col + WALL) * TILE - w + 1;
-      const p = standing('gigi', x, a.row * TILE);
-      p.vx = dir * LEARN_MOTION.playerSpeed;
-      const out = jump(t.map, p, held(dir));
-      if (!landedWell(st, k + 1, out, w)) misses.push(`tower ${ti} storey ${s} hop ${k + 1}`);
-    })));
-    expect(misses).toEqual([]);
-  });
+    it(`lands even a running jump from the very lip onto a long plank, for ${character}`, () => {
+      const misses: string[] = [];
+      TOWERS.forEach((t, ti) => t.storeys.forEach((st, s) => st.planks.slice(1).forEach((b, k) => {
+        if (b.width !== 8 - GAPS[s]) return;
+        const a = st.planks[k];
+        const dir = b.col > a.col ? 1 : -1;
+        const { w } = playerSize(character);
+        const x = dir > 0 ? (a.col + a.width + WALL) * TILE - 1 : (a.col + WALL) * TILE - w + 1;
+        const p = standing(character, x, a.row * TILE);
+        p.vx = dir * LEARN_MOTION.playerSpeed;
+        const out = jump(t.map, p, held(dir));
+        if (!landedWell(st, k + 1, out, w)) misses.push(`tower ${ti} storey ${s} hop ${k + 1}`);
+      })));
+      expect(misses).toEqual([]);
+    });
 
-  it('lands a jump from the last plank on the letter floor', () => {
-    TOWERS.forEach((t) => t.storeys.forEach((st) => {
-      const last = st.planks[st.planks.length - 1];
-      expect(jump(t.map, standing('gigi', centredUnder('gigi', last), last.row * TILE), held(0)).landedRow)
-        .toBe(st.letterFloorRow);
-    }));
-  });
+    it(`lands a jump from the last plank on the letter floor, for ${character}`, () => {
+      TOWERS.forEach((t) => t.storeys.forEach((st) => {
+        const last = st.planks[st.planks.length - 1];
+        expect(jump(t.map, standing(character, centredUnder(character, last), last.row * TILE), held(0)).landedRow)
+          .toBe(st.letterFloorRow);
+      }));
+    });
+  }
 });
 
 describe('the letter ceiling', () => {

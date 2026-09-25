@@ -7,7 +7,7 @@ import { BASE_H, BASE_W } from '../config/constants';
  *
  * No randomness and no per-dot state: position is arithmetic on the dot's index, and
  * brightness is a sine of the frame counter offset by that index, which is what makes
- * the field shimmer rather than blink in unison. Both screens run it at a different
+ * the field shimmer rather than blink in unison. Each screen runs it at a different
  * count, stride and speed, which is the whole of the difference between them.
  */
 export interface StarFieldSpec {
