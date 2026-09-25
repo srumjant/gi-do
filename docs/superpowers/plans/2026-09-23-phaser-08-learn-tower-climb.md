@@ -1722,6 +1722,10 @@ git commit -m "feat: a learn tower, built to the spacing rules" -m "buildTower l
 - Create: `next/tests/helpers/towerMove.ts`
 - Test: `next/tests/learnGate.test.ts`
 
+Review ran these tests, and Task 7's, on real Arcade: same verdicts. It added tests for the
+trapdoor's side columns and the climb onto the roof, gave `towerMove` the scene's world edges
+and Arcade's strict landing test, and tidied `gate.ts`. The code below is the result.
+
 - [ ] **Step 1: Share the head's probe columns**
 
 A head bumps a block the way the adventure's `?` blocks always have: at two columns probed
@@ -1812,12 +1816,19 @@ import type { ClimbMove } from '../../src/game/learn/types';
 const TILE_BIAS = 16;
 
 /**
- * A stand-in for the tower scene's Arcade body, for tests only: Arcade cannot be built
- * under Vitest. Plain integration, then separation against the tower's map with the same
- * per-side rule the scene gives Arcade — solid tiles stop you from every side, planks only
- * from above, and a falling body up to TILE_BIAS deep in a tile top is put back on it, as
- * Arcade's TileCheckY does. Reports the row a rising head was stopped under, as the scene's
- * mover does (physics/player.ts's MoveReport).
+ * A stand-in for the tower scene's Arcade body, for tests: plain integration, then separation
+ * against the tower's map with the same per-side rule the scene gives Arcade — solid tiles
+ * stop you from every side, planks only from above, and a falling body up to TILE_BIAS deep
+ * in a tile top is put back on it, as Arcade's TileCheckY does — inside the same left and
+ * right world edges. Reports the row a rising head was stopped under, as the scene's mover
+ * does (physics/player.ts's MoveReport).
+ *
+ * Phaser's package entry cannot load under Vitest, which is why this exists. Arcade's own
+ * World and Body can, deep-imported from phaser/src, and run that way the gate tests and the
+ * jump checks give the same verdicts. One structural difference remains: this separates X,
+ * against the rows the body was in before this step's vertical move, then Y, where Arcade
+ * moves both and resolves each tile along its smaller overlap. At a solid corner (an open
+ * trapdoor's edge, a battlement) that can shift a sideways move by a frame.
  *
  * It reads `map` live, so trapdoors the gate rules open and shut are seen at once.
  */
@@ -1830,6 +1841,9 @@ export function towerMove(map: number[][]): ClimbMove {
     let headHitRow: number | null = null;
 
     p.x += p.vx;
+    // Arcade clamps to the world edges the scene sets (left and right) before any tile.
+    const width = (map[0]?.length ?? 0) * TILE;
+    if (p.x < 0) { p.x = 0; p.vx = 0; } else if (p.x + p.w > width) { p.x = width - p.w; p.vx = 0; }
     const [r0, r1] = span(p.y, p.h);
     const [x0, x1] = span(p.x, p.w);
     let wall: number | null = null;
@@ -1858,7 +1872,9 @@ export function towerMove(map: number[][]): ClimbMove {
       }
     } else if (p.vy > 0) {
       const bottom = p.y + p.h;
-      for (let row = Math.floor(prevBottom / TILE); row * TILE <= bottom; row++) {
+      // Strictly below: Arcade's overlap test is strict, so feet exactly on a tile top land
+      // there on the next step, not this one.
+      for (let row = Math.floor(prevBottom / TILE); row * TILE < bottom; row++) {
         const top = row * TILE;
         if (bottom - top > TILE_BIAS) continue;
         let floor = false;
@@ -1950,6 +1966,30 @@ describe('a letter gate', () => {
     expect(c.events).toContainEqual({ type: 'gate-closed', storey: 0 });
   });
 
+  it('carries you through from a bump at either edge of the letter, not only its middle', () => {
+    for (const edge of ['left', 'right'] as const) {
+      const c = climb();
+      const block = answerOf(c, 0);
+      standUnder(c, 0, block);
+      const b = c.layout.storeys[0].blocks[block];
+      const left = (b.col + WALL) * TILE;
+      c.player.x = edge === 'left' ? left - c.player.w + 4 : left + b.width * TILE - 4;
+      expect(run(c, 40, held, () => c.gates[0].solved)).toBe(true);
+      expect(run(c, 150, idle, () => c.storey === 1 && c.player.onGround)).toBe(true);
+      expect(c.events.some((e) => e.type === 'rearm')).toBe(false);
+    }
+  });
+
+  it('turns the whole letter ceiling to brick when it shuts', () => {
+    const c = climb();
+    standUnder(c, 0, answerOf(c, 0));
+    run(c, 40, held, () => c.gates[0].solved);
+    run(c, 150, idle, () => c.storey === 1 && c.player.onGround);
+    c.layout.storeys[0].blocks.forEach((_, i) => {
+      expect(codes(c, blockCells(c.layout, 0, i)).every((code) => code === T_BRICK)).toBe(true);
+    });
+  });
+
   it('wobbles for a wrong letter and costs nothing', () => {
     const c = climb();
     standUnder(c, 0, wrongOf(c, 0));
@@ -1970,6 +2010,16 @@ describe('a letter gate', () => {
       run(c, 40, held, () => c.gates[0].mistakes === miss);
     }
     expect(c.events).toContainEqual({ type: 'hint', storey: 0, block: answerOf(c, 0) });
+  });
+
+  it('glows once, however many more misses follow', () => {
+    const c = climb();
+    for (let miss = 1; miss <= 3; miss++) {
+      standUnder(c, 0, wrongOf(c, 0));
+      run(c, 40, held, () => c.gates[0].mistakes === miss);
+    }
+    expect(c.gates[0].mistakes).toBe(3);
+    expect(c.events.filter((e) => e.type === 'hint')).toHaveLength(1);
   });
 
   it('counts a head a little way under either edge of a letter, and not one just outside', () => {
@@ -2025,6 +2075,18 @@ describe('a letter gate', () => {
 });
 
 describe('the roof', () => {
+  it('is reached through the last gate', () => {
+    const c = climb();
+    const last = c.layout.storeys.length - 1;
+    c.gates.slice(0, last).forEach((g) => { g.solved = true; g.armed = false; });
+    standUnder(c, last, answerOf(c, last));
+    run(c, 40, held, () => c.gates[last].solved);
+    expect(run(c, 150, idle, () => c.player.onGround)).toBe(true);
+    expect(c.storey).toBe(c.layout.storeys.length);
+    expect(c.events).toContainEqual({ type: 'storey', storey: c.layout.storeys.length });
+    expect(c.player.y + c.player.h).toBe(c.layout.roofRow * TILE);
+  });
+
   it('ends the tower when the hero touches the star', () => {
     const c = climb();
     c.gates.forEach((g) => { g.solved = true; g.armed = false; });
@@ -2068,7 +2130,7 @@ export interface TileEdit extends Cell {
 export interface GateState {
   /** Answered right at least once. Scores once. */
   solved: boolean;
-  /** The right block will spring you when bumped. False once it has, until re-armed. */
+  /** Bumps at this gate count. False from a right answer until re-armed. */
   armed: boolean;
   mistakes: number;
   trapdoorOpen: boolean;
@@ -2099,7 +2161,10 @@ export interface Climb {
   gates: GateState[];
   /** Where the hero is: a storey index, or `layout.storeys.length` on the roof. */
   storey: number;
-  /** The storey whose letter floor the hero last stood on, or -1. A bump counts only from there. */
+  /**
+   * The storey whose letter floor the hero stood on when last on the ground; -1 if that
+   * ground was anything else. A bump counts only from there.
+   */
   lastGround: number;
   /** A spring is carrying the hero: no jump cut until the apex. */
   sprung: boolean;
@@ -2139,6 +2204,13 @@ export function blockAt(layout: TowerLayout, col: number, row: number): { storey
   return null;
 }
 
+/** Storey `s`'s right block. buildTower gives every storey exactly one (tests/learnTower.test.ts). */
+function answerIndex(layout: TowerLayout, storey: number): number {
+  const i = layout.storeys[storey].blocks.findIndex((b) => b.correct);
+  if (i < 0) throw new Error(`storey ${storey} has no right block`);
+  return i;
+}
+
 /** A block's map cells: its columns through both ceiling rows. */
 export function blockCells(layout: TowerLayout, storey: number, block: number): Cell[] {
   const st = layout.storeys[storey];
@@ -2150,7 +2222,7 @@ export function blockCells(layout: TowerLayout, storey: number, block: number): 
 /** The trapdoor: the right block's columns plus one on each side, through both ceiling rows. */
 export function trapdoorCells(layout: TowerLayout, storey: number): Cell[] {
   const st = layout.storeys[storey];
-  const b = st.blocks.find((x) => x.correct) ?? st.blocks[0];
+  const b = st.blocks[answerIndex(layout, storey)];
   const from = Math.max(0, b.col - 1);
   const to = Math.min(INSIDE - 1, b.col + b.width);
   return st.ceilingRows.flatMap((row) =>
@@ -2188,7 +2260,7 @@ export function headBump(c: Climb, hit: Cell): BumpOutcome {
   c.sounds.push('block');
   c.events.push({ type: 'bump-wrong', storey, block });
   if (gate.mistakes === 2) {
-    c.events.push({ type: 'hint', storey, block: blocks.findIndex((b) => b.correct) });
+    c.events.push({ type: 'hint', storey, block: answerIndex(c.layout, storey) });
   }
   return 'wrong';
 }
@@ -2204,16 +2276,18 @@ export function closeTrapdoors(c: Climb): void {
     const st = c.layout.storeys[s];
     if (feet >= st.ceilingRows[0] * TILE) return;
     gate.trapdoorOpen = false;
-    const letters = st.blocks.flatMap((_, i) => blockCells(c.layout, s, i));
+    // The right block's cells are the trapdoor's already.
+    const letters = st.blocks.flatMap((b, i) => (b.correct ? [] : blockCells(c.layout, s, i)));
     setCells(c, [...trapdoorCells(c.layout, s), ...letters], T_BRICK);
     c.events.push({ type: 'gate-closed', storey: s });
   });
 }
 
 /**
- * If the hero is standing on a letter floor whose trapdoor is still open — the spring
- * clipped the trapdoor's edge and they fell back — the right block comes back, armed, so
- * bumping it springs them again. Nobody can get stuck below a solved gate.
+ * A safety net: if the hero is ever standing on a letter floor whose trapdoor is still open,
+ * the right block comes back, armed, so bumping it springs them again. Play does not produce
+ * this today (a counted bump leaves the head well inside the opening), but nobody may get
+ * stuck below a solved gate.
  */
 export function rearmIfStranded(c: Climb): void {
   const s = c.lastGround;
@@ -2222,7 +2296,7 @@ export function rearmIfStranded(c: Climb): void {
   if (!gate.trapdoorOpen) return;
   gate.trapdoorOpen = false;
   gate.armed = true;
-  const answer = c.layout.storeys[s].blocks.findIndex((b) => b.correct);
+  const answer = answerIndex(c.layout, s);
   setCells(c, trapdoorCells(c.layout, s), T_BRICK);
   setCells(c, blockCells(c.layout, s, answer), T_LETTER);
   c.events.push({ type: 'rearm', storey: s, block: answer });
@@ -2608,8 +2682,17 @@ git commit -m "test: every hop lands, no plank reaches the letters, the spring a
 
 **Files:**
 - Create: `next/src/gfx/learnTiles.ts`
+- Modify: `next/src/gfx/tiles.ts` (three exports)
+
+Review found the first version's brick was a lookalike of the adventure's. The tiles are now
+drawn with Phaser Graphics and baked with `generateTexture`, calling the adventure's own
+`drawBrick`. The code below is the result.
 
 - [ ] **Step 1: Implement**
+
+In `next/src/gfx/tiles.ts`, export `QUESTION_FILL`, `QUESTION_STROKE` and `drawBrick`
+(add `export` in front of each; nothing else changes), so the tower draws the adventure's own
+brick and `?` gold.
 
 Create `next/src/gfx/learnTiles.ts`:
 
@@ -2617,30 +2700,34 @@ Create `next/src/gfx/learnTiles.ts`:
 import type Phaser from 'phaser';
 import { TILE } from '../config/constants';
 import { T_BRICK, T_EMPTY, T_LETTER, T_PLANK, T_STONE } from '../game/learn/tower';
+import { drawBrick, QUESTION_FILL, QUESTION_STROKE } from './tiles';
 
 /** The tower's tileset: one 16px frame per tile code, frame 0 unused (Phaser's empty is -1). */
 export const LEARN_TILES_KEY = 'learn-tiles';
-const FRAMES = 5;
+/** A frame per tile code, T_EMPTY's included, so a code is its own frame number. */
+const FRAMES = T_LETTER + 1;
 
-const BRICK = '#c07a44';
-const STONE = '#a3a3ba';
-const WOOD = '#b5773a';
-const WOOD_LIGHT = '#d99a58';
-const WOOD_DARK = '#7a4a20';
-const GOLD = '#ffcc00';
-const GOLD_EDGE = '#cc8800';
+/** The first world's brick (data/levels.ts, Doll Garden): the tower is built of the adventure's own. */
+const BRICK = 0xcc8844;
+const STONE = 0xa3a3ba;
+const WOOD = 0xb5773a;
+const WOOD_LIGHT = 0xd99a58;
+const WOOD_DARK = 0x7a4a20;
 
 /**
- * Draws the tileset and the letter-block textures once, into canvases, and registers them
- * as textures. Idempotent: a restarted tower reuses them.
+ * Bakes the tileset and the letter-block pictures into textures, once. Idempotent: a restarted
+ * tower reuses them.
  */
 export function registerLearnTiles(scene: Phaser.Scene): void {
-  if (!scene.textures.exists(LEARN_TILES_KEY)) {
-    scene.textures.addCanvas(LEARN_TILES_KEY, tilesetCanvas());
-  }
+  bake(scene, LEARN_TILES_KEY, TILE * FRAMES, TILE, (g) => {
+    drawBrick(g, T_BRICK * TILE, 0, BRICK);
+    drawStone(g, T_STONE * TILE);
+    drawPlank(g, T_PLANK * TILE);
+    // Under the block pictures (see drawBlock); shows only if a picture is hidden.
+    g.fillStyle(QUESTION_FILL).fillRect(T_LETTER * TILE, 0, TILE, TILE);
+  });
   for (const width of [2, 3]) {
-    const key = blockTextureKey(width);
-    if (!scene.textures.exists(key)) scene.textures.addCanvas(key, blockCanvas(width));
+    bake(scene, blockTextureKey(width), width * TILE, 2 * TILE, (g) => drawBlock(g, width));
   }
 }
 
@@ -2654,85 +2741,56 @@ export function toPhaserData(map: readonly number[][]): number[][] {
   return map.map((row) => row.map((code) => (code === T_EMPTY ? -1 : code)));
 }
 
-function tilesetCanvas(): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.width = TILE * FRAMES;
-  canvas.height = TILE;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return canvas;
-  drawBrick(ctx, T_BRICK * TILE);
-  drawStone(ctx, T_STONE * TILE);
-  drawPlank(ctx, T_PLANK * TILE);
-  // Under the block pictures (see blockCanvas); shows only if a picture is hidden.
-  ctx.fillStyle = GOLD;
-  ctx.fillRect(T_LETTER * TILE, 0, TILE, TILE);
-  return canvas;
-}
-
-/** The adventure's brick (gfx/tiles.ts): fill, a darker lower-right edge, a mortar cross. */
-function drawBrick(ctx: CanvasRenderingContext2D, x: number): void {
-  ctx.fillStyle = BRICK;
-  ctx.fillRect(x, 0, TILE, TILE);
-  ctx.fillStyle = 'rgba(0,0,0,0.2)';
-  ctx.fillRect(x, TILE - 1, TILE, 1);
-  ctx.fillRect(x + TILE - 1, 0, 1, TILE);
-  ctx.fillStyle = 'rgba(0,0,0,0.133)';
-  ctx.fillRect(x + 7, 0, 1, TILE);
-  ctx.fillRect(x, 7, TILE, 1);
-  ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  ctx.fillRect(x, 0, TILE, 1);
+/**
+ * Draws into a throwaway Graphics and bakes it into a texture. The guard is not only for the
+ * console: generateTexture draws OVER a texture that already has the key, without clearing
+ * it, so a second bake would darken every translucent edge.
+ */
+function bake(
+  scene: Phaser.Scene,
+  key: string,
+  width: number,
+  height: number,
+  draw: (g: Phaser.GameObjects.Graphics) => void,
+): void {
+  if (scene.textures.exists(key)) return;
+  const g = scene.make.graphics({}, false);
+  draw(g);
+  g.generateTexture(key, width, height);
+  g.destroy();
 }
 
 /** Wall stone: two courses, offset joints, a lit top edge. */
-function drawStone(ctx: CanvasRenderingContext2D, x: number): void {
-  ctx.fillStyle = STONE;
-  ctx.fillRect(x, 0, TILE, TILE);
-  ctx.fillStyle = 'rgba(0,0,0,0.2)';
-  ctx.fillRect(x, 7, TILE, 1);
-  ctx.fillRect(x, 15, TILE, 1);
-  ctx.fillRect(x + 7, 0, 1, 7);
-  ctx.fillRect(x + 2, 8, 1, 7);
-  ctx.fillRect(x + 12, 8, 1, 7);
-  ctx.fillStyle = 'rgba(255,255,255,0.14)';
-  ctx.fillRect(x, 0, TILE, 1);
+function drawStone(g: Phaser.GameObjects.Graphics, x: number): void {
+  g.fillStyle(STONE).fillRect(x, 0, TILE, TILE);
+  g.fillStyle(0x000000, 0.2)
+    .fillRect(x, 7, TILE, 1)
+    .fillRect(x, 15, TILE, 1)
+    .fillRect(x + 7, 0, 1, 7)
+    .fillRect(x + 2, 8, 1, 7)
+    .fillRect(x + 12, 8, 1, 7);
+  g.fillStyle(0xffffff, 0.14).fillRect(x, 0, TILE, 1);
 }
 
 /**
  * A plank: a 7px board at the top of the tile and nothing below it, so it reads as thin —
  * something you can jump up through — next to the solid brick.
  */
-function drawPlank(ctx: CanvasRenderingContext2D, x: number): void {
-  ctx.fillStyle = WOOD;
-  ctx.fillRect(x, 0, TILE, 7);
-  ctx.fillStyle = WOOD_LIGHT;
-  ctx.fillRect(x, 0, TILE, 2);
-  ctx.fillStyle = WOOD_DARK;
-  ctx.fillRect(x, 6, TILE, 1);
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  ctx.fillRect(x + 11, 2, 1, 4);
+function drawPlank(g: Phaser.GameObjects.Graphics, x: number): void {
+  g.fillStyle(WOOD).fillRect(x, 0, TILE, 7);
+  g.fillStyle(WOOD_LIGHT).fillRect(x, 0, TILE, 2);
+  g.fillStyle(WOOD_DARK).fillRect(x, 6, TILE, 1);
+  g.fillStyle(0x000000, 0.25).fillRect(x + 11, 2, 1, 4);
 }
 
-/** One letter block in the `?` block's gold, drawn whole so it reads as one block, not four. */
-function blockCanvas(width: number): HTMLCanvasElement {
+/** One letter block in the `?` block's own gold and edge, drawn whole so it reads as one block, not four. */
+function drawBlock(g: Phaser.GameObjects.Graphics, width: number): void {
   const w = width * TILE;
   const h = 2 * TILE;
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return canvas;
-  ctx.fillStyle = GOLD;
-  ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  ctx.fillRect(2, 2, w - 4, 2);
-  ctx.fillRect(2, 2, 2, h - 4);
-  ctx.fillStyle = 'rgba(0,0,0,0.15)';
-  ctx.fillRect(2, h - 4, w - 4, 2);
-  ctx.fillRect(w - 4, 2, 2, h - 4);
-  ctx.strokeStyle = GOLD_EDGE;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(1, 1, w - 2, h - 2);
-  return canvas;
+  g.fillStyle(QUESTION_FILL).fillRect(0, 0, w, h);
+  g.fillStyle(0xffffff, 0.35).fillRect(2, 2, w - 4, 2).fillRect(2, 2, 2, h - 4);
+  g.fillStyle(0x000000, 0.15).fillRect(2, h - 4, w - 4, 2).fillRect(w - 4, 2, 2, h - 4);
+  g.lineStyle(2, QUESTION_STROKE).strokeRect(1, 1, w - 2, h - 2);
 }
 ```
 
@@ -2742,7 +2800,7 @@ Run: `npm test && npm run build`
 Expected: all pass, build clean. (Nothing imports this file yet; Task 10 does.)
 
 ```bash
-git add src/gfx/learnTiles.ts
+git add src/gfx/learnTiles.ts src/gfx/tiles.ts
 git commit -m "feat: the tower's tiles, drawn once at boot" -m "A five-frame tileset in the tower's tile codes — brick, stone, and a thin plank that reads as something to jump through — and a whole letter block picture per width, so a 2x2 block looks like one block rather than four tiles. toPhaserData turns the tower's empty 0 into Phaser's -1, because 0 is a real tile index to Phaser."
 ```
 
@@ -3052,6 +3110,8 @@ const LETTER_FONT = {
   color: '#8a4b00',
 };
 const LETTER_RESOLUTION = 3;
+/** How white the right block's hint glow gets at its brightest. */
+const GLOW_ALPHA = 0.55;
 
 /**
  * One learn tower. The rules are game/learn/ (tested there); this scene is the engine side:
@@ -3175,11 +3235,17 @@ export class LearnTowerScene extends Phaser.Scene {
       const x = (b.col + WALL) * TILE;
       const y = st.ceilingRows[0] * TILE;
       const picture = this.add.image(0, 0, blockTextureKey(b.width)).setOrigin(0, 0);
+      // The hint: white over the gold, faded in and out once the right block should glow.
+      // Fading the block itself would show the gold letter tile underneath, gold on gold.
+      const glow = this.add.rectangle(0, 0, b.width * TILE, 2 * TILE, 0xffffff).setOrigin(0, 0).setAlpha(0);
       const letter = this.add
         .text((b.width * TILE) / 2, TILE + 1, b.letter, LETTER_FONT)
         .setOrigin(0.5, 0.5)
         .setResolution(LETTER_RESOLUTION);
-      return this.add.container(x, y, [picture, letter]).setDepth(DEPTH_BLOCK).setData('x', x);
+      return this.add.container(x, y, [picture, glow, letter])
+        .setDepth(DEPTH_BLOCK)
+        .setData('x', x)
+        .setData('glow', glow);
     }));
   }
 
@@ -3205,8 +3271,8 @@ export class LearnTowerScene extends Phaser.Scene {
         return;
       case 'hint':
         this.tweens.add({
-          targets: this.blocks[event.storey][event.block],
-          alpha: 0.5, duration: 450, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+          targets: this.blocks[event.storey][event.block].getData('glow'),
+          alpha: GLOW_ALPHA, duration: 450, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
         });
         return;
       case 'rearm':
@@ -3214,7 +3280,7 @@ export class LearnTowerScene extends Phaser.Scene {
         return;
       case 'gate-closed':
         for (const box of this.blocks[event.storey]) {
-          this.tweens.killTweensOf(box);
+          this.tweens.killTweensOf([box, box.getData('glow')]);
           box.setVisible(false);
         }
         return;
@@ -3319,7 +3385,7 @@ Click the canvas so it has focus, then check, in this order:
    letter blocks with letters, the HUD band with a prompt, a letter and four dim stars.
 2. Walk and jump up the first storey. You pass UP through planks and land ON them.
 3. On the letter floor, walk under a WRONG letter and jump: it shakes, you bonk and fall back.
-4. Do it once more: the right block starts to pulse.
+4. Do it once more: the right block starts to glow, a white pulse over its gold.
 5. Stand under a WRONG letter with the hero only a little way under the block's LEFT edge,
    most of the body under the brick beside it, and jump: it still shakes. The same at its
    right edge. A head fully under the brick beside a letter just bonks.
@@ -3353,7 +3419,7 @@ key('keydown'); tick(10); key('keyup'); tick(90);
 
 ```bash
 git add src/scenes/LearnHudScene.ts src/scenes/LearnTowerScene.ts src/scenes/keys.ts src/main.ts tests/navigation.test.ts
-git commit -m "feat: the learn tower, playable" -m "A real Phaser tilemap from the tower's own tileset, which Arcade collides against too, planks from above only. The adventure's mover, reporting the row a head hit so the climb can pick the letter, the same fixed step as the level, and a camera that follows inside the current storey — holding still when the storey fits — and pans to the next. Wrong letters shake and the right one pulses after two; the star starts a new tower. The HUD asks what to find and fills a star per gate. Checked in the browser, including a spring with jump let go the instant the head hits the letter."
+git commit -m "feat: the learn tower, playable" -m "A real Phaser tilemap from the tower's own tileset, which Arcade collides against too, planks from above only. The adventure's mover, reporting the row a head hit so the climb can pick the letter, the same fixed step as the level, and a camera that follows inside the current storey — holding still when the storey fits — and pans to the next. Wrong letters shake and the right one glows after two; the star starts a new tower. The HUD asks what to find and fills a star per gate. Checked in the browser, including a spring with jump let go the instant the head hits the letter."
 ```
 
 ---
@@ -3627,7 +3693,7 @@ differs:
   skipping the last plank. That is expected (a full jump rises just over two hops) and
   harmless.
 - Walking between the three letters on the letter floor is easy; nothing to fall off.
-- A wrong answer costs nothing; after two misses the right block pulses.
+- A wrong answer costs nothing; after two misses the right block glows.
 - A head a little way under the left or right edge of a letter bumps it, from either side
   alike; a head fully under the brick beside it just bonks.
 - Arriving on the letter floor from the plank below never bumps your head.
