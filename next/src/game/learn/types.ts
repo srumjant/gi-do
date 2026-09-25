@@ -14,7 +14,7 @@ export interface TileEdit extends Cell {
 export interface GateState {
   /** Answered right at least once. Scores once. */
   solved: boolean;
-  /** The right block will spring you when bumped. False once it has, until re-armed. */
+  /** Bumps at this gate count. False from a right answer until re-armed. */
   armed: boolean;
   mistakes: number;
   trapdoorOpen: boolean;
@@ -45,7 +45,10 @@ export interface Climb {
   gates: GateState[];
   /** Where the hero is: a storey index, or `layout.storeys.length` on the roof. */
   storey: number;
-  /** The storey whose letter floor the hero last stood on, or -1. A bump counts only from there. */
+  /**
+   * The storey whose letter floor the hero stood on when last on the ground; -1 if that
+   * ground was anything else. A bump counts only from there.
+   */
   lastGround: number;
   /** A spring is carrying the hero: no jump cut until the apex. */
   sprung: boolean;

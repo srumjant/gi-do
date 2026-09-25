@@ -14,6 +14,13 @@ export function blockAt(layout: TowerLayout, col: number, row: number): { storey
   return null;
 }
 
+/** Storey `s`'s right block. buildTower gives every storey exactly one (tests/learnTower.test.ts). */
+function answerIndex(layout: TowerLayout, storey: number): number {
+  const i = layout.storeys[storey].blocks.findIndex((b) => b.correct);
+  if (i < 0) throw new Error(`storey ${storey} has no right block`);
+  return i;
+}
+
 /** A block's map cells: its columns through both ceiling rows. */
 export function blockCells(layout: TowerLayout, storey: number, block: number): Cell[] {
   const st = layout.storeys[storey];
@@ -25,7 +32,7 @@ export function blockCells(layout: TowerLayout, storey: number, block: number): 
 /** The trapdoor: the right block's columns plus one on each side, through both ceiling rows. */
 export function trapdoorCells(layout: TowerLayout, storey: number): Cell[] {
   const st = layout.storeys[storey];
-  const b = st.blocks.find((x) => x.correct) ?? st.blocks[0];
+  const b = st.blocks[answerIndex(layout, storey)];
   const from = Math.max(0, b.col - 1);
   const to = Math.min(INSIDE - 1, b.col + b.width);
   return st.ceilingRows.flatMap((row) =>
@@ -63,7 +70,7 @@ export function headBump(c: Climb, hit: Cell): BumpOutcome {
   c.sounds.push('block');
   c.events.push({ type: 'bump-wrong', storey, block });
   if (gate.mistakes === 2) {
-    c.events.push({ type: 'hint', storey, block: blocks.findIndex((b) => b.correct) });
+    c.events.push({ type: 'hint', storey, block: answerIndex(c.layout, storey) });
   }
   return 'wrong';
 }
@@ -79,16 +86,18 @@ export function closeTrapdoors(c: Climb): void {
     const st = c.layout.storeys[s];
     if (feet >= st.ceilingRows[0] * TILE) return;
     gate.trapdoorOpen = false;
-    const letters = st.blocks.flatMap((_, i) => blockCells(c.layout, s, i));
+    // The right block's cells are the trapdoor's already.
+    const letters = st.blocks.flatMap((b, i) => (b.correct ? [] : blockCells(c.layout, s, i)));
     setCells(c, [...trapdoorCells(c.layout, s), ...letters], T_BRICK);
     c.events.push({ type: 'gate-closed', storey: s });
   });
 }
 
 /**
- * If the hero is standing on a letter floor whose trapdoor is still open — the spring
- * clipped the trapdoor's edge and they fell back — the right block comes back, armed, so
- * bumping it springs them again. Nobody can get stuck below a solved gate.
+ * A safety net: if the hero is ever standing on a letter floor whose trapdoor is still open,
+ * the right block comes back, armed, so bumping it springs them again. Play does not produce
+ * this today (a counted bump leaves the head well inside the opening), but nobody may get
+ * stuck below a solved gate.
  */
 export function rearmIfStranded(c: Climb): void {
   const s = c.lastGround;
@@ -97,7 +106,7 @@ export function rearmIfStranded(c: Climb): void {
   if (!gate.trapdoorOpen) return;
   gate.trapdoorOpen = false;
   gate.armed = true;
-  const answer = c.layout.storeys[s].blocks.findIndex((b) => b.correct);
+  const answer = answerIndex(c.layout, s);
   setCells(c, trapdoorCells(c.layout, s), T_BRICK);
   setCells(c, blockCells(c.layout, s, answer), T_LETTER);
   c.events.push({ type: 'rearm', storey: s, block: answer });

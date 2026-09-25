@@ -65,6 +65,30 @@ describe('a letter gate', () => {
     expect(c.events).toContainEqual({ type: 'gate-closed', storey: 0 });
   });
 
+  it('carries you through from a bump at either edge of the letter, not only its middle', () => {
+    for (const edge of ['left', 'right'] as const) {
+      const c = climb();
+      const block = answerOf(c, 0);
+      standUnder(c, 0, block);
+      const b = c.layout.storeys[0].blocks[block];
+      const left = (b.col + WALL) * TILE;
+      c.player.x = edge === 'left' ? left - c.player.w + 4 : left + b.width * TILE - 4;
+      expect(run(c, 40, held, () => c.gates[0].solved)).toBe(true);
+      expect(run(c, 150, idle, () => c.storey === 1 && c.player.onGround)).toBe(true);
+      expect(c.events.some((e) => e.type === 'rearm')).toBe(false);
+    }
+  });
+
+  it('turns the whole letter ceiling to brick when it shuts', () => {
+    const c = climb();
+    standUnder(c, 0, answerOf(c, 0));
+    run(c, 40, held, () => c.gates[0].solved);
+    run(c, 150, idle, () => c.storey === 1 && c.player.onGround);
+    c.layout.storeys[0].blocks.forEach((_, i) => {
+      expect(codes(c, blockCells(c.layout, 0, i)).every((code) => code === T_BRICK)).toBe(true);
+    });
+  });
+
   it('wobbles for a wrong letter and costs nothing', () => {
     const c = climb();
     standUnder(c, 0, wrongOf(c, 0));
@@ -85,6 +109,16 @@ describe('a letter gate', () => {
       run(c, 40, held, () => c.gates[0].mistakes === miss);
     }
     expect(c.events).toContainEqual({ type: 'hint', storey: 0, block: answerOf(c, 0) });
+  });
+
+  it('glows once, however many more misses follow', () => {
+    const c = climb();
+    for (let miss = 1; miss <= 3; miss++) {
+      standUnder(c, 0, wrongOf(c, 0));
+      run(c, 40, held, () => c.gates[0].mistakes === miss);
+    }
+    expect(c.gates[0].mistakes).toBe(3);
+    expect(c.events.filter((e) => e.type === 'hint')).toHaveLength(1);
   });
 
   it('counts a head a little way under either edge of a letter, and not one just outside', () => {
@@ -140,6 +174,18 @@ describe('a letter gate', () => {
 });
 
 describe('the roof', () => {
+  it('is reached through the last gate', () => {
+    const c = climb();
+    const last = c.layout.storeys.length - 1;
+    c.gates.slice(0, last).forEach((g) => { g.solved = true; g.armed = false; });
+    standUnder(c, last, answerOf(c, last));
+    run(c, 40, held, () => c.gates[last].solved);
+    expect(run(c, 150, idle, () => c.player.onGround)).toBe(true);
+    expect(c.storey).toBe(c.layout.storeys.length);
+    expect(c.events).toContainEqual({ type: 'storey', storey: c.layout.storeys.length });
+    expect(c.player.y + c.player.h).toBe(c.layout.roofRow * TILE);
+  });
+
   it('ends the tower when the hero touches the star', () => {
     const c = climb();
     c.gates.forEach((g) => { g.solved = true; g.armed = false; });
