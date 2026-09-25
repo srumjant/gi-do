@@ -8,8 +8,8 @@ import type { BlockState, World } from '../game/types';
  * level data, unlike ground and brick — these are fixed, matching the live game's own
  * hardcoded fills (index.html:1692-1693).
  */
-const QUESTION_FILL = 0xffcc00;
-const QUESTION_STROKE = 0xcc8800;
+export const QUESTION_FILL = 0xffcc00;
+export const QUESTION_STROKE = 0xcc8800;
 const RAINBOW_STROKE = 0xffffff;
 
 /**
@@ -113,7 +113,7 @@ export function drawStaticTiles(scene: Phaser.Scene, world: World): BlockView[] 
  * one by a bump has to be indistinguishable from a tile that was a brick all along,
  * and two copies of these five calls would sooner or later stop being one brick.
  */
-function drawBrick(
+export function drawBrick(
   graphics: Phaser.GameObjects.Graphics,
   dx: number,
   dy: number,
