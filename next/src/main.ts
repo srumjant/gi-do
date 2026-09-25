@@ -7,7 +7,9 @@ import { CharacterScene } from './scenes/CharacterScene';
 import { DifficultyScene } from './scenes/DifficultyScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { HudScene } from './scenes/HudScene';
-import { LearnScene } from './scenes/LearnScene';
+import { LearnMenuScene } from './scenes/LearnMenuScene';
+import { LearnHudScene } from './scenes/LearnHudScene';
+import { LearnTowerScene } from './scenes/LearnTowerScene';
 import { LevelOverlayScene } from './scenes/LevelOverlayScene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
 import { PauseScene } from './scenes/PauseScene';
@@ -16,7 +18,7 @@ import { SliceScene } from './scenes/SliceScene';
 import { TitleScene } from './scenes/TitleScene';
 import { WinScene } from './scenes/WinScene';
 
-// Before any scene builds a string: two translations carry a {A}-style placeholder and
+// Before any scene builds a string: several translations carry a {A}-style placeholder and
 // would otherwise render it literally. Which glyph they get is the controller's business.
 // See config/glyphs.ts.
 installGlyphs();
@@ -57,7 +59,7 @@ const game = new Phaser.Game({
       /**
        * Arcade's own fixed delta, and therefore the length of one of our frames. It is
        * already the default; stated here because `PX_PER_FRAME_TO_PX_PER_SECOND` in
-       * physics/player.ts is the same number, and the two must not drift apart.
+       * physics/body.ts is the same number, and the two must not drift apart.
        */
       fps: STEP_HZ,
       debug: false,
@@ -95,7 +97,9 @@ const game = new Phaser.Game({
   scene: [
     TitleScene,
     ModeSelectScene,
-    LearnScene,
+    LearnMenuScene,
+    LearnTowerScene,
+    LearnHudScene,
     DifficultyScene,
     CharacterScene,
     SliceScene,

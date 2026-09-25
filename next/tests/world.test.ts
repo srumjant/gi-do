@@ -95,10 +95,13 @@ describe('stepCamera', () => {
 });
 
 it('src/game stays free of Phaser so it can run headlessly', () => {
-  const dir = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '../src/game');
-  for (const file of fs.readdirSync(dir)) {
-    const source = fs.readFileSync(path.join(dir, file), 'utf8');
-    expect(source, `${file} imports Phaser`).not.toMatch(/from ['"]phaser['"]/);
+  const root = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '../src/game');
+  // Every file, subfolders included: learn mode keeps its rules in src/game/learn/.
+  const files = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? files(path.join(dir, entry.name)) : [path.join(dir, entry.name)]);
+  for (const file of files(root)) {
+    const source = fs.readFileSync(file, 'utf8');
+    expect(source, `${path.relative(root, file)} imports Phaser`).not.toMatch(/from ['"]phaser['"]/);
   }
 });
 

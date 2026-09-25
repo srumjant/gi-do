@@ -31,7 +31,7 @@ export interface EnemyBodies {
  * run itself (index.html:1527-1528, :1538).
  *
  * **A body is a separator, not a home**, exactly as it is for the player (physics/player.ts
- * says the same thing at more length). `world.enemies` stays the single source of truth;
+ * says the same thing). `world.enemies` stays the single source of truth;
  * every step writes `e.x/e.y/e.vx/e.vy` into the body, takes one Arcade step, and reads
  * back what came out. `e.vx` is the one thing NOT read back — see EnemyMove in game/enemy.ts
  * for why, since it is the whole reason the wall reversal is a returned flag rather than a

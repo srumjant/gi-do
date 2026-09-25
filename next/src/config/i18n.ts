@@ -101,14 +101,24 @@ export const TRANSLATIONS: Record<string, Entry> = {
   ], en:[
     'YOU CAN\'T CATCH ME!','HEH, TOO SLOW!','TRY AGAIN, LITTLE ONE!','I\'M TOO FAST!','COME AND GET ME!'
   ]},
-  // Not in the live game. Learn mode is a whole second game — letters, syllables, a climb —
-  // and this port does not have it yet, so the mode select's second card leads to a screen
-  // that says so. The alternative was a card that does nothing when pressed, which reads as
-  // a broken game rather than an absent one. They go when learn mode lands.
-  learn_soon:         {et:'ÕPPIMINE TULEB VARSTI!',   en:'LEARNING IS COMING SOON!'},
-  learn_soon_d:       {et:'Tähed ja silbid on veel tegemisel.',
-                       en:'Letters and syllables are still being made.'},
-  back_hint:          {et:'Vajuta ESC või {B} tagasi', en:'Press ESC or {B} to go back'},
+  // Learn mode's own words. The live game hardcodes them in Estonian inside drawLearn and
+  // drawLearnMenu (index.html:2890, :2947-2955, :2983-2985); here they have both languages.
+  // Three are reworded on purpose: words mode builds its word a gate at a time, so it says
+  // "Ehita sõna" and "LEIA TÄHED:" where the live game says "Kirjuta sõna" and "KIRJUTA
+  // SÕNA:", and the hint takes mode_hint's shape, with the pad's buttons.
+  learn_title:        {et:'ÕPIME!',                   en:'LET\'S LEARN!'},
+  learn_choose:       {et:'Vali harjutus:',           en:'Choose an exercise:'},
+  learn_letters:      {et:'TÄHED',                    en:'LETTERS'},
+  learn_letters_d:    {et:'Leia õige täht',           en:'Find the right letter'},
+  learn_syllables:    {et:'SILBID',                   en:'SYLLABLES'},
+  learn_syllables_d:  {et:'Leia õige silp',           en:'Find the right syllable'},
+  learn_words:        {et:'SÕNAD',                    en:'WORDS'},
+  learn_words_d:      {et:'Ehita sõna',               en:'Build the word'},
+  learn_menu_hint:    {et:'◀ ▶ vali  •  Space / {A} alusta  •  ESC / {B} tagasi',
+                       en:'◀ ▶ choose  •  Space / {A} start  •  ESC / {B} back'},
+  learn_find_letter:  {et:'LEIA TÄHT:',               en:'FIND THE LETTER:'},
+  learn_find_syll:    {et:'LEIA SILP:',               en:'FIND THE SYLLABLE:'},
+  learn_find_letters: {et:'LEIA TÄHED:',              en:'FIND THE LETTERS:'},
   // Level names
   level_1:            {et:'Nukuaed',                  en:'Doll Garden'},
   level_2:            {et:'Dinosauruse kanjon',       en:'Dinosaur Canyon'},

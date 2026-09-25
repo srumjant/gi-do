@@ -5,7 +5,7 @@ import { bumpBlocksAbove } from '../src/game/player';
 import { createWorld } from '../src/game/world';
 import { PX_PER_FRAME_TO_PX_PER_SECOND } from '../src/physics/body';
 import { headTileRow } from '../src/physics/player';
-import { SOLID_TILE_INDEXES } from '../src/physics/tiles';
+import { collisionSides, SOLID_TILE_INDEXES } from '../src/physics/tiles';
 
 /**
  * What this can and cannot check.
@@ -134,5 +134,21 @@ describe('bumping a block from below', () => {
 
     expect(block.hit).toBe(false);
     expect(world.stars.length).toBe(0);
+  });
+});
+
+describe('per-side tile collision', () => {
+  it('stops a body at every side of a solid tile', () => {
+    expect(collisionSides('all')).toEqual([true, true, true, true]);
+  });
+
+  it('stops a body only on top of a plank, so a jump passes up through it', () => {
+    // Tile#setCollision's order is left, right, up, down, and "up" is the tile's TOP face:
+    // the one that stops a body moving down onto it (Arcade's TileCheckY).
+    expect(collisionSides('top')).toEqual([false, false, true, false]);
+  });
+
+  it('stops nothing at an empty tile', () => {
+    expect(collisionSides('none')).toEqual([false, false, false, false]);
   });
 });

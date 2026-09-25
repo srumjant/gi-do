@@ -9,6 +9,7 @@
 import type Phaser from 'phaser';
 import { TILE } from '../config/constants';
 import { isSolid } from '../data/levels';
+import type { FacesRule, TileFaces } from '../game/tiles';
 import type { World } from '../game/types';
 
 /**
@@ -128,4 +129,48 @@ export function syncCollisionLayer(layer: Phaser.Tilemaps.TilemapLayer, world: W
       tile.setCollision(isSolid(code));
     }
   }
+}
+
+/**
+ * `Tile#setCollision`'s four sides — left, right, up, down — for each kind of tile.
+ *
+ * Arcade names the sides of the TILE: `up` is its top face, which stops a body moving DOWN
+ * onto it (`TileCheckY`: `deltaY() > 0 && collideUp`), and `down` is its underside, which
+ * stops a body moving up. So a plank is `up` alone. This is the only part of the per-side
+ * collision a test can reach (see the Phaser import note at the top of this file).
+ */
+export function collisionSides(faces: TileFaces): [boolean, boolean, boolean, boolean] {
+  switch (faces) {
+    case 'all': return [true, true, true, true];
+    case 'top': return [false, false, true, false];
+    default: return [false, false, false, false];
+  }
+}
+
+/**
+ * Sets every tile's collision in `layer` from `rule`, then recomputes, once, the faces
+ * Arcade separates against. Tiles Phaser holds as empty (index -1) answer `none`.
+ */
+export function applyTileFaces(layer: Phaser.Tilemaps.TilemapLayer, rule: FacesRule): void {
+  layer.forEachTile((tile) => {
+    const [left, right, up, down] = collisionSides(rule(tile.index));
+    tile.setCollision(left, right, up, down, false);
+  });
+  layer.calculateFacesWithin();
+}
+
+/**
+ * The same for one tile — one just put back into the layer, such as a trapdoor cell that
+ * has shut. Recalculates that tile's faces and its neighbours'.
+ */
+export function applyTileFacesAt(
+  layer: Phaser.Tilemaps.TilemapLayer,
+  tileX: number,
+  tileY: number,
+  rule: FacesRule,
+): void {
+  const tile = layer.getTileAt(tileX, tileY);
+  if (!tile) return;
+  const [left, right, up, down] = collisionSides(rule(tile.index));
+  tile.setCollision(left, right, up, down, true);
 }
