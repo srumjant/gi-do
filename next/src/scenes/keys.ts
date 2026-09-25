@@ -61,9 +61,9 @@ export const PAUSE_SCENE_KEY = 'Pause';
  *
  * Three states map to SliceScene, because in the live game they are one screen with the
  * simulation stopped: `dead` and `levelcomplete` are the frozen world with a label over it,
- * and the label is a scene of its own already (LevelOverlayScene). Four states map to
- * nothing at all — `intro` and `debug` are not ported, and `learnletters`/`learnresult` sit
- * behind the one placeholder that stands in for the whole of learn mode.
+ * and the label is a scene of its own already (LevelOverlayScene). Three states map to
+ * nothing at all — `intro` and `debug` are not ported, and `learnresult` arrives with the
+ * learn tower's second plan.
  *
  * The gaps are what makes this worth writing down. A `BACK_TARGET` row pointing at a state
  * with no scene would be a back button that leads nowhere, and the test that checks for
@@ -82,5 +82,6 @@ export const SCENE_FOR_STATE: Readonly<Partial<Record<GameState, string>>> = {
   gameover: GAME_OVER_SCENE_KEY,
   win: WIN_SCENE_KEY,
   learnmenu: LEARN_SCENE_KEY,
+  learnletters: LEARN_TOWER_SCENE_KEY,
   paused: PAUSE_SCENE_KEY,
 };

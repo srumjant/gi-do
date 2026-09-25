@@ -219,6 +219,6 @@ describe('every route this port can take leads to a screen that exists', () => {
    */
   it('names exactly what is left to port', () => {
     const missing = GAME_STATES.filter((s) => !SCENE_FOR_STATE[s]);
-    expect(missing).toEqual(['intro', 'debug', 'learnletters', 'learnresult']);
+    expect(missing).toEqual(['intro', 'debug', 'learnresult']);
   });
 });
