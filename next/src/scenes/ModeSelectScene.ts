@@ -126,7 +126,7 @@ interface ModeCard {
  * The second card opens the learn menu (LearnMenuScene): letters, syllables or words, each
  * a tower to climb.
  *
- * Its route is fully wired regardless: `learnmenu` goes back to `modeselect` with the cursor
+ * Its way back is wired as well: `learnmenu` goes back to `modeselect` with the cursor
  * on the learn card (game/navigation.ts's `modeCursorFor`), which is the one live rule in
  * this area that exists purely for learn mode and the one most easily left out.
  */
