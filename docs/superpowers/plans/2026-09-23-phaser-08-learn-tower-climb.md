@@ -2871,8 +2871,11 @@ In `next/src/config/i18n.ts`, insert immediately ABOVE the comment line
 `  // Not in the live game. Learn mode is a whole second game — letters, syllables, a climb —`:
 
 ```ts
-  // Learn mode's own words. The live game hardcodes these in Estonian inside drawLearn and
-  // drawLearnMenu (index.html:2887, :2945-2958); here they have both languages.
+  // Learn mode's own words. The live game hardcodes them in Estonian inside drawLearn and
+  // drawLearnMenu (index.html:2890, :2947-2955, :2983-2985); here they have both languages.
+  // Three are reworded on purpose: words mode builds its word a gate at a time, so it says
+  // "Ehita sõna" and "LEIA TÄHED:" where the live game says "Kirjuta sõna" and "KIRJUTA
+  // SÕNA:", and the hint takes mode_hint's shape, with the pad's buttons.
   learn_title:        {et:'ÕPIME!',                   en:'LET\'S LEARN!'},
   learn_choose:       {et:'Vali harjutus:',           en:'Choose an exercise:'},
   learn_letters:      {et:'TÄHED',                    en:'LETTERS'},
@@ -2933,6 +2936,10 @@ git commit -m "feat: learn mode's words, in both languages" -m "The menu's title
 - Modify: `next/src/scenes/keys.ts`
 - Modify: `next/src/main.ts`
 - Test: `next/tests/navigation.test.ts`
+
+Review kept the scene as planned and tidied it: each block is a typed view, `apply()` fails
+the build on an unhandled event, a dead `centerOn` went, and the hint glows rather than
+fading gold on gold. The code below is the result.
 
 - [ ] **Step 1: Update the navigation test first**
 
@@ -3113,12 +3120,20 @@ const LETTER_RESOLUTION = 3;
 /** How white the right block's hint glow gets at its brightest. */
 const GLOW_ALPHA = 0.55;
 
+/** A letter block on screen: its container (picture, hint glow, letter), the glow, and where it rests. */
+interface BlockView {
+  box: Phaser.GameObjects.Container;
+  glow: Phaser.GameObjects.Rectangle;
+  restX: number;
+}
+
 /**
  * One learn tower. The rules are game/learn/ (tested there); this scene is the engine side:
  * a real tilemap drawn from the tower's own tileset, which Arcade also collides against,
- * with planks colliding only from above; the adventure's Arcade mover, which reports the row
- * a head hit for the climb to pick the letter; the same fixed 60Hz step as SliceScene; and a
- * camera that follows the hero inside the current storey's bounds and pans to the next.
+ * with planks colliding only from above; the general Arcade mover (physics/player.ts's
+ * createBodyMover), which reports the row a head hit for the climb to pick the letter; the
+ * same fixed 60Hz step as SliceScene; and a camera that follows the hero inside the current
+ * storey's bounds and pans to the next.
  *
  * Back goes to the learn menu (game/navigation.ts: `learnletters` is not pausable).
  */
@@ -3130,8 +3145,8 @@ export class LearnTowerScene extends Phaser.Scene {
   private climb!: Climb;
   private layer!: Phaser.Tilemaps.TilemapLayer;
   private move!: ClimbMove;
-  /** One container per block (picture + letter), per storey. */
-  private blocks: Phaser.GameObjects.Container[][] = [];
+  /** One view per block, per storey. */
+  private blocks: BlockView[][] = [];
   private playerImage!: Phaser.GameObjects.Image;
   /** The point the camera follows: the hero's centre. */
   private readonly follow = { x: 0, y: 0 };
@@ -3183,8 +3198,8 @@ export class LearnTowerScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setZoom(LEARN_ZOOM);
     this.boundToStorey(0);
-    const start = settleCenter(storeyView(this.climb.layout, 0));
-    cam.centerOn(start.x, start.y);
+    // startFollow snaps the scroll to the follow point and clamps it to the bounds, so this
+    // is also the first frame's position: storey 0 always fits, and its top is pinned.
     // lerpX 0: the camera never moves sideways; the bounds are exactly the view's width.
     cam.startFollow(this.follow, true, 0, FOLLOW_LERP, 0, FOLLOW_ABOVE);
 
@@ -3242,10 +3257,8 @@ export class LearnTowerScene extends Phaser.Scene {
         .text((b.width * TILE) / 2, TILE + 1, b.letter, LETTER_FONT)
         .setOrigin(0.5, 0.5)
         .setResolution(LETTER_RESOLUTION);
-      return this.add.container(x, y, [picture, glow, letter])
-        .setDepth(DEPTH_BLOCK)
-        .setData('x', x)
-        .setData('glow', glow);
+      const box = this.add.container(x, y, [picture, glow, letter]).setDepth(DEPTH_BLOCK);
+      return { box, glow, restX: x };
     }));
   }
 
@@ -3264,23 +3277,23 @@ export class LearnTowerScene extends Phaser.Scene {
         for (const cell of event.cells) this.setTile(cell.col, cell.row, cell.code);
         return;
       case 'bump-right':
-        this.blocks[event.storey][event.block].setVisible(false);
+        this.blocks[event.storey][event.block].box.setVisible(false);
         return;
       case 'bump-wrong':
         this.shake(this.blocks[event.storey][event.block]);
         return;
       case 'hint':
         this.tweens.add({
-          targets: this.blocks[event.storey][event.block].getData('glow'),
+          targets: this.blocks[event.storey][event.block].glow,
           alpha: GLOW_ALPHA, duration: 450, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
         });
         return;
       case 'rearm':
-        this.blocks[event.storey][event.block].setVisible(true);
+        this.blocks[event.storey][event.block].box.setVisible(true);
         return;
       case 'gate-closed':
-        for (const box of this.blocks[event.storey]) {
-          this.tweens.killTweensOf([box, box.getData('glow')]);
+        for (const { box, glow } of this.blocks[event.storey]) {
+          this.tweens.killTweensOf([box, glow]);
           box.setVisible(false);
         }
         return;
@@ -3292,24 +3305,31 @@ export class LearnTowerScene extends Phaser.Scene {
           this.scene.restart({ mode: this.mode, used: this.used } satisfies LearnTowerData);
         });
         return;
+      default:
+        // A ClimbEvent this switch does not know fails the build here, not silently in play.
+        event satisfies never;
     }
   }
 
-  /** Mirrors a map edit on the Phaser layer, collision included. */
+  /**
+   * Mirrors a map edit on the Phaser layer, collision included. Both calls are needed:
+   * putTileAt sets a tile's collision from the layer's collideIndexes, which this layer does
+   * not use (its collision is per tile and per side), so it leaves the tile colliding on no
+   * side; applyTileFacesAt then sets the tower's sides and recalculates the faces around it.
+   */
   private setTile(col: number, row: number, code: number): void {
     if (code === T_EMPTY) {
       this.layer.removeTileAt(col, row, true, true);
       return;
     }
-    this.layer.putTileAt(code, col, row, true);
+    this.layer.putTileAt(code, col, row, false);
     applyTileFacesAt(this.layer, col, row, towerTileFaces);
   }
 
-  private shake(box: Phaser.GameObjects.Container): void {
-    const x = box.getData('x') as number;
+  private shake({ box, restX }: BlockView): void {
     this.tweens.killTweensOf(box);
-    box.setX(x);
-    this.tweens.add({ targets: box, x: x + 3, duration: 40, yoyo: true, repeat: 3, onComplete: () => box.setX(x) });
+    box.setX(restX);
+    this.tweens.add({ targets: box, x: restX + 3, duration: 40, yoyo: true, repeat: 3, onComplete: () => box.setX(restX) });
   }
 
   /**
@@ -3432,6 +3452,12 @@ git commit -m "feat: the learn tower, playable" -m "A real Phaser tilemap from t
 - Modify: `next/src/scenes/keys.ts`, `next/src/scenes/ModeSelectScene.ts`, `next/src/main.ts`,
   `next/src/config/i18n.ts`, `next/tests/i18n.test.ts`
 
+Review matched the menu to the live one where the sibling screens do: it opens on the first
+card, draws Gigi in the Classic skin, and confirms silently. It also uses the port's
+`clampIndex` and scaled player textures. A follow-up fixed three comments elsewhere that
+still described the placeholder (`game/navigation.ts`, `ModeSelectScene.ts`,
+`gfx/starfield.ts`). The code below is the result.
+
 - [ ] **Step 1: Update the i18n parity test first**
 
 In `next/tests/i18n.test.ts`, delete the line `  'learn_soon', 'learn_soon_d', 'back_hint',`
@@ -3465,14 +3491,14 @@ Create `next/src/scenes/LearnMenuScene.ts`:
 
 ```ts
 import Phaser from 'phaser';
-import { sfxPickup } from '../audio/sfx';
 import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import type { LearnMode } from '../game/learn/content';
+import { clampIndex } from '../game/menu';
 import { getSkinIndex } from '../game/run';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
-import { playerTextureKey, registerTextures } from '../gfx/textures';
+import { registerScaledPlayerTextures, scaledPlayerTextureKey } from '../gfx/textures';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
 import { LEARN_MENU_SCENE_KEY, LEARN_TOWER_SCENE_KEY } from './keys';
 import type { LearnTowerData } from './LearnTowerScene';
@@ -3492,17 +3518,47 @@ interface Card {
   label: string;
   desc: string;
   sample: string;
-  color: number;
-  css: string;
+  /** index.html:2953-2955: the label, the highlight's fill and its border. */
+  color: string;
 }
 
-// index.html:2955-2973's layout: three 160px cards, 20px apart, 120px down.
+/** index.html:2946-2949. */
+const TITLE_Y = 60;
+const SUBTITLE_Y = 85;
+
+/** index.html:2957-2961: three 160px cards, 20px apart, 120px down, centred as a row. */
+const CARD_COUNT = 3;
 const CARD_W = 160;
 const CARD_H = 160;
 const CARD_GAP = 20;
 const CARD_Y = 120;
+const CARD_START_X = (BASE_W - (CARD_COUNT * CARD_W + (CARD_COUNT - 1) * CARD_GAP)) / 2;
+/** index.html:2968-2973: each card's three lines, as baselines below its top. */
+const LABEL_DY = 35;
+const SAMPLE_DY = 80;
+const DESC_DY = 115;
+
+/** index.html:2962-2967. */
+const BOX_OUTSET = 2;
+const BOX_LINE_WIDTH = 3;
+/** `opt.color+'22'`, as the fraction Phaser takes. */
+const BOX_FILL_ALPHA = 0x22 / 0xff;
+const IDLE_FILL = 0xffffff;
+const IDLE_FILL_ALPHA = 0.05;
+
+/** index.html:2977-2980: both at scale 3, bobbing together; Dodo faces Gigi. */
+const HERO_SCALE = 3;
+const GIGI_X = 60;
+const DODO_X = BASE_W - 90;
 const HERO_Y = BASE_H - 100;
-const HERO_SCALE = 1.5;
+const BOB_SPEED = 0.06;
+const BOB_AMPLITUDE = 3;
+
+/**
+ * index.html:2982-2985 draws two lines, the keys at 340 and "ESC = tagasi" at 365. The
+ * port's one line (i18n.ts's `learn_menu_hint`) sits between them.
+ */
+const HINT_Y = 350;
 
 const TITLE_FONT = { fontFamily: 'monospace', fontSize: '30px', fontStyle: 'bold', color: '#88ff88' };
 const SUBTITLE_FONT = { fontFamily: 'monospace', fontSize: '14px', color: '#aaddcc' };
@@ -3512,16 +3568,20 @@ const DESC_FONT = { fontFamily: 'monospace', fontSize: '10px', color: '#aaaaaa' 
 const HINT_FONT = { fontFamily: 'monospace', fontSize: '12px', color: '#aaddcc' };
 
 function cardX(i: number): number {
-  const total = 3 * CARD_W + 2 * CARD_GAP;
-  return (BASE_W - total) / 2 + i * (CARD_W + CARD_GAP);
+  return CARD_START_X + i * (CARD_W + CARD_GAP);
 }
 
 /**
- * The learn menu: letters, syllables or words. A port of drawLearnMenu (index.html:2940),
- * translated. Confirm starts a tower in that mode with a fresh session; back goes to the
- * mode select with the cursor on the learn card (game/navigation.ts's modeCursorFor).
+ * The learn menu: letters, syllables or words. A port of drawLearnMenu (index.html:2940-2987)
+ * and the input that drives it (updateLearn's `learnmenu` branch, :2645-2656), translated.
+ * Confirm starts a tower in that mode with a fresh session; back goes to the mode select
+ * with the cursor on the learn card (game/navigation.ts's modeCursorFor).
  */
 export class LearnMenuScene extends Phaser.Scene {
+  /**
+   * The chosen card. A field, so it outlives `create()` (Phaser reuses the instance): the
+   * live `learnMenuIdx` is kept across a tower and back. `update` resets it on the way out.
+   */
   private index = 0;
   private cards: Card[] = [];
   private boxes!: Phaser.GameObjects.Graphics;
@@ -3537,73 +3597,92 @@ export class LearnMenuScene extends Phaser.Scene {
 
   create(): void {
     this.leaving = false;
-    registerTextures(this);
+    registerScaledPlayerTextures(this, [['stand', HERO_SCALE]]);
     this.cameras.main.setBackgroundColor(BACKGROUND);
     this.stars = createStarField(this, STARS);
 
     this.cards = [
-      { mode: 'letters', label: TStr('learn_letters'), desc: TStr('learn_letters_d'), sample: 'A B C', color: 0x88ccff, css: '#88ccff' },
-      { mode: 'syllables', label: TStr('learn_syllables'), desc: TStr('learn_syllables_d'), sample: 'MA KA', color: 0xffaa66, css: '#ffaa66' },
-      { mode: 'words', label: TStr('learn_words'), desc: TStr('learn_words_d'), sample: 'KASS', color: 0xff88cc, css: '#ff88cc' },
+      { mode: 'letters', label: TStr('learn_letters'), desc: TStr('learn_letters_d'), sample: 'A B C', color: '#88ccff' },
+      { mode: 'syllables', label: TStr('learn_syllables'), desc: TStr('learn_syllables_d'), sample: 'MA KA', color: '#ffaa66' },
+      { mode: 'words', label: TStr('learn_words'), desc: TStr('learn_words_d'), sample: 'KASS', color: '#ff88cc' },
     ];
 
-    this.add.text(BASE_W / 2, 60, TStr('learn_title'), TITLE_FONT).setOrigin(0.5, 1);
-    this.add.text(BASE_W / 2, 85, TStr('learn_choose'), SUBTITLE_FONT).setOrigin(0.5, 1);
+    this.add.text(BASE_W / 2, TITLE_Y, TStr('learn_title'), TITLE_FONT).setOrigin(0.5, 1);
+    this.add.text(BASE_W / 2, SUBTITLE_Y, TStr('learn_choose'), SUBTITLE_FONT).setOrigin(0.5, 1);
 
     this.boxes = this.add.graphics();
     this.cards.forEach((card, i) => {
       const x = cardX(i) + CARD_W / 2;
-      this.add.text(x, CARD_Y + 35, card.label, { ...LABEL_FONT, color: card.css }).setOrigin(0.5, 1);
-      this.add.text(x, CARD_Y + 80, card.sample, SAMPLE_FONT).setOrigin(0.5, 1);
-      this.add.text(x, CARD_Y + 115, card.desc, DESC_FONT).setOrigin(0.5, 1);
+      this.add.text(x, CARD_Y + LABEL_DY, card.label, { ...LABEL_FONT, color: card.color }).setOrigin(0.5, 1);
+      this.add.text(x, CARD_Y + SAMPLE_DY, card.sample, SAMPLE_FONT).setOrigin(0.5, 1);
+      this.add.text(x, CARD_Y + DESC_DY, card.desc, DESC_FONT).setOrigin(0.5, 1);
     });
 
-    // Gigi on the left and Dodo on the right, bobbing (index.html:2976-2979).
+    // Gigi is the bare GIGI_STAND/GIGI_P (index.html:2978), the Classic skin whichever was
+    // chosen, and Dodo the chosen skin (:2979): the asymmetry the title and the mode select
+    // reproduce too.
     this.heroes = [
-      this.add.image(60, HERO_Y, playerTextureKey('gigi', getSkinIndex('gigi'), 'stand'))
-        .setOrigin(0, 0).setScale(HERO_SCALE),
-      this.add.image(BASE_W - 90, HERO_Y, playerTextureKey('dodo', getSkinIndex('dodo'), 'stand'))
-        .setOrigin(0, 0).setScale(HERO_SCALE).setFlipX(true),
+      this.add.image(GIGI_X, HERO_Y, scaledPlayerTextureKey('gigi', 0, 'stand', HERO_SCALE)).setOrigin(0, 0),
+      this.add.image(DODO_X, HERO_Y, scaledPlayerTextureKey('dodo', getSkinIndex('dodo'), 'stand', HERO_SCALE))
+        .setOrigin(0, 0)
+        .setFlipX(true),
     ];
 
-    this.add.text(BASE_W / 2, 350, TStr('learn_menu_hint'), HINT_FONT).setOrigin(0.5, 1);
+    this.add.text(BASE_W / 2, HINT_Y, TStr('learn_menu_hint'), HINT_FONT).setOrigin(0.5, 1);
 
     this.clock = createFrameClock();
     this.keys = bindMenuKeys(this);
+    this.drawBoxes();
   }
 
   update(_time: number, delta: number): void {
     const t = this.clock.advance(delta);
     this.stars.update();
-    this.drawBoxes();
-    const bob = Math.sin(t * 0.06) * 3;
+    const bob = Math.sin(t * BOB_SPEED) * BOB_AMPLITUDE;
     for (const hero of this.heroes) hero.setY(HERO_Y + bob);
 
     if (this.leaving) return;
-    if (pressedAny(this.keys.left, this.keys.altLeft)) this.index = Math.max(0, this.index - 1);
-    if (pressedAny(this.keys.right, this.keys.altRight)) this.index = Math.min(this.cards.length - 1, this.index + 1);
+    if (pressedAny(this.keys.left, this.keys.altLeft)) this.move(-1);
+    if (pressedAny(this.keys.right, this.keys.altRight)) this.move(1);
+    // index.html:2648-2654. No sound: the live confirm is silent.
     if (pressedAny(this.keys.confirm, this.keys.enter)) {
       this.leaving = true;
-      sfxPickup();
       this.scene.start(LEARN_TOWER_SCENE_KEY, { mode: this.cards[this.index].mode, used: [] } satisfies LearnTowerData);
       return;
     }
     if (justDown(this.keys.back)) {
       this.leaving = true;
+      // The mode select opens this menu on its first card (index.html:1325's
+      // `learnMenuIdx=0`); back from a tower finds it where it was, because handleBack
+      // (:1259-1272) does not touch it. Back to the mode select is the only way out of learn
+      // mode, so the reset is made here, on the way out.
+      this.index = 0;
       takeBack(this, 'learnmenu');
     }
   }
 
+  private move(delta: number): void {
+    const next = clampIndex(this.index, delta, this.cards.length);
+    if (next === this.index) return;
+    this.index = next;
+    this.drawBoxes();
+  }
+
+  /** index.html:2962-2967. Drawn at create and when the choice moves; nothing else changes it. */
   private drawBoxes(): void {
     this.boxes.clear();
     this.cards.forEach((card, i) => {
       const x = cardX(i);
-      if (i === this.index) {
-        this.boxes.fillStyle(card.color, 0x22 / 0xff).fillRect(x, CARD_Y, CARD_W, CARD_H);
-        this.boxes.lineStyle(3, card.color).strokeRect(x - 2, CARD_Y - 2, CARD_W + 4, CARD_H + 4);
-      } else {
-        this.boxes.fillStyle(0xffffff, 0.05).fillRect(x, CARD_Y, CARD_W, CARD_H);
+      if (i !== this.index) {
+        this.boxes.fillStyle(IDLE_FILL, IDLE_FILL_ALPHA).fillRect(x, CARD_Y, CARD_W, CARD_H);
+        return;
       }
+      const color = Phaser.Display.Color.HexStringToColor(card.color).color;
+      this.boxes
+        .fillStyle(color, BOX_FILL_ALPHA)
+        .fillRect(x, CARD_Y, CARD_W, CARD_H)
+        .lineStyle(BOX_LINE_WIDTH, color)
+        .strokeRect(x - BOX_OUTSET, CARD_Y - BOX_OUTSET, CARD_W + 2 * BOX_OUTSET, CARD_H + 2 * BOX_OUTSET);
     });
   }
 }
