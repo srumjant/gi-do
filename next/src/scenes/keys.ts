@@ -27,8 +27,6 @@ import type { GameState } from '../game/navigation';
 export const TITLE_SCENE_KEY = 'Title';
 /** Adventure or learn (`modeselect`). */
 export const MODE_SELECT_SCENE_KEY = 'ModeSelect';
-/** Learn mode, which is not ported: a screen that says so (stands in for `learnmenu`). */
-export const LEARN_SCENE_KEY = 'Learn';
 /** The learn menu: letters, syllables or words (`learnmenu`). */
 export const LEARN_MENU_SCENE_KEY = 'LearnMenu';
 /** One learn tower, climbed gate by gate (`learnletters`). */
@@ -81,7 +79,7 @@ export const SCENE_FOR_STATE: Readonly<Partial<Record<GameState, string>>> = {
   between: BETWEEN_SCENE_KEY,
   gameover: GAME_OVER_SCENE_KEY,
   win: WIN_SCENE_KEY,
-  learnmenu: LEARN_SCENE_KEY,
+  learnmenu: LEARN_MENU_SCENE_KEY,
   learnletters: LEARN_TOWER_SCENE_KEY,
   paused: PAUSE_SCENE_KEY,
 };

@@ -119,14 +119,6 @@ export const TRANSLATIONS: Record<string, Entry> = {
   learn_find_letter:  {et:'LEIA TÄHT:',               en:'FIND THE LETTER:'},
   learn_find_syll:    {et:'LEIA SILP:',               en:'FIND THE SYLLABLE:'},
   learn_find_letters: {et:'LEIA TÄHED:',              en:'FIND THE LETTERS:'},
-  // Not in the live game. Learn mode is a whole second game — letters, syllables, a climb —
-  // and this port does not have it yet, so the mode select's second card leads to a screen
-  // that says so. The alternative was a card that does nothing when pressed, which reads as
-  // a broken game rather than an absent one. They go when learn mode lands.
-  learn_soon:         {et:'ÕPPIMINE TULEB VARSTI!',   en:'LEARNING IS COMING SOON!'},
-  learn_soon_d:       {et:'Tähed ja silbid on veel tegemisel.',
-                       en:'Letters and syllables are still being made.'},
-  back_hint:          {et:'Vajuta ESC või {B} tagasi', en:'Press ESC or {B} to go back'},
   // Level names
   level_1:            {et:'Nukuaed',                  en:'Doll Garden'},
   level_2:            {et:'Dinosauruse kanjon',       en:'Dinosaur Canyon'},

@@ -17,14 +17,12 @@ const legacy = loadLegacySection({
  *
  * The `learn_*` keys are learn mode's own words. The live game hardcodes them in Estonian
  * inside drawLearn and drawLearnMenu rather than keeping them in TRANSLATIONS, so the port's
- * versions are new keys with both languages. The first three say that learn mode is not built
- * yet, and leave with the placeholder screen.
+ * versions are new keys with both languages.
  *
  * An unlisted extra key fails the same assertion a missing live key does, which is the point
  * — the list is a short, deliberate exception, not a hole.
  */
 const PORT_ONLY_KEYS = [
-  'learn_soon', 'learn_soon_d', 'back_hint',
   'learn_title', 'learn_choose',
   'learn_letters', 'learn_letters_d',
   'learn_syllables', 'learn_syllables_d',

@@ -8,7 +8,7 @@ import { MODE_ADVENTURE, MODE_LEARN } from '../game/navigation';
 import { getSkinIndex } from '../game/run';
 import { menuPlayerTextureKey, MENU_PREVIEW_SCALE, registerMenuTextures } from '../gfx/textures';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
-import { DIFFICULTY_SCENE_KEY, LEARN_SCENE_KEY, MODE_SELECT_SCENE_KEY } from './keys';
+import { DIFFICULTY_SCENE_KEY, LEARN_MENU_SCENE_KEY, MODE_SELECT_SCENE_KEY } from './keys';
 import { takeBack } from './navigate';
 
 /**
@@ -121,13 +121,10 @@ interface ModeCard {
  * Adventure or learn. Port of `drawModeSelect` (index.html:1965-2018) and the input that
  * drives it (:1318-1329).
  *
- * ## Learn mode is not ported
+ * ## Learn mode
  *
- * The second card is real, choosable, and leads to a screen that says the letters are not
- * ready yet (LearnScene). The alternative was a card that does nothing when pressed, which
- * a four-year-old reads as a broken game rather than as an absent feature — and the
- * alternative to THAT was drawing one card, which would quietly remove half of what the live
- * game offers from the screen whose whole job is to offer it.
+ * The second card opens the learn menu (LearnMenuScene): letters, syllables or words, each
+ * a tower to climb.
  *
  * Its route is fully wired regardless: `learnmenu` goes back to `modeselect` with the cursor
  * on the learn card (game/navigation.ts's `modeCursorFor`), which is the one live rule in
@@ -254,7 +251,7 @@ export class ModeSelectScene extends Phaser.Scene {
     this.leaving = true;
     ensureAudio();
     sfxPickup();
-    this.scene.start(this.index === MODE_ADVENTURE ? DIFFICULTY_SCENE_KEY : LEARN_SCENE_KEY);
+    this.scene.start(this.index === MODE_ADVENTURE ? DIFFICULTY_SCENE_KEY : LEARN_MENU_SCENE_KEY);
   }
 
   private heroKey(): string {
