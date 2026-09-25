@@ -16,7 +16,7 @@ import { SliceScene } from './scenes/SliceScene';
 import { TitleScene } from './scenes/TitleScene';
 import { WinScene } from './scenes/WinScene';
 
-// Before any scene builds a string: two translations carry a {A}-style placeholder and
+// Before any scene builds a string: several translations carry a {A}-style placeholder and
 // would otherwise render it literally. Which glyph they get is the controller's business.
 // See config/glyphs.ts.
 installGlyphs();

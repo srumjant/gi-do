@@ -67,8 +67,8 @@ export const PAUSE_SCENE_KEY = 'Pause';
  *
  * The gaps are what makes this worth writing down. A `BACK_TARGET` row pointing at a state
  * with no scene would be a back button that leads nowhere, and the test that checks for
- * that needs something to check against — which is this, rather than a reading of eleven
- * scene files.
+ * that needs something to check against — which is this, rather than a reading of every
+ * scene file.
  */
 export const SCENE_FOR_STATE: Readonly<Partial<Record<GameState, string>>> = {
   title: TITLE_SCENE_KEY,

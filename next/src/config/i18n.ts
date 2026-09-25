@@ -101,8 +101,11 @@ export const TRANSLATIONS: Record<string, Entry> = {
   ], en:[
     'YOU CAN\'T CATCH ME!','HEH, TOO SLOW!','TRY AGAIN, LITTLE ONE!','I\'M TOO FAST!','COME AND GET ME!'
   ]},
-  // Learn mode's own words. The live game hardcodes these in Estonian inside drawLearn and
-  // drawLearnMenu (index.html:2887, :2945-2958); here they have both languages.
+  // Learn mode's own words. The live game hardcodes them in Estonian inside drawLearn and
+  // drawLearnMenu (index.html:2890, :2947-2955, :2983-2985); here they have both languages.
+  // Three are reworded on purpose: words mode builds its word a gate at a time, so it says
+  // "Ehita sõna" and "LEIA TÄHED:" where the live game says "Kirjuta sõna" and "KIRJUTA
+  // SÕNA:", and the hint takes mode_hint's shape, with the pad's buttons.
   learn_title:        {et:'ÕPIME!',                   en:'LET\'S LEARN!'},
   learn_choose:       {et:'Vali harjutus:',           en:'Choose an exercise:'},
   learn_letters:      {et:'TÄHED',                    en:'LETTERS'},
