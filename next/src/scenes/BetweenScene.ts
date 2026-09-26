@@ -16,6 +16,7 @@ import {
   kidnapperIndex,
 } from '../game/run';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import {
   KIDNAPPER_SCALE,
   kidnapperTextureKey,
@@ -184,6 +185,7 @@ export class BetweenScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     registerScaledPlayerTextures(this, [['stand', CUTSCENE_SCALE], ['jump', CARRIED_SCALE]]);
     registerKidnapperTextures(this);
 

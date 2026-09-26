@@ -10,6 +10,7 @@ import type { Climb, ClimbEvent, ClimbMove, LearnSession } from '../game/learn/t
 import { type Character, PLAYER_DRAW_INSET } from '../game/player';
 import { getSelectedChar, getSkinIndex } from '../game/run';
 import { GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { RENDER_SCALE } from '../gfx/render';
 import {
   blockTextureKey, LEARN_BRICK, LEARN_CONFETTI_COLORS, LEARN_SPARK_TEXTURE, LEARN_TILES_TEXTURE, registerLearnTiles,
   toPhaserData,
@@ -48,7 +49,8 @@ const LETTER_FONT = {
   fontFamily: GAME_FONT_BOLD,
   fontSize: '20px',
   color: '#8a4b00',
-  resolution: GAME_TEXT_RESOLUTION,
+  // Zoomed with the world, so drawn that much denser to land 1:1.
+  resolution: GAME_TEXT_RESOLUTION * LEARN_ZOOM,
 };
 /** The star floats up and down this far, this slowly. */
 const STAR_BOB_PX = 4;
@@ -165,7 +167,7 @@ export class LearnTowerScene extends Phaser.Scene {
     this.buildEffects();
 
     const cam = this.cameras.main;
-    cam.setZoom(LEARN_ZOOM);
+    cam.setZoom(LEARN_ZOOM * RENDER_SCALE);
     this.boundToStorey(0);
     // startFollow snaps the scroll to the follow point and clamps it to the bounds, so this
     // is also the first frame's position: storey 0 always fits, and its top is pinned.
@@ -367,11 +369,14 @@ export class LearnTowerScene extends Phaser.Scene {
     });
   }
 
-  /** The HUD's star for a right answer flies from the block: its centre, in screen px. */
+  /**
+   * The HUD's star for a right answer flies from the block: its centre, in the HUD's layout px
+   * (world px times the tower's own zoom; the render scale is the HUD camera's business).
+   */
   private sendStar({ box }: BlockView): void {
     const cam = this.cameras.main;
     const hud = this.scene.get(LEARN_HUD_SCENE_KEY) as LearnHudScene;
-    hud.flyStar((box.x - cam.worldView.x) * cam.zoom, (box.y - cam.worldView.y) * cam.zoom);
+    hud.flyStar((box.x - cam.worldView.x) * LEARN_ZOOM, (box.y - cam.worldView.y) * LEARN_ZOOM);
   }
 
   private shake({ box, restX }: BlockView): void {

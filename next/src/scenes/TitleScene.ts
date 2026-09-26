@@ -8,6 +8,7 @@ import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { MODE_ADVENTURE } from '../game/navigation';
 import { getSkinIndex } from '../game/run';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION, preloadGameFont } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import {
   cloudTextureKey,
   registerScaledPlayerTextures,
@@ -152,6 +153,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     this.leaving = false;
     this.creatures = [];
     registerTitleTextures(this);

@@ -4,6 +4,7 @@ import { TStr } from '../config/i18n';
 import { getRescueSprites, isLastLevel } from '../game/run';
 import type { World } from '../game/types';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import { LEVEL_OVERLAY_SCENE_KEY } from './keys';
 
 /**
@@ -75,6 +76,7 @@ export class LevelOverlayScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     this.dim = this.add.graphics().setVisible(false);
 
     // index.html:1898's `getRescueSprites().name.toUpperCase()+T('is_safe')`. Resolved at

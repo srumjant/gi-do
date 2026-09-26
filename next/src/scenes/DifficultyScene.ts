@@ -5,6 +5,7 @@ import { capitals, TDiff, TStr } from '../config/i18n';
 import { clampIndex, difficultyAt, difficultyLines } from '../game/menu';
 import { getSkinIndex } from '../game/run';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
 import { menuPlayerTextureKey, MENU_PREVIEW_SCALE, registerMenuTextures } from '../gfx/textures';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
@@ -104,6 +105,7 @@ export class DifficultyScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     // index.html:1324 — entering this state sets `diffIndex=0`. The field initialiser
     // above runs once per scene INSTANCE, and Phaser reuses instances across restarts,
     // so without this a finished run returns to the last difficulty picked rather than

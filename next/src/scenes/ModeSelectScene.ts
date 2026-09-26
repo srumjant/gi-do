@@ -7,6 +7,7 @@ import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { MODE_ADVENTURE, MODE_LEARN } from '../game/navigation';
 import { getSkinIndex } from '../game/run';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import { menuPlayerTextureKey, MENU_PREVIEW_SCALE, registerMenuTextures } from '../gfx/textures';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
 import { DIFFICULTY_SCENE_KEY, LEARN_MENU_SCENE_KEY, MODE_SELECT_SCENE_KEY } from './keys';
@@ -160,6 +161,7 @@ export class ModeSelectScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     registerMenuTextures(this);
     this.cameras.main.setBackgroundColor(SKY);
 

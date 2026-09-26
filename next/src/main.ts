@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import { installVoice } from './audio/voice';
 import { BASE_W, BASE_H, STEP_HZ } from './config/constants';
 import { installGlyphs } from './config/glyphs';
+import { RENDER_SCALE } from './gfx/render';
 import { BetweenScene } from './scenes/BetweenScene';
 import { CharacterScene } from './scenes/CharacterScene';
 import { DifficultyScene } from './scenes/DifficultyScene';
@@ -30,8 +31,9 @@ installVoice();
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
-  width: BASE_W,
-  height: BASE_H,
+  // RENDER_SCALE canvas pixels per layout pixel, every camera zoomed to match: see gfx/render.ts.
+  width: BASE_W * RENDER_SCALE,
+  height: BASE_H * RENDER_SCALE,
   backgroundColor: '#10131a',
   pixelArt: true,
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },

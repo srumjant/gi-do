@@ -5,6 +5,7 @@ import { TStr } from '../config/i18n';
 import { BGM_GAMEOVER } from '../data/bgmThemes';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import { bindMenuKeys, type MenuKeys, justDown } from '../input/menuKeys';
 import { GAME_OVER_SCENE_KEY, TITLE_SCENE_KEY } from './keys';
 import { takeBack } from './navigate';
@@ -66,6 +67,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     this.cameras.main.setBackgroundColor(BACKGROUND);
     // index.html:1348's `startBGM(BGM_GAMEOVER)`, which the live game plays on the line
     // that ENTERS this state — the same moment SliceScene reads `world.gameOver` and

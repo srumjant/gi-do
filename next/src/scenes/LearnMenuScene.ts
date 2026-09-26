@@ -7,6 +7,7 @@ import type { LearnSession } from '../game/learn/types';
 import { clampIndex } from '../game/menu';
 import { getSkinIndex } from '../game/run';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
 import { registerScaledPlayerTextures, scaledPlayerTextureKey } from '../gfx/textures';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
@@ -111,6 +112,7 @@ export class LearnMenuScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     this.leaving = false;
     registerScaledPlayerTextures(this, [['stand', HERO_SCALE]]);
     this.cameras.main.setBackgroundColor(BACKGROUND);

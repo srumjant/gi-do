@@ -6,6 +6,7 @@ import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
 import { LEVEL_NAME_KEYS } from '../data/levels';
 import type { World } from '../game/types';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import {
   HUD_BOW_TEXTURE,
   HUD_CAT_TEXTURE,
@@ -198,6 +199,7 @@ export class HudScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     registerHudTextures(this);
     // Phaser reuses the scene INSTANCE, and this scene is now stopped and relaunched once
     // per level rather than living for the whole run. Everything else here is rebuilt by

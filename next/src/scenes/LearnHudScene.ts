@@ -5,6 +5,7 @@ import type { LearnMode } from '../game/learn/content';
 import { LEARN_HUD_H } from '../game/learn/tower';
 import type { Climb } from '../game/learn/types';
 import { GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import { LEARN_HUD_STAR_TEXTURE, registerTextures } from '../gfx/textures';
 import { LEARN_HUD_SCENE_KEY } from './keys';
 
@@ -77,6 +78,7 @@ export class LearnHudScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     registerTextures(this);
     const { layout } = this.climb;
     this.add.graphics().fillStyle(0x000000, 0.45).fillRect(0, 0, BASE_W, LEARN_HUD_H);

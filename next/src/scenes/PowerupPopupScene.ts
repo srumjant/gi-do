@@ -5,6 +5,7 @@ import { powerupLabel } from '../data/powerups';
 import type { PowerupType, World } from '../game/types';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { popupFrame, popupSparks } from '../gfx/powerupPopup';
+import { fitScreenCamera } from '../gfx/render';
 import { POWERUP_POPUP_SCENE_KEY } from './keys';
 
 /**
@@ -97,6 +98,7 @@ export class PowerupPopupScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     // Added before the labels, so the labels draw in front of the box rather than under
     // it — inside one scene, creation order is what decides that.
     this.graphics = this.add.graphics();

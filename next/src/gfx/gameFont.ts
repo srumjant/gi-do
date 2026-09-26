@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import andikaBoldUrl from '../assets/fonts/Andika-Bold.woff2?url';
 import andikaRegularUrl from '../assets/fonts/Andika-Regular.woff2?url';
+import { RENDER_SCALE } from './render';
 
 /**
  * The game's one typeface: Andika, SIL's font for children learning to read. Its a and g are
@@ -25,10 +26,12 @@ export const GAME_FONT = `${REGULAR}, ${FALLBACK}`;
 export const GAME_FONT_BOLD = `${BOLD}, ${FALLBACK}`;
 
 /**
- * Text is drawn at this many times its size, so the letters stay smooth when the canvas is
- * scaled up to fill the screen (`pixelArt` scales everything else with hard edges).
+ * Text is drawn at the canvas's own density (gfx/render.ts), so a screen's text lands on the
+ * canvas 1:1 and is never resampled: with `pixelArt`'s nearest-pixel sampling, a denser text
+ * texture shrunk onto the canvas loses strokes. Text in a zoomed world multiplies this by the
+ * world camera's zoom.
  */
-export const GAME_TEXT_RESOLUTION = 3;
+export const GAME_TEXT_RESOLUTION = RENDER_SCALE;
 
 /** A face already added to the page's fonts: Phaser's font loader keeps no cache to ask. */
 function loaded(family: string): boolean {

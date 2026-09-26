@@ -7,6 +7,7 @@ import { random } from '../game/random';
 import { getSelectedChar, getSkinIndex } from '../game/run';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { LEARN_CONFETTI_COLORS, LEARN_SPARK_TEXTURE, registerLearnTiles } from '../gfx/learnTiles';
+import { fitScreenCamera } from '../gfx/render';
 import { registerScaledPlayerTextures, scaledPlayerTextureKey } from '../gfx/textures';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
 import { LEARN_RESULT_SCENE_KEY, LEARN_TOWER_SCENE_KEY } from './keys';
@@ -65,6 +66,7 @@ export class LearnResultScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     registerLearnTiles(this);
     registerScaledPlayerTextures(this, [['jump', HERO_SCALE]]);
     this.cameras.main.setBackgroundColor(BACKGROUND);

@@ -5,6 +5,7 @@ import type { Character } from '../game/player';
 import { characterAt, characterName, siblingOf, wrapIndex } from '../game/menu';
 import { getSkinIndex, setSelectedChar, setSkinIndex, skinsOf, startRun } from '../game/run';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
 import { menuPlayerTextureKey, MENU_PORTRAIT_SCALE, registerMenuTextures } from '../gfx/textures';
 import { bindMenuKeys, type MenuKeys, justDown, pressedAny } from '../input/menuKeys';
@@ -105,6 +106,7 @@ export class CharacterScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     // index.html:1334 — confirming a difficulty sets `selectIndex=0`. Same reason as
     // DifficultyScene's: the field initialiser runs once per instance, and Phaser reuses
     // instances, so re-entering would otherwise keep the previous choice's cursor.
