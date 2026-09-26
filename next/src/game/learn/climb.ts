@@ -9,7 +9,7 @@ import { rectOverlap } from '../tiles';
 import type { PlayerState } from '../types';
 import { type LearnMode, pickTargets, type Rand } from './content';
 import { closeTrapdoors, feetAbove, headBump, rearmIfStranded } from './gate';
-import { say, speakOnGround, speakOnX, starLine, targetLine } from './speech';
+import { say, speakOnGround, speakOnX, starClips, targetClips } from './speech';
 import { buildTower, starBox, WALL } from './tower';
 import type { Climb, ClimbMove } from './types';
 
@@ -64,7 +64,7 @@ export function createClimb(mode: LearnMode, used: string[], character: Characte
     lastSpokeAt: 0,
     announced: 0,
   };
-  say(c, targetLine(layout, 0), 'now');
+  say(c, targetClips(layout, 0), 'now');
   return c;
 }
 
@@ -137,6 +137,6 @@ function checkStar(c: Climb): void {
   c.finished = true;
   c.score += 100;
   c.sounds.push('win');
-  say(c, starLine(c.layout), 'now');
+  say(c, starClips(c.layout), 'now');
   c.events.push({ type: 'finished' });
 }

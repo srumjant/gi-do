@@ -5,7 +5,7 @@ import type { LearnMode } from '../src/game/learn/content';
 import { REPEAT_GAP } from '../src/game/learn/speech';
 import { starBox } from '../src/game/learn/tower';
 import type { Climb } from '../src/game/learn/types';
-import { LEARN_CHEERS } from '../src/game/learn/voiceClips';
+import { cheerClip, LEARN_CHEERS, letterClip, syllableClip, wordClip } from '../src/game/learn/voiceClips';
 import { emptyInput } from '../src/input/actions';
 import { answerOf, held, idle, run, standUnder, wrongOf } from './helpers/climbs';
 import { seeded } from './helpers/seeded';
@@ -13,24 +13,26 @@ import { towerMove } from './helpers/towerMove';
 
 const climb = (mode: LearnMode = 'letters'): Climb => createClimb(mode, [], 'gigi', seeded(3));
 const target = (c: Climb, s: number): string => c.layout.storeys[s].target;
+/** Storey `s`'s target, as the voice asks for it in letters mode. */
+const asked = (c: Climb, s: number): string[] => [letterClip(target(c, s))];
 /** What the voice was asked to say, and empties the list, as the scene does. */
 const heard = (c: Climb) => c.speech.splice(0);
 
 describe('the voice', () => {
   it('says what to find when a tower starts', () => {
     const c = climb();
-    expect(heard(c)).toEqual([{ text: target(c, 0), when: 'now' }]);
+    expect(heard(c)).toEqual([{ clips: asked(c, 0), when: 'now' }]);
   });
 
   it('says a syllable as a syllable, not as two letters', () => {
     const c = climb('syllables');
-    expect(heard(c)).toEqual([{ text: target(c, 0).toLowerCase(), when: 'now' }]);
+    expect(heard(c)).toEqual([{ clips: [syllableClip(target(c, 0))], when: 'now' }]);
   });
 
   it('says the word and then the letter in words mode', () => {
     const c = climb('words');
     const word = c.layout.word ?? '';
-    expect(heard(c)).toEqual([{ text: `${word.toLowerCase()}. ${target(c, 0)}.`, when: 'now' }]);
+    expect(heard(c)).toEqual([{ clips: [wordClip(word), letterClip(target(c, 0))], when: 'now' }]);
   });
 
   it('says the letter and a cheer for a right answer', () => {
@@ -38,7 +40,7 @@ describe('the voice', () => {
     heard(c);
     standUnder(c, 0, answerOf(c, 0));
     run(c, 40, held, () => c.gates[0].solved);
-    expect(heard(c)).toEqual([{ text: `${target(c, 0)}. ${LEARN_CHEERS[0]}`, when: 'now' }]);
+    expect(heard(c)).toEqual([{ clips: [...asked(c, 0), cheerClip(0)], when: 'now' }]);
   });
 
   it('says the target again for a wrong one', () => {
@@ -46,7 +48,7 @@ describe('the voice', () => {
     heard(c);
     standUnder(c, 0, wrongOf(c, 0));
     run(c, 40, held, () => c.gates[0].mistakes === 1);
-    expect(heard(c)).toEqual([{ text: target(c, 0), when: 'now' }]);
+    expect(heard(c)).toEqual([{ clips: asked(c, 0), when: 'now' }]);
   });
 
   it('says the next target on landing in the new storey, after the cheer, and once', () => {
@@ -56,7 +58,7 @@ describe('the voice', () => {
     heard(c);
     run(c, 150, idle, () => c.storey === 1 && c.player.onGround);
     run(c, 30, idle, () => false);
-    expect(heard(c)).toEqual([{ text: target(c, 1), when: 'after' }]);
+    expect(heard(c)).toEqual([{ clips: asked(c, 1), when: 'after' }]);
   });
 
   it('says the target on reaching the letter floor, unless it spoke in the last four seconds', () => {
@@ -71,7 +73,7 @@ describe('the voice', () => {
       return c;
     };
     const spoke = arrive(REPEAT_GAP);
-    expect(heard(spoke)).toEqual([{ text: target(spoke, 0), when: 'now' }]);
+    expect(heard(spoke)).toEqual([{ clips: asked(spoke, 0), when: 'now' }]);
     expect(heard(arrive(REPEAT_GAP - 1))).toEqual([]);
   });
 
@@ -92,7 +94,7 @@ describe('the voice', () => {
     const c = climb();
     heard(c);
     stepClimb(c, { ...emptyInput(), firePressed: true }, towerMove(c.layout.map));
-    expect(heard(c)).toEqual([{ text: target(c, 0), when: 'now' }]);
+    expect(heard(c)).toEqual([{ clips: asked(c, 0), when: 'now' }]);
   });
 
   it("on the way up through a trapdoor, X says the next storey's target, and landing stays quiet", () => {
@@ -102,7 +104,7 @@ describe('the voice', () => {
     heard(c);
     stepClimb(c, { ...emptyInput(), firePressed: true }, towerMove(c.layout.map));
     expect(c.storey).toBe(0); // still in the trapdoor
-    expect(heard(c)).toEqual([{ text: target(c, 1), when: 'now' }]);
+    expect(heard(c)).toEqual([{ clips: asked(c, 1), when: 'now' }]);
     run(c, 150, idle, () => c.storey === 1 && c.player.onGround);
     run(c, 30, idle, () => false);
     expect(heard(c)).toEqual([]);
@@ -116,7 +118,7 @@ describe('the voice', () => {
     expect(c.player.onGround).toBe(false);
     heard(c);
     stepClimb(c, { ...emptyInput(), firePressed: true }, towerMove(c.layout.map));
-    expect(heard(c)).toEqual([{ text: target(c, 1), when: 'now' }]);
+    expect(heard(c)).toEqual([{ clips: asked(c, 1), when: 'now' }]);
     run(c, 150, idle, () => c.player.onGround);
     run(c, 30, idle, () => false);
     expect(heard(c)).toEqual([]);
@@ -152,7 +154,7 @@ describe('the voice', () => {
     c.player.onGround = true;
     heard(c);
     stepClimb(c, idle(), towerMove(c.layout.map));
-    expect(heard(c)).toEqual([{ text: LEARN_CHEERS[c.layout.storeys.length], when: 'now' }]);
+    expect(heard(c)).toEqual([{ clips: [cheerClip(c.layout.storeys.length)], when: 'now' }]);
     expect(new Set(LEARN_CHEERS).size).toBe(c.layout.storeys.length + 1);
   });
 });

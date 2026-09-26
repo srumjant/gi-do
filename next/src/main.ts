@@ -25,8 +25,6 @@ import { WinScene } from './scenes/WinScene';
 // would otherwise render it literally. Which glyph they get is the controller's business.
 // See config/glyphs.ts.
 installGlyphs();
-// The learn tower's voice list fills in after the page loads; picking starts now. See audio/voice.ts.
-installVoice();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -119,6 +117,10 @@ const game = new Phaser.Game({
     PauseScene,
   ],
 });
+
+// The learn tower's voice: the owner's recordings, through the game's own sound. A clip counts
+// once its file is loaded, which the tower does in its preload. See audio/voice.ts.
+installVoice(game.sound, (key) => game.cache.audio.exists(key));
 
 /**
  * A handle on the running game, for driving it by hand from a browser console: stepping

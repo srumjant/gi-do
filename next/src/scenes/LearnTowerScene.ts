@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { playEffect } from '../audio/cues';
 import { hush, speak } from '../audio/voice';
+import { preloadVoice } from '../audio/voiceFiles';
 import { MAX_STEPS_PER_FRAME, STEP_MS, TILE } from '../config/constants';
 import { createClimb, stepClimb } from '../game/learn/climb';
 import {
@@ -137,6 +138,11 @@ export class LearnTowerScene extends Phaser.Scene {
     this.leaving = false;
   }
 
+  preload(): void {
+    // The voice's recordings, the first time a tower starts: the first line is said at once.
+    preloadVoice(this);
+  }
+
   create(): void {
     registerTextures(this);
     registerLearnTiles(this);
@@ -202,7 +208,7 @@ export class LearnTowerScene extends Phaser.Scene {
       for (const event of this.climb.events.splice(0)) this.apply(event);
       for (const cue of this.climb.sounds.splice(0)) playEffect(cue);
       for (const cue of this.climb.rumbles.splice(0)) padRumble(cue);
-      for (const line of this.climb.speech.splice(0)) speak(line.text, line.when);
+      for (const line of this.climb.speech.splice(0)) speak(line.clips, line.when);
       this.accumulator -= STEP_MS;
     }
     this.syncPlayer();

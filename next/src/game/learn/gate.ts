@@ -1,7 +1,7 @@
 import { TILE } from '../../config/constants';
 import type { PlayerState, RumbleCue } from '../types';
 import { INSIDE, T_BRICK, T_EMPTY, T_LETTER, type TowerLayout, WALL } from './tower';
-import { rightLine, say, targetLine } from './speech';
+import { rightClips, say, targetClips } from './speech';
 import type { Cell, Climb } from './types';
 
 /**
@@ -84,14 +84,14 @@ export function headBump(c: Climb, hit: Cell): BumpOutcome {
     setCells(c, trapdoorCells(c.layout, storey), T_EMPTY);
     c.sounds.push('coin');
     c.rumbles.push(RIGHT_RUMBLE);
-    say(c, rightLine(c.layout, storey), 'now');
+    say(c, rightClips(c.layout, storey), 'now');
     c.events.push({ type: 'bump-right', storey, block });
     return 'right';
   }
   gate.mistakes++;
   c.sounds.push('wrong');
   c.rumbles.push(WRONG_RUMBLE);
-  say(c, targetLine(c.layout, storey), 'now');
+  say(c, targetClips(c.layout, storey), 'now');
   c.events.push({ type: 'bump-wrong', storey, block });
   if (gate.mistakes === 2) {
     c.events.push({ type: 'hint', storey, block: answerIndex(c.layout, storey) });

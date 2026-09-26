@@ -1,128 +1,110 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { hush, installVoice, pickVoiceFrom, speak, VOICE_PITCH, VOICE_RATE, type VoiceLike } from '../src/audio/voice';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { hush, installVoice, speak, type VoiceSound, type VoiceSounds } from '../src/audio/voice';
+import { VOICE_FILES } from '../src/audio/voiceFiles';
+import { VOICE_CLIPS } from '../src/game/learn/voiceClips';
 
-const V = (lang: string): VoiceLike => ({ lang, name: `test-${lang}` });
+/** A clip as Phaser plays one: stopping it is not an end, and destroying it drops the listener. */
+class FakeSound implements VoiceSound {
+  private listener: (() => void) | null = null;
 
-// The September plan's eight cases (docs/plans/2026-09-20-learn-path-refinement-implementation.md, Task 6).
-describe('the voice pick', () => {
-  it('prefers Estonian above all', () => {
-    expect(pickVoiceFrom([V('it-IT'), V('fi-FI'), V('et-EE')])?.lang).toBe('et-EE');
-  });
+  constructor(readonly key: string, private readonly sounds: FakeSounds) {}
 
-  it('falls back to Finnish when there is no Estonian', () => {
-    expect(pickVoiceFrom([V('en-US'), V('it-IT'), V('fi-FI')])?.lang).toBe('fi-FI');
-  });
-
-  it('falls back to Italian when there is no Estonian or Finnish', () => {
-    expect(pickVoiceFrom([V('en-US'), V('it-IT')])?.lang).toBe('it-IT');
-  });
-
-  it('falls back to the first voice otherwise', () => {
-    expect(pickVoiceFrom([V('en-US'), V('de-DE')])?.lang).toBe('en-US');
-  });
-
-  it('handles bare language codes', () => {
-    expect(pickVoiceFrom([V('en'), V('et')])?.lang).toBe('et');
-  });
-
-  it('ignores case', () => {
-    expect(pickVoiceFrom([V('ET-ee')])?.lang).toBe('ET-ee');
-  });
-
-  it('is null with no voices', () => {
-    expect(pickVoiceFrom([])).toBeNull();
-  });
-
-  it('is null with no voice list at all', () => {
-    expect(pickVoiceFrom(undefined)).toBeNull();
-  });
-});
-
-/** The part of speechSynthesis the voice uses, recording what it was asked. */
-class FakeSynth {
-  voices: VoiceLike[] = [];
-  calls: string[] = [];
-  spoken: FakeUtterance[] = [];
-  private readonly changed: Array<() => void> = [];
-
-  getVoices(): VoiceLike[] { return this.voices; }
-  addEventListener(type: string, listener: () => void): void {
-    if (type === 'voiceschanged') this.changed.push(listener);
+  play(): boolean {
+    this.sounds.log.push(`play ${this.key}`);
+    return this.sounds.audible;
   }
-  cancel(): void { this.calls.push('cancel'); }
-  speak(u: FakeUtterance): void {
-    this.calls.push(`speak ${u.text}`);
-    this.spoken.push(u);
+  stop(): boolean {
+    this.sounds.log.push(`stop ${this.key}`);
+    return true;
   }
-  /** What the browser does when its voice list fills in after the page has loaded. */
-  install(voices: VoiceLike[]): void {
-    this.voices = voices;
-    for (const listener of this.changed) listener();
+  destroy(): void { this.listener = null; }
+  once(_event: 'complete', listener: () => void): unknown {
+    this.listener = listener;
+    return this;
   }
+  /** The clip reaches its end. */
+  finish(): void { this.listener?.(); }
 }
 
-class FakeUtterance {
-  voice: VoiceLike | null = null;
-  lang = '';
-  rate = 1;
-  pitch = 1;
-  constructor(readonly text: string) {}
+/** The part of Phaser's sound manager the voice uses, recording what it was asked. */
+class FakeSounds implements VoiceSounds {
+  log: string[] = [];
+  /** False for a game with no audio at all, where nothing plays. */
+  audible = true;
+  private last: FakeSound | null = null;
+
+  add(key: string): FakeSound {
+    this.last = new FakeSound(key, this);
+    return this.last;
+  }
+  /** The clip playing now reaches its end. */
+  finish(): void { this.last?.finish(); }
 }
 
-describe('speaking', () => {
-  let synth: FakeSynth;
+describe('the voice', () => {
+  let sounds: FakeSounds;
+  let recorded: (key: string) => boolean;
 
   beforeEach(() => {
-    synth = new FakeSynth();
-    vi.stubGlobal('window', { speechSynthesis: synth });
-    vi.stubGlobal('SpeechSynthesisUtterance', FakeUtterance);
-    installVoice();
+    sounds = new FakeSounds();
+    recorded = () => true;
+    installVoice(sounds, (key) => recorded(key));
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
+  it("says a line's clips one after another", () => {
+    speak(['word-kass', 'letter-k'], 'now');
+    expect(sounds.log).toEqual(['play word-kass']);
+    sounds.finish();
+    expect(sounds.log).toEqual(['play word-kass', 'play letter-k']);
+    sounds.finish();
+    expect(sounds.log).toEqual(['play word-kass', 'play letter-k']);
   });
 
-  it('cuts off what is being said to say something now', () => {
-    speak('A', 'now');
-    expect(synth.calls).toEqual(['cancel', 'speak A']);
+  it('cuts off what is being said, and what is waiting, to say something now', () => {
+    speak(['letter-a', 'cheer-1'], 'now');
+    speak(['letter-b'], 'now');
+    sounds.finish();
+    expect(sounds.log).toEqual(['play letter-a', 'stop letter-a', 'play letter-b']);
   });
 
   it('waits its turn to say something after', () => {
-    speak('Tubli!', 'now');
-    speak('K', 'after');
-    expect(synth.calls).toEqual(['cancel', 'speak Tubli!', 'speak K']);
+    speak(['letter-a', 'cheer-1'], 'now');
+    speak(['letter-b'], 'after');
+    sounds.finish();
+    sounds.finish();
+    expect(sounds.log).toEqual(['play letter-a', 'play cheer-1', 'play letter-b']);
   });
 
-  it('speaks slower and brighter, for a small child', () => {
-    speak('A', 'now');
-    expect(synth.spoken[0].rate).toBe(VOICE_RATE);
-    expect(synth.spoken[0].pitch).toBe(VOICE_PITCH);
-    expect([VOICE_RATE, VOICE_PITCH]).toEqual([0.8, 1.1]);
+  it('says something after at once when nothing is being said', () => {
+    speak(['letter-b'], 'after');
+    expect(sounds.log).toEqual(['play letter-b']);
   });
 
-  it('asks for Estonian when no voice is installed', () => {
-    speak('A', 'now');
-    expect(synth.spoken[0].voice).toBeNull();
-    expect(synth.spoken[0].lang).toBe('et-EE');
-  });
-
-  it('picks again when the voice list fills in', () => {
-    synth.install([V('en-US'), V('fi-FI')]);
-    speak('A', 'now');
-    expect(synth.spoken[0].voice?.lang).toBe('fi-FI');
-    expect(synth.spoken[0].lang).toBe('fi-FI');
+  it('skips a clip not recorded yet: silence, never another voice', () => {
+    recorded = (key) => key !== 'cheer-1';
+    speak(['letter-a', 'cheer-1', 'letter-b'], 'now');
+    sounds.finish();
+    expect(sounds.log).toEqual(['play letter-a', 'play letter-b']);
   });
 
   it('hushes: stops what is being said, and what is waiting', () => {
+    speak(['letter-a', 'cheer-1'], 'now');
     hush();
-    expect(synth.calls).toEqual(['cancel']);
+    sounds.finish();
+    expect(sounds.log).toEqual(['play letter-a', 'stop letter-a']);
+    speak(['letter-b'], 'after');
+    expect(sounds.log).toEqual(['play letter-a', 'stop letter-a', 'play letter-b']);
   });
 
-  it('is silent, and does not throw, where there is no speech at all', () => {
-    vi.stubGlobal('window', {});
-    expect(() => speak('A', 'now')).not.toThrow();
-    expect(() => hush()).not.toThrow();
-    expect(synth.calls).toEqual([]);
+  it('goes on in silence in a game with no audio, never stuck waiting', () => {
+    sounds.audible = false;
+    speak(['letter-a', 'letter-b'], 'now');
+    speak(['letter-c'], 'after');
+    expect(sounds.log).toEqual(['play letter-a', 'play letter-b', 'play letter-c']);
+  });
+
+  it('holds only recordings of clips the game asks for', () => {
+    const known = new Set(VOICE_CLIPS.map((clip) => clip.key));
+    for (const key of VOICE_FILES.keys()) expect(known).toContain(key);
   });
 });

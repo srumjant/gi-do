@@ -54,9 +54,12 @@ export type ClimbEvent =
   | { type: 'storey'; storey: number }
   | { type: 'finished' };
 
-/** A line for the voice: 'now' cuts off what is being said, 'after' waits its turn (audio/voice.ts). */
+/**
+ * A line for the voice: the recorded clips it is made of, played in order (voiceClips.ts's
+ * keys). 'now' cuts off what is being said; 'after' waits its turn (audio/voice.ts).
+ */
 export interface SpeechCue {
-  text: string;
+  clips: string[];
   when: 'now' | 'after';
 }
 

@@ -1,83 +1,72 @@
 /**
- * The learn tower's voice: the browser's speech synthesis, always in Estonian, whatever the
- * UI language, because the letters and words are Estonian. Phaser has no speech of its own.
- * The rules are the September plan's (docs/plans/2026-09-20-learn-path-refinement.md, §3).
- *
- * No voice, or no speech at all, is silence and nothing worse: the HUD always shows the
- * target, so the game stays fully playable.
+ * The learn tower's voice: the owner's recordings, one clip per letter, syllable, word and
+ * cheer (game/learn/voiceClips.ts), played through Phaser's sound manager. A line is clips in
+ * order. 'now' cuts off whatever is being said or waiting, as a target said again should;
+ * 'after' waits its turn, so the next storey's target never talks over a cheer. A clip not
+ * recorded yet is skipped: silence, never another voice.
  */
 
-/** The part of a SpeechSynthesisVoice the pick reads. */
-export interface VoiceLike {
-  lang: string;
-  name: string;
+/** The part of Phaser's sound manager the voice uses (a fake in tests/voice.test.ts). */
+export interface VoiceSounds {
+  add(key: string): VoiceSound;
 }
+
+/** The part of a Phaser sound the voice uses. */
+export interface VoiceSound {
+  play(): boolean;
+  stop(): boolean;
+  destroy(): void;
+  once(event: 'complete', listener: () => void): unknown;
+}
+
+let sounds: VoiceSounds | null = null;
+let recorded: (key: string) => boolean = () => false;
+/** The clip playing now, and the ones still to come after it, in order. */
+let playing: VoiceSound | null = null;
+let queue: string[] = [];
 
 /**
- * Estonian, then Finnish and Italian, which both say Estonian vowels closely enough to learn
- * from (and Italian is very widely installed), then whatever the system has.
+ * Hands the voice the game's sound manager, and a way to ask whether a clip is loaded.
+ * Called once, at boot (main.ts).
  */
-const VOICE_PREFS = ['et', 'fi', 'it'];
-
-/** Slower and brighter than the default, for a small child. */
-export const VOICE_RATE = 0.8;
-export const VOICE_PITCH = 1.1;
-
-/** The first voice in a language VOICE_PREFS names, in that order; else the first voice; else null. */
-export function pickVoiceFrom<V extends VoiceLike>(voices: readonly V[] | null | undefined): V | null {
-  if (!voices || voices.length === 0) return null;
-  for (const want of VOICE_PREFS) {
-    const hit = voices.find((v) => v.lang.toLowerCase().startsWith(want));
-    if (hit) return hit;
-  }
-  return voices[0];
+export function installVoice(manager: VoiceSounds, isRecorded: (key: string) => boolean): void {
+  hush();
+  sounds = manager;
+  recorded = isRecorded;
 }
 
-let voice: SpeechSynthesisVoice | null = null;
-
-/** The browser's speech synthesis, or null where there is none. Looked up per call, never at import. */
-function synth(): SpeechSynthesis | null {
-  return typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
-}
-
-/**
- * Picks the voice, and picks again whenever the browser's list changes: Chrome fills it in
- * after the page loads, so the first pick often sees none. Called once, at boot (main.ts).
- */
-export function installVoice(): void {
-  const s = synth();
-  if (!s) return;
-  const pick = (): void => { voice = pickVoiceFrom(s.getVoices()); };
-  pick();
-  s.addEventListener('voiceschanged', pick);
-}
-
-/**
- * Says `text`. 'now' cuts off whatever is being said or waiting, as a target said again
- * should; 'after' waits its turn, so the next storey's target never talks over a cheer.
- */
-export function speak(text: string, when: 'now' | 'after'): void {
-  const s = synth();
-  if (!s) return;
-  try {
-    if (when === 'now') s.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    if (voice) u.voice = voice;
-    // With no voice picked, Estonian still, and the browser chooses.
-    u.lang = voice?.lang ?? 'et-EE';
-    u.rate = VOICE_RATE;
-    u.pitch = VOICE_PITCH;
-    s.speak(u);
-  } catch {
-    // Speech is never worth breaking a frame over.
-  }
+/** Says a line: its clips, one after another. */
+export function speak(clips: readonly string[], when: 'now' | 'after'): void {
+  if (!sounds) return;
+  if (when === 'now') hush();
+  queue.push(...clips.filter((key) => recorded(key)));
+  if (!playing) playNext();
 }
 
 /** Stops whatever is being said, and whatever is waiting: leaving the tower should be quiet. */
 export function hush(): void {
-  try {
-    synth()?.cancel();
-  } catch {
-    // As above.
+  queue = [];
+  const sound = playing;
+  playing = null;
+  sound?.stop();
+  sound?.destroy();
+}
+
+function playNext(): void {
+  const key = queue.shift();
+  if (key === undefined || !sounds) return;
+  const sound = sounds.add(key);
+  playing = sound;
+  // A clip cut off (hush) never completes: Phaser's stop is not an end, and destroy drops the listener.
+  sound.once('complete', () => {
+    sound.destroy();
+    playing = null;
+    playNext();
+  });
+  // A game with no audio at all plays nothing and never completes: go straight on, in silence.
+  if (!sound.play()) {
+    sound.destroy();
+    playing = null;
+    playNext();
   }
 }
