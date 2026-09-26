@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { TILE } from '../config/constants';
 import { isSolid, TILE_BRICK, TILE_GROUND, TILE_QUESTION, TILE_RAINBOW } from '../data/levels';
 import type { BlockState, World } from '../game/types';
+import { GAME_FONT, GAME_FONT_BOLD, WORLD_TEXT_RESOLUTION } from './gameFont';
 
 /**
  * Question and rainbow blocks (tiles 3 and 5) have no level-specific colour in the
@@ -21,8 +22,13 @@ const BRICK_MORTAR_ALPHA = 0x22 / 0xff;
 
 const GROUND_TOP_HEIGHT = 3;
 
-const QUESTION_FONT = { fontFamily: 'monospace', fontSize: '10px', color: '#cc8800' };
-const RAINBOW_FONT = { fontFamily: 'monospace', fontSize: '11px', fontStyle: 'bold', color: '#ffffff' };
+/**
+ * The blocks' '?' and '!', the live game's 10px and bold 11px (index.html:1692-1693), in the
+ * game's font. Drawn at the zoomed world's density: at the default of 1 the '?' was a 7x11
+ * texture blown up six times, a blur of soft blocks on an otherwise crisp square.
+ */
+const QUESTION_FONT = { fontFamily: GAME_FONT, resolution: WORLD_TEXT_RESOLUTION, fontSize: '10px', color: '#cc8800' };
+const RAINBOW_FONT = { fontFamily: GAME_FONT_BOLD, resolution: WORLD_TEXT_RESOLUTION, fontSize: '11px', color: '#ffffff' };
 
 /**
  * One question (tile 3) or rainbow (tile 5) block as the DRAWING side holds it: where

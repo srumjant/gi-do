@@ -25,7 +25,7 @@ const ICON_DY = -20;
 const NAME_DY = 15;
 const DESC_DY = 35;
 
-const ICON_FONT = { fontFamily: 'serif', fontSize: '36px', color: '#ffffff' };
+const ICON_FONT = { fontFamily: 'serif', resolution: GAME_TEXT_RESOLUTION, fontSize: '36px', color: '#ffffff' };
 const NAME_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '20px' };
 const DESC_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#ffffff' };
 

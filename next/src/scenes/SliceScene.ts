@@ -21,7 +21,7 @@ import {
 import { createWorld, rescueSpot, stepWorld } from '../game/world';
 import type { EnemyState, World } from '../game/types';
 import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
-import { GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { GAME_FONT_BOLD, WORLD_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { RENDER_SCALE } from '../gfx/render';
 import { cloudPosition, cloudScale, drawRidges, drawSky } from '../gfx/parallax';
 import {
@@ -87,8 +87,6 @@ import type { WinData } from './WinScene';
  */
 const CAMERA_PIVOT_X = (BASE_W * RENDER_SCALE - VIEW_W) / 2;
 const CAMERA_PIVOT_Y = (BASE_H * RENDER_SCALE - VIEW_H) / 2;
-/** Text in the world is zoomed with it, so it is drawn that much denser to land 1:1. */
-const WORLD_TEXT_RESOLUTION = GAME_TEXT_RESOLUTION * ZOOM;
 
 /** Cloud alpha (index.html:1681: `ctx.globalAlpha=0.75`). */
 const CLOUD_ALPHA = 0.75;
