@@ -20,7 +20,7 @@ import { bindBackKey, justDown, type MenuKey, padContextFor } from '../input/men
 import { createBodyMover } from '../physics/player';
 import { applyTileFaces, applyTileFacesAt } from '../physics/tiles';
 import { LEARN_HUD_SCENE_KEY, LEARN_TOWER_SCENE_KEY } from './keys';
-import type { LearnHudData } from './LearnHudScene';
+import type { LearnHudData, LearnHudScene } from './LearnHudScene';
 import { takeBack } from './navigate';
 
 export interface LearnTowerData {
@@ -281,6 +281,7 @@ export class LearnTowerScene extends Phaser.Scene {
         for (const cell of event.cells) this.setTile(cell.col, cell.row, cell.code);
         return;
       case 'bump-right':
+        this.sendStar(this.blocks[event.storey][event.block]);
         this.pop(this.blocks[event.storey][event.block]);
         // Now, not when the hero reaches the next storey: they spring up through the HUD band
         // otherwise. Every counted bump carries them there (tests/learnJumps.test.ts).
@@ -353,6 +354,13 @@ export class LearnTowerScene extends Phaser.Scene {
       targets: box, scale: POP_SCALE, alpha: 0, duration: POP_MS, ease: 'Quad.easeOut',
       onComplete: () => box.setVisible(false).setScale(1).setAlpha(1),
     });
+  }
+
+  /** The HUD's star for a right answer flies from the block: its centre, in screen px. */
+  private sendStar({ box }: BlockView): void {
+    const cam = this.cameras.main;
+    const hud = this.scene.get(LEARN_HUD_SCENE_KEY) as LearnHudScene;
+    hud.flyStar((box.x - cam.worldView.x) * cam.zoom, (box.y - cam.worldView.y) * cam.zoom);
   }
 
   private shake({ box, restX }: BlockView): void {

@@ -119,6 +119,7 @@ export const TRANSLATIONS: Record<string, Entry> = {
   learn_find_letter:  {et:'LEIA TÄHT:',               en:'FIND THE LETTER:'},
   learn_find_syllable: {et:'LEIA SILP:',              en:'FIND THE SYLLABLE:'},
   learn_find_letters: {et:'LEIA TÄHED:',              en:'FIND THE LETTERS:'},
+  learn_speak:        {et:'🔊 X / {X}',               en:'🔊 X / {X}'},
   // Level names
   level_1:            {et:'Nukuaed',                  en:'Doll Garden'},
   level_2:            {et:'Dinosauruse kanjon',       en:'Dinosaur Canyon'},

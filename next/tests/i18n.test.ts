@@ -29,6 +29,7 @@ const PORT_ONLY_KEYS = [
   'learn_words', 'learn_words_d',
   'learn_menu_hint',
   'learn_find_letter', 'learn_find_syllable', 'learn_find_letters',
+  'learn_speak',
 ];
 
 describe('translations match the live game', () => {
