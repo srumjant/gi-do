@@ -42,6 +42,7 @@ both animated side by side. Its voice rules, four-gate pacing and hint rule carr
 | Engine | Phaser features first | The owner's direction: Phaser is the engine; write our own only for a strong reason. |
 | Player | The adventure's movement, at super_easy numbers | One jump across the whole game, and one the kids have already approved. |
 | Zoom | 1.25 (the adventure uses 1.5) | So a one- or two-plank storey fits on screen whole. |
+| Hint | Phaser's Glow round the right block, and the block pulsing in size | White over the gold was too faint to find (1.24:1); movement catches the eye. |
 
 ## How a tower plays
 
@@ -147,13 +148,15 @@ the head. The geometry already keeps accidental answers out:
    and it is handled the same way.
 4. The trapdoor shuts, as plain brick, once the player's feet are above the ceiling top. The
    child lands on it and cannot fall back through.
-5. If the child ever stands on the letter floor with the trapdoor still open, a jump under
-   the opening springs them again. Nobody can get stuck below a solved gate.
+5. If the child ever stands on the letter floor with the trapdoor still open, the trapdoor
+   shuts and the right block comes back, and bumping it springs them again. Play does not
+   produce this (a counted bump leaves the hero at least 3px inside the opening); it is a
+   safety net, so nobody can get stuck below a solved gate.
 
 **Wrong answer.** The block wobbles, a low tone plays (the live learn mode's
 `playTone(150,.15,'triangle',.08,100)`, `index.html:2743`), the pad gives a duller buzz, and
 the voice says the target again. Nothing is lost. After two wrong answers at a gate, the
-right block glows until it is found.
+right block glows and pulses until it is found.
 
 ### Voice
 
@@ -205,7 +208,8 @@ Vertically the camera is bounded to the current storey:
 - A storey that fits is shown whole, and the camera holds still. Up to two planks fit: 16
   tiles, against 17.6 visible under a 48px HUD.
 - A taller storey is followed inside its bounds, with more room above the child than below.
-- Springing into the next storey pans the camera to it.
+- A right answer pans the camera up to the next storey as the spring starts, so the hero
+  never rises behind the HUD.
 
 ## The look: a castle tower
 
@@ -262,8 +266,10 @@ Moving the adventure onto Phaser features is separate, later work.
   trapdoor opening and shutting, and the re-arm if the hero is ever stranded under one.
 - `climb.ts`: one fixed step of the climb: the shared movement, the mover, the gate rules on
   what the head hit, the spring, the storey the hero is in, the star and the score.
-- `types.ts`: the climb's state, the events the scene draws from, and the mover's contract.
-  Cues (sounds, events) come back as values, the way `World.sounds` does for the adventure.
+- `speech.ts`: what the voice says and when (see *Voice*), as lines for the scene to speak.
+- `types.ts`: the climb's state, the events the scene draws from, and the learn session.
+  Cues (sounds, buzzes, speech, events) come back as values, the way `World.sounds` does
+  for the adventure. The mover's contract is `game/player.ts`'s `BodyMover`.
 
 **Changed, with adventure behaviour unchanged:**
 - `game/player.ts`: the movement part of `stepPlayer` and the walk animation become
