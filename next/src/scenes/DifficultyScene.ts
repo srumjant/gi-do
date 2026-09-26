@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
 import { BASE_W } from '../config/constants';
 import { DIFFICULTY_CONFIG, DIFF_KEYS, setDifficulty } from '../config/difficulty';
-import { TDiff, TStr } from '../config/i18n';
+import { capitals, TDiff, TStr } from '../config/i18n';
 import { clampIndex, difficultyAt, difficultyLines } from '../game/menu';
 import { getSkinIndex } from '../game/run';
+import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
 import { menuPlayerTextureKey, MENU_PREVIEW_SCALE, registerMenuTextures } from '../gfx/textures';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
@@ -22,7 +24,7 @@ const STARS: StarFieldSpec = {
 
 /** index.html:2124. */
 const TITLE_Y = 55;
-const TITLE_FONT = { fontFamily: 'monospace', fontSize: '26px', fontStyle: 'bold', color: '#ffdd00' };
+const TITLE_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '26px', color: '#ffdd00' };
 
 /**
  * index.html:2126-2128. Four cards, 130 apart, the row centred by starting half a card
@@ -51,15 +53,24 @@ const BOX_FILL_ALPHA = 0x22 / 0xff;
  */
 const LINE_DY = 30;
 const LINE_STEP = 18;
-const NAME_FONT = { fontFamily: 'monospace', fontSize: '14px', fontStyle: 'bold' };
-const LINE_FONT = { fontFamily: 'monospace', fontSize: '10px', color: '#aaaacc' };
+const NAME_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '14px' };
+const LINE_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#aaaacc' };
+/**
+ * The widest a line may be: the highlight's width, less a little air. Capitals in the game's
+ * font run wider than the live game's lowercase monospace, and a line wider than this is
+ * shrunk to fit instead of running into the next card.
+ */
+const LINE_MAX_W = BOX_W - 6;
 
-/** The little Gigi under the chosen card (index.html:2140-2143). */
-const PREVIEW_DY = 115;
+/**
+ * The little Gigi under the chosen card (index.html:2140-2143). 10px lower than the live
+ * game's 115, where she covered the sixth line (super easy's speed) and it could not be read.
+ */
+const PREVIEW_DY = 125;
 
 /** index.html:2146. */
 const HINT_Y = 370;
-const HINT_FONT = { fontFamily: 'monospace', fontSize: '12px', color: '#aaaacc' };
+const HINT_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#aaaacc' };
 
 /**
  * Pick a difficulty. Port of `drawDifficulty` (index.html:2121-2149) and the input that
@@ -94,6 +105,7 @@ export class DifficultyScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     // index.html:1324 — entering this state sets `diffIndex=0`. The field initialiser
     // above runs once per scene INSTANCE, and Phaser reuses instances across restarts,
     // so without this a finished run returns to the last difficulty picked rather than
@@ -115,7 +127,8 @@ export class DifficultyScene extends Phaser.Scene {
       // Fixed at create: which lines a card has depends only on its record, and a
       // record does not change while the screen is up.
       difficultyLines(key).forEach((line, row) => {
-        this.add.text(x, CARD_Y + LINE_DY + row * LINE_STEP, line, LINE_FONT).setOrigin(0.5, 1);
+        const text = this.add.text(x, CARD_Y + LINE_DY + row * LINE_STEP, capitals(line), LINE_FONT).setOrigin(0.5, 1);
+        if (text.width > LINE_MAX_W) text.setScale(LINE_MAX_W / text.width);
       });
     });
 

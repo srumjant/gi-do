@@ -6,6 +6,8 @@ import { TStr } from '../config/i18n';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { MODE_ADVENTURE, MODE_LEARN } from '../game/navigation';
 import { getSkinIndex } from '../game/run';
+import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import { menuPlayerTextureKey, MENU_PREVIEW_SCALE, registerMenuTextures } from '../gfx/textures';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
 import { DIFFICULTY_SCENE_KEY, LEARN_MENU_SCENE_KEY, MODE_SELECT_SCENE_KEY } from './keys';
@@ -47,7 +49,7 @@ const CLOUD_PUFFS = [{ dx: -15, dy: 8, w: 30, h: 20 }, { dx: 15, dy: 8, w: 30, h
 /** index.html:1975-1976. */
 const HEADING_Y = 50;
 const HEADING_FONT = {
-  fontFamily: 'monospace', fontSize: '26px', fontStyle: 'bold', color: '#e03030',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '26px', color: '#e03030',
 };
 
 /** index.html:1982. The card geometry, from which every label on a card is an offset. */
@@ -80,8 +82,8 @@ const ICON_DY = 52;
 const NAME_DY = 110;
 const DESC_DY = 134;
 const ICON_FONT = { fontFamily: 'serif', fontSize: '48px' };
-const NAME_FONT = { fontFamily: 'monospace', fontSize: '19px', fontStyle: 'bold' };
-const DESC_FONT = { fontFamily: 'monospace', fontSize: '11px' };
+const NAME_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '19px' };
+const DESC_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '11px' };
 const NAME_COLOR_OFF = '#cccccc';
 const DESC_COLOR_ON = '#ffffff';
 const DESC_COLOR_OFF = '#999999';
@@ -89,7 +91,7 @@ const DESC_COLOR_OFF = '#999999';
 /** :2002-2006. Two arrows, pointing INWARD at the chosen card from just outside it. */
 const ARROW_DX = 16;
 const ARROW_DY = 5;
-const ARROW_FONT = { fontFamily: 'monospace', fontSize: '14px', fontStyle: 'bold' };
+const ARROW_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '14px' };
 
 /** :2009-2011. Whoever you would be playing, standing on the grass under the cards. */
 const HERO_X = BASE_W / 2 - 15;
@@ -97,7 +99,7 @@ const HERO_X = BASE_W / 2 - 15;
 /** :2013-2015. */
 const HINT_Y = BASE_H - 14;
 const HINT_FONT = {
-  fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffdd00',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#ffdd00',
 };
 const BLINK_FRAMES = 30;
 
@@ -159,6 +161,7 @@ export class ModeSelectScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     registerMenuTextures(this);
     this.cameras.main.setBackgroundColor(SKY);
 

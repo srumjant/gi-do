@@ -134,11 +134,10 @@ export function difficultyLines(key: DifficultyKey): string[] {
     // 'Infinity' and super_easy really does have infinite lives.
     `${cfg.lives === Infinity ? '∞' : cfg.lives} ${TStr('lives')}`,
     `${cfg.bowCharges} ${TStr('arrows')}`,
-    // index.html:2134. Three states, not two: no cape, a cape you start with, and a
-    // cape that also catches you over a pit — the last of which is super_easy alone.
-    cfg.startWithCape
-      ? (cfg.capeSavesPit ? TStr('cape_pit') : TStr('cape_start'))
-      : TStr('no_cape'),
+    // index.html:2134, with two states where the live game has three: every cape catches
+    // you over a pit here (game/player.ts), so a cape you start with is always the one
+    // that does, and the live `cape_start` (a cape without that) no longer applies.
+    cfg.startWithCape ? TStr('cape_pit') : TStr('no_cape'),
     // index.html:2136. `enemies_label` carries its own trailing space and colon, so
     // this really is a bare concatenation (same shape as the HUD's score label).
     TStr('enemies_label') + TStr(enemySpeedKey(cfg.enemySpeed)),

@@ -106,13 +106,12 @@ describe('a difficulty card describes its own record', () => {
     }
   });
 
-  // index.html:2134's three-way cape line, asserted from the flags rather than by name.
-  it('says which kind of cape, if any, each record starts you with', () => {
+  // index.html:2134's cape line, asserted from the flag rather than by name. Every cape
+  // catches you over a pit in the port, so a record that starts you with one says so.
+  it('says whether each record starts you with a cape, which also saves you from pits', () => {
     for (const key of DIFF_KEYS) {
       const cfg = DIFFICULTY_CONFIG[key];
-      const expected = cfg.startWithCape
-        ? ('capeSavesPit' in cfg ? TStr('cape_pit') : TStr('cape_start'))
-        : TStr('no_cape');
+      const expected = cfg.startWithCape ? TStr('cape_pit') : TStr('no_cape');
       expect(difficultyLines(key)[2], key).toBe(expected);
     }
   });

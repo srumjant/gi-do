@@ -1,10 +1,15 @@
 /**
- * The four records are NOT uniform. Thirteen fields are on all of them; four exist
+ * The four records are NOT uniform. Thirteen fields are on all of them; three exist
  * only on `super_easy`. Every read site in the live game guards for that, and the
  * fallbacks are load-bearing — carry them into later plans:
- *   stompHitbox    -> `dc.stompHitbox || 1`      (index.html:1542, 1601)
- *   invincibleTime -> `dc.invincibleTime || 60`  (index.html:1646)
- *   enemySkipChance / capeSavesPit -> truthiness (index.html:1359, 1423)
+ *   stompHitbox     -> `dc.stompHitbox || 1`      (index.html:1542, 1601)
+ *   invincibleTime  -> `dc.invincibleTime || 60`  (index.html:1646)
+ *   enemySkipChance -> truthiness                 (index.html:1359)
+ *
+ * The live super_easy record has a fourth, `capeSavesPit`: only there does a cape save you
+ * from a pit (index.html:1423). The port leaves it out, because here a cape saves you from
+ * a pit on every difficulty (the owner's call, game/player.ts); tests/difficulty.test.ts
+ * names it as the one difference from the live table.
  */
 export interface DifficultyRecord {
   label: string;
@@ -22,7 +27,6 @@ export interface DifficultyRecord {
   startWithCape: boolean;
 
   // super_easy only.
-  capeSavesPit?: boolean;
   enemySkipChance?: number;
   invincibleTime?: number;
   stompHitbox?: number;
@@ -38,7 +42,6 @@ export const DIFFICULTY_CONFIG = {
     jumpForce: -9.0,        // bigger jump for kids
     bowCharges: 8,
     startWithCape: true,    // start every level with cape
-    capeSavesPit: true,     // cape protects from pit falls too
     stompHitbox: 2.0,       // multiplier on stomp detection zone (bigger = easier)
     gapWidth: 0.3,          // multiplier on gap widths (smaller = easier)
     ghostAggroRange: 70,

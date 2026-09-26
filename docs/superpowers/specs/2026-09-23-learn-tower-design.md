@@ -42,6 +42,8 @@ both animated side by side. Its voice rules, four-gate pacing and hint rule carr
 | Engine | Phaser features first | The owner's direction: Phaser is the engine; write our own only for a strong reason. |
 | Player | The adventure's movement, at super_easy numbers | One jump across the whole game, and one the kids have already approved. |
 | Zoom | 1.25 (the adventure uses 1.5) | So a one- or two-plank storey fits on screen whole. |
+| Hint | Phaser's Glow round the right block, and the block pulsing in size | White over the gold was too faint to find (1.24:1); movement catches the eye. |
+| Voice | The owner's own recordings: a clip per letter (said as its sound), syllable, word and cheer | The kids' Mac has no Estonian voice, and a Finnish or English one reading Estonian says the wrong sounds. |
 
 ## How a tower plays
 
@@ -147,20 +149,28 @@ the head. The geometry already keeps accidental answers out:
    and it is handled the same way.
 4. The trapdoor shuts, as plain brick, once the player's feet are above the ceiling top. The
    child lands on it and cannot fall back through.
-5. If the child ever stands on the letter floor with the trapdoor still open, a jump under
-   the opening springs them again. Nobody can get stuck below a solved gate.
+5. If the child ever stands on the letter floor with the trapdoor still open, the trapdoor
+   shuts and the right block comes back, and bumping it springs them again. Play does not
+   produce this (a counted bump leaves the hero at least 3px inside the opening); it is a
+   safety net, so nobody can get stuck below a solved gate.
 
 **Wrong answer.** The block wobbles, a low tone plays (the live learn mode's
 `playTone(150,.15,'triangle',.08,100)`, `index.html:2743`), the pad gives a duller buzz, and
 the voice says the target again. Nothing is lost. After two wrong answers at a gate, the
-right block glows until it is found.
+right block glows and pulses until it is found.
 
 ### Voice
 
-Carried over from the September plan (§3):
+The voice is the owner's own, recorded a clip at a time. When it speaks is carried over from
+the September plan (§3); its `speechSynthesis` voice is not, because the kids' Mac has no
+Estonian voice.
 
-- `speechSynthesis`, with the voice chosen by `et` → `fi` → `it` → the default, and chosen
-  again on `voiceschanged`. Rate 0.8, pitch 1.1.
+- A clip per letter, said as its sound, per syllable, per word and per cheer: 58 in all
+  (`game/learn/voiceClips.ts`). A longer line is clips played back to back.
+- Recorded on a dev-only page, `next/record.html`: space records and stops, the arrows move
+  along the list, P plays the clip back. It trims the silence, levels the peak and saves a
+  small mono WAV to `src/assets/voice/<key>.wav` through the dev server.
+- Played through Phaser's sound manager. The tower preloads whatever recordings exist.
 - Always Estonian, whatever the UI language, because the content is Estonian.
 - It speaks the target:
   - when a tower starts, and when you land in a new storey;
@@ -170,8 +180,8 @@ Carried over from the September plan (§3):
 - After a right answer it says the letter and a cheer. The next storey's target is queued
   after that, never spoken over it.
 - In words mode it says the word, then the letter: "KASS. K."
-- With no voice installed the game is silent and still fully playable; the HUD always shows
-  the target.
+- A clip not recorded yet is silence, never another voice. The game stays fully playable,
+  and the HUD always shows the target.
 
 ### HUD
 
@@ -205,7 +215,8 @@ Vertically the camera is bounded to the current storey:
 - A storey that fits is shown whole, and the camera holds still. Up to two planks fit: 16
   tiles, against 17.6 visible under a 48px HUD.
 - A taller storey is followed inside its bounds, with more room above the child than below.
-- Springing into the next storey pans the camera to it.
+- A right answer pans the camera up to the next storey as the spring starts, so the hero
+  never rises behind the HUD.
 
 ## The look: a castle tower
 
@@ -246,7 +257,8 @@ Moving the adventure onto Phaser features is separate, later work.
 | The fixed 60 Hz step for the player | The adventure's accumulator and single-body Arcade step, so the jump is exactly the adventure's. |
 | Which block a head hit | Arcade's tile collision callback reports only the first tile along a head, so a head under a brick and a letter would report the brick. The mover reports `blocked.up` and the row instead, and the gate rules probe two columns 3px in from each side: the adventure's `?` block rule, the same from either edge, and testable under Vitest. |
 | Tower building and the gate rules | Game rules, not engine features. Keeping them free of Phaser lets Vitest test them; Phaser cannot be imported under Vitest. |
-| Voice | Phaser has no speech synthesis. |
+| Saying a line | Phaser plays each clip; playing a line's clips in turn, cutting in or waiting, is ours (`audio/voice.ts`). |
+| The voice recorder | A dev tool, not the game: the browser's `MediaRecorder`, with our own trimming, levelling and WAV encoding (`tools/clipAudio.ts`). |
 | Sound effects | The existing procedural synth. |
 
 ### Modules
@@ -262,8 +274,11 @@ Moving the adventure onto Phaser features is separate, later work.
   trapdoor opening and shutting, and the re-arm if the hero is ever stranded under one.
 - `climb.ts`: one fixed step of the climb: the shared movement, the mover, the gate rules on
   what the head hit, the spring, the storey the hero is in, the star and the score.
-- `types.ts`: the climb's state, the events the scene draws from, and the mover's contract.
-  Cues (sounds, events) come back as values, the way `World.sounds` does for the adventure.
+- `speech.ts`: what the voice says and when (see *Voice*), as clip lists for the scene to play.
+- `voiceClips.ts`: every clip the voice says, and its key, read by the game and the recorder.
+- `types.ts`: the climb's state, the events the scene draws from, and the learn session.
+  Cues (sounds, buzzes, speech, events) come back as values, the way `World.sounds` does
+  for the adventure. The mover's contract is `game/player.ts`'s `BodyMover`.
 
 **Changed, with adventure behaviour unchanged:**
 - `game/player.ts`: the movement part of `stepPlayer` and the walk animation become
@@ -284,7 +299,10 @@ Moving the adventure onto Phaser features is separate, later work.
 - `gfx/learnTiles.ts`: the tileset and the letter-block pictures, baked with Phaser from the
   adventure's own brick (Part 1). Part 2 adds the back wall, windows, torches, banners, sky
   and roof.
-- `audio/voice.ts`: `pickVoiceFrom`, and speaking with the queueing rule above.
+- `audio/voice.ts`: playing clip lists with the queueing rule above; `audio/voiceFiles.ts`
+  finds the recordings and preloads them.
+- The recorder: `next/record.html`, `tools/recorder.ts`, `tools/clipAudio.ts`, and a
+  dev-server plugin in `vite.config.ts` that lists and saves the clips.
 
 **Also:**
 - The learn strings in `config/i18n.ts`, in both languages. The placeholder's `learn_soon`
@@ -321,7 +339,9 @@ gentlest adventure feel. The hero is the last selected character and skin, Gigi 
   - right and wrong effects, and the glow after two misses;
   - the trapdoor shuts once the player is above it;
   - a solved gate cannot be answered again, and the star ends the tower.
-- **Voice:** the September plan's `pickVoiceFrom` cases.
+- **Voice:** a line's clips in turn, 'now' cutting in, 'after' waiting its turn, missing
+  clips skipped, hush; every recording is a clip the game asks for; the recorder's trim,
+  levelling and WAV encoding.
 - **Navigation:** every learn state has a scene.
 - **No regressions:** the existing player and physics tests pass unchanged once the movement
   code is split out.
@@ -334,7 +354,7 @@ gentlest adventure feel. The hero is the last selected character and skin, Gigi 
   appears after two misses.
 - A head a little way under a letter's left or right edge bumps it, from either side alike.
 - Back works from the tower and from the result screen, and X replays the voice.
-- On a machine with no Estonian voice, the game is silent and fully playable.
+- The tower speaks in the owner's voice, and a clip not recorded yet is skipped in silence.
 
 ## Build order
 
@@ -370,5 +390,5 @@ gentlest adventure feel. The hero is the last selected character and skin, Gigi 
 - **Thin head clearance.** Under the letter ceiling it is 5.6px for Gigi. Any change to
   super_easy's jump or to the player's size breaks it, which is why the jump checks test it
   instead of trusting it.
-- **Voices.** Nobody knows yet whether the kids' laptop has an Estonian, Finnish or Italian
-  voice. If none, the game is silent.
+- **Voices** (settled: recorded). The kids' Mac has no Estonian voice, so the owner records
+  their own. Until every clip is recorded, the missing ones are silent.

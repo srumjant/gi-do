@@ -1,43 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { TILE } from '../src/config/constants';
 import { createClimb, LEARN_MOTION, stepClimb } from '../src/game/learn/climb';
-import { blockCells, headBump, trapdoorCells } from '../src/game/learn/gate';
+import { blockCells, feetAbove, headBump, RIGHT_RUMBLE, trapdoorCells, WRONG_RUMBLE } from '../src/game/learn/gate';
 import { starBox, T_BRICK, T_EMPTY, T_LETTER, WALL } from '../src/game/learn/tower';
 import type { Cell, Climb } from '../src/game/learn/types';
-import { emptyInput, type InputState } from '../src/input/actions';
+import { answerOf, held, idle, run, standUnder, wrongOf } from './helpers/climbs';
 import { seeded } from './helpers/seeded';
 import { towerMove } from './helpers/towerMove';
 
 const climb = (): Climb => createClimb('letters', [], 'gigi', seeded(3));
-const answerOf = (c: Climb, s: number): number => c.layout.storeys[s].blocks.findIndex((b) => b.correct);
-const wrongOf = (c: Climb, s: number): number => c.layout.storeys[s].blocks.findIndex((b) => !b.correct);
-const held = (f: number): InputState => ({ ...emptyInput(), jump: true, jumpPressed: f === 0 });
-const idle = (): InputState => emptyInput();
 const codes = (c: Climb, cells: Cell[]): number[] => cells.map(({ col, row }) => c.layout.map[row][col]);
-
-/** Stands the hero on storey `s`'s letter floor, centred under block `block`. */
-function standUnder(c: Climb, s: number, block: number): void {
-  const st = c.layout.storeys[s];
-  const b = st.blocks[block];
-  const p = c.player;
-  p.x = (b.col + WALL) * TILE + (b.width * TILE - p.w) / 2;
-  p.y = st.letterFloorRow * TILE - p.h;
-  p.vx = 0;
-  p.vy = 0;
-  p.onGround = true;
-  c.storey = s;
-  c.lastGround = s;
-}
-
-/** Steps until `until` holds (true) or the frames run out (false). */
-function run(c: Climb, frames: number, input: (f: number) => InputState, until: () => boolean): boolean {
-  const move = towerMove(c.layout.map);
-  for (let f = 0; f < frames; f++) {
-    stepClimb(c, input(f), move);
-    if (until()) return true;
-  }
-  return false;
-}
 
 describe('a letter gate', () => {
   it('opens the trapdoor, springs you and scores for the right letter', () => {
@@ -50,6 +22,7 @@ describe('a letter gate', () => {
     expect(c.player.vy).toBe(LEARN_MOTION.jumpForce);
     expect(codes(c, trapdoorCells(c.layout, 0)).every((code) => code === T_EMPTY)).toBe(true);
     expect(c.sounds).toContain('coin');
+    expect(c.rumbles).toEqual([RIGHT_RUMBLE]);
     expect(c.events).toContainEqual({ type: 'bump-right', storey: 0, block: answerOf(c, 0) });
   });
 
@@ -79,6 +52,17 @@ describe('a letter gate', () => {
     }
   });
 
+  it('counts the hero through a ceiling only once the feet are above its top', () => {
+    const c = climb();
+    const top = c.layout.storeys[0].ceilingRows[0];
+    // The one boundary both the trapdoor and the storey count go by: this row is the next floor.
+    expect(c.layout.storeys[1].floorRow).toBe(top);
+    c.player.y = top * TILE - c.player.h;
+    expect(feetAbove(c.player, top)).toBe(false);
+    c.player.y -= 0.5;
+    expect(feetAbove(c.player, top)).toBe(true);
+  });
+
   it('turns the whole letter ceiling to brick when it shuts', () => {
     const c = climb();
     standUnder(c, 0, answerOf(c, 0));
@@ -98,8 +82,17 @@ describe('a letter gate', () => {
     expect(c.score).toBe(0);
     expect(codes(c, blockCells(c.layout, 0, answerOf(c, 0))).every((code) => code === T_LETTER)).toBe(true);
     expect(c.events).toContainEqual({ type: 'bump-wrong', storey: 0, block: wrongOf(c, 0) });
+    expect(c.sounds).toContain('wrong');
+    expect(c.sounds).not.toContain('block');
+    expect(c.rumbles).toEqual([WRONG_RUMBLE]);
     expect(run(c, 120, idle, () => c.player.onGround)).toBe(true);
     expect(c.player.y + c.player.h).toBe(c.layout.storeys[0].letterFloorRow * TILE);
+  });
+
+  it('buzzes a controller light for a right letter and dull for a wrong one', () => {
+    // The September plan's two buzzes (docs/plans/2026-09-20-learn-path-refinement.md, §7).
+    expect(RIGHT_RUMBLE).toEqual({ strong: 0, weak: 0.6, dur: 120 });
+    expect(WRONG_RUMBLE).toEqual({ strong: 0.35, weak: 0, dur: 200 });
   });
 
   it('makes the right block glow after two misses', () => {
@@ -146,6 +139,8 @@ describe('a letter gate', () => {
     c.lastGround = -1;
     expect(headBump(c, blockCells(c.layout, 0, answerOf(c, 0))[0])).toBeNull();
     expect(c.gates[0].solved).toBe(false);
+    expect(c.sounds).toEqual([]);
+    expect(c.rumbles).toEqual([]);
   });
 
   it('cannot be answered again once solved', () => {

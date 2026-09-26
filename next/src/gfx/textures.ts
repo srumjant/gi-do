@@ -82,8 +82,9 @@ export const PLAYER_SCALE = 2;
  */
 export const BIG_HEAD_SCALE = 5;
 
-const POSES = ['stand', 'run', 'jump'] as const;
-export type Pose = typeof POSES[number];
+/** `player.frame`: 0 stand, 1 run, 2 jump (game/types.ts, index.html:1424-1429). */
+export const PLAYER_POSES = ['stand', 'run', 'jump'] as const;
+export type Pose = typeof PLAYER_POSES[number];
 
 /** `player-<character>-<skinIndex>-<pose>`, e.g. `player-gigi-0-stand`. */
 export function playerTextureKey(character: Character, skinIndex: number, pose: Pose): string {
@@ -127,7 +128,7 @@ export function bigHeadRows(sprite: SpriteData): number {
 function registerPlayerTextures(scene: Phaser.Scene): void {
   CHARACTERS.forEach((character) => {
     skinsOf(character).forEach((skin, skinIndex) => {
-      for (const pose of POSES) {
+      for (const pose of PLAYER_POSES) {
         const sprite = skin[pose];
         const headRows = bigHeadRows(sprite);
         const key = playerTextureKey(character, skinIndex, pose);
@@ -248,10 +249,18 @@ export const CAPE_TEXTURE = 'cape';
  * tag the cannon sets on its own (see EnemyProjectile in game/types.ts).
  */
 export const FIREBALL_TEXTURE = 'fireball';
+/**
+ * The learn tower's star on its roof, and the HUD's star for each gate: STAR_S again, at whole
+ * scales of their own, since scale belongs to the draw site. 4 on the roof (28px, inside the
+ * two-tile star box) and 3 in the HUD (21px). Enlarging the world's 1.5 bake would blur them.
+ */
+export const LEARN_STAR_TEXTURE = 'learn-star';
+export const LEARN_HUD_STAR_TEXTURE = 'learn-hud-star';
 
 /**
  * Everything the world draws that is not a player, an enemy or a cloud: the pickups,
- * the star, the cat and its claw mark, the two kinds of projectile, and the cape.
+ * the star, the cat and its claw mark, the two kinds of projectile, and the cape; and the
+ * learn tower's two stars.
  * Each is one fixed sprite at one fixed scale — none of them animate, flip aside —
  * so one texture apiece covers every frame they will ever be drawn on.
  */
@@ -265,6 +274,8 @@ const ITEM_TEXTURES: readonly [string, SpriteData, Palette, number][] = [
   [CHICKEN_ARROW_TEXTURE, CHICKEN_S, CHICKEN_P, 1.5],
   [CAPE_TEXTURE, CAPE_S, CAPE_P, 2],
   [FIREBALL_TEXTURE, FIREBALL_S, FIREBALL_P, 2],
+  [LEARN_STAR_TEXTURE, STAR_S, STAR_P, 4],
+  [LEARN_HUD_STAR_TEXTURE, STAR_S, STAR_P, 3],
 ];
 
 function registerItemTextures(scene: Phaser.Scene): void {

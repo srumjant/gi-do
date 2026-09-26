@@ -311,6 +311,34 @@ describe('pit death', () => {
     expect(world.player.vy).toBe(frozen.vy);
     expect(world.dead).toBe(true);
   });
+
+  // The owner's call: a cape saves the hero from a pit on EVERY difficulty. The live game
+  // allows it on super_easy alone (its `capeSavesPit`, index.html:1423); everywhere else
+  // it let the pit kill a player wearing a cape.
+  it('a cape saves a pit fall on every difficulty, and is spent doing it', () => {
+    for (const key of DIFF_KEYS) {
+      const world = createWorld(0, key);
+      world.player.hasCape = true;
+      world.player.y = world.level.height * TILE + 64; // below the bottom of the world
+
+      expect(stepPlayer(world, emptyInput(), testMove), key).toBe(false);
+      expect(world.dead, key).toBe(false);
+      expect(world.player.hasCape, key).toBe(false);
+      expect(world.player.invincible, key).toBe(60);
+      expect(world.player.vy, key).toBe(-10);
+      expect(world.player.y, key).toBe(world.level.height * TILE - 32);
+    }
+  });
+
+  it('kills on a second fall, once the cape is spent', () => {
+    const world = makeWorld();
+    world.player.hasCape = true;
+    world.player.y = world.level.height * TILE + 64;
+    stepPlayer(world, emptyInput(), testMove);
+    world.player.y = world.level.height * TILE + 64;
+    stepPlayer(world, emptyInput(), testMove);
+    expect(world.dead).toBe(true);
+  });
 });
 
 // Port of index.html:1148-1156. The one place in this plan where unit tests genuinely

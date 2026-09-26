@@ -1,5 +1,19 @@
-import type { PlayerState, SoundCue } from '../types';
+import type { BodyMover } from '../player';
+import type { LearnMode } from './content';
+import type { EffectCue, PlayerState, RumbleCue } from '../types';
 import type { TowerLayout } from './tower';
+
+/**
+ * One sitting at the learn tower, from the learn menu's confirm until back: the exercise,
+ * what it has asked (the same array from tower to tower, emptied by pickTargets when a round
+ * ends), and the score, which adds up tower after tower as the live `learn.score` does
+ * (index.html:2650).
+ */
+export interface LearnSession {
+  mode: LearnMode;
+  used: string[];
+  score: number;
+}
 
 /** A map cell: column and row of the tower's map. */
 export interface Cell {
@@ -22,14 +36,15 @@ export interface GateState {
 
 /**
  * What the scene has to show for a step, in the order it happened. Sounds ride
- * `Climb.sounds`, exactly as the adventure's ride `World.sounds`.
+ * `Climb.sounds` and buzzes `Climb.rumbles`, exactly as the adventure's ride `World.sounds`
+ * and `World.rumbles`.
  */
 export type ClimbEvent =
   /** Map cells changed; mirror them on the Phaser layer. */
   | { type: 'tiles'; cells: TileEdit[] }
   | { type: 'bump-right'; storey: number; block: number }
   | { type: 'bump-wrong'; storey: number; block: number }
-  /** Two misses at a gate: the right block should glow until found. */
+  /** Two misses at a gate: the right block should glow and pulse until found. */
   | { type: 'hint'; storey: number; block: number }
   /** The right block is back, after the hero ended up under its open trapdoor. */
   | { type: 'rearm'; storey: number; block: number }
@@ -38,6 +53,15 @@ export type ClimbEvent =
   /** The hero has risen into storey `storey`; past the last storey is the roof. */
   | { type: 'storey'; storey: number }
   | { type: 'finished' };
+
+/**
+ * A line for the voice: the recorded clips it is made of, played in order (voiceClips.ts's
+ * keys). 'now' cuts off what is being said; 'after' waits its turn (audio/voice.ts).
+ */
+export interface SpeechCue {
+  clips: string[];
+  when: 'now' | 'after';
+}
 
 export interface Climb {
   layout: TowerLayout;
@@ -54,14 +78,22 @@ export interface Climb {
   sprung: boolean;
   finished: boolean;
   score: number;
-  sounds: SoundCue[];
+  sounds: EffectCue[];
+  rumbles: RumbleCue[];
   events: ClimbEvent[];
+  /** Lines for the voice, in order (game/learn/speech.ts). The scene speaks them and empties the list. */
+  speech: SpeechCue[];
+  /** Steps taken since the tower began: the voice's clock. */
+  steps: number;
+  /** The step the voice was last asked to speak on. */
+  lastSpokeAt: number;
+  /** The highest storey whose target has been said on arrival; the first is said as the tower starts. */
+  announced: number;
 }
 
 /**
- * Moves the hero one step and reports the tile row a rising head was stopped under, or
- * null. The scene's is its Arcade body (physics/player.ts's createBodyMover); the tests'
- * is tests/helpers/towerMove.ts. Which cells of that row the head hit is the climb's own
- * rule (climb.ts).
+ * What a climb steps the hero with: game/player.ts's BodyMover, the scene's Arcade body or
+ * the tests' towerMove. Which cells of the reported row the head hit is the climb's own rule
+ * (climb.ts).
  */
-export type ClimbMove = (p: PlayerState) => { headHitRow: number | null };
+export type ClimbMove = BodyMover;

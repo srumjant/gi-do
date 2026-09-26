@@ -1,7 +1,10 @@
 /// <reference types="vite/client" />
 import Phaser from 'phaser';
+import { installVoice } from './audio/voice';
 import { BASE_W, BASE_H, STEP_HZ } from './config/constants';
 import { installGlyphs } from './config/glyphs';
+import { installFullscreenButton } from './gfx/fullscreen';
+import { RENDER_SCALE } from './gfx/render';
 import { BetweenScene } from './scenes/BetweenScene';
 import { CharacterScene } from './scenes/CharacterScene';
 import { DifficultyScene } from './scenes/DifficultyScene';
@@ -9,6 +12,7 @@ import { GameOverScene } from './scenes/GameOverScene';
 import { HudScene } from './scenes/HudScene';
 import { LearnMenuScene } from './scenes/LearnMenuScene';
 import { LearnHudScene } from './scenes/LearnHudScene';
+import { LearnResultScene } from './scenes/LearnResultScene';
 import { LearnTowerScene } from './scenes/LearnTowerScene';
 import { LevelOverlayScene } from './scenes/LevelOverlayScene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
@@ -25,12 +29,18 @@ installGlyphs();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
-  parent: 'game',
-  width: BASE_W,
-  height: BASE_H,
   backgroundColor: '#10131a',
   pixelArt: true,
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+  scale: {
+    parent: 'game',
+    // RENDER_SCALE canvas pixels per layout pixel, every camera zoomed to match: see gfx/render.ts.
+    width: BASE_W * RENDER_SCALE,
+    height: BASE_H * RENDER_SCALE,
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    // The game's container goes full screen, with the button inside it: see gfx/fullscreen.ts.
+    fullscreenTarget: 'game',
+  },
   physics: {
     default: 'arcade',
     arcade: {
@@ -100,6 +110,7 @@ const game = new Phaser.Game({
     LearnMenuScene,
     LearnTowerScene,
     LearnHudScene,
+    LearnResultScene,
     DifficultyScene,
     CharacterScene,
     SliceScene,
@@ -112,6 +123,12 @@ const game = new Phaser.Game({
     PauseScene,
   ],
 });
+
+// The learn tower's voice: the owner's recordings, through the game's own sound. A clip counts
+// once its file is loaded, which the tower does in its preload. See audio/voice.ts.
+installVoice(game.sound, (key) => game.cache.audio.exists(key));
+// The live game's full-screen button, in the page's corner. See gfx/fullscreen.ts.
+installFullscreenButton(game);
 
 /**
  * A handle on the running game, for driving it by hand from a browser console: stepping

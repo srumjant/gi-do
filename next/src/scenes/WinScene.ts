@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { BASE_H, BASE_W } from '../config/constants';
 import { getDifficulty } from '../config/difficulty';
-import { TDiff, TStr } from '../config/i18n';
+import { capitals, TDiff, TStr } from '../config/i18n';
 import { startBGM, stopBGM } from '../audio/bgm';
 import { sfxWin } from '../audio/sfx';
 import { BGM_WIN } from '../data/bgmThemes';
@@ -10,6 +10,8 @@ import { characterName, siblingOf } from '../game/menu';
 import type { Character } from '../game/player';
 import { random } from '../game/random';
 import { getSelectedChar, getSkinIndex } from '../game/run';
+import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import {
   registerScaledPlayerTextures,
   registerWinHeartTexture,
@@ -38,13 +40,13 @@ const SUMMARY_Y = 160;
 const HINT_Y = 330;
 
 const SAVED_FONT = {
-  fontFamily: 'monospace', fontSize: '28px', fontStyle: 'bold', color: '#ff69b4',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '28px', color: '#ff69b4',
 };
 const BEST_FONT = {
-  fontFamily: 'monospace', fontSize: '18px', fontStyle: 'bold', color: '#ffdd00',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '18px', color: '#ffdd00',
 };
-const SUMMARY_FONT = { fontFamily: 'monospace', fontSize: '14px', color: '#aaddff' };
-const HINT_FONT = { fontFamily: 'monospace', fontSize: '12px', color: '#ffffff' };
+const SUMMARY_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '14px', color: '#aaddff' };
+const HINT_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#ffffff' };
 
 /** The two of them standing together (index.html:2457). Scale 4, and the sibling sits lower. */
 const PORTRAIT_SCALE = 4;
@@ -128,6 +130,7 @@ export class WinScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     registerScaledPlayerTextures(this, [['stand', PORTRAIT_SCALE]]);
     registerWinHeartTexture(this);
 
@@ -154,7 +157,7 @@ export class WinScene extends Phaser.Scene {
     // index.html:2452-2454. 'GIGI IS SAVED!' is the rescued sibling; '<hero> is the best!'
     // is whoever did the rescuing. Neither name is translated — see game/menu.ts.
     this.line(SAVED_Y, SAVED_FONT, characterName(sibling).toUpperCase() + TStr('is_saved'));
-    this.line(BEST_Y, BEST_FONT, characterName(hero) + TStr('is_the_best'));
+    this.line(BEST_Y, BEST_FONT, capitals(characterName(hero)) + TStr('is_the_best'));
     // :2455. Four fragments run together, and both labels carry their own punctuation.
     const summary = TStr('difficulty_label') + TDiff(getDifficulty())
       + TStr('final_score') + this.score;

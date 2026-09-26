@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
 import { BASE_H, BASE_W, STEP_HZ } from '../config/constants';
 import type { DifficultyKey } from '../config/difficulty';
-import { TDiff, TStr } from '../config/i18n';
+import { capitals, TDiff, TStr } from '../config/i18n';
 import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
 import { LEVEL_NAME_KEYS } from '../data/levels';
 import type { World } from '../game/types';
+import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import {
   HUD_BOW_TEXTURE,
   HUD_CAT_TEXTURE,
@@ -77,22 +79,22 @@ const POWERUP_STEP_Y = 16;
  */
 const FRAMES_PER_SECOND = STEP_HZ;
 
-const INFINITY_FONT = { fontFamily: 'monospace', fontSize: '16px', fontStyle: 'bold', color: '#ffffff' };
-const SCORE_FONT = { fontFamily: 'monospace', fontSize: '14px', fontStyle: 'bold', color: '#ffffff' };
+const INFINITY_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '16px', color: '#ffffff' };
+const SCORE_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '14px', color: '#ffffff' };
 /**
  * `'#ffffffaa'` (index.html:1859) — white at two-thirds alpha, passed through as the
  * eight-digit hex the live game writes. Phaser assigns a Text style's `color` straight
  * to the canvas `fillStyle`, which takes `#rrggbbaa` as readily as `#rrggbb`, so unlike
  * the Graphics objects elsewhere in this port there is no colour/alpha split to do.
  */
-const LEVEL_FONT = { fontFamily: 'monospace', fontSize: '10px', color: '#ffffffaa' };
-const CAT_COUNT_FONT = { fontFamily: 'monospace', fontSize: '8px', fontStyle: 'bold', color: '#ffffff' };
-const BOW_COUNT_FONT = { fontFamily: 'monospace', fontSize: '10px', fontStyle: 'bold', color: '#ffffff' };
+const LEVEL_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#ffffffaa' };
+const CAT_COUNT_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '8px', color: '#ffffff' };
+const BOW_COUNT_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#ffffff' };
 /** The three power-up glyphs are emoji in `14px serif` (index.html:1865-1867). */
 const POWERUP_ICON_FONT = { fontFamily: 'serif', fontSize: '14px' };
-const FART_LABEL_FONT = { fontFamily: 'monospace', fontSize: '10px', fontStyle: 'bold', color: '#88cc44' };
-const BIG_HEAD_LABEL_FONT = { fontFamily: 'monospace', fontSize: '10px', fontStyle: 'bold', color: '#ff69b4' };
-const CHICKEN_LABEL_FONT = { fontFamily: 'monospace', fontSize: '10px', fontStyle: 'bold', color: '#ffffff' };
+const FART_LABEL_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#88cc44' };
+const BIG_HEAD_LABEL_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#ff69b4' };
+const CHICKEN_LABEL_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#ffffff' };
 
 /**
  * The boss bar across the bottom of the screen (index.html:1885-1892) — 120x10, centred,
@@ -115,11 +117,11 @@ const BOSS_LABEL_Y = BOSS_BAR_Y - 3;
 const BOSS_LABEL = 'BOSS';
 /** index.html:1892's `bold 9px monospace`, centred over the bar. */
 const BOSS_LABEL_FONT = {
-  fontFamily: 'monospace', fontSize: '9px', fontStyle: 'bold', color: '#ffffff',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '9px', color: '#ffffff',
 };
 /** index.html:1895's `bold 20px monospace` in the same gold the score uses. */
 const BOSS_DEFEATED_FONT = {
-  fontFamily: 'monospace', fontSize: '20px', fontStyle: 'bold', color: '#ffdd00',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '20px', color: '#ffdd00',
 };
 const BOSS_DEFEATED_Y = BASE_H / 2 - 30;
 
@@ -197,6 +199,7 @@ export class HudScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     registerHudTextures(this);
     // Phaser reuses the scene INSTANCE, and this scene is now stopped and relaunched once
     // per level rather than living for the whole run. Everything else here is rebuilt by
@@ -392,7 +395,7 @@ export class HudScene extends Phaser.Scene {
     this.catCount.setVisible(showCat);
     if (cat && showCat) {
       this.catIcon.setPosition(hx, CAT_ICON_Y);
-      this.catCount.setPosition(hx + COUNT_X_OFFSET, CAT_COUNT_Y).setText(`x${cat.hitsLeft}`);
+      this.catCount.setPosition(hx + COUNT_X_OFFSET, CAT_COUNT_Y).setText(capitals(`x${cat.hitsLeft}`));
       hx -= ICON_STEP;
     }
 
@@ -406,7 +409,7 @@ export class HudScene extends Phaser.Scene {
     this.bowCount.setVisible(player.hasBow);
     if (player.hasBow) {
       this.bowIcon.setPosition(hx, ITEM_ICON_Y);
-      this.bowCount.setPosition(hx + COUNT_X_OFFSET, BOW_COUNT_Y).setText(`x${player.bowCharges}`);
+      this.bowCount.setPosition(hx + COUNT_X_OFFSET, BOW_COUNT_Y).setText(capitals(`x${player.bowCharges}`));
     }
   }
 
@@ -451,7 +454,7 @@ export class HudScene extends Phaser.Scene {
     label.setVisible(shown);
     if (!shown) return y;
     icon.setY(y);
-    label.setY(y).setText(text);
+    label.setY(y).setText(capitals(text));
     return y + POWERUP_STEP_Y;
   }
 }

@@ -1,14 +1,14 @@
 import Phaser from 'phaser';
 import { startBGM } from '../audio/bgm';
 import { playSounds } from '../audio/cues';
-import { BASE_H, BASE_W, STEP_MS, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
+import { BASE_H, BASE_W, MAX_STEPS_PER_FRAME, STEP_MS, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
 import { getDifficulty, type DifficultyKey } from '../config/difficulty';
 import { T, TStr } from '../config/i18n';
 import { PARALLAX, type ParallaxLayer } from '../data/parallax';
 import type { SpriteData } from '../data/sprites';
 import { isFinalLevel } from '../game/boss';
 import type { GameState } from '../game/navigation';
-import type { Character, PlayerMove } from '../game/player';
+import { type Character, PLAYER_DRAW_INSET, type PlayerMove } from '../game/player';
 import {
   finishLevel,
   getCurrentLevel,
@@ -21,6 +21,8 @@ import {
 import { createWorld, rescueSpot, stepWorld } from '../game/world';
 import type { EnemyState, World } from '../game/types';
 import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
+import { GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { RENDER_SCALE } from '../gfx/render';
 import { cloudPosition, cloudScale, drawRidges, drawSky } from '../gfx/parallax';
 import {
   type BlockView,
@@ -45,6 +47,7 @@ import {
   FIREBALL_TEXTURE,
   playerBodyTextureKey,
   playerHeadTextureKey,
+  PLAYER_POSES,
   PLAYER_SCALE,
   playerTextureKey,
   registerTextures,
@@ -77,22 +80,14 @@ import type { WinData } from './WinScene';
 
 /**
  * Half the difference between the canvas and the zoomed view. See setScroll below —
- * the correction for Phaser zooming about the camera centre rather than its top-left.
+ * the correction for Phaser zooming about the camera centre rather than its top-left. The
+ * canvas is RENDER_SCALE times the layout (gfx/render.ts), and the view is the same world
+ * size as ever, so this is measured against the real canvas.
  */
-const CAMERA_PIVOT_X = (BASE_W - VIEW_W) / 2;
-const CAMERA_PIVOT_Y = (BASE_H - VIEW_H) / 2;
-
-/**
- * The sprite draws 2px larger than the hitbox on every side (index.html:1848:
- * `drawSprite(spr,p.x-2,p.y-2,ps.palette,2,p.facing<0)`, because the hitbox itself is
- * inset from the sprite by `w = spriteW - 4`, `h = spriteH - 4`, player.ts:35-36). Not
- * cosmetic — get this wrong and the art sits 2px off the hitbox, which reads as a
- * collision bug.
- */
-const PLAYER_DRAW_INSET = 2;
-
-/** `player.frame`: 0 stand, 1 run, 2 jump (types.ts, index.html:1424-1429). */
-const PLAYER_POSES = ['stand', 'run', 'jump'] as const;
+const CAMERA_PIVOT_X = (BASE_W * RENDER_SCALE - VIEW_W) / 2;
+const CAMERA_PIVOT_Y = (BASE_H * RENDER_SCALE - VIEW_H) / 2;
+/** Text in the world is zoomed with it, so it is drawn that much denser to land 1:1. */
+const WORLD_TEXT_RESOLUTION = GAME_TEXT_RESOLUTION * ZOOM;
 
 /** Cloud alpha (index.html:1681: `ctx.globalAlpha=0.75`). */
 const CLOUD_ALPHA = 0.75;
@@ -204,7 +199,7 @@ const BOSS_BAR_HEIGHT = 6;
 const BOSS_BAR_OFFSET_Y = 12;
 /** index.html:1818's `bold 8px monospace` in white, centred over the boss. */
 const BOSS_TAUNT_FONT = {
-  fontFamily: 'monospace', fontSize: '8px', fontStyle: 'bold', color: '#ffffff',
+  fontFamily: GAME_FONT_BOLD, resolution: WORLD_TEXT_RESOLUTION, fontSize: '8px', color: '#ffffff',
 };
 const BOSS_TAUNT_OFFSET_Y = 18;
 
@@ -215,7 +210,7 @@ const BOSS_TAUNT_OFFSET_Y = 18;
  * canvas font metrics Phaser's text renderer does not share (same reasoning as the
  * `?` glyph in gfx/tiles.ts).
  */
-const MEOW_FONT = { fontFamily: 'monospace', fontSize: '7px', fontStyle: 'bold', color: '#aabbcc' };
+const MEOW_FONT = { fontFamily: GAME_FONT_BOLD, resolution: WORLD_TEXT_RESOLUTION, fontSize: '7px', color: '#aabbcc' };
 
 /**
  * The cage the sibling is held in until the boss falls (index.html:1738-1750). It is
@@ -243,9 +238,9 @@ const CAGE_RAIL_COLOR = 0x999999;
  * (:1755). Same origin reasoning as MEOW_FONT above — the live `fillText` places a
  * baseline, so the bottom is what gets anchored.
  */
-const RESCUE_CRY_FONT = { fontFamily: 'monospace', fontSize: '7px', fontStyle: 'bold', color: '#3388ff' };
+const RESCUE_CRY_FONT = { fontFamily: GAME_FONT_BOLD, resolution: WORLD_TEXT_RESOLUTION, fontSize: '7px', color: '#3388ff' };
 const RESCUE_CRY_OFFSET_Y = 12;
-const RESCUE_CALL_FONT = { fontFamily: 'monospace', fontSize: '8px', fontStyle: 'bold', color: '#ff69b4' };
+const RESCUE_CALL_FONT = { fontFamily: GAME_FONT_BOLD, resolution: WORLD_TEXT_RESOLUTION, fontSize: '8px', color: '#ff69b4' };
 const RESCUE_CALL_OFFSET_Y = 8;
 /** Both are drawn at `rX-2` (index.html:1752, :1755), not at the sibling's own left edge. */
 const RESCUE_TEXT_OFFSET_X = 2;
@@ -447,7 +442,7 @@ export class SliceScene extends Phaser.Scene {
     this.bodyImage = this.hiddenImage(playerBodyTextureKey(...currentSkin(), 'stand'), DEPTH_PLAYER);
     this.headImage = this.hiddenImage(playerHeadTextureKey(...currentSkin(), 'stand'), DEPTH_PLAYER);
 
-    this.cameras.main.setZoom(ZOOM);
+    this.cameras.main.setZoom(ZOOM * RENDER_SCALE);
 
     // Keyboard and controller, read as one value per fixed step. Made HERE, in create(),
     // and not earlier: the pad half seeds itself from what is held the moment it is built,
@@ -729,7 +724,7 @@ export class SliceScene extends Phaser.Scene {
       return;
     }
     // Clamp so a backgrounded tab does not produce a hundred catch-up steps at once.
-    this.accumulator = Math.min(this.accumulator + delta, STEP_MS * 5);
+    this.accumulator = Math.min(this.accumulator + delta, STEP_MS * MAX_STEPS_PER_FRAME);
     while (this.accumulator >= STEP_MS) {
       stepWorld(this.world, this.readInput(), this.movePlayer, this.enemyBodies.move);
       // Everything that step made a noise about, played now, before the next one clears

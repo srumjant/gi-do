@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { loadLegacySection } from './helpers/legacy';
 import {
-  TRANSLATIONS, LANG_KEYS, T, TDiff, getLang, setLang, setGlyphResolver,
+  TRANSLATIONS, LANG_KEYS, T, TDiff, capitals, getLang, setLang, setGlyphResolver,
 } from '../src/config/i18n';
 
 const legacy = loadLegacySection({
@@ -16,8 +16,11 @@ const legacy = loadLegacySection({
  * below stays a parity check.
  *
  * The `learn_*` keys are learn mode's own words. The live game hardcodes them in Estonian
- * inside drawLearn and drawLearnMenu rather than keeping them in TRANSLATIONS, so the port's
- * versions are new keys with both languages.
+ * inside drawLearn, drawLearnMenu and drawLearnResult rather than keeping them in
+ * TRANSLATIONS, so the port's versions are new keys with both languages.
+ *
+ * The `fullscreen_*` keys are the full-screen button's tooltip, which the live game gives as
+ * a hardcoded English "Fullscreen" (index.html:52).
  *
  * An unlisted extra key fails the same assertion a missing live key does, which is the point
  * — the list is a short, deliberate exception, not a hole.
@@ -28,7 +31,9 @@ const PORT_ONLY_KEYS = [
   'learn_syllables', 'learn_syllables_d',
   'learn_words', 'learn_words_d',
   'learn_menu_hint',
-  'learn_find_letter', 'learn_find_syll', 'learn_find_letters',
+  'learn_find_letter', 'learn_find_syllable', 'learn_find_letters',
+  'learn_speak', 'learn_cheers', 'learn_found', 'learn_result_hint',
+  'fullscreen_on', 'fullscreen_off',
 ];
 
 describe('translations match the live game', () => {
@@ -64,13 +69,13 @@ describe('T()', () => {
   });
 
   it('returns the Estonian string by default', () => {
-    expect(T('score')).toBe(legacy.TRANSLATIONS.score.et);
+    expect(T('score')).toBe(capitals(legacy.TRANSLATIONS.score.et as string));
   });
 
   it('follows the selected language', () => {
     setLang('en');
     expect(getLang()).toBe('en');
-    expect(T('score')).toBe(legacy.TRANSLATIONS.score.en);
+    expect(T('score')).toBe(capitals(legacy.TRANSLATIONS.score.en as string));
   });
 
   it('falls back to the key when it is unknown', () => {
@@ -79,10 +84,10 @@ describe('T()', () => {
 
   // Commit 8354ea0: glyph substitution must not run on a phrase array, because
   // indexOf('{') on an array compares whole elements and silently misbehaves.
-  it('returns phrase arrays untouched', () => {
+  it('returns phrase arrays with no placeholder substituted', () => {
     const phrases = T('dino_phrases');
     expect(Array.isArray(phrases)).toBe(true);
-    expect(phrases).toEqual(legacy.TRANSLATIONS.dino_phrases.et);
+    expect(phrases).toEqual((legacy.TRANSLATIONS.dino_phrases.et as string[]).map(capitals));
   });
 
   // The live game substitutes by ACTION, not by letter: {A} resolves through
@@ -91,12 +96,26 @@ describe('T()', () => {
     setGlyphResolver((action) => `[${action}]`);
     const raw = legacy.TRANSLATIONS.press_start.et as string;
     expect(raw).toContain('{A}');
-    expect(T('press_start')).toBe(raw.replace('{A}', '[confirm]'));
+    expect(T('press_start')).toBe(capitals(raw.replace('{A}', '[confirm]')));
   });
 
   it('leaves strings without a placeholder alone', () => {
     setGlyphResolver(() => 'SHOULD NOT APPEAR');
-    expect(T('score')).toBe(legacy.TRANSLATIONS.score.et);
+    expect(T('score')).toBe(capitals(legacy.TRANSLATIONS.score.et as string));
+  });
+
+  // The owner's call, for children who read capital letters first: the table keeps the live
+  // game's spelling (the parity tests above), and T shows all of it in capitals.
+  it('shows every string in capitals, in both languages', () => {
+    for (const language of LANG_KEYS) {
+      setLang(language);
+      for (const key of Object.keys(TRANSLATIONS)) {
+        const shown = T(key);
+        for (const text of typeof shown === 'string' ? [shown] : shown) {
+          expect(text, `${language} ${key}`).not.toMatch(/\p{Ll}/u);
+        }
+      }
+    }
   });
 });
 
@@ -107,12 +126,12 @@ describe('TDiff()', () => {
 
   it('returns the live game\'s label for every difficulty', () => {
     for (const key of ['super_easy', 'easy', 'normal', 'hard']) {
-      expect(TDiff(key)).toBe(legacy.TRANSLATIONS[key].et);
+      expect(TDiff(key)).toBe(capitals(legacy.TRANSLATIONS[key].et as string));
     }
   });
 
   it('follows the selected language', () => {
     setLang('en');
-    expect(TDiff('normal')).toBe(legacy.TRANSLATIONS.normal.en);
+    expect(TDiff('normal')).toBe(capitals(legacy.TRANSLATIONS.normal.en as string));
   });
 });

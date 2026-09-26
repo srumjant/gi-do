@@ -192,8 +192,8 @@ describe('menu states and run states do not blur together', () => {
 
 /**
  * The port's own half. The live game cannot ask these: its states ARE its screens, drawn by
- * a dispatch that covers all of them. Here a state is a scene, three states have no scene
- * yet, and a back route into one of those three would be a button that leads nowhere.
+ * a dispatch that covers all of them. Here a state is a scene, two states have no scene,
+ * and a back route into one of those two would be a button that leads nowhere.
  */
 describe('every route this port can take leads to a screen that exists', () => {
   it('never sends a ported screen back to an unported one', () => {
@@ -219,6 +219,6 @@ describe('every route this port can take leads to a screen that exists', () => {
    */
   it('names exactly what is left to port', () => {
     const missing = GAME_STATES.filter((s) => !SCENE_FOR_STATE[s]);
-    expect(missing).toEqual(['intro', 'debug', 'learnresult']);
+    expect(missing).toEqual(['intro', 'debug']);
   });
 });

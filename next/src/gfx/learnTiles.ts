@@ -1,34 +1,52 @@
-import type Phaser from 'phaser';
+import Phaser from 'phaser';
 import { TILE } from '../config/constants';
-import { T_BRICK, T_EMPTY, T_LETTER, T_PLANK, T_STONE } from '../game/learn/tower';
+import { LEVELS } from '../data/levels';
+import { LEARN_MODES } from '../game/learn/content';
+import { blockLayout, CEILING, T_BRICK, T_EMPTY, T_LETTER, T_PLANK, T_STONE } from '../game/learn/tower';
 import { drawBrick, QUESTION_FILL, QUESTION_STROKE } from './tiles';
 
 /** The tower's tileset: one 16px frame per tile code, frame 0 unused (Phaser's empty is -1). */
-export const LEARN_TILES_KEY = 'learn-tiles';
+export const LEARN_TILES_TEXTURE = 'learn-tiles';
 /** A frame per tile code, T_EMPTY's included, so a code is its own frame number. */
 const FRAMES = T_LETTER + 1;
+/**
+ * A small white square, tinted per use: the tower's sparks, brick chunks and confetti. Tints
+ * are a WebGL feature; under the canvas renderer every piece is white.
+ */
+export const LEARN_SPARK_TEXTURE = 'learn-spark';
+const SPARK_PX = 3;
+/** The live learn mode's confetti (index.html:2994): the star's burst and the result screen's fall. */
+export const LEARN_CONFETTI_COLORS = [0xffdd00, 0xff69b4, 0x88ff88, 0x88ccff, 0xffaa44];
 
-/** The first world's brick (data/levels.ts, Doll Garden): the tower is built of the adventure's own. */
-const BRICK = 0xcc8844;
+/**
+ * The first world's brick (Doll Garden): the tower is built of the adventure's own, and a
+ * knocked-out brick's chunks are tinted with it.
+ */
+export const LEARN_BRICK = Phaser.Display.Color.HexStringToColor(LEVELS[0].brickColor).color;
+/** One picture per block width the tower uses (tower.ts's blockLayout). */
+const BLOCK_WIDTHS = [...new Set(LEARN_MODES.map((mode) => blockLayout(mode).width))];
 const STONE = 0xa3a3ba;
 const WOOD = 0xb5773a;
 const WOOD_LIGHT = 0xd99a58;
 const WOOD_DARK = 0x7a4a20;
 
 /**
- * Bakes the tileset and the letter-block pictures into textures, once. Idempotent: a restarted
- * tower reuses them.
+ * Bakes the tileset, the letter-block pictures and the spark into textures, once. Idempotent:
+ * a restarted tower reuses them.
  */
 export function registerLearnTiles(scene: Phaser.Scene): void {
-  bake(scene, LEARN_TILES_KEY, TILE * FRAMES, TILE, (g) => {
-    drawBrick(g, T_BRICK * TILE, 0, BRICK);
+  bake(scene, LEARN_TILES_TEXTURE, TILE * FRAMES, TILE, (g) => {
+    drawBrick(g, T_BRICK * TILE, 0, LEARN_BRICK);
     drawStone(g, T_STONE * TILE);
     drawPlank(g, T_PLANK * TILE);
     // Under the block pictures (see drawBlock); shows only if a picture is hidden.
     g.fillStyle(QUESTION_FILL).fillRect(T_LETTER * TILE, 0, TILE, TILE);
   });
-  for (const width of [2, 3]) {
-    bake(scene, blockTextureKey(width), width * TILE, 2 * TILE, (g) => drawBlock(g, width));
+  bake(scene, LEARN_SPARK_TEXTURE, SPARK_PX, SPARK_PX, (g) => {
+    g.fillStyle(0xffffff).fillRect(0, 0, SPARK_PX, SPARK_PX);
+  });
+  for (const width of BLOCK_WIDTHS) {
+    bake(scene, blockTextureKey(width), width * TILE, CEILING * TILE, (g) => drawBlock(g, width));
   }
 }
 
@@ -87,7 +105,7 @@ function drawPlank(g: Phaser.GameObjects.Graphics, x: number): void {
 /** One letter block in the `?` block's own gold and edge, drawn whole so it reads as one block, not four. */
 function drawBlock(g: Phaser.GameObjects.Graphics, width: number): void {
   const w = width * TILE;
-  const h = 2 * TILE;
+  const h = CEILING * TILE;
   g.fillStyle(QUESTION_FILL).fillRect(0, 0, w, h);
   g.fillStyle(0xffffff, 0.35).fillRect(2, 2, w - 4, 2).fillRect(2, 2, 2, h - 4);
   g.fillStyle(0x000000, 0.15).fillRect(2, h - 4, w - 4, 2).fillRect(w - 4, 2, 2, h - 4);

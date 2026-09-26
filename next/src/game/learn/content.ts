@@ -3,6 +3,9 @@ import { random } from '../random';
 /** Which learn exercise a tower asks. */
 export type LearnMode = 'letters' | 'syllables' | 'words';
 
+/** The three exercises, in the learn menu's order. */
+export const LEARN_MODES: readonly LearnMode[] = ['letters', 'syllables', 'words'];
+
 /** A random source in [0, 1). Defaults to game/random.ts's seam; tests pass their own. */
 export type Rand = () => number;
 

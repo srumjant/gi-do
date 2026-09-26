@@ -17,3 +17,10 @@ export const ENEMY_SCALE = 1.8;
 /** The simulation runs at exactly this rate regardless of display refresh. */
 export const STEP_HZ = 60;
 export const STEP_MS = 1000 / STEP_HZ;
+
+/**
+ * The most fixed steps one rendered frame may run. A frame that arrives late, above all the
+ * first one after a backgrounded tab comes back, catches up this far and drops the rest,
+ * rather than running a burst of steps at once.
+ */
+export const MAX_STEPS_PER_FRAME = 5;

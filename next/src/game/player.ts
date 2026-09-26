@@ -30,6 +30,22 @@ export type Character = 'gigi' | 'dodo';
  */
 export type PlayerMove = (world: World) => void;
 
+/** What one step of a body found out that the player state cannot hold. */
+export interface MoveReport {
+  /**
+   * The tile row a rising head was stopped under this step, or null. Which cells of that row
+   * it hit is the caller's rule: the adventure's is bumpBlocksAbove's two probe columns, the
+   * learn tower's is climb.ts's.
+   */
+  headHitRow: number | null;
+}
+
+/**
+ * Moves one player one fixed step and reports what it found. The game's is an Arcade body
+ * (physics/player.ts's createBodyMover); the learn tower's tests step tests/helpers/towerMove.ts.
+ */
+export type BodyMover = (p: PlayerState) => MoveReport;
+
 /**
  * Port of index.html:1362 — engine constants, not tunable per difficulty. Exported so
  * tests can check the deceleration rate without duplicating the literal.
@@ -38,6 +54,14 @@ export const GRND_ACCEL = 0.6;
 export const AIR_ACCEL = 0.4;
 export const GRND_DECEL = 0.72;
 export const AIR_DECEL = 0.92;
+
+/**
+ * The sprite draws 2px larger than the hitbox on every side (index.html:1848:
+ * `drawSprite(spr,p.x-2,p.y-2,ps.palette,2,p.facing<0)`): half of the 4 playerSize below
+ * takes off each dimension. Not cosmetic — get this wrong and the art sits 2px off the hitbox,
+ * which reads as a collision bug. Every scene that draws a player uses it.
+ */
+export const PLAYER_DRAW_INSET = 2;
 
 /**
  * The hitbox of a character: the stand sprite at scale 2, inset by 4 each way
@@ -299,6 +323,9 @@ function fireArrow(world: World, input: InputState): void {
  */
 export type MotionRecord = Pick<DifficultyRecord, 'playerSpeed' | 'jumpForce'>;
 
+/** The only cues the movement raises: a jump, or a fart jump. */
+type MotionCue = Extract<SoundCue, 'jump' | 'fart'>;
+
 export interface MotionOptions {
   /**
    * Skip the variable-height cut this step. Learn mode sets it while a letter block's
@@ -316,13 +343,15 @@ export interface MotionOptions {
  * so a jump is the same jump in both.
  *
  * Mutates `p`, and pushes 'jump' or 'fart' onto `sounds` on the step a jump starts.
+ * `sounds` is typed as exactly that, so the adventure's list and the climb's effects-only one
+ * (game/learn/types.ts) both fit, and pushing anything else here would not compile.
  * Moves nothing: position is the mover's job, and runs after this.
  */
 export function stepMotion(
   p: PlayerState,
   input: InputState,
   dc: MotionRecord,
-  sounds: SoundCue[],
+  sounds: { push(cue: MotionCue): unknown },
   options: MotionOptions = {},
 ): void {
   // Player movement — smooth acceleration with air control (index.html:1362-1370).
@@ -475,7 +504,7 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
   //     `onGround` outright from the body, so there is nothing to clear first.
   move?.(world);
 
-  // The pit (index.html:1423), and the cape that can survive it.
+  // The pit (index.html:1423), and the cape that survives it.
   //
   // The `return` is OUTSIDE the branch and fires whether the player was saved or
   // killed, so nothing below this line runs on a pit frame either way — not the walk
@@ -487,15 +516,14 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
   //
   // Four things in the save branch are easy to get subtly wrong:
   //
-  //   - `capeSavesPit` is a super_easy-only field (difficulty.ts) and is read for
-  //     truthiness, not compared — on every other difficulty it is simply absent and
-  //     the pit kills. The live source reads it off a FRESH `DC()` here rather than
-  //     the `dc` it captured at the top of update(); `world.dc` is the same record for
-  //     the whole run, so this is the same read, just without the indirection.
+  //   - A cape saves you on EVERY difficulty. That is the owner's call for the children
+  //     who play this, and a break from the live game, where only super_easy's
+  //     `capeSavesPit` allowed it and a cape was no help over a pit anywhere else
+  //     (difficulty.ts, which drops the field).
   //   - The invincibility is a HARDCODED 60, NOT `dc.invincibleTime || 60` like the
-  //     contact hit in playerHit below. On super_easy — the only difficulty that can
-  //     reach this branch at all — invincibleTime is 120, so the two paths genuinely
-  //     hand out different windows: 120 for a hit absorbed, 60 for a pit survived.
+  //     contact hit in playerHit below. On super_easy invincibleTime is 120, so there
+  //     the two paths hand out different windows: 120 for a hit absorbed, 60 for a pit
+  //     survived. Everywhere else both are 60.
   //   - It is a RESCUE, not a bounce. `p.y` is teleported to `lvl.height*TILE - 32`,
   //     two tiles above the bottom of the world, which is well above wherever the
   //     player actually fell from — and it is assigned AFTER the condition above has
@@ -508,7 +536,7 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
   // where it fell. The live source's `spawnParticles`/`playTone` in the save branch
   // are presentation and sound, which src/game/ does not own.
   if (p.y > level.height * TILE + 32) {
-    if (world.dc.capeSavesPit && p.hasCape) {
+    if (p.hasCape) {
       p.hasCape = false;
       p.invincible = 60;
       p.vy = -10;

@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TILE } from '../src/config/constants';
 import { getCurrentTheme, stopBGM } from '../src/audio/bgm';
 import { setAudioContext } from '../src/audio/context';
-import { playCue, playSounds } from '../src/audio/cues';
+import { playCue, playEffect, playSounds } from '../src/audio/cues';
 import { LEVELS } from '../src/data/levels';
 import { stepEnemy } from '../src/game/enemy';
 import {
@@ -274,10 +274,10 @@ describe('the moments that make a noise', () => {
     expect(killed.sounds).toEqual(['hurt', 'music-stop']);
   });
 
-  // index.html:1423 — the pit save, which pays the same tone from a different branch.
+  // index.html:1423 — the pit save, which pays the same tone from a different branch. On
+  // any difficulty: here a cape always saves from a pit (see player.test.ts).
   it('a cape catching a pit fall whooshes too', () => {
-    const world = createWorld(0, 'super_easy'); // the one difficulty with capeSavesPit
-    expect(world.dc.capeSavesPit).toBeTruthy();
+    const world = createWorld(0, 'normal');
     world.player.hasCape = true;
     world.player.y = world.level.height * TILE + 64; // below the bottom of the world
 
@@ -399,7 +399,7 @@ describe('every cue reaches the audio stack', () => {
   const EFFECTS: SoundCue[] = [
     'jump', 'fart', 'shoot', 'cluck', 'block', 'pickup', 'coin',
     'stomp', 'boing', 'hurt', 'win', 'cape', 'cat-arrive', 'cat-vanish',
-    'boss-fire', 'boss-charge', 'boss-roar', 'cannon-fire',
+    'boss-fire', 'boss-charge', 'boss-roar', 'cannon-fire', 'wrong',
   ];
 
   // A cue the switch does not answer is silence with no error anywhere — exactly the
@@ -411,6 +411,13 @@ describe('every cue reaches the audio stack', () => {
       expect(fake.oscillators.length, `${cue} produced no oscillator`).toBeGreaterThan(0);
     });
   }
+
+  // The learn tower plays its cues through playEffect, which takes no level index.
+  it('plays an effect without a level index', () => {
+    playEffect('wrong');
+    vi.runAllTimers();
+    expect(fake.oscillators.map((o) => o.type)).toEqual(['triangle']);
+  });
 
   it('music-level starts the theme the scene names, not some fixed one', () => {
     playCue('music-level', 3);

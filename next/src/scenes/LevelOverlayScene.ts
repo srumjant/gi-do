@@ -3,6 +3,8 @@ import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
 import { getRescueSprites, isLastLevel } from '../game/run';
 import type { World } from '../game/types';
+import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { fitScreenCamera } from '../gfx/render';
 import { LEVEL_OVERLAY_SCENE_KEY } from './keys';
 
 /**
@@ -25,13 +27,13 @@ const DEATH_DIM = 0.3;
 const RESCUE_TITLE_DY = -10;
 const RESCUE_SUB_DY = 20;
 const RESCUE_TITLE_FONT = {
-  fontFamily: 'monospace', fontSize: '24px', fontStyle: 'bold', color: '#ff69b4',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '24px', color: '#ff69b4',
 };
-const RESCUE_SUB_FONT = { fontFamily: 'monospace', fontSize: '14px', color: '#ffffff' };
+const RESCUE_SUB_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '14px', color: '#ffffff' };
 
 /** index.html:1899. One line, dead centre. */
 const DEATH_FONT = {
-  fontFamily: 'monospace', fontSize: '20px', fontStyle: 'bold', color: '#ff3333',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '20px', color: '#ff3333',
 };
 
 /**
@@ -74,6 +76,7 @@ export class LevelOverlayScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitScreenCamera(this);
     this.dim = this.add.graphics().setVisible(false);
 
     // index.html:1898's `getRescueSprites().name.toUpperCase()+T('is_safe')`. Resolved at

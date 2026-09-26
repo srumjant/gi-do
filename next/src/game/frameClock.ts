@@ -1,4 +1,4 @@
-import { STEP_HZ } from '../config/constants';
+import { MAX_STEPS_PER_FRAME, STEP_HZ } from '../config/constants';
 
 /**
  * A frame counter that counts at exactly 60Hz however fast the display refreshes.
@@ -28,13 +28,13 @@ export interface FrameClock {
 }
 
 /**
- * The ceiling on how many frames one call can advance, and the same one SliceScene's
- * accumulator uses, for a reason that matters more here: a backgrounded tab hands the next
+ * The ceiling on how many frames one call can advance: the scenes' fixed-step loops use the
+ * same one, and it matters more here: a backgrounded tab hands the next
  * frame a delta of everything it missed, and without a ceiling half a minute away would
  * arrive as eighteen hundred frames — every screen in the run loop past its exit before it
  * had drawn once. With it, a tab-out pauses a cutscene rather than skipping it.
  */
-const MAX_FRAMES_PER_CALL = 5;
+const MAX_FRAMES_PER_CALL = MAX_STEPS_PER_FRAME;
 
 const MS_PER_SECOND = 1000;
 

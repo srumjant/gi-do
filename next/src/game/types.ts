@@ -67,9 +67,9 @@ export interface PlayerState {
    *
    * Spent, never worn out: the first hit of any kind takes it. A contact hit is
    * absorbed for a bounce and an invincibility window (index.html:1646, playerHit),
-   * and on a difficulty with `capeSavesPit` a pit fall is absorbed too, by teleporting
-   * back above the floor of the world (index.html:1423, stepPlayer). Both clear it, so
-   * the second hit — of either kind — kills.
+   * and a pit fall is absorbed too, by teleporting back above the floor of the world
+   * (index.html:1423, stepPlayer) — on every difficulty, where the live game allows it on
+   * super_easy alone. Both clear it, so the second hit — of either kind — kills.
    */
   hasCape: boolean;
   /**
@@ -534,6 +534,9 @@ export interface BossState {
  *     as long and slides UP to 300 where the boss's slides down to 80 — a spit rather
  *     than a belch. Folding the two into one cue would make a level of cannons sound
  *     like a room of bosses.
+ *   - `wrong` is learn mode's wrong letter (index.html:2743), a bare
+ *     `playTone(150,.15,'triangle',.08,100)` in the live learn update. Low and soft: a
+ *     wrong answer costs nothing.
  *   - `music-level` is the level's own theme, restarted by a respawn. Which theme that is
  *     is the SCENE's business — a World does not know its own level index — so the cue
  *     carries no argument and the scene supplies it.
@@ -557,8 +560,15 @@ export type SoundCue =
   | 'boss-charge'
   | 'boss-roar'
   | 'cannon-fire'
+  | 'wrong'
   | 'music-level'
   | 'music-stop';
+
+/**
+ * The cues that are sound effects: every SoundCue but the music's two, so a name is all they
+ * need. The learn tower raises only these, and plays them without a level index.
+ */
+export type EffectCue = Exclude<SoundCue, 'music-level' | 'music-stop'>;
 
 /**
  * One buzz of a controller's motors, raised by the world exactly where the live game calls
