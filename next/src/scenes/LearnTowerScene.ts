@@ -180,7 +180,9 @@ export class LearnTowerScene extends Phaser.Scene {
     this.scene.launch(LEARN_HUD_SCENE_KEY, { climb: this.climb } satisfies LearnHudData);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scene.stop(LEARN_HUD_SCENE_KEY);
-      hush();
+      // Leaving mid-climb cuts the voice off. After the star the only line left is its cheer,
+      // which a slow voice may still be saying as the result screen opens: let it finish.
+      if (!this.climb.finished) hush();
     });
   }
 
@@ -316,6 +318,10 @@ export class LearnTowerScene extends Phaser.Scene {
         this.confetti.explode(CONFETTI, this.star.x, this.star.y);
         this.tweens.add({ targets: this.star, scale: POP_SCALE, alpha: 0, duration: POP_MS });
         this.time.delayedCall(RESULT_DELAY_MS, () => {
+          // The timer fires just before update() in the same step, so a back press on that
+          // step would start the learn menu too. Whichever leaves first, the other does not.
+          if (this.leaving) return;
+          this.leaving = true;
           this.scene.start(LEARN_RESULT_SCENE_KEY, {
             session: this.session,
             found: this.climb.layout.storeys.map((st) => st.target),
