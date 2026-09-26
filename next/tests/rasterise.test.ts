@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planSprite } from '../src/gfx/rasterise';
+import { bakeScale, planSprite } from '../src/gfx/rasterise';
 import type { Palette, SpriteData } from '../src/data/sprites';
 
 // 2 rows x 3 cols: transparent corners, one solid cell of each of two palette colours.
@@ -37,5 +37,18 @@ describe('planSprite', () => {
     const oddSprite: SpriteData = [[9]];
     expect(() => planSprite(oddSprite, PALETTE, 1)).not.toThrow();
     expect(planSprite(oddSprite, PALETTE, 1).cells).toHaveLength(1);
+  });
+});
+
+describe('bakeScale', () => {
+  it('bakes a whole scale as it is', () => {
+    expect([1, 2, 4, 6].map(bakeScale)).toEqual([1, 2, 4, 6]);
+  });
+
+  it('bakes a fraction at one pixel a cell, so no cell edge falls between pixels', () => {
+    expect([1.5, 1.8].map(bakeScale)).toEqual([1, 1]);
+    const plan = planSprite(SPRITE, PALETTE, bakeScale(1.8));
+    const whole = (n: number): boolean => Number.isInteger(n);
+    expect(plan.cells.every((cell) => whole(cell.x) && whole(cell.y) && whole(cell.size))).toBe(true);
   });
 });

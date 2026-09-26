@@ -16,6 +16,7 @@ import {
   registerScaledPlayerTextures,
   registerWinHeartTexture,
   scaledPlayerTextureKey,
+  spriteScale,
   WIN_HEART_TEXTURE,
 } from '../gfx/textures';
 import { bindMenuKeys, type MenuKeys, justDown } from '../input/menuKeys';
@@ -168,9 +169,8 @@ export class WinScene extends Phaser.Scene {
 
     this.hearts = [];
     for (let i = 0; i < HEART_COUNT; i++) {
-      this.hearts.push(
-        this.add.image(HEART_X + i * HEART_STEP, HEART_Y, WIN_HEART_TEXTURE).setOrigin(0, 0),
-      );
+      const heart = this.add.image(HEART_X + i * HEART_STEP, HEART_Y, WIN_HEART_TEXTURE).setOrigin(0, 0);
+      this.hearts.push(heart.setScale(spriteScale(heart)));
     }
 
     this.line(HINT_Y, HINT_FONT, TStr('press_play_again'));
