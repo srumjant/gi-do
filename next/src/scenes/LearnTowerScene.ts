@@ -3,11 +3,10 @@ import { playEffect } from '../audio/cues';
 import { hush, speak } from '../audio/voice';
 import { MAX_STEPS_PER_FRAME, STEP_MS, TILE } from '../config/constants';
 import { createClimb, stepClimb } from '../game/learn/climb';
-import type { LearnMode } from '../game/learn/content';
 import {
   CEILING, LEARN_ZOOM, MAP_COLS, settleCenter, starBox, storeyView, T_BRICK, T_EMPTY, towerTileFaces, WALL,
 } from '../game/learn/tower';
-import type { Climb, ClimbEvent, ClimbMove } from '../game/learn/types';
+import type { Climb, ClimbEvent, ClimbMove, LearnSession } from '../game/learn/types';
 import { type Character, PLAYER_DRAW_INSET } from '../game/player';
 import { getSelectedChar, getSkinIndex } from '../game/run';
 import {
@@ -19,15 +18,10 @@ import { padRumble } from '../input/gamepad';
 import { bindBackKey, justDown, type MenuKey, padContextFor } from '../input/menuKeys';
 import { createBodyMover } from '../physics/player';
 import { applyTileFaces, applyTileFacesAt } from '../physics/tiles';
-import { LEARN_HUD_SCENE_KEY, LEARN_TOWER_SCENE_KEY } from './keys';
+import { LEARN_HUD_SCENE_KEY, LEARN_RESULT_SCENE_KEY, LEARN_TOWER_SCENE_KEY } from './keys';
 import type { LearnHudData, LearnHudScene } from './LearnHudScene';
+import type { LearnResultData } from './LearnResultScene';
 import { takeBack } from './navigate';
-
-export interface LearnTowerData {
-  mode: LearnMode;
-  /** What this round has asked: the same array from tower to tower, emptied by pickTargets when a round ends. */
-  used: string[];
-}
 
 /** A plain sky until the castle backdrop. */
 const SKY = '#7ec0ee';
@@ -35,8 +29,8 @@ const FOLLOW_LERP = 0.15;
 /** The camera centres this far above the hero: more of the climb above than below. */
 const FOLLOW_ABOVE = 48;
 const PAN_MS = 600;
-/** After the star, a new tower in the same mode. The result screen goes here. */
-const NEXT_TOWER_MS = 2000;
+/** After the star, the result screen. */
+const RESULT_DELAY_MS = 2000;
 const DEPTH_BLOCK = 5;
 const DEPTH_STAR = 6;
 const DEPTH_PLAYER = 10;
@@ -94,13 +88,12 @@ interface BlockView {
  * createBodyMover), which reports the row a head hit for the climb to pick the letter; the
  * same fixed 60Hz step as SliceScene; a camera that follows the hero inside the current
  * storey's bounds and pans to the next; and the climb's cues, played: sounds, buzzes, the
- * voice and the effects.
+ * voice and the effects. The star ends it, and the result screen follows.
  *
  * Back goes to the learn menu (game/navigation.ts: `learnletters` is not pausable).
  */
 export class LearnTowerScene extends Phaser.Scene {
-  private mode: LearnMode = 'letters';
-  private used: string[] = [];
+  private session: LearnSession = { mode: 'letters', used: [], score: 0 };
   private character: Character = 'gigi';
   private skin = 0;
   private climb!: Climb;
@@ -126,9 +119,10 @@ export class LearnTowerScene extends Phaser.Scene {
     super(LEARN_TOWER_SCENE_KEY);
   }
 
-  init(data: LearnTowerData): void {
-    this.mode = data?.mode ?? 'letters';
-    this.used = data?.used ?? [];
+  init(data: Partial<LearnSession>): void {
+    // The learn menu starts a session and the result screen carries it on. Started bare, from
+    // a console, a tower is a letters one.
+    this.session = { mode: data?.mode ?? 'letters', used: data?.used ?? [], score: data?.score ?? 0 };
     this.blocks = [];
     this.viewStorey = 0;
     this.accumulator = 0;
@@ -142,7 +136,7 @@ export class LearnTowerScene extends Phaser.Scene {
 
     this.character = getSelectedChar();
     this.skin = getSkinIndex(this.character);
-    this.climb = createClimb(this.mode, this.used, this.character);
+    this.climb = createClimb(this.session.mode, this.session.used, this.character);
 
     this.layer = this.buildLayer();
     // The side walls are world edges too: above the last storey they stand only BATTLEMENTS
@@ -311,11 +305,16 @@ export class LearnTowerScene extends Phaser.Scene {
         if (event.storey !== this.viewStorey) this.panToStorey(event.storey);
         return;
       case 'finished':
+        this.session.score += this.climb.score;
         this.tweens.killTweensOf(this.star);
         this.confetti.explode(CONFETTI, this.star.x, this.star.y);
         this.tweens.add({ targets: this.star, scale: POP_SCALE, alpha: 0, duration: POP_MS });
-        this.time.delayedCall(NEXT_TOWER_MS, () => {
-          this.scene.restart({ mode: this.mode, used: this.used } satisfies LearnTowerData);
+        this.time.delayedCall(RESULT_DELAY_MS, () => {
+          this.scene.start(LEARN_RESULT_SCENE_KEY, {
+            session: this.session,
+            found: this.climb.layout.storeys.map((st) => st.target),
+            word: this.climb.layout.word,
+          } satisfies LearnResultData);
         });
         return;
       default:

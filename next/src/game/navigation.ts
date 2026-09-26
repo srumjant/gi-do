@@ -34,11 +34,9 @@
  * The live `gameState` values, all sixteen — exactly the set `testBackNav` calls `ALL`
  * (index.html:3233-3235).
  *
- * Three of them have no scene in this port: `intro` and `debug` are not ported, and
- * `learnresult` arrives with the learn tower's second plan. They are in the union anyway,
- * because the TABLE is what is being ported and a half-copied table is the thing the live
- * comment warns about. Their rows cost nothing and they are already correct for the plan
- * that adds the screens.
+ * Two of them have no scene in this port: `intro` and `debug` are not ported. They are in
+ * the union anyway, because the TABLE is what is being ported and a half-copied table is the
+ * thing the live comment warns about. Their rows cost nothing.
  */
 export type GameState =
   | 'title'

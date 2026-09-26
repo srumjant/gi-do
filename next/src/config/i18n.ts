@@ -101,8 +101,9 @@ export const TRANSLATIONS: Record<string, Entry> = {
   ], en:[
     'YOU CAN\'T CATCH ME!','HEH, TOO SLOW!','TRY AGAIN, LITTLE ONE!','I\'M TOO FAST!','COME AND GET ME!'
   ]},
-  // Learn mode's own words. The live game hardcodes them in Estonian inside drawLearn and
-  // drawLearnMenu (index.html:2890, :2947-2955, :2983-2985); here they have both languages.
+  // Learn mode's own words. The live game hardcodes them in Estonian inside drawLearn,
+  // drawLearnMenu and drawLearnResult (index.html:2890, :2929, :2947-2955, :2983-2985,
+  // :3001-3021); here they have both languages.
   // Three are reworded on purpose: words mode builds its word a gate at a time, so it says
   // "Ehita sõna" and "LEIA TÄHED:" where the live game says "Kirjuta sõna" and "KIRJUTA
   // SÕNA:", and the hint takes mode_hint's shape, with the pad's buttons.
@@ -120,6 +121,11 @@ export const TRANSLATIONS: Record<string, Entry> = {
   learn_find_syllable: {et:'LEIA SILP:',              en:'FIND THE SYLLABLE:'},
   learn_find_letters: {et:'LEIA TÄHED:',              en:'FIND THE LETTERS:'},
   learn_speak:        {et:'🔊 X / {X}',               en:'🔊 X / {X}'},
+  learn_cheers:       {et:['TUBLI!','VÄGA HEA!','SUPER!','SUUREPÄRANE!','FANTASTILINE!'],
+                       en:['WELL DONE!','VERY GOOD!','SUPER!','EXCELLENT!','FANTASTIC!']},
+  learn_found:        {et:'Leitud:',                  en:'Found:'},
+  learn_result_hint:  {et:'Space / {A} uus torn  •  ESC / {B} menüü',
+                       en:'Space / {A} new tower  •  ESC / {B} menu'},
   // Level names
   level_1:            {et:'Nukuaed',                  en:'Doll Garden'},
   level_2:            {et:'Dinosauruse kanjon',       en:'Dinosaur Canyon'},

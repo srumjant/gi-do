@@ -1,6 +1,19 @@
 import type { BodyMover } from '../player';
+import type { LearnMode } from './content';
 import type { EffectCue, PlayerState, RumbleCue } from '../types';
 import type { TowerLayout } from './tower';
+
+/**
+ * One sitting at the learn tower, from the learn menu's confirm until back: the exercise,
+ * what it has asked (the same array from tower to tower, emptied by pickTargets when a round
+ * ends), and the score, which adds up tower after tower as the live `learn.score` does
+ * (index.html:2650).
+ */
+export interface LearnSession {
+  mode: LearnMode;
+  used: string[];
+  score: number;
+}
 
 /** A map cell: column and row of the tower's map. */
 export interface Cell {

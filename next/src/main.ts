@@ -10,6 +10,7 @@ import { GameOverScene } from './scenes/GameOverScene';
 import { HudScene } from './scenes/HudScene';
 import { LearnMenuScene } from './scenes/LearnMenuScene';
 import { LearnHudScene } from './scenes/LearnHudScene';
+import { LearnResultScene } from './scenes/LearnResultScene';
 import { LearnTowerScene } from './scenes/LearnTowerScene';
 import { LevelOverlayScene } from './scenes/LevelOverlayScene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
@@ -103,6 +104,7 @@ const game = new Phaser.Game({
     LearnMenuScene,
     LearnTowerScene,
     LearnHudScene,
+    LearnResultScene,
     DifficultyScene,
     CharacterScene,
     SliceScene,

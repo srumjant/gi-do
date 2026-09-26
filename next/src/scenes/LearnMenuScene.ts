@@ -3,13 +3,13 @@ import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import type { LearnMode } from '../game/learn/content';
+import type { LearnSession } from '../game/learn/types';
 import { clampIndex } from '../game/menu';
 import { getSkinIndex } from '../game/run';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
 import { registerScaledPlayerTextures, scaledPlayerTextureKey } from '../gfx/textures';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
 import { LEARN_MENU_SCENE_KEY, LEARN_TOWER_SCENE_KEY } from './keys';
-import type { LearnTowerData } from './LearnTowerScene';
 import { takeBack } from './navigate';
 
 /** index.html:2941-2943: the learn menu's night blue and its twinkling stars. */
@@ -155,7 +155,7 @@ export class LearnMenuScene extends Phaser.Scene {
     // index.html:2648-2654. No sound: the live confirm is silent.
     if (pressedAny(this.keys.confirm, this.keys.enter)) {
       this.leaving = true;
-      this.scene.start(LEARN_TOWER_SCENE_KEY, { mode: this.cards[this.index].mode, used: [] } satisfies LearnTowerData);
+      this.scene.start(LEARN_TOWER_SCENE_KEY, { mode: this.cards[this.index].mode, used: [], score: 0 } satisfies LearnSession);
       return;
     }
     if (justDown(this.keys.back)) {

@@ -16,8 +16,8 @@ const legacy = loadLegacySection({
  * below stays a parity check.
  *
  * The `learn_*` keys are learn mode's own words. The live game hardcodes them in Estonian
- * inside drawLearn and drawLearnMenu rather than keeping them in TRANSLATIONS, so the port's
- * versions are new keys with both languages.
+ * inside drawLearn, drawLearnMenu and drawLearnResult rather than keeping them in
+ * TRANSLATIONS, so the port's versions are new keys with both languages.
  *
  * An unlisted extra key fails the same assertion a missing live key does, which is the point
  * — the list is a short, deliberate exception, not a hole.
@@ -29,7 +29,7 @@ const PORT_ONLY_KEYS = [
   'learn_words', 'learn_words_d',
   'learn_menu_hint',
   'learn_find_letter', 'learn_find_syllable', 'learn_find_letters',
-  'learn_speak',
+  'learn_speak', 'learn_cheers', 'learn_found', 'learn_result_hint',
 ];
 
 describe('translations match the live game', () => {
