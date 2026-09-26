@@ -4,6 +4,7 @@ import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
 import { clampIndex } from '../game/menu';
 import { MODE_ADVENTURE } from '../game/navigation';
+import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
 import { MODE_SELECT_SCENE_KEY, PAUSE_SCENE_KEY, TITLE_SCENE_KEY } from './keys';
 import type { ModeSelectData } from './ModeSelectScene';
@@ -29,7 +30,7 @@ const WASH_ALPHA = 0.72;
 /** index.html:1906. */
 const TITLE_Y = 90;
 const TITLE_FONT = {
-  fontFamily: 'monospace', fontSize: '26px', fontStyle: 'bold', color: '#ffdd00',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '26px', color: '#ffdd00',
 };
 
 /** index.html:1909-1911. Three buttons in a row, the row centred. */
@@ -42,7 +43,7 @@ const ROW_W = BUTTON_COUNT * BUTTON_W + (BUTTON_COUNT - 1) * BUTTON_GAP;
 const ROW_X = (BASE_W - ROW_W) / 2;
 /** :1923. The label sits 33 below the button's top edge, on its baseline. */
 const LABEL_DY = 33;
-const LABEL_FONT = { fontFamily: 'monospace', fontSize: '15px', fontStyle: 'bold' };
+const LABEL_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '15px' };
 
 /** :1914-1921. The chosen button is green and lit; the others are barely there. */
 const CHOSEN_FILL = 0x88ff88;
@@ -56,7 +57,7 @@ const PLAIN_COLOR = '#cccccc';
 
 /** :1927. */
 const HINT_Y = BASE_H - 40;
-const HINT_FONT = { fontFamily: 'monospace', fontSize: '12px', color: '#aaddcc' };
+const HINT_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#aaddcc' };
 
 /** The three buttons, in the order the live game lays them out (index.html:1908, :1288-1290). */
 const CONTINUE = 0;

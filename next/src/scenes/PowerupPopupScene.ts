@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { BASE_H, BASE_W } from '../config/constants';
+import { capitals } from '../config/i18n';
 import { powerupLabel } from '../data/powerups';
 import type { PowerupType, World } from '../game/types';
+import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { popupFrame, popupSparks } from '../gfx/powerupPopup';
 import { POWERUP_POPUP_SCENE_KEY } from './keys';
 
@@ -23,8 +25,8 @@ const NAME_DY = 15;
 const DESC_DY = 35;
 
 const ICON_FONT = { fontFamily: 'serif', fontSize: '36px', color: '#ffffff' };
-const NAME_FONT = { fontFamily: 'monospace', fontSize: '20px', fontStyle: 'bold' };
-const DESC_FONT = { fontFamily: 'monospace', fontSize: '12px', color: '#ffffff' };
+const NAME_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '20px' };
+const DESC_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#ffffff' };
 
 /** :3148 and :3159 — the screen dim and the box are both black, at different alphas. */
 const BLACK = 0x000000;
@@ -180,8 +182,8 @@ export class PowerupPopupScene extends Phaser.Scene {
     this.color = Phaser.Display.Color.HexStringToColor(label.color).color;
     this.iconText.setText(label.icon);
     // :3170. The name is in the power-up's colour; the description stays white.
-    this.nameText.setText(label.name).setColor(label.color);
-    this.descText.setText(label.desc);
+    this.nameText.setText(capitals(label.name)).setColor(label.color);
+    this.descText.setText(capitals(label.desc));
   }
 
   private hide(): void {

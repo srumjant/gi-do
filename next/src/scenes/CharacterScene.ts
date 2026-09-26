@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
 import { BASE_W } from '../config/constants';
-import { TStr } from '../config/i18n';
+import { capitals, TStr } from '../config/i18n';
 import type { Character } from '../game/player';
 import { characterAt, characterName, siblingOf, wrapIndex } from '../game/menu';
 import { getSkinIndex, setSelectedChar, setSkinIndex, skinsOf, startRun } from '../game/run';
+import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
 import { menuPlayerTextureKey, MENU_PORTRAIT_SCALE, registerMenuTextures } from '../gfx/textures';
 import { bindMenuKeys, type MenuKeys, justDown, pressedAny } from '../input/menuKeys';
@@ -22,7 +23,7 @@ const STARS: StarFieldSpec = {
 
 /** index.html:2154. */
 const TITLE_Y = 60;
-const TITLE_FONT = { fontFamily: 'monospace', fontSize: '28px', fontStyle: 'bold', color: '#ffdd00' };
+const TITLE_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '28px', color: '#ffdd00' };
 
 /**
  * The two panels (index.html:2155-2164). `x` is each panel's anchor, the live `gx`/`dx`,
@@ -65,14 +66,15 @@ const LABEL_DX = 40;
 const NAME_DY = 175;
 const SKIN_DY = 192;
 
-const NAME_FONT = { fontFamily: 'monospace', fontSize: '16px', fontStyle: 'bold', color: '#ffffff' };
-const SKIN_FONT = { fontFamily: 'monospace', fontSize: '9px', color: '#aaaaaa' };
+const NAME_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '16px', color: '#ffffff' };
+/** 11px where the live game has 9: too small to read. */
+const SKIN_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '11px', color: '#aaaaaa' };
 
 /** index.html:2165-2166. */
 const HINT_Y = 350;
 const RESCUE_Y = 375;
-const HINT_FONT = { fontFamily: 'monospace', fontSize: '12px', color: '#aaaacc' };
-const RESCUE_FONT = { fontFamily: 'monospace', fontSize: '12px', color: '#ffaacc' };
+const HINT_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#aaaacc' };
+const RESCUE_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#ffaacc' };
 
 /**
  * Choose your hero. Port of `drawSelect` (index.html:2151-2168) and the input that
@@ -216,11 +218,11 @@ export class CharacterScene extends Phaser.Scene {
     PANELS.forEach((p, i) => {
       this.portraits[i].setTexture(this.portraitKey(p.character));
       const chosen = i === this.index;
-      this.skinLabels[i].setVisible(chosen).setText(chosen ? `↑↓ ${skinName(p.character)}` : '');
+      this.skinLabels[i].setVisible(chosen).setText(chosen ? `↑↓ ${capitals(skinName(p.character))}` : '');
     });
 
     // index.html:2166. Whoever you are NOT is the one in the cage.
-    this.rescueText.setText(`${TStr('rescue')} ${characterName(siblingOf(this.chosen()))}!`);
+    this.rescueText.setText(`${TStr('rescue')} ${capitals(characterName(siblingOf(this.chosen())))}!`);
   }
 }
 

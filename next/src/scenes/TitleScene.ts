@@ -7,6 +7,7 @@ import { BGM_TITLE } from '../data/bgmThemes';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { MODE_ADVENTURE } from '../game/navigation';
 import { getSkinIndex } from '../game/run';
+import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION, preloadGameFont } from '../gfx/gameFont';
 import {
   cloudTextureKey,
   registerScaledPlayerTextures,
@@ -41,19 +42,19 @@ const WORLDS_Y = 172;
 const CONTROLS_Y = 195;
 const MODES_Y = 210;
 const TITLE_FONT = {
-  fontFamily: 'monospace', fontSize: '36px', fontStyle: 'bold', color: '#e03030',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '36px', color: '#e03030',
 };
-const SUBTITLE_FONT = { fontFamily: 'monospace', fontSize: '14px', color: '#ffffff' };
-const WORLDS_FONT = { fontFamily: 'monospace', fontSize: '11px', color: '#dddddd' };
-const CONTROLS_FONT = { fontFamily: 'monospace', fontSize: '10px', color: '#333333' };
+const SUBTITLE_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '14px', color: '#ffffff' };
+const WORLDS_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '11px', color: '#dddddd' };
+const CONTROLS_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#333333' };
 const MODES_FONT = {
-  fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#64ff96',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#64ff96',
 };
 
 /** index.html:1955. The one that blinks, and the reason the screen does not look frozen. */
 const START_Y = BASE_H - 15;
 const START_FONT = {
-  fontFamily: 'monospace', fontSize: '16px', fontStyle: 'bold', color: '#ffdd00',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '16px', color: '#ffdd00',
 };
 /** `Math.floor(animFrame/30)%2===0` — half a second on, half a second off. */
 const BLINK_FRAMES = 30;
@@ -143,6 +144,11 @@ export class TitleScene extends Phaser.Scene {
 
   constructor() {
     super(TITLE_SCENE_KEY);
+  }
+
+  /** The game's font, for this screen and every one after it (gfx/gameFont.ts). */
+  preload(): void {
+    preloadGameFont(this);
   }
 
   create(): void {

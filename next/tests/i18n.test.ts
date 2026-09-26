@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { loadLegacySection } from './helpers/legacy';
 import {
-  TRANSLATIONS, LANG_KEYS, T, TDiff, getLang, setLang, setGlyphResolver,
+  TRANSLATIONS, LANG_KEYS, T, TDiff, capitals, getLang, setLang, setGlyphResolver,
 } from '../src/config/i18n';
 
 const legacy = loadLegacySection({
@@ -65,13 +65,13 @@ describe('T()', () => {
   });
 
   it('returns the Estonian string by default', () => {
-    expect(T('score')).toBe(legacy.TRANSLATIONS.score.et);
+    expect(T('score')).toBe(capitals(legacy.TRANSLATIONS.score.et as string));
   });
 
   it('follows the selected language', () => {
     setLang('en');
     expect(getLang()).toBe('en');
-    expect(T('score')).toBe(legacy.TRANSLATIONS.score.en);
+    expect(T('score')).toBe(capitals(legacy.TRANSLATIONS.score.en as string));
   });
 
   it('falls back to the key when it is unknown', () => {
@@ -80,10 +80,10 @@ describe('T()', () => {
 
   // Commit 8354ea0: glyph substitution must not run on a phrase array, because
   // indexOf('{') on an array compares whole elements and silently misbehaves.
-  it('returns phrase arrays untouched', () => {
+  it('returns phrase arrays with no placeholder substituted', () => {
     const phrases = T('dino_phrases');
     expect(Array.isArray(phrases)).toBe(true);
-    expect(phrases).toEqual(legacy.TRANSLATIONS.dino_phrases.et);
+    expect(phrases).toEqual((legacy.TRANSLATIONS.dino_phrases.et as string[]).map(capitals));
   });
 
   // The live game substitutes by ACTION, not by letter: {A} resolves through
@@ -92,12 +92,26 @@ describe('T()', () => {
     setGlyphResolver((action) => `[${action}]`);
     const raw = legacy.TRANSLATIONS.press_start.et as string;
     expect(raw).toContain('{A}');
-    expect(T('press_start')).toBe(raw.replace('{A}', '[confirm]'));
+    expect(T('press_start')).toBe(capitals(raw.replace('{A}', '[confirm]')));
   });
 
   it('leaves strings without a placeholder alone', () => {
     setGlyphResolver(() => 'SHOULD NOT APPEAR');
-    expect(T('score')).toBe(legacy.TRANSLATIONS.score.et);
+    expect(T('score')).toBe(capitals(legacy.TRANSLATIONS.score.et as string));
+  });
+
+  // The owner's call, for children who read capital letters first: the table keeps the live
+  // game's spelling (the parity tests above), and T shows all of it in capitals.
+  it('shows every string in capitals, in both languages', () => {
+    for (const language of LANG_KEYS) {
+      setLang(language);
+      for (const key of Object.keys(TRANSLATIONS)) {
+        const shown = T(key);
+        for (const text of typeof shown === 'string' ? [shown] : shown) {
+          expect(text, `${language} ${key}`).not.toMatch(/\p{Ll}/u);
+        }
+      }
+    }
   });
 });
 
@@ -108,12 +122,12 @@ describe('TDiff()', () => {
 
   it('returns the live game\'s label for every difficulty', () => {
     for (const key of ['super_easy', 'easy', 'normal', 'hard']) {
-      expect(TDiff(key)).toBe(legacy.TRANSLATIONS[key].et);
+      expect(TDiff(key)).toBe(capitals(legacy.TRANSLATIONS[key].et as string));
     }
   });
 
   it('follows the selected language', () => {
     setLang('en');
-    expect(TDiff('normal')).toBe(legacy.TRANSLATIONS.normal.en);
+    expect(TDiff('normal')).toBe(capitals(legacy.TRANSLATIONS.normal.en as string));
   });
 });

@@ -6,7 +6,7 @@ import type { LearnMode } from '../game/learn/content';
 import type { LearnSession } from '../game/learn/types';
 import { clampIndex } from '../game/menu';
 import { getSkinIndex } from '../game/run';
-import { LEARN_FONT, LEARN_FONT_BOLD, LEARN_TEXT_RESOLUTION, preloadLearnFont } from '../gfx/learnFont';
+import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
 import { registerScaledPlayerTextures, scaledPlayerTextureKey } from '../gfx/textures';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
@@ -70,17 +70,17 @@ const BOB_AMPLITUDE = 3;
 const HINT_Y = 350;
 
 /**
- * Learn mode's own face (gfx/learnFont.ts), where the live menu is monospace: the sample
- * letters here are the shapes the tower asks for.
+ * The game's face (gfx/gameFont.ts), where the live menu is monospace: the sample letters
+ * here are the shapes the tower asks for.
  */
-const TEXT = { resolution: LEARN_TEXT_RESOLUTION };
-const TITLE_FONT = { ...TEXT, fontFamily: LEARN_FONT_BOLD, fontSize: '30px', color: '#88ff88' };
-const SUBTITLE_FONT = { ...TEXT, fontFamily: LEARN_FONT, fontSize: '14px', color: '#aaddcc' };
-const LABEL_FONT = { ...TEXT, fontFamily: LEARN_FONT_BOLD, fontSize: '18px' };
-const SAMPLE_FONT = { ...TEXT, fontFamily: LEARN_FONT_BOLD, fontSize: '24px', color: '#ffffff' };
+const TEXT = { resolution: GAME_TEXT_RESOLUTION };
+const TITLE_FONT = { ...TEXT, fontFamily: GAME_FONT_BOLD, fontSize: '30px', color: '#88ff88' };
+const SUBTITLE_FONT = { ...TEXT, fontFamily: GAME_FONT, fontSize: '14px', color: '#aaddcc' };
+const LABEL_FONT = { ...TEXT, fontFamily: GAME_FONT_BOLD, fontSize: '18px' };
+const SAMPLE_FONT = { ...TEXT, fontFamily: GAME_FONT_BOLD, fontSize: '24px', color: '#ffffff' };
 /** 12px where the live menu has 10: the one size too small to read comfortably. */
-const DESC_FONT = { ...TEXT, fontFamily: LEARN_FONT, fontSize: '12px', color: '#aaaaaa' };
-const HINT_FONT = { ...TEXT, fontFamily: LEARN_FONT, fontSize: '12px', color: '#aaddcc' };
+const DESC_FONT = { ...TEXT, fontFamily: GAME_FONT, fontSize: '12px', color: '#aaaaaa' };
+const HINT_FONT = { ...TEXT, fontFamily: GAME_FONT, fontSize: '12px', color: '#aaddcc' };
 
 function cardX(i: number): number {
   return CARD_START_X + i * (CARD_W + CARD_GAP);
@@ -108,10 +108,6 @@ export class LearnMenuScene extends Phaser.Scene {
 
   constructor() {
     super(LEARN_MENU_SCENE_KEY);
-  }
-
-  preload(): void {
-    preloadLearnFont(this);
   }
 
   create(): void {

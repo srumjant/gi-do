@@ -4,7 +4,7 @@ import { TStr } from '../config/i18n';
 import type { LearnMode } from '../game/learn/content';
 import { LEARN_HUD_H } from '../game/learn/tower';
 import type { Climb } from '../game/learn/types';
-import { LEARN_FONT_BOLD, LEARN_TEXT_RESOLUTION, preloadLearnFont } from '../gfx/learnFont';
+import { GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { LEARN_HUD_STAR_TEXTURE, registerTextures } from '../gfx/textures';
 import { LEARN_HUD_SCENE_KEY } from './keys';
 
@@ -18,9 +18,9 @@ const PROMPT: Record<LearnMode, string> = {
   syllables: 'learn_find_syllable',
   words: 'learn_find_letters',
 };
-const PROMPT_FONT = { fontFamily: LEARN_FONT_BOLD, fontSize: '12px', color: '#ffdd00', resolution: LEARN_TEXT_RESOLUTION };
-const TARGET_FONT = { fontFamily: LEARN_FONT_BOLD, fontSize: '26px', color: '#ffffff', resolution: LEARN_TEXT_RESOLUTION };
-const SPEAK_FONT = { fontFamily: LEARN_FONT_BOLD, fontSize: '12px', color: '#aaddff', resolution: LEARN_TEXT_RESOLUTION };
+const PROMPT_FONT = { fontFamily: GAME_FONT_BOLD, fontSize: '12px', color: '#ffdd00', resolution: GAME_TEXT_RESOLUTION };
+const TARGET_FONT = { fontFamily: GAME_FONT_BOLD, fontSize: '26px', color: '#ffffff', resolution: GAME_TEXT_RESOLUTION };
+const SPEAK_FONT = { fontFamily: GAME_FONT_BOLD, fontSize: '12px', color: '#aaddff', resolution: GAME_TEXT_RESOLUTION };
 /** Where the prompt's and the target's baselines sit in the band. */
 const PROMPT_BOTTOM = 16;
 const TARGET_BOTTOM = 44;
@@ -74,10 +74,6 @@ export class LearnHudScene extends Phaser.Scene {
     this.shown = '';
     this.stars = [];
     this.sent = 0;
-  }
-
-  preload(): void {
-    preloadLearnFont(this);
   }
 
   create(): void {

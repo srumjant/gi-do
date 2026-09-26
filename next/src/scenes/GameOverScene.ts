@@ -4,6 +4,7 @@ import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
 import { BGM_GAMEOVER } from '../data/bgmThemes';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
+import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { bindMenuKeys, type MenuKeys, justDown } from '../input/menuKeys';
 import { GAME_OVER_SCENE_KEY, TITLE_SCENE_KEY } from './keys';
 import { takeBack } from './navigate';
@@ -27,10 +28,10 @@ const SCORE_DY = 20;
 const HINT_DY = 50;
 
 const TITLE_FONT = {
-  fontFamily: 'monospace', fontSize: '32px', fontStyle: 'bold', color: '#ff3333',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '32px', color: '#ff3333',
 };
-const SCORE_FONT = { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' };
-const HINT_FONT = { fontFamily: 'monospace', fontSize: '12px', color: '#ffffff' };
+const SCORE_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '16px', color: '#ffffff' };
+const HINT_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#ffffff' };
 
 /**
  * Out of lives. Port of `drawGameOver` (index.html:2441-2445) and the state that runs it

@@ -15,6 +15,7 @@ import {
   type Kidnapper,
   kidnapperIndex,
 } from '../game/run';
+import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import {
   KIDNAPPER_SCALE,
   kidnapperTextureKey,
@@ -72,27 +73,27 @@ const CUTSCENE_SCALE = 3;
 const CARRIED_SCALE = 2;
 
 const HEART_FONT = {
-  fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#ff69b4',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#ff69b4',
 };
 const CONFUSED_FONT = {
-  fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#ff3333',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#ff3333',
 };
 const OH_NO_FONT = {
-  fontFamily: 'monospace', fontSize: '14px', fontStyle: 'bold', color: '#ff3333',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '14px', color: '#ff3333',
 };
 const HELP_FONT = {
-  fontFamily: 'monospace', fontSize: '10px', fontStyle: 'bold', color: '#3388ff',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#3388ff',
 };
-const BUBBLE_FONT = { fontFamily: 'monospace', fontSize: '10px', fontStyle: 'bold' };
-const HINT_FONT = { fontFamily: 'monospace', fontSize: '10px', color: '#ffffff' };
+const BUBBLE_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px' };
+const HINT_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#ffffff' };
 /** Both headline lines are black-outlined; the thickness is the live `ctx.lineWidth` (:2358). */
 const HEADLINE_STROKE = { stroke: '#000000', strokeThickness: 3 };
 const HEADLINE_FONT = {
-  fontFamily: 'monospace', fontSize: '28px', fontStyle: 'bold', color: '#ff3333',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '28px', color: '#ff3333',
   ...HEADLINE_STROKE,
 };
 const SUBHEAD_FONT = {
-  fontFamily: 'monospace', fontSize: '16px', fontStyle: 'bold', color: '#ffdd00',
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '16px', color: '#ffdd00',
   ...HEADLINE_STROKE,
 };
 

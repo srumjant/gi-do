@@ -174,21 +174,32 @@ export function setGlyphResolver(fn: (action: GlyphAction) => string): void {
   glyphFor = fn;
 }
 
+/**
+ * How every string is shown: in capitals, the letters the children this is for read first
+ * (the owner's call; the live game mixes cases). T applies it to everything it returns, and
+ * scenes apply it to the little they show that is not a translation (a hero's name, a skin's).
+ * The table above keeps the live game's own spelling, so the parity test still compares like
+ * with like.
+ */
+export function capitals(text: string): string {
+  return text.toUpperCase();
+}
+
 export function T(key: string): Phrase {
   const entry = TRANSLATIONS[key];
   if (!entry) return key;
 
   const value = entry[lang] ?? entry.en ?? key;
 
-  // Only strings get glyph substitution. A phrase array must come back untouched —
+  // Only strings get glyph substitution. A phrase array is never searched for placeholders —
   // indexOf('{') on an array compares whole elements, which is the bug 8354ea0 fixed.
-  if (typeof value !== 'string') return value;
-  if (value.indexOf('{') < 0) return value;
+  if (typeof value !== 'string') return value.map(capitals);
+  if (value.indexOf('{') < 0) return capitals(value);
 
-  return value.replace(/\{([ABXP])\}/g, (whole, letter: string) => {
+  return capitals(value.replace(/\{([ABXP])\}/g, (whole, letter: string) => {
     const action = GLYPH_ACTIONS[letter];
     return action ? glyphFor(action) : whole;
-  });
+  }));
 }
 
 /** Convenience for the common case where the caller knows the value is a string. */
