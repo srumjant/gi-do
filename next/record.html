@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gigi &amp; Dodo: voice recorder</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #1a2a4a; color: #fff; font-family: system-ui, sans-serif; }
+    #app { max-width: 900px; margin: 0 auto; padding: 24px 16px; box-sizing: border-box; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .help { color: #aaddff; margin: 0 0 20px; line-height: 1.5; }
+    .help kbd { background: #2a3a5a; border-radius: 4px; padding: 1px 6px; font-family: inherit; }
+    .card { background: #2a3a5a; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 20px; }
+    .item { font-size: 120px; font-weight: 700; line-height: 1.1; min-height: 132px; }
+    .hint { color: #ffdd00; font-size: 18px; margin-top: 8px; }
+    .status { margin-top: 16px; font-size: 18px; min-height: 24px; }
+    .status.recording { color: #ff6666; font-weight: 700; }
+    .progress { color: #aaddff; margin-top: 8px; }
+    .grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    .grid button { font: inherit; font-size: 15px; min-width: 44px; padding: 6px 8px; border-radius: 6px; border: 2px solid transparent;
+      background: #2a3a5a; color: #fff; cursor: pointer; }
+    .grid button.done { background: #2f6b3a; }
+    .grid button.current { border-color: #ffdd00; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/tools/recorder.ts"></script>
+</body>
+</html>

@@ -2,13 +2,7 @@ import { STEP_HZ } from '../../config/constants';
 import type { LearnMode } from './content';
 import type { TowerLayout } from './tower';
 import type { Climb } from './types';
-
-/**
- * The voice's cheers, in Estonian like everything it says: one for each gate, in this order,
- * and the last for the star, so each tower ends on its biggest. The result screen shows the
- * same five as text, in the UI language (config/i18n.ts's `learn_cheers`).
- */
-export const LEARN_CHEERS: readonly string[] = ['Tubli!', 'Väga hea!', 'Super!', 'Suurepärane!', 'Fantastiline!'];
+import { LEARN_CHEERS } from './voiceClips';
 
 /** How long the voice stays quiet before saying the target again on reaching a letter floor: 4 seconds. */
 export const REPEAT_GAP = 4 * STEP_HZ;
