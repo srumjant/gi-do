@@ -66,6 +66,18 @@ export function planSprite(sprite: SpriteData, palette: Palette, scale: number):
 }
 
 /**
+ * The scale a sprite is painted into its texture at: a whole scale as it is, and a fraction
+ * (an enemy's 1.8, a star's 1.5) at one pixel a cell, for the image to scale up instead
+ * (textures.ts's `spriteScale`). Painted at 1.8 pixels a cell, every cell's edge falls
+ * between two pixels, and the canvas softens each edge into a faint see-through seam: a
+ * dark grid round every cell once the camera magnifies the texture. A whole scale puts every
+ * edge on a pixel, which is why the player never had it.
+ */
+export function bakeScale(scale: number): number {
+  return Number.isInteger(scale) ? scale : 1;
+}
+
+/**
  * Paints a `planSprite` plan onto a fresh canvas. The only impure part of this
  * module, and the reason the whole file needs a browser: `document.createElement`
  * does not exist under Vitest's `node` test environment. Not unit tested for that

@@ -19,7 +19,7 @@ import {
 } from '../data/sprites';
 import type { Character } from '../game/player';
 import { CHARACTERS, getEnemySpriteInfo, skinsOf } from '../game/run';
-import { rasterise } from './rasterise';
+import { bakeScale, rasterise } from './rasterise';
 
 /**
  * Registers every sprite this plan draws as a named Phaser texture, once, at boot.
@@ -59,6 +59,10 @@ export function registerTextures(scene: Phaser.Scene): void {
  * per-game and holds what it is given for the life of the game, so the second call has
  * nothing to do — and `addCanvas` on a key in use does not merely no-op, it logs an error
  * and returns null, which is six screenfuls of red on a run through to the end.
+ *
+ * A fractional scale is baked at one pixel a cell (rasterise.ts's `bakeScale`, which says
+ * why), and what is left of it goes on the texture, in Phaser's own `customData`, for the
+ * image that draws it to scale by: see `spriteScale` below.
  */
 function addSprite(
   scene: Phaser.Scene,
@@ -68,7 +72,23 @@ function addSprite(
   scale: number,
 ): void {
   if (scene.textures.exists(key)) return;
-  scene.textures.addCanvas(key, rasterise(sprite, palette, scale));
+  const bake = bakeScale(scale);
+  const texture = scene.textures.addCanvas(key, rasterise(sprite, palette, bake));
+  if (texture) (texture.customData as BakedSprite).drawScale = scale / bake;
+}
+
+/** What `addSprite` leaves on a texture it bakes. */
+interface BakedSprite {
+  drawScale?: number;
+}
+
+/**
+ * The scale an image draws its sprite texture at: 1 for a sprite baked at its own whole
+ * scale, and the sprite's scale for one baked at a pixel a cell (see `addSprite`). Ask again
+ * after every `setTexture`: a pooled image can swap between the two kinds.
+ */
+export function spriteScale(image: Phaser.GameObjects.Image): number {
+  return (image.texture.customData as BakedSprite).drawScale ?? 1;
 }
 
 /** Player and rescue-NPC sprites draw at this scale (index.html:1848). */

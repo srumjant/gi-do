@@ -51,6 +51,7 @@ import {
   PLAYER_SCALE,
   playerTextureKey,
   registerTextures,
+  spriteScale,
   STAR_TEXTURE,
   SUPER_TEXTURE,
 } from '../gfx/textures';
@@ -570,7 +571,8 @@ export class SliceScene extends Phaser.Scene {
    * between an arrow and a chicken).
    */
   private hiddenImage(texture: string, depth: number): Phaser.GameObjects.Image {
-    return this.add.image(0, 0, texture).setOrigin(0, 0).setDepth(depth).setVisible(false);
+    const image = this.add.image(0, 0, texture).setOrigin(0, 0).setDepth(depth).setVisible(false);
+    return image.setScale(spriteScale(image));
   }
 
   /**
@@ -1275,6 +1277,7 @@ export class SliceScene extends Phaser.Scene {
       const texture = arrow.isChicken ? CHICKEN_ARROW_TEXTURE : ARROW_TEXTURE;
       const image = this.pooledImage(this.arrowImages, i, texture, DEPTH_ARROW);
       image.setTexture(texture).setVisible(true).setFlipX(arrow.vx < 0);
+      image.setScale(spriteScale(image));
 
       if (arrow.isChicken) {
         image.setPosition(arrow.x, arrow.y - 4);
@@ -1380,6 +1383,9 @@ export class SliceScene extends Phaser.Scene {
     // creation instead and a converted doll goes on being a doll for ever.
     image.setTexture(enemyTextureKey(enemy.type));
     image.setFlipX(enemy.vx > 0);
+    // Enemies draw at ENEMY_SCALE's 1.8, so their textures are baked a pixel a cell and
+    // scaled here (gfx/rasterise.ts's bakeScale says why).
+    const scale = spriteScale(image);
 
     if (!enemy.alive) {
       if (enemy.squashTimer <= 0) {
@@ -1394,7 +1400,7 @@ export class SliceScene extends Phaser.Scene {
       // `ctx.translate(e.x,e.y+e.h*.7);ctx.scale(1,.3)`.
       image.setVisible(true);
       image.setPosition(enemy.x, enemy.y + enemy.h * 0.7);
-      image.setScale(1, 0.3);
+      image.setScale(scale, scale * 0.3);
       image.setAlpha(enemy.squashTimer / 30);
       return;
     }
@@ -1405,7 +1411,7 @@ export class SliceScene extends Phaser.Scene {
     // simulation.
     const wobble = Math.sin(animFrame * 0.15 + enemy.x);
     image.setVisible(true);
-    image.setScale(1, 1);
+    image.setScale(scale);
     // A living GHOST is translucent and breathes (index.html:1761): `.6 + sin(f*.08)*.2`,
     // so it runs between 0.4 and 0.8 and never reaches solid. Off the SHARED animFrame
     // with no per-ghost offset, exactly like its drift, so every ghost on screen pulses

@@ -13,6 +13,7 @@ import {
   HUD_HEART_TEXTURE,
   HUD_SUPER_TEXTURE,
   registerHudTextures,
+  spriteScale,
 } from '../gfx/textures';
 import { HUD_SCENE_KEY } from './keys';
 
@@ -252,7 +253,8 @@ export class HudScene extends Phaser.Scene {
    * TOP-LEFT, and every HUD coordinate below is written as that call's argument.
    */
   private hudImage(texture: string): Phaser.GameObjects.Image {
-    return this.add.image(0, 0, texture).setOrigin(0, 0).setVisible(false);
+    const image = this.add.image(0, 0, texture).setOrigin(0, 0).setVisible(false);
+    return image.setScale(spriteScale(image));
   }
 
   /**
