@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installVoice, pickVoiceFrom, speak, VOICE_PITCH, VOICE_RATE, type VoiceLike } from '../src/audio/voice';
+import { hush, installVoice, pickVoiceFrom, speak, VOICE_PITCH, VOICE_RATE, type VoiceLike } from '../src/audio/voice';
 
 const V = (lang: string): VoiceLike => ({ lang, name: `test-${lang}` });
 
@@ -114,9 +114,15 @@ describe('speaking', () => {
     expect(synth.spoken[0].lang).toBe('fi-FI');
   });
 
+  it('hushes: stops what is being said, and what is waiting', () => {
+    hush();
+    expect(synth.calls).toEqual(['cancel']);
+  });
+
   it('is silent, and does not throw, where there is no speech at all', () => {
     vi.stubGlobal('window', {});
     expect(() => speak('A', 'now')).not.toThrow();
+    expect(() => hush()).not.toThrow();
     expect(synth.calls).toEqual([]);
   });
 });

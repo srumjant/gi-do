@@ -72,3 +72,12 @@ export function speak(text: string, when: 'now' | 'after'): void {
     // Speech is never worth breaking a frame over.
   }
 }
+
+/** Stops whatever is being said, and whatever is waiting: leaving the tower should be quiet. */
+export function hush(): void {
+  try {
+    synth()?.cancel();
+  } catch {
+    // As above.
+  }
+}

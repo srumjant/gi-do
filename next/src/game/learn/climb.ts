@@ -9,6 +9,7 @@ import { rectOverlap } from '../tiles';
 import type { PlayerState } from '../types';
 import { type LearnMode, pickTargets, type Rand } from './content';
 import { closeTrapdoors, feetAbove, headBump, rearmIfStranded } from './gate';
+import { say, speakOnGround, starLine, targetLine } from './speech';
 import { buildTower, starBox, WALL } from './tower';
 import type { Climb, ClimbMove } from './types';
 
@@ -18,7 +19,7 @@ export const LEARN_MOTION: MotionRecord = {
   jumpForce: DIFFICULTY_CONFIG.super_easy.jumpForce,
 };
 
-/** A fresh tower for `mode`, adding what it asks to `used`, with the hero at the door. */
+/** A fresh tower for `mode`, adding what it asks to `used`, with the hero at the door and the voice saying what to find. */
 export function createClimb(mode: LearnMode, used: string[], character: Character, rand: Rand = random): Climb {
   const { targets, word } = pickTargets(mode, used, rand);
   const layout = buildTower(mode, targets, word, rand);
@@ -46,7 +47,7 @@ export function createClimb(mode: LearnMode, used: string[], character: Characte
     bigHeadTimer: 0,
     chickenRayCharges: 0,
   };
-  return {
+  const c: Climb = {
     layout,
     player,
     gates: layout.storeys.map(() => ({ solved: false, armed: true, mistakes: 0, trapdoorOpen: false })),
@@ -58,16 +59,25 @@ export function createClimb(mode: LearnMode, used: string[], character: Characte
     sounds: [],
     rumbles: [],
     events: [],
+    speech: [],
+    steps: 0,
+    lastSpokeAt: 0,
+    announced: 0,
   };
+  say(c, targetLine(layout, 0), 'now');
+  return c;
 }
 
 /**
  * One fixed step of the climb: the adventure's movement, the mover, then the gate rules on
- * what the head hit, the trapdoors, where the hero now stands, the walk cycle and the star.
+ * what the head hit, the trapdoors, where the hero now stands, the voice, the walk cycle and
+ * the star. X asks the voice for the target again, anywhere below the roof.
  */
 export function stepClimb(c: Climb, input: InputState, move: ClimbMove): void {
   if (c.finished) return;
+  c.steps++;
   const p = c.player;
+  if (input.firePressed && c.storey < c.layout.storeys.length) say(c, targetLine(c.layout, c.storey), 'now');
 
   stepMotion(p, input, LEARN_MOTION, c.sounds, { noJumpCut: c.sprung });
   if (c.sprung && p.vy >= 0) c.sprung = false;
@@ -92,9 +102,11 @@ export function stepClimb(c: Climb, input: InputState, move: ClimbMove): void {
   }
 
   closeTrapdoors(c);
+  const groundBefore = c.lastGround;
   trackGround(c);
   rearmIfStranded(c);
   trackStorey(c);
+  speakOnGround(c, groundBefore);
   stepWalkCycle(p);
   checkStar(c);
 }
@@ -125,5 +137,6 @@ function checkStar(c: Climb): void {
   c.finished = true;
   c.score += 100;
   c.sounds.push('win');
+  say(c, starLine(c.layout), 'now');
   c.events.push({ type: 'finished' });
 }

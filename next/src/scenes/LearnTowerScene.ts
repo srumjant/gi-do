@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { playEffect } from '../audio/cues';
+import { hush, speak } from '../audio/voice';
 import { MAX_STEPS_PER_FRAME, STEP_MS, TILE } from '../config/constants';
 import { createClimb, stepClimb } from '../game/learn/climb';
 import type { LearnMode } from '../game/learn/content';
@@ -143,7 +144,10 @@ export class LearnTowerScene extends Phaser.Scene {
     this.backKey = bindBackKey(this, padContextFor('learnletters'));
 
     this.scene.launch(LEARN_HUD_SCENE_KEY, { climb: this.climb } satisfies LearnHudData);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scene.stop(LEARN_HUD_SCENE_KEY));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scene.stop(LEARN_HUD_SCENE_KEY);
+      hush();
+    });
   }
 
   update(_time: number, delta: number): void {
@@ -160,6 +164,7 @@ export class LearnTowerScene extends Phaser.Scene {
       for (const event of this.climb.events.splice(0)) this.apply(event);
       for (const cue of this.climb.sounds.splice(0)) playEffect(cue);
       for (const cue of this.climb.rumbles.splice(0)) padRumble(cue);
+      for (const line of this.climb.speech.splice(0)) speak(line.text, line.when);
       this.accumulator -= STEP_MS;
     }
     this.syncPlayer();

@@ -41,6 +41,12 @@ export type ClimbEvent =
   | { type: 'storey'; storey: number }
   | { type: 'finished' };
 
+/** A line for the voice: 'now' cuts off what is being said, 'after' waits its turn (audio/voice.ts). */
+export interface SpeechCue {
+  text: string;
+  when: 'now' | 'after';
+}
+
 export interface Climb {
   layout: TowerLayout;
   player: PlayerState;
@@ -59,6 +65,14 @@ export interface Climb {
   sounds: EffectCue[];
   rumbles: RumbleCue[];
   events: ClimbEvent[];
+  /** Lines for the voice, in order (game/learn/speech.ts). The scene speaks them and empties the list. */
+  speech: SpeechCue[];
+  /** Steps taken since the tower began: the voice's clock. */
+  steps: number;
+  /** The step the voice was last asked to speak on. */
+  lastSpokeAt: number;
+  /** The highest storey whose target has been said on arrival; the first is said as the tower starts. */
+  announced: number;
 }
 
 /**

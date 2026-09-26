@@ -2,6 +2,7 @@ import { TILE } from '../../config/constants';
 import type { PlayerState } from '../types';
 import { INSIDE, T_BRICK, T_EMPTY, T_LETTER, type TowerLayout, WALL } from './tower';
 import type { RumbleCue } from '../types';
+import { rightLine, say, targetLine } from './speech';
 import type { Cell, Climb } from './types';
 
 /**
@@ -62,9 +63,10 @@ export type BumpOutcome = 'right' | 'wrong' | null;
 
 /**
  * A rising head hit cell `hit`. Counts only for an armed gate, and only if the jump began on
- * that gate's own letter floor. Right: the gate is solved (scoring once) and its trapdoor
- * opens; the caller springs the hero (climb.ts). Wrong: a miss, and after two the right
- * block glows. Returns what happened, or null for a bump that does not count.
+ * that gate's own letter floor. Right: the gate is solved (scoring once), its trapdoor
+ * opens and the voice says the letter and a cheer; the caller springs the hero (climb.ts).
+ * Wrong: a miss, the voice says the target again, and after two misses the right block glows.
+ * Returns what happened, or null for a bump that does not count.
  */
 export function headBump(c: Climb, hit: Cell): BumpOutcome {
   const found = blockAt(c.layout, hit.col, hit.row);
@@ -83,12 +85,14 @@ export function headBump(c: Climb, hit: Cell): BumpOutcome {
     setCells(c, trapdoorCells(c.layout, storey), T_EMPTY);
     c.sounds.push('coin');
     c.rumbles.push(RIGHT_RUMBLE);
+    say(c, rightLine(c.layout, storey), 'now');
     c.events.push({ type: 'bump-right', storey, block });
     return 'right';
   }
   gate.mistakes++;
   c.sounds.push('wrong');
   c.rumbles.push(WRONG_RUMBLE);
+  say(c, targetLine(c.layout, storey), 'now');
   c.events.push({ type: 'bump-wrong', storey, block });
   if (gate.mistakes === 2) {
     c.events.push({ type: 'hint', storey, block: answerIndex(c.layout, storey) });

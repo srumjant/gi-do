@@ -4,40 +4,12 @@ import { createClimb, LEARN_MOTION, stepClimb } from '../src/game/learn/climb';
 import { blockCells, feetAbove, headBump, RIGHT_RUMBLE, trapdoorCells, WRONG_RUMBLE } from '../src/game/learn/gate';
 import { starBox, T_BRICK, T_EMPTY, T_LETTER, WALL } from '../src/game/learn/tower';
 import type { Cell, Climb } from '../src/game/learn/types';
-import { emptyInput, type InputState } from '../src/input/actions';
+import { answerOf, held, idle, run, standUnder, wrongOf } from './helpers/climbs';
 import { seeded } from './helpers/seeded';
 import { towerMove } from './helpers/towerMove';
 
 const climb = (): Climb => createClimb('letters', [], 'gigi', seeded(3));
-const answerOf = (c: Climb, s: number): number => c.layout.storeys[s].blocks.findIndex((b) => b.correct);
-const wrongOf = (c: Climb, s: number): number => c.layout.storeys[s].blocks.findIndex((b) => !b.correct);
-const held = (f: number): InputState => ({ ...emptyInput(), jump: true, jumpPressed: f === 0 });
-const idle = (): InputState => emptyInput();
 const codes = (c: Climb, cells: Cell[]): number[] => cells.map(({ col, row }) => c.layout.map[row][col]);
-
-/** Stands the hero on storey `s`'s letter floor, centred under block `block`. */
-function standUnder(c: Climb, s: number, block: number): void {
-  const st = c.layout.storeys[s];
-  const b = st.blocks[block];
-  const p = c.player;
-  p.x = (b.col + WALL) * TILE + (b.width * TILE - p.w) / 2;
-  p.y = st.letterFloorRow * TILE - p.h;
-  p.vx = 0;
-  p.vy = 0;
-  p.onGround = true;
-  c.storey = s;
-  c.lastGround = s;
-}
-
-/** Steps until `until` holds (true) or the frames run out (false). */
-function run(c: Climb, frames: number, input: (f: number) => InputState, until: () => boolean): boolean {
-  const move = towerMove(c.layout.map);
-  for (let f = 0; f < frames; f++) {
-    stepClimb(c, input(f), move);
-    if (until()) return true;
-  }
-  return false;
-}
 
 describe('a letter gate', () => {
   it('opens the trapdoor, springs you and scores for the right letter', () => {
