@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import andikaBoldUrl from '../assets/fonts/Andika-Bold.woff2?url';
 import andikaRegularUrl from '../assets/fonts/Andika-Regular.woff2?url';
+import { ZOOM } from '../config/constants';
 import { RENDER_SCALE } from './render';
 
 /**
@@ -32,6 +33,9 @@ export const GAME_FONT_BOLD = `${BOLD}, ${FALLBACK}`;
  * world camera's zoom.
  */
 export const GAME_TEXT_RESOLUTION = RENDER_SCALE;
+
+/** Text in the adventure's world, which its camera zooms by ZOOM: drawn that much denser to land 1:1. */
+export const WORLD_TEXT_RESOLUTION = GAME_TEXT_RESOLUTION * ZOOM;
 
 /** A face already added to the page's fonts: Phaser's font loader keeps no cache to ask. */
 function loaded(family: string): boolean {

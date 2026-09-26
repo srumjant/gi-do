@@ -92,7 +92,7 @@ const LEVEL_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fo
 const CAT_COUNT_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '8px', color: '#ffffff' };
 const BOW_COUNT_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#ffffff' };
 /** The three power-up glyphs are emoji in `14px serif` (index.html:1865-1867). */
-const POWERUP_ICON_FONT = { fontFamily: 'serif', fontSize: '14px' };
+const POWERUP_ICON_FONT = { fontFamily: 'serif', resolution: GAME_TEXT_RESOLUTION, fontSize: '14px' };
 const FART_LABEL_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#88cc44' };
 const BIG_HEAD_LABEL_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#ff69b4' };
 const CHICKEN_LABEL_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#ffffff' };
