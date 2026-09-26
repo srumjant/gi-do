@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { TILE } from '../src/config/constants';
 import { GATES_PER_TOWER, LEARN_WORDS, pickTargets, type LearnMode } from '../src/game/learn/content';
 import {
-  BATTLEMENTS, buildTower, GAPS, HUD_ROOM, INSIDE, LEARN_VIEW_H, LEARN_VIEW_W, LETTER_ROOM, MAP_COLS,
+  BATTLEMENTS, buildTower, GAPS, HUD_ROOM, INSIDE, LEARN_HUD_H, LEARN_VIEW_H, LEARN_VIEW_W, LEARN_ZOOM,
+  LETTER_ROOM, MAP_COLS,
   plankLengths, RISE, settleCenter, START_COL, starBox, storeyView, T_BRICK, T_EMPTY, T_LETTER,
   T_PLANK, T_STONE, towerTileFaces, type TowerLayout, WALL,
 } from '../src/game/learn/tower';
@@ -126,6 +127,10 @@ describe('a learn tower', () => {
       const fits = storeyView(t, s).height <= LEARN_VIEW_H;
       return fits === (st.planks.length <= 2) ? [] : [`storey ${s} with ${st.planks.length} planks`];
     }))).toEqual([]);
+  });
+
+  it('keeps the whole HUD band clear above every view', () => {
+    expect(HUD_ROOM * LEARN_ZOOM).toBeGreaterThanOrEqual(LEARN_HUD_H);
   });
 
   it('stands the star on the roof, in view below the HUD', () => {

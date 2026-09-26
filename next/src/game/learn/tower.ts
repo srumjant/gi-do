@@ -47,7 +47,13 @@ export const LEARN_ZOOM = 1.25;
 /** The tower's view in world px. Not config/constants.ts's VIEW_W/VIEW_H: the adventure zooms 1.5. */
 export const LEARN_VIEW_W = BASE_W / LEARN_ZOOM;
 export const LEARN_VIEW_H = BASE_H / LEARN_ZOOM;
-/** World px the 48px HUD covers at this zoom (48 / 1.25 = 38.4), rounded up. */
+/** The learn HUD's band across the top of the screen, in screen px (LearnHudScene). */
+export const LEARN_HUD_H = 48;
+/**
+ * The world px a view keeps clear above a storey's ceiling, so the ceiling shows below the
+ * HUD rather than under it: the band covers LEARN_HUD_H / LEARN_ZOOM = 38.4 of them, and this
+ * keeps a little more.
+ */
 export const HUD_ROOM = 40;
 
 /** A plank: `col` counts inside the walls, `row` is the map row whose top it stands on. */

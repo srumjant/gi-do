@@ -40,6 +40,14 @@ export const GRND_DECEL = 0.72;
 export const AIR_DECEL = 0.92;
 
 /**
+ * The sprite draws 2px larger than the hitbox on every side (index.html:1848:
+ * `drawSprite(spr,p.x-2,p.y-2,ps.palette,2,p.facing<0)`): half of the 4 playerSize below
+ * takes off each dimension. Not cosmetic — get this wrong and the art sits 2px off the hitbox,
+ * which reads as a collision bug. Every scene that draws a player uses it.
+ */
+export const PLAYER_DRAW_INSET = 2;
+
+/**
  * The hitbox of a character: the stand sprite at scale 2, inset by 4 each way
  * (index.html:670, :1167) — 16x24 for Gigi, 16x20 for Dodo. `createPlayer` and learn
  * mode's climber both size from here, so the two are the same body.

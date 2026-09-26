@@ -82,8 +82,9 @@ export const PLAYER_SCALE = 2;
  */
 export const BIG_HEAD_SCALE = 5;
 
-const POSES = ['stand', 'run', 'jump'] as const;
-export type Pose = typeof POSES[number];
+/** `player.frame`: 0 stand, 1 run, 2 jump (game/types.ts, index.html:1424-1429). */
+export const PLAYER_POSES = ['stand', 'run', 'jump'] as const;
+export type Pose = typeof PLAYER_POSES[number];
 
 /** `player-<character>-<skinIndex>-<pose>`, e.g. `player-gigi-0-stand`. */
 export function playerTextureKey(character: Character, skinIndex: number, pose: Pose): string {
@@ -127,7 +128,7 @@ export function bigHeadRows(sprite: SpriteData): number {
 function registerPlayerTextures(scene: Phaser.Scene): void {
   CHARACTERS.forEach((character) => {
     skinsOf(character).forEach((skin, skinIndex) => {
-      for (const pose of POSES) {
+      for (const pose of PLAYER_POSES) {
         const sprite = skin[pose];
         const headRows = bigHeadRows(sprite);
         const key = playerTextureKey(character, skinIndex, pose);

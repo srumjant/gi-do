@@ -4,7 +4,7 @@ import { T_BRICK, T_EMPTY, T_LETTER, T_PLANK, T_STONE } from '../game/learn/towe
 import { drawBrick, QUESTION_FILL, QUESTION_STROKE } from './tiles';
 
 /** The tower's tileset: one 16px frame per tile code, frame 0 unused (Phaser's empty is -1). */
-export const LEARN_TILES_KEY = 'learn-tiles';
+export const LEARN_TILES_TEXTURE = 'learn-tiles';
 /** A frame per tile code, T_EMPTY's included, so a code is its own frame number. */
 const FRAMES = T_LETTER + 1;
 
@@ -20,7 +20,7 @@ const WOOD_DARK = 0x7a4a20;
  * tower reuses them.
  */
 export function registerLearnTiles(scene: Phaser.Scene): void {
-  bake(scene, LEARN_TILES_KEY, TILE * FRAMES, TILE, (g) => {
+  bake(scene, LEARN_TILES_TEXTURE, TILE * FRAMES, TILE, (g) => {
     drawBrick(g, T_BRICK * TILE, 0, BRICK);
     drawStone(g, T_STONE * TILE);
     drawPlank(g, T_PLANK * TILE);

@@ -88,8 +88,8 @@ export type BodyMover = (p: PlayerState) => MoveReport;
  * position from it every step, which would make the drawn image an input to the physics;
  * and a player can be drawn by more than one image (SliceScene's syncPlayer swaps three),
  * none of which is the hitbox. The body IS the hitbox, so `body.position` is `p.x, p.y`
- * with no offset: the sprite's 2px margin is SliceScene's PLAYER_DRAW_INSET, where the
- * drawing is, and does not belong here.
+ * with no offset: the sprite's 2px margin is game/player.ts's PLAYER_DRAW_INSET, which the
+ * scenes apply where they draw, and does not belong here.
  *
  * **It rests disabled** and is switched on for exactly its own step (physics/body.ts's
  * stepBodyAlone), so no other body's step moves it.

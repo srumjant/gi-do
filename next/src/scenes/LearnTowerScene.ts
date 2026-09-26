@@ -1,16 +1,16 @@
 import Phaser from 'phaser';
 import { playCue } from '../audio/cues';
-import { STEP_MS, TILE } from '../config/constants';
+import { MAX_STEPS_PER_FRAME, STEP_MS, TILE } from '../config/constants';
 import { createClimb, stepClimb } from '../game/learn/climb';
 import type { LearnMode } from '../game/learn/content';
 import {
   LEARN_ZOOM, MAP_COLS, settleCenter, starBox, storeyView, T_EMPTY, towerTileFaces, WALL,
 } from '../game/learn/tower';
 import type { Climb, ClimbEvent, ClimbMove } from '../game/learn/types';
-import type { Character } from '../game/player';
+import { type Character, PLAYER_DRAW_INSET } from '../game/player';
 import { getSelectedChar, getSkinIndex } from '../game/run';
-import { blockTextureKey, LEARN_TILES_KEY, registerLearnTiles, toPhaserData } from '../gfx/learnTiles';
-import { playerTextureKey, registerTextures, STAR_TEXTURE } from '../gfx/textures';
+import { blockTextureKey, LEARN_TILES_TEXTURE, registerLearnTiles, toPhaserData } from '../gfx/learnTiles';
+import { PLAYER_POSES, playerTextureKey, registerTextures, STAR_TEXTURE } from '../gfx/textures';
 import { createControls, type Controls } from '../input/controls';
 import { bindBackKey, justDown, type MenuKey, padContextFor } from '../input/menuKeys';
 import { createBodyMover } from '../physics/player';
@@ -27,9 +27,6 @@ export interface LearnTowerData {
 
 /** A plain sky until Part 2's castle backdrop. */
 const SKY = '#7ec0ee';
-/** The sprite draws 2px larger than the hitbox on every side, as in SliceScene. */
-const PLAYER_DRAW_INSET = 2;
-const POSES = ['stand', 'run', 'jump'] as const;
 const FOLLOW_LERP = 0.15;
 /** The camera centres this far above the hero: more of the climb above than below. */
 const FOLLOW_ABOVE = 48;
@@ -148,8 +145,8 @@ export class LearnTowerScene extends Phaser.Scene {
       takeBack(this, 'learnletters');
       return;
     }
-    // The same fixed step as SliceScene: never more than five steps' worth of time banked.
-    this.accumulator = Math.min(this.accumulator + delta, STEP_MS * 5);
+    // The same fixed step as SliceScene, with the same ceiling on the time banked.
+    this.accumulator = Math.min(this.accumulator + delta, STEP_MS * MAX_STEPS_PER_FRAME);
     while (this.accumulator >= STEP_MS) {
       stepClimb(this.climb, this.controls.read(), this.move);
       for (const event of this.climb.events.splice(0)) this.apply(event);
@@ -165,7 +162,7 @@ export class LearnTowerScene extends Phaser.Scene {
       tileWidth: TILE,
       tileHeight: TILE,
     });
-    const tileset = tilemap.addTilesetImage(LEARN_TILES_KEY, LEARN_TILES_KEY, TILE, TILE, 0, 0);
+    const tileset = tilemap.addTilesetImage(LEARN_TILES_TEXTURE, LEARN_TILES_TEXTURE, TILE, TILE, 0, 0);
     if (!tileset) throw new Error('the tower tileset is not a texture');
     // `false`: the CPU layer, the only kind Arcade collides against (as physics/tiles.ts).
     const layer = tilemap.createLayer(0, tileset, 0, 0, false);
@@ -291,6 +288,6 @@ export class LearnTowerScene extends Phaser.Scene {
   }
 
   private poseKey(): string {
-    return playerTextureKey(this.character, this.skin, POSES[this.climb.player.frame]);
+    return playerTextureKey(this.character, this.skin, PLAYER_POSES[this.climb.player.frame]);
   }
 }

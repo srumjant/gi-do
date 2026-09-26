@@ -117,7 +117,7 @@ export const TRANSLATIONS: Record<string, Entry> = {
   learn_menu_hint:    {et:'◀ ▶ vali  •  Space / {A} alusta  •  ESC / {B} tagasi',
                        en:'◀ ▶ choose  •  Space / {A} start  •  ESC / {B} back'},
   learn_find_letter:  {et:'LEIA TÄHT:',               en:'FIND THE LETTER:'},
-  learn_find_syll:    {et:'LEIA SILP:',               en:'FIND THE SYLLABLE:'},
+  learn_find_syllable: {et:'LEIA SILP:',              en:'FIND THE SYLLABLE:'},
   learn_find_letters: {et:'LEIA TÄHED:',              en:'FIND THE LETTERS:'},
   // Level names
   level_1:            {et:'Nukuaed',                  en:'Doll Garden'},

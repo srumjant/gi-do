@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
 import type { LearnMode } from '../game/learn/content';
+import { LEARN_HUD_H } from '../game/learn/tower';
 import type { Climb } from '../game/learn/types';
 import { registerTextures, STAR_TEXTURE } from '../gfx/textures';
 import { LEARN_HUD_SCENE_KEY } from './keys';
@@ -11,11 +12,9 @@ export interface LearnHudData {
   climb: Climb;
 }
 
-/** The band across the top. The tower keeps storeys out from under it (tower.ts's HUD_ROOM). */
-const HUD_H = 48;
 const PROMPT: Record<LearnMode, string> = {
   letters: 'learn_find_letter',
-  syllables: 'learn_find_syll',
+  syllables: 'learn_find_syllable',
   words: 'learn_find_letters',
 };
 const PROMPT_FONT = { fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffdd00' };
@@ -50,7 +49,7 @@ export class LearnHudScene extends Phaser.Scene {
 
   create(): void {
     registerTextures(this);
-    this.add.graphics().fillStyle(0x000000, 0.45).fillRect(0, 0, BASE_W, HUD_H);
+    this.add.graphics().fillStyle(0x000000, 0.45).fillRect(0, 0, BASE_W, LEARN_HUD_H);
     this.add.text(BASE_W / 2, 16, TStr(PROMPT[this.climb.layout.mode]), PROMPT_FONT).setOrigin(0.5, 1);
     this.target = this.add.text(BASE_W / 2, 44, '', TARGET_FONT).setOrigin(0.5, 1);
     this.stars = this.climb.gates.map((_, i) => this.add
