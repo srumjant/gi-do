@@ -66,10 +66,12 @@ These facts shape the code below; do not re-derive them, but do not contradict t
   With `emitting: false` it waits, and `explode(count, x, y)` bursts `count` particles at
   `x, y`. With the emitter at `(0, 0)` that point is in world px. In the config, an array
   (`tint: [a, b, c]`) picks one value per particle, `{ min, max }` a random value per
-  particle, and `{ start, end }` runs over the particle's life. `scale` sets `scaleX` and
-  `scaleY` separately, so a random `scale` gives oblongs, which suits brick chunks.
+  particle, and `{ start, end }` runs over the particle's life. `scale` sets `scaleX`, and
+  `scaleY` copies it unless set on its own (`Particle.js`), so a random `scale` gives squares
+  of random size. (This line said oblongs until the final review read the source.)
   `advance: ms` fast-forwards the emitter when it is made. The default tint mode multiplies,
-  so one white texture takes any colour.
+  so one white texture takes any colour; tints are WebGL-only, and the canvas renderer draws
+  every particle white.
 - **Filters.** Every Game Object has `enableFilters()` (`GameObject` mixes in `Filters`).
   Under the canvas renderer it does nothing and `filters` stays `null`, so the code must
   treat the Glow as optional. `filters.internal.addGlow(color, outerStrength,
@@ -4168,6 +4170,27 @@ Spec coverage for step 4, *the learning around it*:
 Left for Plan 10, as the spec's build order has it: the castle (step 5) and the playtest
 notes (step 6), with the trapdoor's swing tween and the opt-in real-Arcade check.
 
+## After the dry run
+
+The tasks above landed as written, one commit each. A final review of the whole branch and
+the owner's first play then changed these, each in a commit of its own:
+
+- **The pan eases out** (`fix: the camera keeps up with the spring at the roof too`). With
+  the ease-in-out above, the roof's short pan fell behind the spring and the head rose 15px
+  into the HUD band for 11 frames. Measured in the game after the change: at least 24px clear
+  at the roof and 42px between storeys.
+- **The tower leaves once, and lets the star's cheer finish** (`fix: the tower leaves once,
+  ...`). A back press on the step the result timer fired started both scenes; and the
+  shutdown hush could clip "Fantastiline!" on the way to the result screen.
+- **X on the way up says the next storey's target, once** (`fix: X on the way up says where
+  the hero is going, ...`), with a test that every line counts toward the four seconds.
+- **Learn mode in Andika** (`feat: learn mode in Andika, ...`), at the owner's request: the
+  blocks were Trebuchet and the HUD monospace, so the letter to find and the letter to bump
+  were different shapes. SIL's unmodified web fonts ship in `next/src/assets/fonts/` with
+  their licence, loaded by Phaser's font loader (`gfx/learnFont.ts`).
+- **Smaller tidies**: `stepMotion`'s cue list typed as exactly what it raises; one confetti
+  palette; the two cheer lists pointing at each other.
+
 ## What only a person can check
 
 - Whether the kids' laptop has an Estonian, Finnish or Italian voice, and how it sounds
@@ -4177,3 +4200,7 @@ notes (step 6), with the trapdoor's swing tween and the opt-in real-Arcade check
 - Whether a child notices the pulsing glow without being told.
 - Whether the pop, the chunks and the confetti are fun or too busy.
 - Gamepad input on the result screen; a 120 Hz screen.
+- Whether the voice speaks at all in a session driven only by the controller: Chrome lets a
+  page speak only after a key press or click on it, and a pad button may not count.
+- That a line said right after a cancel (a wrong answer, X) is never dropped.
+- How the Glow looks at zoom 1.25, and Andika at the kids' screen size.
