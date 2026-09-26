@@ -323,6 +323,9 @@ function fireArrow(world: World, input: InputState): void {
  */
 export type MotionRecord = Pick<DifficultyRecord, 'playerSpeed' | 'jumpForce'>;
 
+/** The only cues the movement raises: a jump, or a fart jump. */
+type MotionCue = Extract<SoundCue, 'jump' | 'fart'>;
+
 export interface MotionOptions {
   /**
    * Skip the variable-height cut this step. Learn mode sets it while a letter block's
@@ -340,13 +343,15 @@ export interface MotionOptions {
  * so a jump is the same jump in both.
  *
  * Mutates `p`, and pushes 'jump' or 'fart' onto `sounds` on the step a jump starts.
+ * `sounds` is typed as exactly that, so the adventure's list and the climb's effects-only one
+ * (game/learn/types.ts) both fit, and pushing anything else here would not compile.
  * Moves nothing: position is the mover's job, and runs after this.
  */
 export function stepMotion(
   p: PlayerState,
   input: InputState,
   dc: MotionRecord,
-  sounds: SoundCue[],
+  sounds: { push(cue: MotionCue): unknown },
   options: MotionOptions = {},
 ): void {
   // Player movement — smooth acceleration with air control (index.html:1362-1370).
