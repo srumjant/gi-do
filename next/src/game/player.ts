@@ -30,6 +30,22 @@ export type Character = 'gigi' | 'dodo';
  */
 export type PlayerMove = (world: World) => void;
 
+/** What one step of a body found out that the player state cannot hold. */
+export interface MoveReport {
+  /**
+   * The tile row a rising head was stopped under this step, or null. Which cells of that row
+   * it hit is the caller's rule: the adventure's is bumpBlocksAbove's two probe columns, the
+   * learn tower's is climb.ts's.
+   */
+  headHitRow: number | null;
+}
+
+/**
+ * Moves one player one fixed step and reports what it found. The game's is an Arcade body
+ * (physics/player.ts's createBodyMover); the learn tower's tests step tests/helpers/towerMove.ts.
+ */
+export type BodyMover = (p: PlayerState) => MoveReport;
+
 /**
  * Port of index.html:1362 — engine constants, not tunable per difficulty. Exported so
  * tests can check the deceleration rate without duplicating the literal.

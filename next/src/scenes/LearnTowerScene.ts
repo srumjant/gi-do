@@ -4,13 +4,13 @@ import { MAX_STEPS_PER_FRAME, STEP_MS, TILE } from '../config/constants';
 import { createClimb, stepClimb } from '../game/learn/climb';
 import type { LearnMode } from '../game/learn/content';
 import {
-  LEARN_ZOOM, MAP_COLS, settleCenter, starBox, storeyView, T_EMPTY, towerTileFaces, WALL,
+  CEILING, LEARN_ZOOM, MAP_COLS, settleCenter, starBox, storeyView, T_EMPTY, towerTileFaces, WALL,
 } from '../game/learn/tower';
 import type { Climb, ClimbEvent, ClimbMove } from '../game/learn/types';
 import { type Character, PLAYER_DRAW_INSET } from '../game/player';
 import { getSelectedChar, getSkinIndex } from '../game/run';
 import { blockTextureKey, LEARN_TILES_TEXTURE, registerLearnTiles, toPhaserData } from '../gfx/learnTiles';
-import { PLAYER_POSES, playerTextureKey, registerTextures, STAR_TEXTURE } from '../gfx/textures';
+import { LEARN_STAR_TEXTURE, PLAYER_POSES, playerTextureKey, registerTextures } from '../gfx/textures';
 import { createControls, type Controls } from '../input/controls';
 import { bindBackKey, justDown, type MenuKey, padContextFor } from '../input/menuKeys';
 import { createBodyMover } from '../physics/player';
@@ -45,6 +45,13 @@ const LETTER_FONT = {
 const LETTER_RESOLUTION = 3;
 /** How white the right block's hint glow gets at its brightest. */
 const GLOW_ALPHA = 0.55;
+/** The star floats up and down this far, this slowly. */
+const STAR_BOB_PX = 4;
+const STAR_BOB_MS = 800;
+/** A wrong block shakes sideways this far, this fast, this many times. */
+const SHAKE_PX = 3;
+const SHAKE_MS = 40;
+const SHAKE_REPEATS = 3;
 
 /** A letter block on screen: its container (picture, hint glow, letter), the glow, and where it rests. */
 interface BlockView {
@@ -178,7 +185,7 @@ export class LearnTowerScene extends Phaser.Scene {
       const picture = this.add.image(0, 0, blockTextureKey(b.width)).setOrigin(0, 0);
       // The hint: white over the gold, faded in and out once the right block should glow.
       // Fading the block itself would show the gold letter tile underneath, gold on gold.
-      const glow = this.add.rectangle(0, 0, b.width * TILE, 2 * TILE, 0xffffff).setOrigin(0, 0).setAlpha(0);
+      const glow = this.add.rectangle(0, 0, b.width * TILE, CEILING * TILE, 0xffffff).setOrigin(0, 0).setAlpha(0);
       const letter = this.add
         .text((b.width * TILE) / 2, TILE + 1, b.letter, LETTER_FONT)
         .setOrigin(0.5, 0.5)
@@ -190,11 +197,10 @@ export class LearnTowerScene extends Phaser.Scene {
 
   private buildStar(): void {
     const box = starBox(this.climb.layout);
-    const star = this.add
-      .image(box.x + box.w / 2, box.y + box.h / 2, STAR_TEXTURE)
-      .setScale(3)
-      .setDepth(DEPTH_STAR);
-    this.tweens.add({ targets: star, y: star.y - 4, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    const star = this.add.image(box.x + box.w / 2, box.y + box.h / 2, LEARN_STAR_TEXTURE).setDepth(DEPTH_STAR);
+    this.tweens.add({
+      targets: star, y: star.y - STAR_BOB_PX, duration: STAR_BOB_MS, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
   }
 
   private apply(event: ClimbEvent): void {
@@ -255,7 +261,10 @@ export class LearnTowerScene extends Phaser.Scene {
   private shake({ box, restX }: BlockView): void {
     this.tweens.killTweensOf(box);
     box.setX(restX);
-    this.tweens.add({ targets: box, x: restX + 3, duration: 40, yoyo: true, repeat: 3, onComplete: () => box.setX(restX) });
+    this.tweens.add({
+      targets: box, x: restX + SHAKE_PX, duration: SHAKE_MS, yoyo: true, repeat: SHAKE_REPEATS,
+      onComplete: () => box.setX(restX),
+    });
   }
 
   /**

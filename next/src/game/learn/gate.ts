@@ -1,6 +1,16 @@
 import { TILE } from '../../config/constants';
+import type { PlayerState } from '../types';
 import { INSIDE, T_BRICK, T_EMPTY, T_LETTER, type TowerLayout, WALL } from './tower';
 import type { Cell, Climb } from './types';
+
+/**
+ * The hero's feet are above the top of map row `row`. A letter ceiling's top row is the next
+ * storey's floor, so this one test both shuts a trapdoor and counts the hero into the storey
+ * above (climb.ts), on the same step.
+ */
+export function feetAbove(p: PlayerState, row: number): boolean {
+  return p.y + p.h < row * TILE;
+}
 
 /** Which gate and block a map cell belongs to, or null. */
 export function blockAt(layout: TowerLayout, col: number, row: number): { storey: number; block: number } | null {
@@ -80,14 +90,14 @@ export function headBump(c: Climb, hit: Cell): BumpOutcome {
  * becomes plain brick: it is the next storey's floor now, and the gate is done.
  */
 export function closeTrapdoors(c: Climb): void {
-  const feet = c.player.y + c.player.h;
   c.gates.forEach((gate, s) => {
     if (!gate.trapdoorOpen) return;
     const st = c.layout.storeys[s];
-    if (feet >= st.ceilingRows[0] * TILE) return;
+    if (!feetAbove(c.player, st.ceilingRows[0])) return;
     gate.trapdoorOpen = false;
     // The right block's cells are the trapdoor's already.
-    const letters = st.blocks.flatMap((b, i) => (b.correct ? [] : blockCells(c.layout, s, i)));
+    const answer = answerIndex(c.layout, s);
+    const letters = st.blocks.flatMap((_, i) => (i === answer ? [] : blockCells(c.layout, s, i)));
     setCells(c, [...trapdoorCells(c.layout, s), ...letters], T_BRICK);
     c.events.push({ type: 'gate-closed', storey: s });
   });
@@ -96,8 +106,9 @@ export function closeTrapdoors(c: Climb): void {
 /**
  * A safety net: if the hero is ever standing on a letter floor whose trapdoor is still open,
  * the right block comes back, armed, so bumping it springs them again. Play does not produce
- * this today (a counted bump leaves the head well inside the opening), but nobody may get
- * stuck below a solved gate.
+ * this today: a counted bump leaves the hero's body at least 3px inside the opening's edges,
+ * which one step's drift (3px at most) cannot cross before the head is in the opening. But
+ * nobody may get stuck below a solved gate.
  */
 export function rearmIfStranded(c: Climb): void {
   const s = c.lastGround;

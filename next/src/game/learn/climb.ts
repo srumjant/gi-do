@@ -8,7 +8,7 @@ import { random } from '../random';
 import { rectOverlap } from '../tiles';
 import type { PlayerState } from '../types';
 import { type LearnMode, pickTargets, type Rand } from './content';
-import { closeTrapdoors, headBump, rearmIfStranded } from './gate';
+import { closeTrapdoors, feetAbove, headBump, rearmIfStranded } from './gate';
 import { buildTower, starBox, WALL } from './tower';
 import type { Climb, ClimbMove } from './types';
 
@@ -112,7 +112,7 @@ function trackStorey(c: Climb): void {
   if (c.storey >= storeys.length) return;
   const next = c.storey + 1;
   const nextFloorRow = next < storeys.length ? storeys[next].floorRow : roofRow;
-  if (c.player.y + c.player.h > nextFloorRow * TILE) return;
+  if (!feetAbove(c.player, nextFloorRow)) return;
   c.storey = next;
   c.events.push({ type: 'storey', storey: next });
 }

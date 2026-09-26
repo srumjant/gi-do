@@ -249,10 +249,18 @@ export const CAPE_TEXTURE = 'cape';
  * tag the cannon sets on its own (see EnemyProjectile in game/types.ts).
  */
 export const FIREBALL_TEXTURE = 'fireball';
+/**
+ * The learn tower's star on its roof, and the HUD's star for each gate: STAR_S again, at whole
+ * scales of their own, since scale belongs to the draw site. 4 on the roof (28px, inside the
+ * two-tile star box) and 3 in the HUD (21px). Enlarging the world's 1.5 bake would blur them.
+ */
+export const LEARN_STAR_TEXTURE = 'learn-star';
+export const LEARN_HUD_STAR_TEXTURE = 'learn-hud-star';
 
 /**
  * Everything the world draws that is not a player, an enemy or a cloud: the pickups,
- * the star, the cat and its claw mark, the two kinds of projectile, and the cape.
+ * the star, the cat and its claw mark, the two kinds of projectile, and the cape; and the
+ * learn tower's two stars.
  * Each is one fixed sprite at one fixed scale — none of them animate, flip aside —
  * so one texture apiece covers every frame they will ever be drawn on.
  */
@@ -266,6 +274,8 @@ const ITEM_TEXTURES: readonly [string, SpriteData, Palette, number][] = [
   [CHICKEN_ARROW_TEXTURE, CHICKEN_S, CHICKEN_P, 1.5],
   [CAPE_TEXTURE, CAPE_S, CAPE_P, 2],
   [FIREBALL_TEXTURE, FIREBALL_S, FIREBALL_P, 2],
+  [LEARN_STAR_TEXTURE, STAR_S, STAR_P, 4],
+  [LEARN_HUD_STAR_TEXTURE, STAR_S, STAR_P, 3],
 ];
 
 function registerItemTextures(scene: Phaser.Scene): void {

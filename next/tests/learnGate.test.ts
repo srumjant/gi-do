@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TILE } from '../src/config/constants';
 import { createClimb, LEARN_MOTION, stepClimb } from '../src/game/learn/climb';
-import { blockCells, headBump, trapdoorCells } from '../src/game/learn/gate';
+import { blockCells, feetAbove, headBump, trapdoorCells } from '../src/game/learn/gate';
 import { starBox, T_BRICK, T_EMPTY, T_LETTER, WALL } from '../src/game/learn/tower';
 import type { Cell, Climb } from '../src/game/learn/types';
 import { emptyInput, type InputState } from '../src/input/actions';
@@ -77,6 +77,17 @@ describe('a letter gate', () => {
       expect(run(c, 150, idle, () => c.storey === 1 && c.player.onGround)).toBe(true);
       expect(c.events.some((e) => e.type === 'rearm')).toBe(false);
     }
+  });
+
+  it('counts the hero through a ceiling only once the feet are above its top', () => {
+    const c = climb();
+    const top = c.layout.storeys[0].ceilingRows[0];
+    // The one boundary both the trapdoor and the storey count go by: this row is the next floor.
+    expect(c.layout.storeys[1].floorRow).toBe(top);
+    c.player.y = top * TILE - c.player.h;
+    expect(feetAbove(c.player, top)).toBe(false);
+    c.player.y -= 0.5;
+    expect(feetAbove(c.player, top)).toBe(true);
   });
 
   it('turns the whole letter ceiling to brick when it shuts', () => {

@@ -3,7 +3,7 @@
 // tests/physics.test.ts (Phaser cannot be imported under Vitest at all).
 import type Phaser from 'phaser';
 import { TILE } from '../config/constants';
-import { bumpBlocksAbove, type PlayerMove } from '../game/player';
+import { type BodyMover, bumpBlocksAbove, type MoveReport, type PlayerMove } from '../game/player';
 import type { PlayerState, World } from '../game/types';
 import { PX_PER_FRAME_TO_PX_PER_SECOND, stepBodyAlone } from './body';
 
@@ -41,22 +41,13 @@ export interface WorldEdges {
 export interface BodyMoverOptions {
   /** The layer the body collides with. The only thing it collides with. */
   layer: Phaser.Tilemaps.TilemapLayer;
-  /** World bounds to set; left out, the world's bounds are not touched and not used. */
+  /**
+   * World bounds to set; left out, the world's bounds are not touched and not used. A top
+   * edge (`up`) stops a rising head as a tile does, and the report then names the row just
+   * above the world, which holds no tile; no mover sets one today.
+   */
   edges?: WorldEdges;
 }
-
-/** What one step found out that the player state cannot hold. */
-export interface MoveReport {
-  /**
-   * The tile row a rising head was stopped under this step, or null. Which cells of that
-   * row it hit is the caller's rule — the adventure's is bumpBlocksAbove's two probe
-   * columns (game/player.ts). A top world edge (`edges.up`) stops a head too, and then this
-   * names the row just above the world, which holds no tile; no mover has one today.
-   */
-  headHitRow: number | null;
-}
-
-export type BodyMover = (p: PlayerState) => MoveReport;
 
 /**
  * Puts a player on an Arcade body and returns the function that moves it one fixed step.

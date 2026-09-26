@@ -4,7 +4,7 @@ import { TStr } from '../config/i18n';
 import type { LearnMode } from '../game/learn/content';
 import { LEARN_HUD_H } from '../game/learn/tower';
 import type { Climb } from '../game/learn/types';
-import { registerTextures, STAR_TEXTURE } from '../gfx/textures';
+import { LEARN_HUD_STAR_TEXTURE, registerTextures } from '../gfx/textures';
 import { LEARN_HUD_SCENE_KEY } from './keys';
 
 export interface LearnHudData {
@@ -19,10 +19,12 @@ const PROMPT: Record<LearnMode, string> = {
 };
 const PROMPT_FONT = { fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffdd00' };
 const TARGET_FONT = { fontFamily: 'monospace', fontSize: '26px', fontStyle: 'bold', color: '#ffffff' };
+/** Where the prompt's and the target's baselines sit in the band. */
+const PROMPT_BOTTOM = 16;
+const TARGET_BOTTOM = 44;
 const STAR_X = 12;
 const STAR_Y = 12;
 const STAR_STEP = 26;
-const STAR_SCALE = 2;
 const UNSOLVED_ALPHA = 0.28;
 /** Shown instead of a target once the hero is on the roof. */
 const ROOF_MARK = '★';
@@ -50,12 +52,11 @@ export class LearnHudScene extends Phaser.Scene {
   create(): void {
     registerTextures(this);
     this.add.graphics().fillStyle(0x000000, 0.45).fillRect(0, 0, BASE_W, LEARN_HUD_H);
-    this.add.text(BASE_W / 2, 16, TStr(PROMPT[this.climb.layout.mode]), PROMPT_FONT).setOrigin(0.5, 1);
-    this.target = this.add.text(BASE_W / 2, 44, '', TARGET_FONT).setOrigin(0.5, 1);
+    this.add.text(BASE_W / 2, PROMPT_BOTTOM, TStr(PROMPT[this.climb.layout.mode]), PROMPT_FONT).setOrigin(0.5, 1);
+    this.target = this.add.text(BASE_W / 2, TARGET_BOTTOM, '', TARGET_FONT).setOrigin(0.5, 1);
     this.stars = this.climb.gates.map((_, i) => this.add
-      .image(STAR_X + i * STAR_STEP, STAR_Y, STAR_TEXTURE)
-      .setOrigin(0, 0)
-      .setScale(STAR_SCALE));
+      .image(STAR_X + i * STAR_STEP, STAR_Y, LEARN_HUD_STAR_TEXTURE)
+      .setOrigin(0, 0));
   }
 
   update(): void {

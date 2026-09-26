@@ -11,7 +11,7 @@ const TILE_BIAS = 16;
  * stop you from every side, planks only from above, and a falling body up to TILE_BIAS deep
  * in a tile top is put back on it, as Arcade's TileCheckY does — inside the same left and
  * right world edges. Reports the row a rising head was stopped under, as the scene's mover
- * does (physics/player.ts's MoveReport).
+ * does (game/player.ts's MoveReport).
  *
  * Phaser's package entry cannot load under Vitest, which is why this exists. Arcade's own
  * World and Body can, deep-imported from phaser/src, and run that way the gate tests and the

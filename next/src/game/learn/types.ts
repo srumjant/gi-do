@@ -1,3 +1,4 @@
+import type { BodyMover } from '../player';
 import type { PlayerState, SoundCue } from '../types';
 import type { TowerLayout } from './tower';
 
@@ -59,9 +60,8 @@ export interface Climb {
 }
 
 /**
- * Moves the hero one step and reports the tile row a rising head was stopped under, or
- * null. The scene's is its Arcade body (physics/player.ts's createBodyMover); the tests'
- * is tests/helpers/towerMove.ts. Which cells of that row the head hit is the climb's own
- * rule (climb.ts).
+ * What a climb steps the hero with: game/player.ts's BodyMover, the scene's Arcade body or
+ * the tests' towerMove. Which cells of the reported row the head hit is the climb's own rule
+ * (climb.ts).
  */
-export type ClimbMove = (p: PlayerState) => { headHitRow: number | null };
+export type ClimbMove = BodyMover;
