@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import Phaser from 'phaser';
+import { installVoice } from './audio/voice';
 import { BASE_W, BASE_H, STEP_HZ } from './config/constants';
 import { installGlyphs } from './config/glyphs';
 import { BetweenScene } from './scenes/BetweenScene';
@@ -22,6 +23,8 @@ import { WinScene } from './scenes/WinScene';
 // would otherwise render it literally. Which glyph they get is the controller's business.
 // See config/glyphs.ts.
 installGlyphs();
+// The learn tower's voice list fills in after the page loads; picking starts now. See audio/voice.ts.
+installVoice();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
