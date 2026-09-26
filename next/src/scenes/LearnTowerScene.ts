@@ -12,6 +12,7 @@ import { getSelectedChar, getSkinIndex } from '../game/run';
 import {
   blockTextureKey, LEARN_BRICK, LEARN_SPARK_TEXTURE, LEARN_TILES_TEXTURE, registerLearnTiles, toPhaserData,
 } from '../gfx/learnTiles';
+import { LEARN_FONT_BOLD, LEARN_TEXT_RESOLUTION, preloadLearnFont } from '../gfx/learnFont';
 import { LEARN_STAR_TEXTURE, PLAYER_POSES, playerTextureKey, registerTextures } from '../gfx/textures';
 import { createControls, type Controls } from '../input/controls';
 import { padRumble } from '../input/gamepad';
@@ -41,13 +42,13 @@ const DEPTH_BLOCK = 5;
 const DEPTH_STAR = 6;
 const DEPTH_PLAYER = 10;
 const DEPTH_EFFECTS = 20;
+/** The letters on the blocks: the HUD's own face, so the letter to find and the block's match. */
 const LETTER_FONT = {
-  fontFamily: '"Trebuchet MS", system-ui, sans-serif',
+  fontFamily: LEARN_FONT_BOLD,
   fontSize: '20px',
-  fontStyle: 'bold',
   color: '#8a4b00',
+  resolution: LEARN_TEXT_RESOLUTION,
 };
-const LETTER_RESOLUTION = 3;
 /** The star floats up and down this far, this slowly. */
 const STAR_BOB_PX = 4;
 const STAR_BOB_MS = 800;
@@ -133,6 +134,10 @@ export class LearnTowerScene extends Phaser.Scene {
     this.viewStorey = 0;
     this.accumulator = 0;
     this.leaving = false;
+  }
+
+  preload(): void {
+    preloadLearnFont(this);
   }
 
   create(): void {
@@ -228,7 +233,7 @@ export class LearnTowerScene extends Phaser.Scene {
       const x = (b.col + WALL) * TILE + w / 2;
       const y = st.ceilingRows[0] * TILE + h / 2;
       const picture = this.add.image(0, 0, blockTextureKey(b.width));
-      const letter = this.add.text(0, 1, b.letter, LETTER_FONT).setOrigin(0.5, 0.5).setResolution(LETTER_RESOLUTION);
+      const letter = this.add.text(0, 1, b.letter, LETTER_FONT).setOrigin(0.5, 0.5);
       const box = this.add.container(x, y, [picture, letter]).setDepth(DEPTH_BLOCK);
       return { box, picture, restX: x, glow: null };
     }));

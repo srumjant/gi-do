@@ -5,6 +5,7 @@ import { pickFrom } from '../game/learn/content';
 import type { LearnSession } from '../game/learn/types';
 import { random } from '../game/random';
 import { getSelectedChar, getSkinIndex } from '../game/run';
+import { LEARN_FONT, LEARN_FONT_BOLD, LEARN_TEXT_RESOLUTION, preloadLearnFont } from '../gfx/learnFont';
 import { LEARN_SPARK_TEXTURE, registerLearnTiles } from '../gfx/learnTiles';
 import { registerScaledPlayerTextures, scaledPlayerTextureKey } from '../gfx/textures';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
@@ -38,10 +39,10 @@ const BOB_PX = 5;
 const BOB_HALF_MS = (Math.PI / 0.1) * STEP_MS;
 /** index.html:3021: the hint line. */
 const HINT_Y = 360;
-const CHEER_FONT = { fontFamily: 'monospace', fontSize: '28px', fontStyle: 'bold', color: '#ffdd00' };
-const FOUND_FONT = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' };
-const SCORE_FONT = { fontFamily: 'monospace', fontSize: '14px', color: '#aaddff' };
-const HINT_FONT = { fontFamily: 'monospace', fontSize: '12px', color: '#aaddcc' };
+const CHEER_FONT = { fontFamily: LEARN_FONT_BOLD, fontSize: '28px', color: '#ffdd00', resolution: LEARN_TEXT_RESOLUTION };
+const FOUND_FONT = { fontFamily: LEARN_FONT, fontSize: '18px', color: '#ffffff', resolution: LEARN_TEXT_RESOLUTION };
+const SCORE_FONT = { fontFamily: LEARN_FONT, fontSize: '14px', color: '#aaddff', resolution: LEARN_TEXT_RESOLUTION };
+const HINT_FONT = { fontFamily: LEARN_FONT, fontSize: '12px', color: '#aaddcc', resolution: LEARN_TEXT_RESOLUTION };
 
 /**
  * After a tower: a cheer, what was found, the session's score and the hero jumping, under
@@ -63,6 +64,10 @@ export class LearnResultScene extends Phaser.Scene {
   init(data: LearnResultData): void {
     this.result = data;
     this.leaving = false;
+  }
+
+  preload(): void {
+    preloadLearnFont(this);
   }
 
   create(): void {
