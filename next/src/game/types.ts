@@ -67,9 +67,9 @@ export interface PlayerState {
    *
    * Spent, never worn out: the first hit of any kind takes it. A contact hit is
    * absorbed for a bounce and an invincibility window (index.html:1646, playerHit),
-   * and on a difficulty with `capeSavesPit` a pit fall is absorbed too, by teleporting
-   * back above the floor of the world (index.html:1423, stepPlayer). Both clear it, so
-   * the second hit — of either kind — kills.
+   * and a pit fall is absorbed too, by teleporting back above the floor of the world
+   * (index.html:1423, stepPlayer) — on every difficulty, where the live game allows it on
+   * super_easy alone. Both clear it, so the second hit — of either kind — kills.
    */
   hasCape: boolean;
   /**

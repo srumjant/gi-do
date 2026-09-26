@@ -274,10 +274,10 @@ describe('the moments that make a noise', () => {
     expect(killed.sounds).toEqual(['hurt', 'music-stop']);
   });
 
-  // index.html:1423 — the pit save, which pays the same tone from a different branch.
+  // index.html:1423 — the pit save, which pays the same tone from a different branch. On
+  // any difficulty: here a cape always saves from a pit (see player.test.ts).
   it('a cape catching a pit fall whooshes too', () => {
-    const world = createWorld(0, 'super_easy'); // the one difficulty with capeSavesPit
-    expect(world.dc.capeSavesPit).toBeTruthy();
+    const world = createWorld(0, 'normal');
     world.player.hasCape = true;
     world.player.y = world.level.height * TILE + 64; // below the bottom of the world
 

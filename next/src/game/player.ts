@@ -504,7 +504,7 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
   //     `onGround` outright from the body, so there is nothing to clear first.
   move?.(world);
 
-  // The pit (index.html:1423), and the cape that can survive it.
+  // The pit (index.html:1423), and the cape that survives it.
   //
   // The `return` is OUTSIDE the branch and fires whether the player was saved or
   // killed, so nothing below this line runs on a pit frame either way — not the walk
@@ -516,15 +516,14 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
   //
   // Four things in the save branch are easy to get subtly wrong:
   //
-  //   - `capeSavesPit` is a super_easy-only field (difficulty.ts) and is read for
-  //     truthiness, not compared — on every other difficulty it is simply absent and
-  //     the pit kills. The live source reads it off a FRESH `DC()` here rather than
-  //     the `dc` it captured at the top of update(); `world.dc` is the same record for
-  //     the whole run, so this is the same read, just without the indirection.
+  //   - A cape saves you on EVERY difficulty. That is the owner's call for the children
+  //     who play this, and a break from the live game, where only super_easy's
+  //     `capeSavesPit` allowed it and a cape was no help over a pit anywhere else
+  //     (difficulty.ts, which drops the field).
   //   - The invincibility is a HARDCODED 60, NOT `dc.invincibleTime || 60` like the
-  //     contact hit in playerHit below. On super_easy — the only difficulty that can
-  //     reach this branch at all — invincibleTime is 120, so the two paths genuinely
-  //     hand out different windows: 120 for a hit absorbed, 60 for a pit survived.
+  //     contact hit in playerHit below. On super_easy invincibleTime is 120, so there
+  //     the two paths hand out different windows: 120 for a hit absorbed, 60 for a pit
+  //     survived. Everywhere else both are 60.
   //   - It is a RESCUE, not a bounce. `p.y` is teleported to `lvl.height*TILE - 32`,
   //     two tiles above the bottom of the world, which is well above wherever the
   //     player actually fell from — and it is assigned AFTER the condition above has
@@ -537,7 +536,7 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
   // where it fell. The live source's `spawnParticles`/`playTone` in the save branch
   // are presentation and sound, which src/game/ does not own.
   if (p.y > level.height * TILE + 32) {
-    if (world.dc.capeSavesPit && p.hasCape) {
+    if (p.hasCape) {
       p.hasCape = false;
       p.invincible = 60;
       p.vy = -10;
