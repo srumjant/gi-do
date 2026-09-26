@@ -5,12 +5,14 @@ import { MAX_STEPS_PER_FRAME, STEP_MS, TILE } from '../config/constants';
 import { createClimb, stepClimb } from '../game/learn/climb';
 import type { LearnMode } from '../game/learn/content';
 import {
-  CEILING, LEARN_ZOOM, MAP_COLS, settleCenter, starBox, storeyView, T_EMPTY, towerTileFaces, WALL,
+  CEILING, LEARN_ZOOM, MAP_COLS, settleCenter, starBox, storeyView, T_BRICK, T_EMPTY, towerTileFaces, WALL,
 } from '../game/learn/tower';
 import type { Climb, ClimbEvent, ClimbMove } from '../game/learn/types';
 import { type Character, PLAYER_DRAW_INSET } from '../game/player';
 import { getSelectedChar, getSkinIndex } from '../game/run';
-import { blockTextureKey, LEARN_TILES_TEXTURE, registerLearnTiles, toPhaserData } from '../gfx/learnTiles';
+import {
+  blockTextureKey, LEARN_BRICK, LEARN_SPARK_TEXTURE, LEARN_TILES_TEXTURE, registerLearnTiles, toPhaserData,
+} from '../gfx/learnTiles';
 import { LEARN_STAR_TEXTURE, PLAYER_POSES, playerTextureKey, registerTextures } from '../gfx/textures';
 import { createControls, type Controls } from '../input/controls';
 import { padRumble } from '../input/gamepad';
@@ -27,17 +29,18 @@ export interface LearnTowerData {
   used: string[];
 }
 
-/** A plain sky until Part 2's castle backdrop. */
+/** A plain sky until the castle backdrop. */
 const SKY = '#7ec0ee';
 const FOLLOW_LERP = 0.15;
 /** The camera centres this far above the hero: more of the climb above than below. */
 const FOLLOW_ABOVE = 48;
 const PAN_MS = 600;
-/** After the star, a new tower in the same mode. Part 2 puts the result screen here. */
+/** After the star, a new tower in the same mode. The result screen goes here. */
 const NEXT_TOWER_MS = 2000;
 const DEPTH_BLOCK = 5;
 const DEPTH_STAR = 6;
 const DEPTH_PLAYER = 10;
+const DEPTH_EFFECTS = 20;
 const LETTER_FONT = {
   fontFamily: '"Trebuchet MS", system-ui, sans-serif',
   fontSize: '20px',
@@ -45,8 +48,6 @@ const LETTER_FONT = {
   color: '#8a4b00',
 };
 const LETTER_RESOLUTION = 3;
-/** How white the right block's hint glow gets at its brightest. */
-const GLOW_ALPHA = 0.55;
 /** The star floats up and down this far, this slowly. */
 const STAR_BOB_PX = 4;
 const STAR_BOB_MS = 800;
@@ -54,12 +55,36 @@ const STAR_BOB_MS = 800;
 const SHAKE_PX = 3;
 const SHAKE_MS = 40;
 const SHAKE_REPEATS = 3;
+/** The right block, and the star, pop: they swell to this and fade out, this fast. */
+const POP_SCALE = 1.6;
+const POP_MS = 220;
+/** Sparks from a popped block, chunks from each brick a trapdoor knocks out, confetti from the star. */
+const SPARKS = 16;
+const CHUNKS_PER_BRICK = 4;
+const CONFETTI = 60;
+/** The live learn mode's celebration colours (index.html:2719). */
+const CONFETTI_COLORS = [0xffdd00, 0xff69b4, 0x88ff88, 0x88ccff, 0xffaa44];
+/**
+ * The hint: Phaser's Glow round the right block, breathing, and the block swelling and
+ * settling with it, so it moves as well as shines. White over the gold alone was too faint
+ * to find (1.24:1).
+ */
+const HINT_GLOW_COLOR = 0xffffff;
+const HINT_GLOW_STRENGTH = 6;
+const HINT_GLOW_DISTANCE = 8;
+const HINT_PULSE_SCALE = 1.12;
+const HINT_PULSE_MS = 450;
 
-/** A letter block on screen: its container (picture, hint glow, letter), the glow, and where it rests. */
+/**
+ * A letter block on screen: its container (picture and letter), centred on the block so it
+ * pops and pulses from the middle; the picture, which carries the hint's glow; and where it
+ * rests, for the shake.
+ */
 interface BlockView {
   box: Phaser.GameObjects.Container;
-  glow: Phaser.GameObjects.Rectangle;
+  picture: Phaser.GameObjects.Image;
   restX: number;
+  glow: Phaser.Filters.Glow | null;
 }
 
 /**
@@ -67,8 +92,9 @@ interface BlockView {
  * a real tilemap drawn from the tower's own tileset, which Arcade also collides against,
  * with planks colliding only from above; the general Arcade mover (physics/player.ts's
  * createBodyMover), which reports the row a head hit for the climb to pick the letter; the
- * same fixed 60Hz step as SliceScene; and a camera that follows the hero inside the current
- * storey's bounds and pans to the next.
+ * same fixed 60Hz step as SliceScene; a camera that follows the hero inside the current
+ * storey's bounds and pans to the next; and the climb's cues, played: sounds, buzzes, the
+ * voice and the effects.
  *
  * Back goes to the learn menu (game/navigation.ts: `learnletters` is not pausable).
  */
@@ -82,9 +108,15 @@ export class LearnTowerScene extends Phaser.Scene {
   private move!: ClimbMove;
   /** One view per block, per storey. */
   private blocks: BlockView[][] = [];
+  private star!: Phaser.GameObjects.Image;
   private playerImage!: Phaser.GameObjects.Image;
+  private sparks!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private chunks!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private confetti!: Phaser.GameObjects.Particles.ParticleEmitter;
   /** The point the camera follows: the hero's centre. */
   private readonly follow = { x: 0, y: 0 };
+  /** The storey the camera is panning or bound to, so a pan already under way is not restarted. */
+  private viewStorey = 0;
   private controls!: Controls;
   private backKey!: MenuKey;
   private accumulator = 0;
@@ -98,6 +130,7 @@ export class LearnTowerScene extends Phaser.Scene {
     this.mode = data?.mode ?? 'letters';
     this.used = data?.used ?? [];
     this.blocks = [];
+    this.viewStorey = 0;
     this.accumulator = 0;
     this.leaving = false;
   }
@@ -126,9 +159,10 @@ export class LearnTowerScene extends Phaser.Scene {
       },
     });
     this.buildBlocks();
-    this.buildStar();
+    this.star = this.buildStar();
     this.playerImage = this.add.image(0, 0, this.poseKey()).setOrigin(0, 0).setDepth(DEPTH_PLAYER);
     this.syncPlayer();
+    this.buildEffects();
 
     const cam = this.cameras.main;
     cam.setZoom(LEARN_ZOOM);
@@ -187,27 +221,58 @@ export class LearnTowerScene extends Phaser.Scene {
 
   private buildBlocks(): void {
     this.blocks = this.climb.layout.storeys.map((st) => st.blocks.map((b) => {
-      const x = (b.col + WALL) * TILE;
-      const y = st.ceilingRows[0] * TILE;
-      const picture = this.add.image(0, 0, blockTextureKey(b.width)).setOrigin(0, 0);
-      // The hint: white over the gold, faded in and out once the right block should glow.
-      // Fading the block itself would show the gold letter tile underneath, gold on gold.
-      const glow = this.add.rectangle(0, 0, b.width * TILE, CEILING * TILE, 0xffffff).setOrigin(0, 0).setAlpha(0);
-      const letter = this.add
-        .text((b.width * TILE) / 2, TILE + 1, b.letter, LETTER_FONT)
-        .setOrigin(0.5, 0.5)
-        .setResolution(LETTER_RESOLUTION);
-      const box = this.add.container(x, y, [picture, glow, letter]).setDepth(DEPTH_BLOCK);
-      return { box, glow, restX: x };
+      const w = b.width * TILE;
+      const h = CEILING * TILE;
+      const x = (b.col + WALL) * TILE + w / 2;
+      const y = st.ceilingRows[0] * TILE + h / 2;
+      const picture = this.add.image(0, 0, blockTextureKey(b.width));
+      const letter = this.add.text(0, 1, b.letter, LETTER_FONT).setOrigin(0.5, 0.5).setResolution(LETTER_RESOLUTION);
+      const box = this.add.container(x, y, [picture, letter]).setDepth(DEPTH_BLOCK);
+      return { box, picture, restX: x, glow: null };
     }));
   }
 
-  private buildStar(): void {
+  private buildStar(): Phaser.GameObjects.Image {
     const box = starBox(this.climb.layout);
     const star = this.add.image(box.x + box.w / 2, box.y + box.h / 2, LEARN_STAR_TEXTURE).setDepth(DEPTH_STAR);
     this.tweens.add({
       targets: star, y: star.y - STAR_BOB_PX, duration: STAR_BOB_MS, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     });
+    return star;
+  }
+
+  /**
+   * Three emitters, idle until something explodes them, all from one white spark tinted per
+   * use: the popped block's sparkle, a knocked-out brick's chunks, and the star's confetti.
+   */
+  private buildEffects(): void {
+    this.sparks = this.add.particles(0, 0, LEARN_SPARK_TEXTURE, {
+      emitting: false,
+      lifespan: 600,
+      speed: { min: 60, max: 180 },
+      scale: { start: 1.5, end: 0 },
+      tint: [0xffffff, 0xffdd00, 0x88ff88],
+      gravityY: 200,
+    }).setDepth(DEPTH_EFFECTS);
+    this.chunks = this.add.particles(0, 0, LEARN_SPARK_TEXTURE, {
+      emitting: false,
+      lifespan: 900,
+      speedX: { min: -70, max: 70 },
+      speedY: { min: -150, max: -40 },
+      scale: { min: 1.5, max: 2.5 },
+      rotate: { start: 0, end: 360 },
+      tint: LEARN_BRICK,
+      gravityY: 600,
+    }).setDepth(DEPTH_EFFECTS);
+    this.confetti = this.add.particles(0, 0, LEARN_SPARK_TEXTURE, {
+      emitting: false,
+      lifespan: 1600,
+      speed: { min: 80, max: 240 },
+      angle: { min: 200, max: 340 },
+      rotate: { start: 0, end: 360 },
+      tint: CONFETTI_COLORS,
+      gravityY: 250,
+    }).setDepth(DEPTH_EFFECTS);
   }
 
   private apply(event: ClimbEvent): void {
@@ -216,30 +281,38 @@ export class LearnTowerScene extends Phaser.Scene {
         for (const cell of event.cells) this.setTile(cell.col, cell.row, cell.code);
         return;
       case 'bump-right':
-        this.blocks[event.storey][event.block].box.setVisible(false);
+        this.pop(this.blocks[event.storey][event.block]);
+        // Now, not when the hero reaches the next storey: they spring up through the HUD band
+        // otherwise. Every counted bump carries them there (tests/learnJumps.test.ts).
+        this.panToStorey(event.storey + 1);
         return;
       case 'bump-wrong':
         this.shake(this.blocks[event.storey][event.block]);
         return;
       case 'hint':
-        this.tweens.add({
-          targets: this.blocks[event.storey][event.block].glow,
-          alpha: GLOW_ALPHA, duration: 450, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
-        });
+        this.showHint(this.blocks[event.storey][event.block]);
         return;
       case 'rearm':
         this.blocks[event.storey][event.block].box.setVisible(true);
-        return;
-      case 'gate-closed':
-        for (const { box, glow } of this.blocks[event.storey]) {
-          this.tweens.killTweensOf([box, glow]);
-          box.setVisible(false);
-        }
-        return;
-      case 'storey':
         this.panToStorey(event.storey);
         return;
+      case 'gate-closed':
+        // The wrong letters go with the rest of the ceiling, which is brick now. The right
+        // one is already popping out of sight, and cutting its pop short would show.
+        this.climb.layout.storeys[event.storey].blocks.forEach((b, i) => {
+          if (b.correct) return;
+          const view = this.blocks[event.storey][i];
+          this.stopTweens(view);
+          view.box.setVisible(false);
+        });
+        return;
+      case 'storey':
+        if (event.storey !== this.viewStorey) this.panToStorey(event.storey);
+        return;
       case 'finished':
+        this.tweens.killTweensOf(this.star);
+        this.confetti.explode(CONFETTI, this.star.x, this.star.y);
+        this.tweens.add({ targets: this.star, scale: POP_SCALE, alpha: 0, duration: POP_MS });
         this.time.delayedCall(NEXT_TOWER_MS, () => {
           this.scene.restart({ mode: this.mode, used: this.used } satisfies LearnTowerData);
         });
@@ -255,14 +328,31 @@ export class LearnTowerScene extends Phaser.Scene {
    * putTileAt sets a tile's collision from the layer's collideIndexes, which this layer does
    * not use (its collision is per tile and per side), so it leaves the tile colliding on no
    * side; applyTileFacesAt then sets the tower's sides and recalculates the faces around it.
+   *
+   * A brick knocked out of the map, which only an opening trapdoor does (its side columns),
+   * breaks into chunks.
    */
   private setTile(col: number, row: number, code: number): void {
     if (code === T_EMPTY) {
+      if (this.layer.getTileAt(col, row)?.index === T_BRICK) {
+        this.chunks.explode(CHUNKS_PER_BRICK, (col + 0.5) * TILE, (row + 0.5) * TILE);
+      }
       this.layer.removeTileAt(col, row, true, true);
       return;
     }
     this.layer.putTileAt(code, col, row, false);
     applyTileFacesAt(this.layer, col, row, towerTileFaces);
+  }
+
+  /** The right block pops: it swells and fades in a burst of sparks, and hides until a re-arm brings it back. */
+  private pop(view: BlockView): void {
+    const { box } = view;
+    this.stopTweens(view);
+    this.sparks.explode(SPARKS, box.x, box.y);
+    this.tweens.add({
+      targets: box, scale: POP_SCALE, alpha: 0, duration: POP_MS, ease: 'Quad.easeOut',
+      onComplete: () => box.setVisible(false).setScale(1).setAlpha(1),
+    });
   }
 
   private shake({ box, restX }: BlockView): void {
@@ -274,12 +364,42 @@ export class LearnTowerScene extends Phaser.Scene {
     });
   }
 
+  /** The hint, on the right block. Under the canvas renderer there are no filters, and the pulse alone shows it. */
+  private showHint(view: BlockView): void {
+    const glow = view.picture.enableFilters().filters?.internal
+      .addGlow(HINT_GLOW_COLOR, 0, 0, 1, false, 10, HINT_GLOW_DISTANCE) ?? null;
+    if (glow) {
+      // Pads the picture's framebuffer by the glow's reach, so the glow is not cut off at its edges.
+      glow.setPaddingOverride(null);
+      this.tweens.add({
+        targets: glow, outerStrength: HINT_GLOW_STRENGTH, duration: HINT_PULSE_MS, yoyo: true, repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    }
+    view.glow = glow;
+    this.tweens.add({
+      targets: view.box, scale: HINT_PULSE_SCALE, duration: HINT_PULSE_MS, yoyo: true, repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  /** Stops a block's shake or hint, and puts it back as it rests. */
+  private stopTweens(view: BlockView): void {
+    this.tweens.killTweensOf(view.box);
+    if (view.glow) {
+      this.tweens.killTweensOf(view.glow);
+      view.glow.outerStrength = 0;
+    }
+    view.box.setPosition(view.restX, view.box.y).setScale(1);
+  }
+
   /**
    * Into storey `s`: bounds off (they would clamp the pan, and follow waits while a pan
    * runs), pan to where the camera will settle, and bound it to the new storey when the pan
    * ends. Follow picks up from there.
    */
   private panToStorey(s: number): void {
+    this.viewStorey = s;
     const cam = this.cameras.main;
     const target = settleCenter(storeyView(this.climb.layout, s));
     cam.removeBounds();

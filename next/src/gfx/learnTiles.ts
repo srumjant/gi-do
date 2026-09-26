@@ -9,9 +9,15 @@ import { drawBrick, QUESTION_FILL, QUESTION_STROKE } from './tiles';
 export const LEARN_TILES_TEXTURE = 'learn-tiles';
 /** A frame per tile code, T_EMPTY's included, so a code is its own frame number. */
 const FRAMES = T_LETTER + 1;
+/** A small white square, tinted per use: the tower's sparks, brick chunks and confetti. */
+export const LEARN_SPARK_TEXTURE = 'learn-spark';
+const SPARK_PX = 3;
 
-/** The first world's brick (Doll Garden): the tower is built of the adventure's own. */
-const LEARN_BRICK = Phaser.Display.Color.HexStringToColor(LEVELS[0].brickColor).color;
+/**
+ * The first world's brick (Doll Garden): the tower is built of the adventure's own, and a
+ * knocked-out brick's chunks are tinted with it.
+ */
+export const LEARN_BRICK = Phaser.Display.Color.HexStringToColor(LEVELS[0].brickColor).color;
 /** One picture per block width the tower uses (tower.ts's blockLayout). */
 const BLOCK_WIDTHS = [...new Set(LEARN_MODES.map((mode) => blockLayout(mode).width))];
 const STONE = 0xa3a3ba;
@@ -20,8 +26,8 @@ const WOOD_LIGHT = 0xd99a58;
 const WOOD_DARK = 0x7a4a20;
 
 /**
- * Bakes the tileset and the letter-block pictures into textures, once. Idempotent: a restarted
- * tower reuses them.
+ * Bakes the tileset, the letter-block pictures and the spark into textures, once. Idempotent:
+ * a restarted tower reuses them.
  */
 export function registerLearnTiles(scene: Phaser.Scene): void {
   bake(scene, LEARN_TILES_TEXTURE, TILE * FRAMES, TILE, (g) => {
@@ -30,6 +36,9 @@ export function registerLearnTiles(scene: Phaser.Scene): void {
     drawPlank(g, T_PLANK * TILE);
     // Under the block pictures (see drawBlock); shows only if a picture is hidden.
     g.fillStyle(QUESTION_FILL).fillRect(T_LETTER * TILE, 0, TILE, TILE);
+  });
+  bake(scene, LEARN_SPARK_TEXTURE, SPARK_PX, SPARK_PX, (g) => {
+    g.fillStyle(0xffffff).fillRect(0, 0, SPARK_PX, SPARK_PX);
   });
   for (const width of BLOCK_WIDTHS) {
     bake(scene, blockTextureKey(width), width * TILE, CEILING * TILE, (g) => drawBlock(g, width));
