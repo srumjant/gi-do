@@ -1,7 +1,6 @@
 import { TILE } from '../../config/constants';
-import type { PlayerState } from '../types';
+import type { PlayerState, RumbleCue } from '../types';
 import { INSIDE, T_BRICK, T_EMPTY, T_LETTER, type TowerLayout, WALL } from './tower';
-import type { RumbleCue } from '../types';
 import { rightLine, say, targetLine } from './speech';
 import type { Cell, Climb } from './types';
 

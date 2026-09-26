@@ -121,6 +121,8 @@ export const TRANSLATIONS: Record<string, Entry> = {
   learn_find_syllable: {et:'LEIA SILP:',              en:'FIND THE SYLLABLE:'},
   learn_find_letters: {et:'LEIA TÄHED:',              en:'FIND THE LETTERS:'},
   learn_speak:        {et:'🔊 X / {X}',               en:'🔊 X / {X}'},
+  // The result screen's cheer. The voice says its own Estonian five, one per gate
+  // (game/learn/speech.ts's LEARN_CHEERS).
   learn_cheers:       {et:['TUBLI!','VÄGA HEA!','SUPER!','SUUREPÄRANE!','FANTASTILINE!'],
                        en:['WELL DONE!','VERY GOOD!','SUPER!','EXCELLENT!','FANTASTIC!']},
   learn_found:        {et:'Leitud:',                  en:'Found:'},

@@ -44,7 +44,7 @@ export type ClimbEvent =
   | { type: 'tiles'; cells: TileEdit[] }
   | { type: 'bump-right'; storey: number; block: number }
   | { type: 'bump-wrong'; storey: number; block: number }
-  /** Two misses at a gate: the right block should glow until found. */
+  /** Two misses at a gate: the right block should glow and pulse until found. */
   | { type: 'hint'; storey: number; block: number }
   /** The right block is back, after the hero ended up under its open trapdoor. */
   | { type: 'rearm'; storey: number; block: number }

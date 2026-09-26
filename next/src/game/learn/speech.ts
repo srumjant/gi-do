@@ -5,7 +5,8 @@ import type { Climb } from './types';
 
 /**
  * The voice's cheers, in Estonian like everything it says: one for each gate, in this order,
- * and the last for the star, so each tower ends on its biggest.
+ * and the last for the star, so each tower ends on its biggest. The result screen shows the
+ * same five as text, in the UI language (config/i18n.ts's `learn_cheers`).
  */
 export const LEARN_CHEERS: readonly string[] = ['Tubli!', 'Väga hea!', 'Super!', 'Suurepärane!', 'Fantastiline!'];
 

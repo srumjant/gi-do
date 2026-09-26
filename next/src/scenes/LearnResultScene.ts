@@ -6,7 +6,7 @@ import type { LearnSession } from '../game/learn/types';
 import { random } from '../game/random';
 import { getSelectedChar, getSkinIndex } from '../game/run';
 import { LEARN_FONT, LEARN_FONT_BOLD, LEARN_TEXT_RESOLUTION, preloadLearnFont } from '../gfx/learnFont';
-import { LEARN_SPARK_TEXTURE, registerLearnTiles } from '../gfx/learnTiles';
+import { LEARN_CONFETTI_COLORS, LEARN_SPARK_TEXTURE, registerLearnTiles } from '../gfx/learnTiles';
 import { registerScaledPlayerTextures, scaledPlayerTextureKey } from '../gfx/textures';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
 import { LEARN_RESULT_SCENE_KEY, LEARN_TOWER_SCENE_KEY } from './keys';
@@ -23,8 +23,6 @@ export interface LearnResultData {
 
 /** index.html:2991: the result's deep blue. */
 const BACKGROUND = '#1a2a4a';
-/** index.html:2994: the confetti's five colours, falling down the screen. */
-const CONFETTI_COLORS = [0xffdd00, 0xff69b4, 0x88ff88, 0x88ccff, 0xffaa44];
 /** How long the confetti has already been falling when the screen opens. */
 const CONFETTI_HEAD_START_MS = 6000;
 /** index.html:3000-3010: the baselines of the cheer, what was found, and the score. */
@@ -83,7 +81,7 @@ export class LearnResultScene extends Phaser.Scene {
       speedY: { min: 50, max: 90 },
       rotate: { start: 0, end: 360 },
       scale: { min: 1, max: 1.5 },
-      tint: CONFETTI_COLORS,
+      tint: LEARN_CONFETTI_COLORS,
       advance: CONFETTI_HEAD_START_MS,
     });
 

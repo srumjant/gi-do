@@ -9,9 +9,14 @@ import { drawBrick, QUESTION_FILL, QUESTION_STROKE } from './tiles';
 export const LEARN_TILES_TEXTURE = 'learn-tiles';
 /** A frame per tile code, T_EMPTY's included, so a code is its own frame number. */
 const FRAMES = T_LETTER + 1;
-/** A small white square, tinted per use: the tower's sparks, brick chunks and confetti. */
+/**
+ * A small white square, tinted per use: the tower's sparks, brick chunks and confetti. Tints
+ * are a WebGL feature; under the canvas renderer every piece is white.
+ */
 export const LEARN_SPARK_TEXTURE = 'learn-spark';
 const SPARK_PX = 3;
+/** The live learn mode's confetti (index.html:2994): the star's burst and the result screen's fall. */
+export const LEARN_CONFETTI_COLORS = [0xffdd00, 0xff69b4, 0x88ff88, 0x88ccff, 0xffaa44];
 
 /**
  * The first world's brick (Doll Garden): the tower is built of the adventure's own, and a

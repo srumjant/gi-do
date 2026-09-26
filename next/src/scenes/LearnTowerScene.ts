@@ -10,7 +10,8 @@ import type { Climb, ClimbEvent, ClimbMove, LearnSession } from '../game/learn/t
 import { type Character, PLAYER_DRAW_INSET } from '../game/player';
 import { getSelectedChar, getSkinIndex } from '../game/run';
 import {
-  blockTextureKey, LEARN_BRICK, LEARN_SPARK_TEXTURE, LEARN_TILES_TEXTURE, registerLearnTiles, toPhaserData,
+  blockTextureKey, LEARN_BRICK, LEARN_CONFETTI_COLORS, LEARN_SPARK_TEXTURE, LEARN_TILES_TEXTURE, registerLearnTiles,
+  toPhaserData,
 } from '../gfx/learnTiles';
 import { LEARN_FONT_BOLD, LEARN_TEXT_RESOLUTION, preloadLearnFont } from '../gfx/learnFont';
 import { LEARN_STAR_TEXTURE, PLAYER_POSES, playerTextureKey, registerTextures } from '../gfx/textures';
@@ -63,8 +64,6 @@ const POP_MS = 220;
 const SPARKS = 16;
 const CHUNKS_PER_BRICK = 4;
 const CONFETTI = 60;
-/** The live learn mode's celebration colours (index.html:2719). */
-const CONFETTI_COLORS = [0xffdd00, 0xff69b4, 0x88ff88, 0x88ccff, 0xffaa44];
 /**
  * The hint: Phaser's Glow round the right block, breathing, and the block swelling and
  * settling with it, so it moves as well as shines. White over the gold alone was too faint
@@ -277,7 +276,7 @@ export class LearnTowerScene extends Phaser.Scene {
       speed: { min: 80, max: 240 },
       angle: { min: 200, max: 340 },
       rotate: { start: 0, end: 360 },
-      tint: CONFETTI_COLORS,
+      tint: LEARN_CONFETTI_COLORS,
       gravityY: 250,
     }).setDepth(DEPTH_EFFECTS);
   }
