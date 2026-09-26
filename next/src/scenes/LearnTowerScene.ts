@@ -29,6 +29,12 @@ const FOLLOW_LERP = 0.15;
 /** The camera centres this far above the hero: more of the climb above than below. */
 const FOLLOW_ABOVE = 48;
 const PAN_MS = 600;
+/**
+ * Fast first, like the spring the pan follows: a right answer starts both on the same step,
+ * and a camera that eased in fell behind the hero's head. The roof's pan is the shortest,
+ * and with an ease-in the head rose 15px into the HUD band there.
+ */
+const PAN_EASE = 'Sine.easeOut';
 /** After the star, the result screen. */
 const RESULT_DELAY_MS = 2000;
 const DEPTH_BLOCK = 5;
@@ -410,7 +416,7 @@ export class LearnTowerScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const target = settleCenter(storeyView(this.climb.layout, s));
     cam.removeBounds();
-    cam.pan(target.x, target.y, PAN_MS, 'Sine.easeInOut', true, (_camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+    cam.pan(target.x, target.y, PAN_MS, PAN_EASE, true, (_camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
       if (progress === 1) this.boundToStorey(s);
     });
   }
