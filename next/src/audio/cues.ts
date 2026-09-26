@@ -1,4 +1,4 @@
-import type { SoundCue, World } from '../game/types';
+import type { EffectCue, SoundCue, World } from '../game/types';
 import { startBGM, stopBGM } from './bgm';
 import {
   sfxBlock,
@@ -19,6 +19,7 @@ import {
   sfxShoot,
   sfxStomp,
   sfxWin,
+  sfxWrong,
 } from './sfx';
 
 /**
@@ -34,6 +35,17 @@ import {
  * is on it, the index is the run's. Only `music-level` reads it.
  */
 export function playCue(cue: SoundCue, levelIndex: number): void {
+  switch (cue) {
+    // index.html:1209 — a respawn is an initLevel, and initLevel ends on startBGM(idx).
+    case 'music-level': startBGM(levelIndex); break;
+    // index.html:1631 (rescued) and :1647 (died). Both go quiet on the spot.
+    case 'music-stop': stopBGM(); break;
+    default: playEffect(cue);
+  }
+}
+
+/** A sound effect, which needs nothing but its name. The learn tower plays its cues here. */
+export function playEffect(cue: EffectCue): void {
   switch (cue) {
     case 'jump': sfxJump(); break;
     case 'fart': sfxFart(); break;
@@ -55,10 +67,11 @@ export function playCue(cue: SoundCue, levelIndex: number): void {
     case 'boss-roar': sfxBossRoar(); break;
     // index.html:1535, another bare playTone — and NOT 'boss-fire'. See audio/sfx.ts.
     case 'cannon-fire': sfxCannonFire(); break;
-    // index.html:1209 — a respawn is an initLevel, and initLevel ends on startBGM(idx).
-    case 'music-level': startBGM(levelIndex); break;
-    // index.html:1631 (rescued) and :1647 (died). Both go quiet on the spot.
-    case 'music-stop': stopBGM(); break;
+    // index.html:2743, learn mode's wrong letter.
+    case 'wrong': sfxWrong(); break;
+    default:
+      // An effect this switch does not play fails the build here, not silently in play.
+      cue satisfies never;
   }
 }
 

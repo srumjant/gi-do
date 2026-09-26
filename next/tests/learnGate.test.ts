@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TILE } from '../src/config/constants';
 import { createClimb, LEARN_MOTION, stepClimb } from '../src/game/learn/climb';
-import { blockCells, feetAbove, headBump, trapdoorCells } from '../src/game/learn/gate';
+import { blockCells, feetAbove, headBump, RIGHT_RUMBLE, trapdoorCells, WRONG_RUMBLE } from '../src/game/learn/gate';
 import { starBox, T_BRICK, T_EMPTY, T_LETTER, WALL } from '../src/game/learn/tower';
 import type { Cell, Climb } from '../src/game/learn/types';
 import { emptyInput, type InputState } from '../src/input/actions';
@@ -50,6 +50,7 @@ describe('a letter gate', () => {
     expect(c.player.vy).toBe(LEARN_MOTION.jumpForce);
     expect(codes(c, trapdoorCells(c.layout, 0)).every((code) => code === T_EMPTY)).toBe(true);
     expect(c.sounds).toContain('coin');
+    expect(c.rumbles).toEqual([RIGHT_RUMBLE]);
     expect(c.events).toContainEqual({ type: 'bump-right', storey: 0, block: answerOf(c, 0) });
   });
 
@@ -109,8 +110,17 @@ describe('a letter gate', () => {
     expect(c.score).toBe(0);
     expect(codes(c, blockCells(c.layout, 0, answerOf(c, 0))).every((code) => code === T_LETTER)).toBe(true);
     expect(c.events).toContainEqual({ type: 'bump-wrong', storey: 0, block: wrongOf(c, 0) });
+    expect(c.sounds).toContain('wrong');
+    expect(c.sounds).not.toContain('block');
+    expect(c.rumbles).toEqual([WRONG_RUMBLE]);
     expect(run(c, 120, idle, () => c.player.onGround)).toBe(true);
     expect(c.player.y + c.player.h).toBe(c.layout.storeys[0].letterFloorRow * TILE);
+  });
+
+  it('buzzes a controller light for a right letter and dull for a wrong one', () => {
+    // The September plan's two buzzes (docs/plans/2026-09-20-learn-path-refinement.md, §7).
+    expect(RIGHT_RUMBLE).toEqual({ strong: 0, weak: 0.6, dur: 120 });
+    expect(WRONG_RUMBLE).toEqual({ strong: 0.35, weak: 0, dur: 200 });
   });
 
   it('makes the right block glow after two misses', () => {
@@ -157,6 +167,8 @@ describe('a letter gate', () => {
     c.lastGround = -1;
     expect(headBump(c, blockCells(c.layout, 0, answerOf(c, 0))[0])).toBeNull();
     expect(c.gates[0].solved).toBe(false);
+    expect(c.sounds).toEqual([]);
+    expect(c.rumbles).toEqual([]);
   });
 
   it('cannot be answered again once solved', () => {

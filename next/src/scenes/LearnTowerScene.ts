@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { playCue } from '../audio/cues';
+import { playEffect } from '../audio/cues';
 import { MAX_STEPS_PER_FRAME, STEP_MS, TILE } from '../config/constants';
 import { createClimb, stepClimb } from '../game/learn/climb';
 import type { LearnMode } from '../game/learn/content';
@@ -12,6 +12,7 @@ import { getSelectedChar, getSkinIndex } from '../game/run';
 import { blockTextureKey, LEARN_TILES_TEXTURE, registerLearnTiles, toPhaserData } from '../gfx/learnTiles';
 import { LEARN_STAR_TEXTURE, PLAYER_POSES, playerTextureKey, registerTextures } from '../gfx/textures';
 import { createControls, type Controls } from '../input/controls';
+import { padRumble } from '../input/gamepad';
 import { bindBackKey, justDown, type MenuKey, padContextFor } from '../input/menuKeys';
 import { createBodyMover } from '../physics/player';
 import { applyTileFaces, applyTileFacesAt } from '../physics/tiles';
@@ -157,7 +158,8 @@ export class LearnTowerScene extends Phaser.Scene {
     while (this.accumulator >= STEP_MS) {
       stepClimb(this.climb, this.controls.read(), this.move);
       for (const event of this.climb.events.splice(0)) this.apply(event);
-      for (const cue of this.climb.sounds.splice(0)) playCue(cue, 0);
+      for (const cue of this.climb.sounds.splice(0)) playEffect(cue);
+      for (const cue of this.climb.rumbles.splice(0)) padRumble(cue);
       this.accumulator -= STEP_MS;
     }
     this.syncPlayer();

@@ -64,8 +64,8 @@ export function sfxWin(): void {
 // every sound in index.html, and the way this port's first pass over the audio went —
 // misses all three. There are ten such calls live; these are the three in code this port
 // ran when they were found. Of the other seven, the boss's three and the cannon's shot
-// are named further down this file now that both are ported; what is left is learn
-// mode's, which this port does not have.
+// are named further down this file now that both are ported, and the last, learn mode's
+// wrong answer, is sfxWrong at the bottom.
 //
 // Named here, rather than left inline at the call sites, so that the port has one file
 // that answers "what noises can this game make?".
@@ -143,4 +143,12 @@ export function sfxBossCharge(): void {
 export function sfxBossRoar(): void {
   playTone(80, 0.5, 'sawtooth', 0.15, 50);
   setTimeout(() => playTone(60, 0.4, 'square', 0.12, 40), 150);
+}
+
+/**
+ * A wrong letter in learn mode (index.html:2743): a low 150Hz triangle sliding down to 100,
+ * and soft. A wrong answer costs nothing, so it must not sound like getting hurt.
+ */
+export function sfxWrong(): void {
+  playTone(150, 0.15, 'triangle', 0.08, 100);
 }

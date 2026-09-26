@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import url from 'node:url';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeAudioContext } from './helpers/fakeAudio';
 import { setAudioContext } from '../src/audio/context';
@@ -167,4 +170,26 @@ describe('playTone call sequence matches the live game', () => {
       expect(portCalls).toEqual(legacy.CALLS);
     });
   }
+});
+
+/**
+ * Learn mode's wrong-answer tone is a bare `playTone` in the live learn update
+ * (index.html:2743), like the boss's three and the cannon's shot: there is no named function
+ * to load and call. So it is checked the way boss.test.ts checks those: the call it was copied
+ * from has to still be in index.html, spelled like this, and sfxWrong has to make exactly it.
+ */
+describe("the wrong-answer tone is the live learn mode's", () => {
+  const here = path.dirname(url.fileURLToPath(import.meta.url));
+  const source = fs.readFileSync(path.resolve(here, '../../index.html'), 'utf8');
+
+  it('is still spelled that way (index.html:2743)', () => {
+    expect(source).toContain("playTone(150,.15,'triangle',.08,100)");
+  });
+
+  it('is the one call sfxWrong makes', () => {
+    vi.mocked(playTone).mockClear();
+    sfx.sfxWrong();
+    vi.runAllTimers();
+    expect(vi.mocked(playTone).mock.calls).toEqual([[150, 0.15, 'triangle', 0.08, 100]]);
+  });
 });

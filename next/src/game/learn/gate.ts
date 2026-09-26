@@ -1,7 +1,16 @@
 import { TILE } from '../../config/constants';
 import type { PlayerState } from '../types';
 import { INSIDE, T_BRICK, T_EMPTY, T_LETTER, type TowerLayout, WALL } from './tower';
+import type { RumbleCue } from '../types';
 import type { Cell, Climb } from './types';
+
+/**
+ * The September plan's two buzzes (docs/plans/2026-09-20-learn-path-refinement.md, §7): a
+ * short one on the light motor for a right letter, a longer, duller one on the heavy motor
+ * for a wrong one.
+ */
+export const RIGHT_RUMBLE: RumbleCue = { strong: 0, weak: 0.6, dur: 120 };
+export const WRONG_RUMBLE: RumbleCue = { strong: 0.35, weak: 0, dur: 200 };
 
 /**
  * The hero's feet are above the top of map row `row`. A letter ceiling's top row is the next
@@ -73,11 +82,13 @@ export function headBump(c: Climb, hit: Cell): BumpOutcome {
     gate.trapdoorOpen = true;
     setCells(c, trapdoorCells(c.layout, storey), T_EMPTY);
     c.sounds.push('coin');
+    c.rumbles.push(RIGHT_RUMBLE);
     c.events.push({ type: 'bump-right', storey, block });
     return 'right';
   }
   gate.mistakes++;
-  c.sounds.push('block');
+  c.sounds.push('wrong');
+  c.rumbles.push(WRONG_RUMBLE);
   c.events.push({ type: 'bump-wrong', storey, block });
   if (gate.mistakes === 2) {
     c.events.push({ type: 'hint', storey, block: answerIndex(c.layout, storey) });

@@ -56,6 +56,7 @@ export function createClimb(mode: LearnMode, used: string[], character: Characte
     finished: false,
     score: 0,
     sounds: [],
+    rumbles: [],
     events: [],
   };
 }

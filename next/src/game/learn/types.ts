@@ -1,5 +1,5 @@
 import type { BodyMover } from '../player';
-import type { PlayerState, SoundCue } from '../types';
+import type { EffectCue, PlayerState, RumbleCue } from '../types';
 import type { TowerLayout } from './tower';
 
 /** A map cell: column and row of the tower's map. */
@@ -23,7 +23,8 @@ export interface GateState {
 
 /**
  * What the scene has to show for a step, in the order it happened. Sounds ride
- * `Climb.sounds`, exactly as the adventure's ride `World.sounds`.
+ * `Climb.sounds` and buzzes `Climb.rumbles`, exactly as the adventure's ride `World.sounds`
+ * and `World.rumbles`.
  */
 export type ClimbEvent =
   /** Map cells changed; mirror them on the Phaser layer. */
@@ -55,7 +56,8 @@ export interface Climb {
   sprung: boolean;
   finished: boolean;
   score: number;
-  sounds: SoundCue[];
+  sounds: EffectCue[];
+  rumbles: RumbleCue[];
   events: ClimbEvent[];
 }
 
