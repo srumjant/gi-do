@@ -94,6 +94,45 @@ describe('the voice', () => {
     expect(heard(c)).toEqual([{ text: target(c, 0), when: 'now' }]);
   });
 
+  it("on the way up through a trapdoor, X says the next storey's target, and landing stays quiet", () => {
+    const c = climb();
+    standUnder(c, 0, answerOf(c, 0));
+    run(c, 40, held, () => c.gates[0].solved);
+    heard(c);
+    stepClimb(c, { ...emptyInput(), firePressed: true }, towerMove(c.layout.map));
+    expect(c.storey).toBe(0); // still in the trapdoor
+    expect(heard(c)).toEqual([{ text: target(c, 1), when: 'now' }]);
+    run(c, 150, idle, () => c.storey === 1 && c.player.onGround);
+    run(c, 30, idle, () => false);
+    expect(heard(c)).toEqual([]);
+  });
+
+  it('in a new storey before landing, X says its target once', () => {
+    const c = climb();
+    standUnder(c, 0, answerOf(c, 0));
+    run(c, 40, held, () => c.gates[0].solved);
+    run(c, 40, idle, () => c.storey === 1);
+    expect(c.player.onGround).toBe(false);
+    heard(c);
+    stepClimb(c, { ...emptyInput(), firePressed: true }, towerMove(c.layout.map));
+    expect(heard(c)).toEqual([{ text: target(c, 1), when: 'now' }]);
+    run(c, 150, idle, () => c.player.onGround);
+    run(c, 30, idle, () => false);
+    expect(heard(c)).toEqual([]);
+  });
+
+  it('counts every line toward the four seconds, not only the ones said on the ground', () => {
+    const c = climb();
+    c.steps = 2 * REPEAT_GAP; // the tower's first line is long past
+    const move = towerMove(c.layout.map);
+    stepClimb(c, { ...emptyInput(), firePressed: true }, move);
+    heard(c);
+    standUnder(c, 0, answerOf(c, 0));
+    c.lastGround = -1; // as if just up from the plank below
+    stepClimb(c, idle(), move);
+    expect(heard(c)).toEqual([]);
+  });
+
   it('has nothing to say to X on the roof', () => {
     const c = climb();
     c.storey = c.layout.storeys.length;

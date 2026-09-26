@@ -44,6 +44,20 @@ export function say(c: Climb, text: string, when: 'now' | 'after'): void {
 }
 
 /**
+ * X: the target, now. On the way up through a trapdoor the gate below is answered (and not
+ * re-armed), so X gives the next storey's target instead of the letter just found. Saying a
+ * storey's target this way counts as its announcement, so landing there stays quiet. Nothing
+ * on the roof.
+ */
+export function speakOnX(c: Climb): void {
+  const gate = c.gates[c.storey];
+  const s = gate && !gate.armed ? c.storey + 1 : c.storey;
+  if (s >= c.layout.storeys.length) return;
+  say(c, targetLine(c.layout, s), 'now');
+  c.announced = Math.max(c.announced, s);
+}
+
+/**
  * The voice on the ground. The first time the hero stands in a new storey, that storey's
  * target, after whatever is still being said (the right answer's cheer). And on arriving on
  * a letter floor from below, the target again, unless the voice has spoken in the last

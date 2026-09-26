@@ -9,7 +9,7 @@ import { rectOverlap } from '../tiles';
 import type { PlayerState } from '../types';
 import { type LearnMode, pickTargets, type Rand } from './content';
 import { closeTrapdoors, feetAbove, headBump, rearmIfStranded } from './gate';
-import { say, speakOnGround, starLine, targetLine } from './speech';
+import { say, speakOnGround, speakOnX, starLine, targetLine } from './speech';
 import { buildTower, starBox, WALL } from './tower';
 import type { Climb, ClimbMove } from './types';
 
@@ -71,13 +71,13 @@ export function createClimb(mode: LearnMode, used: string[], character: Characte
 /**
  * One fixed step of the climb: the adventure's movement, the mover, then the gate rules on
  * what the head hit, the trapdoors, where the hero now stands, the voice, the walk cycle and
- * the star. X asks the voice for the target again, anywhere below the roof.
+ * the star. X asks the voice for the target (speech.ts's speakOnX).
  */
 export function stepClimb(c: Climb, input: InputState, move: ClimbMove): void {
   if (c.finished) return;
   c.steps++;
   const p = c.player;
-  if (input.firePressed && c.storey < c.layout.storeys.length) say(c, targetLine(c.layout, c.storey), 'now');
+  if (input.firePressed) speakOnX(c);
 
   stepMotion(p, input, LEARN_MOTION, c.sounds, { noJumpCut: c.sprung });
   if (c.sprung && p.vy >= 0) c.sprung = false;
