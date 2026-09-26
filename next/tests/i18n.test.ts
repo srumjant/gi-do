@@ -19,6 +19,9 @@ const legacy = loadLegacySection({
  * inside drawLearn, drawLearnMenu and drawLearnResult rather than keeping them in
  * TRANSLATIONS, so the port's versions are new keys with both languages.
  *
+ * The `fullscreen_*` keys are the full-screen button's tooltip, which the live game gives as
+ * a hardcoded English "Fullscreen" (index.html:52).
+ *
  * An unlisted extra key fails the same assertion a missing live key does, which is the point
  * — the list is a short, deliberate exception, not a hole.
  */
@@ -30,6 +33,7 @@ const PORT_ONLY_KEYS = [
   'learn_menu_hint',
   'learn_find_letter', 'learn_find_syllable', 'learn_find_letters',
   'learn_speak', 'learn_cheers', 'learn_found', 'learn_result_hint',
+  'fullscreen_on', 'fullscreen_off',
 ];
 
 describe('translations match the live game', () => {

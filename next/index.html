@@ -6,12 +6,31 @@
   <title>Gigi &amp; Dodo</title>
   <style>
     html, body { margin: 0; height: 100%; background: #10131a; overflow: hidden; }
-    #game { width: 100%; height: 100%; }
-    #game canvas { image-rendering: pixelated; display: block; margin: 0 auto; }
+    /* The game's container is also what goes full screen (main.ts), so it paints the page's
+       colour itself: behind a full-screen element the browser shows black. */
+    #game { position: relative; width: 100%; height: 100%; background: #10131a; }
+    /* Phaser sizes, centres and pixelates the canvas itself (FIT, CENTER_BOTH, pixelArt). */
+    #game canvas { display: block; }
+    /* The full-screen button, the live game's (index.html:17-18). gfx/fullscreen.ts wires it. */
+    #fullscreen {
+      position: absolute; top: 8px; right: 8px; z-index: 1; width: 40px; height: 40px; padding: 0;
+      display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff;
+      background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.4); border-radius: 8px;
+      transition: opacity 0.4s;
+    }
+    #fullscreen:hover, #fullscreen:active { background: rgba(255,255,255,0.4); }
+    #fullscreen[hidden] { display: none; }
+    #fullscreen.idle:not(:hover) { opacity: 0; }
+    #fullscreen.on .enter, #fullscreen:not(.on) .leave { display: none; }
   </style>
 </head>
 <body>
-  <div id="game"></div>
+  <div id="game">
+    <button id="fullscreen" type="button" tabindex="-1" hidden>
+      <svg class="enter" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>
+      <svg class="leave" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></svg>
+    </button>
+  </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

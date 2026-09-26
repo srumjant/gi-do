@@ -31,6 +31,9 @@ export const TRANSLATIONS: Record<string, Entry> = {
   // Art style selector
   style_flat:         {et:'F = kangas',               en:'F = felt'},
   style_felt:         {et:'F = tavaline',             en:'F = normal'},
+  // Full-screen button (gfx/fullscreen.ts): its tooltip
+  fullscreen_on:      {et:'Täisekraan',               en:'Full screen'},
+  fullscreen_off:     {et:'Välju täisekraanist',      en:'Exit full screen'},
   // Difficulty
   select_diff:        {et:'VALI RASKUSASTE',          en:'SELECT DIFFICULTY'},
   super_easy:         {et:'Ülikerge',                 en:'Super Easy'},
