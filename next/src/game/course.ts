@@ -1,9 +1,9 @@
 import { TILE } from '../config/constants';
 import {
-  TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_PLANK, TILE_SPRING,
+  TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_LAVA, TILE_PLANK, TILE_SPRING,
   type CourseDef, type StationKind,
 } from '../data/levels';
-import { grantSillyPowerup } from './player';
+import { grantSillyPowerup, playerDie } from './player';
 import { getTile, rectOverlap } from './tiles';
 import { PICKUP_RUMBLE, type Rect, type World } from './types';
 
@@ -66,7 +66,7 @@ export interface StationState {
 
 /** Something the scene should make a little show of. Positions in pixels. */
 export interface CourseFx {
-  kind: 'smash' | 'plank' | 'gate' | 'target' | 'flag' | 'spring' | 'station';
+  kind: 'smash' | 'plank' | 'gate' | 'target' | 'flag' | 'spring' | 'station' | 'splash' | 'vent';
   x: number;
   y: number;
 }
@@ -78,6 +78,8 @@ export interface CourseState {
   flags: Array<{ x: number; y: number }>;
   /** Doors (`:`), open until the player is through, then shut for good. */
   doors: Array<{ x: number; cells: Array<{ x: number; y: number }>; shut: boolean }>;
+  /** Vents in the lava, each counting down to its next fireball. */
+  vents: Array<{ x: number; y: number; timer: number }>;
   /**
    * Bumped whenever this module rewrites a map cell, so the scene knows to redraw the
    * tiles it owns (cracked blocks, planks) without comparing the whole map every frame.
@@ -110,6 +112,8 @@ export function buildCourse(def: CourseDef): CourseState {
     })),
     flags: def.flags.map((f) => ({ ...f })),
     doors: def.doors.map((d) => ({ x: d.x, cells: d.cells.map((c) => ({ ...c })), shut: false })),
+    // Out of step with each other, so a row of vents is a rhythm to read, not one wall of fire.
+    vents: def.vents.map((v) => ({ ...v, timer: 60 + ((v.x * 37) % 90) })),
     mapVersion: 0,
     fx: [],
   };
@@ -278,6 +282,76 @@ function stepFlags(world: World, course: CourseState): void {
   }
 }
 
+/** Frames a vent glows before it erupts. */
+export const VENT_WARN_FRAMES = 45;
+
+/** Frames between a vent's fireballs: slow on super easy, quick on hard. */
+export function ventInterval(dc: { enemyShootInterval: number }): number {
+  return Math.round(dc.enemyShootInterval * 0.9) + 40;
+}
+
+/** Whether a vent is about to erupt: the scene makes it glow. */
+export function ventWarning(vent: { timer: number }): boolean {
+  return vent.timer <= VENT_WARN_FRAMES;
+}
+
+/**
+ * Lava under the hero's feet is a fall, as a pit is: a cape throws them up out of it, once, as
+ * from a pit (player.ts), and without one it is the end of a life.
+ */
+function stepLava(world: World, course: CourseState): void {
+  const p = world.player;
+  if (world.dead) return;
+  const y0 = Math.floor((p.y + p.h - 4) / TILE);
+  const y1 = Math.floor((p.y + p.h - 1) / TILE);
+  const x0 = Math.floor((p.x + 2) / TILE);
+  const x1 = Math.floor((p.x + p.w - 3) / TILE);
+  for (let ty = y0; ty <= y1; ty++) {
+    for (let tx = x0; tx <= x1; tx++) {
+      if (world.map[ty]?.[tx] !== TILE_LAVA) continue;
+      pushFx(course, { kind: 'splash', x: p.x + p.w / 2, y: ty * TILE });
+      if (p.hasCape) {
+        p.hasCape = false;
+        p.invincible = 60;
+        p.vy = -10;
+        p.liftTimer = 30;
+        p.y = ty * TILE - p.h - 1;
+        world.sounds.push('cape');
+      } else {
+        playerDie(world);
+      }
+      return;
+    }
+  }
+}
+
+/**
+ * How near the hero a vent has to be to erupt. A cannon only fires once it is spawned, near the
+ * hero; a vent is part of the map, and far off it was a cannon's bang every second and a half,
+ * all level long, from nothing on screen (browser, 2026-11-22).
+ */
+export const VENT_REACH = 20 * TILE;
+
+/** Each vent near the hero counts down, glows (ventWarning), and spits a fireball straight up. */
+function stepVents(world: World, course: CourseState): void {
+  const p = world.player;
+  for (const v of course.vents) {
+    if (Math.abs(v.x * TILE - (p.x + p.w / 2)) > VENT_REACH) continue;
+    if (--v.timer > 0) continue;
+    v.timer = ventInterval(world.dc);
+    world.enemyProjectiles.push({
+      x: v.x * TILE + 4,
+      y: v.y * TILE - 8,
+      vx: 0,
+      vy: -(2.4 + world.dc.enemySpeed),
+      life: 50,
+      type: 'fireball',
+    });
+    world.sounds.push('cannon-fire');
+    pushFx(course, { kind: 'vent', x: v.x * TILE + TILE / 2, y: v.y * TILE });
+  }
+}
+
 /**
  * One step of the course, after the arrows have flown and the enemies have moved, and
  * before the rescue check and the camera. Called by world.ts's stepWorld only
@@ -291,6 +365,8 @@ export function stepCourse(world: World): void {
   stepDoors(world, course);
   stepCracked(world, course);
   stepSprings(world, course);
+  stepVents(world, course);
+  stepLava(world, course);
   stepFlags(world, course);
 }
 

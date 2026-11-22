@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { TILE } from '../config/constants';
-import { TILE_CRACKED, TILE_GATE, TILE_PLANK, TILE_SPRING, type StationKind } from '../data/levels';
+import { TILE_CRACKED, TILE_GATE, TILE_LAVA, TILE_PLANK, TILE_SPRING, type StationKind } from '../data/levels';
 import { POWERUP_INFO } from '../data/powerups';
-import type { CourseState, StationState, TargetState } from '../game/course';
+import { ventWarning, type CourseState, type StationState, type TargetState } from '../game/course';
 import type { EnemyState, World } from '../game/types';
 import { WORLD_TEXT_RESOLUTION } from './gameFont';
 import { BOW_TEXTURE, SUPER_TEXTURE, spriteScale } from './textures';
@@ -30,7 +30,7 @@ const COURSE_FLAG_TEXTURE = 'course-flag';
 const COURSE_POLE_TEXTURE = 'course-pole';
 
 /** One tileset frame per tile code, so a map cell's code IS its frame. 0..9. */
-const FRAMES = TILE_GATE + 1;
+const FRAMES = TILE_LAVA + 1;
 const SPARK_PX = 3;
 
 const CRACKED_FILL = 0xb58b62;
@@ -107,6 +107,19 @@ function drawGate(g: Phaser.GameObjects.Graphics, x: number): void {
   g.fillStyle(GATE_BAR).fillRect(x, 6, TILE, 2);
 }
 
+const LAVA = 0xff6a1a;
+const LAVA_DEEP = 0xc8320f;
+const LAVA_BRIGHT = 0xffd04a;
+const EMBERS = [0xffd04a, 0xff8a2a, 0xff4a1a];
+
+/** Lava: hot orange over a deeper red, with bright bubbles, so it reads as "don't". */
+function drawLava(g: Phaser.GameObjects.Graphics, x: number): void {
+  g.fillStyle(LAVA_DEEP).fillRect(x, 0, TILE, TILE);
+  g.fillStyle(LAVA).fillRect(x, 0, TILE, 10);
+  g.fillStyle(LAVA_BRIGHT).fillRect(x, 0, TILE, 2);
+  g.fillStyle(LAVA_BRIGHT).fillCircle(x + 4, 5, 1.5).fillCircle(x + 11, 7, 2);
+}
+
 /** Every texture the course draws with. Cheap, and safe to call on every level start. */
 export function registerCourseTextures(scene: Phaser.Scene): void {
   bake(scene, COURSE_TILES_TEXTURE, TILE * FRAMES, TILE, (g) => {
@@ -114,6 +127,7 @@ export function registerCourseTextures(scene: Phaser.Scene): void {
     drawSpring(g, TILE_SPRING * TILE);
     drawPlank(g, TILE_PLANK * TILE);
     drawGate(g, TILE_GATE * TILE);
+    drawLava(g, TILE_LAVA * TILE);
   });
   bake(scene, COURSE_SPARK_TEXTURE, SPARK_PX, SPARK_PX, (g) => {
     g.fillStyle(0xffffff).fillRect(0, 0, SPARK_PX, SPARK_PX);
@@ -147,7 +161,7 @@ export function registerCourseTextures(scene: Phaser.Scene): void {
 /** The course's tiles only, as Phaser data: every other code is drawn by gfx/tiles.ts. */
 function courseOnly(code: number): number {
   return code === TILE_CRACKED || code === TILE_SPRING || code === TILE_PLANK || code === TILE_GATE
-    ? code : -1;
+    || code === TILE_LAVA ? code : -1;
 }
 
 interface StationView {
@@ -182,6 +196,12 @@ export class CourseView {
   private readonly chunks: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly sparks: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly dust: Phaser.GameObjects.Particles.ParticleEmitter;
+  /** Embers off the lava, a splash when someone falls in, a burst from an erupting vent. */
+  private readonly embers: Phaser.GameObjects.Particles.ParticleEmitter;
+  /** Vents glowing before they erupt, redrawn every frame. */
+  private readonly ventGlow: Phaser.GameObjects.Graphics;
+  /** Every lava cell, for the embers to rise from: the lava never moves. */
+  private readonly lavaCells: Array<{ x: number; y: number }> = [];
   private drawnCourse: CourseState | null = null;
   private drawnVersion = -1;
   private lastRoar = -999;
@@ -266,6 +286,20 @@ export class CourseView {
       tint: [0xe8d2a8, 0xffffff],
       alpha: { start: 0.9, end: 0 },
     }).setDepth(DEPTH_COURSE_FX);
+    this.embers = scene.add.particles(0, 0, COURSE_SPARK_TEXTURE, {
+      emitting: false,
+      lifespan: 900,
+      speedX: { min: -20, max: 20 },
+      speedY: { min: -90, max: -30 },
+      scale: { start: 1.3, end: 0 },
+      tint: EMBERS,
+      gravityY: 40,
+    }).setDepth(DEPTH_COURSE_FX);
+    this.ventGlow = scene.add.graphics().setDepth(DEPTH_COURSE_TILES + 0.5);
+    world.map.forEach((row, ty) => row.forEach((code, tx) => {
+      // Only the surface: the top cell of each run of lava.
+      if (code === TILE_LAVA && world.map[ty - 1]?.[tx] !== TILE_LAVA) this.lavaCells.push({ x: tx, y: ty });
+    }));
   }
 
   /** The course the World holds NOW: a respawn replaces it with a fresh one. */
@@ -321,6 +355,22 @@ export class CourseView {
     this.syncTargets();
     this.syncFlags(world);
     this.syncGiants(world);
+    this.syncLava(world, course);
+  }
+
+  /** Vents glow before they erupt; now and then an ember rises off lava near the hero. */
+  private syncLava(world: World, course: CourseState): void {
+    const g = this.ventGlow.clear();
+    for (const v of course.vents) {
+      if (!ventWarning(v)) continue;
+      const pulse = 0.45 + Math.sin(world.animFrame * 0.4) * 0.25;
+      g.fillStyle(LAVA_BRIGHT, pulse).fillCircle(v.x * TILE + TILE / 2, v.y * TILE + 2, 7);
+    }
+    if (this.lavaCells.length === 0 || world.animFrame % 10 !== 0) return;
+    const px = world.player.x / TILE;
+    const near = this.lavaCells.filter((c) => Math.abs(c.x - px) < 16);
+    const cell = near[Math.floor(Math.random() * near.length)];
+    if (cell) this.embers.explode(2, cell.x * TILE + Math.random() * TILE, cell.y * TILE + 2);
   }
 
   /** Puts and removes only the cells that changed, so Phaser re-uploads almost nothing. */
@@ -343,6 +393,8 @@ export class CourseView {
         case 'smash': this.chunks.explode(6, fx.x, fx.y); break;
         case 'plank': this.dust.explode(5, fx.x, fx.y); break;
         case 'gate': this.chunks.explode(4, fx.x, fx.y); break;
+        case 'splash': this.embers.explode(24, fx.x, fx.y); break;
+        case 'vent': this.embers.explode(12, fx.x, fx.y); break;
         case 'target': this.sparks.explode(40, fx.x, fx.y); break;
         case 'flag': this.sparks.explode(24, fx.x, fx.y); break;
         case 'spring': this.dust.explode(8, fx.x, fx.y); break;

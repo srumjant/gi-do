@@ -1,4 +1,4 @@
-import type { DollQueenState } from './bosses/dollQueen';
+import type { CourseBoss } from './bosses';
 import type { CourseState } from './course';
 import type { TileMap, Level } from '../data/levels';
 import type { DifficultyRecord } from '../config/difficulty';
@@ -846,7 +846,7 @@ export interface World {
    * The boss of a hand-built level that ends with one (game/bosses/), rebuilt with the level
    * like the blocks; `null` everywhere else. The original Toy Castle's T-Rex is `boss`.
    */
-  courseBoss: DollQueenState | null;
+  courseBoss: CourseBoss | null;
   /**
    * The last checkpoint flag touched on a course, in tiles, or `null`. NOT rebuilt by a
    * respawn, which is the whole point: `respawnLevel` puts the player back here.

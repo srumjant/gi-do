@@ -89,6 +89,7 @@ export function dizzyFrames(dc: DifficultyRecord): number {
 }
 
 export function buildDollQueen(def: BossDef, dc: DifficultyRecord): DollQueenState {
+  if (def.spots.length === 0) throw new Error('the Doll Queen needs her target spots, 1, 2, 3');
   const floorY = def.y * TILE;
   return {
     kind: 'dollQueen',

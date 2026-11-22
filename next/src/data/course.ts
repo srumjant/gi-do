@@ -1,9 +1,9 @@
 import type {
-  BossDef, CourseDef, EnemyDef, Level, LevelEnding, StationKind, TileMap, Villain,
+  BossDef, BossKind, CourseDef, EnemyDef, Level, LevelEnding, StationKind, TileMap, Villain,
 } from './levels';
 import {
-  isSolid, LEVELS, TILE_BRICK, TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_GROUND, TILE_PLANK,
-  TILE_QUESTION, TILE_RAINBOW, TILE_SPRING,
+  isSolid, LEVELS, TILE_BRICK, TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_GROUND, TILE_LAVA,
+  TILE_PLANK, TILE_QUESTION, TILE_RAINBOW, TILE_SPRING,
 } from './levels';
 
 /**
@@ -27,6 +27,7 @@ import {
  *   t  a helper target: the T nearest it opens only once this is hit too
  *   :  door: open until the player is through it, then it shuts behind them
  *   Q  the boss, where she stands    1 2 3  where her targets stand, round by round
+ *   ~  lava: falling in is a fall     v  a vent in the lava: it spits fireballs straight up
  *   b  bow       c  cape       f  fart jump     h  big head     k  chicken ray
  *      (these come back a few seconds after they are taken)
  *   F  checkpoint flag: a death brings you back to the last one you touched
@@ -54,6 +55,7 @@ const STATION_LETTERS: Record<string, StationKind> = {
 const TILE_LETTERS: Record<string, number> = {
   '#': TILE_GROUND, B: TILE_BRICK, '?': TILE_QUESTION, C: TILE_CRACKED, S: TILE_SPRING, '|': TILE_GATE,
   '!': TILE_RAINBOW,
+  '~': TILE_LAVA, v: TILE_LAVA,
 };
 
 /** The sections laid side by side into one picture, a string per row. */
@@ -144,6 +146,7 @@ export function parseCourse(rows: readonly string[]): ParsedCourse {
   let cat: number | null = null;
   const helpers: Array<{ x: number; y: number }> = [];
   const spots: Array<{ n: number; x: number; y: number }> = [];
+  const vents: CourseDef['vents'] = [];
   const stations: CourseDef['stations'] = [];
   const flags: CourseDef['flags'] = [];
 
@@ -154,6 +157,7 @@ export function parseCourse(rows: readonly string[]): ParsedCourse {
       else if (ch === 'R') rescuePos = [x, y];
       else if (ch === 'Q') queen = { x, y: floorBelow(map, x, y) };
       else if (ch === '@') cat = x;
+      else if (ch === 'v') vents.push({ x, y });
       else if (ch === 't') helpers.push({ x, y });
       else if (ch >= '1' && ch <= '9') spots.push({ n: Number(ch), x, y });
       else if (ch === 'T') targets.push({ x, y });
@@ -197,7 +201,6 @@ export function parseCourse(rows: readonly string[]): ParsedCourse {
   let boss: BossDef | undefined;
   const found = queen as { x: number; y: number } | null;
   if (found) {
-    if (spots.length === 0) throw new Error('a boss needs its target spots, 1, 2, 3');
     spots.sort((a, b) => a.n - b.n);
     const behind = doors.filter((d) => d.x < found.x).map((d) => d.x + 4);
     const rx = (rescuePos as [number, number])[0];
@@ -221,6 +224,7 @@ export function parseCourse(rows: readonly string[]): ParsedCourse {
       stations,
       flags,
       doors,
+      vents,
       ...(boss ? { boss } : {}),
     },
   };
@@ -238,6 +242,8 @@ export interface CourseLevelSpec {
   ending?: LevelEnding;
   villain?: Villain;
   indoors?: boolean;
+  /** Which boss the level's Q is (the Doll Queen if it does not say). */
+  boss?: BossKind;
 }
 
 /**
@@ -266,7 +272,9 @@ export function courseLevel(spec: CourseLevelSpec): Level {
     // The cat, where the level puts one (@).
     catPosition: parsed.cat,
     clouds: theme.clouds,
-    course: parsed.course,
+    course: spec.boss && parsed.course.boss
+      ? { ...parsed.course, boss: { ...parsed.course.boss, kind: spec.boss } }
+      : parsed.course,
     ...(spec.ending ? { ending: spec.ending } : {}),
     ...(spec.villain ? { villain: spec.villain } : {}),
     ...(spec.indoors ? { indoors: true } : {}),

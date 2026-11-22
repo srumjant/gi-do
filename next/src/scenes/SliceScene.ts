@@ -22,6 +22,7 @@ import {
 import { createWorld, rescueSpot, stepWorld, type RescueSpot } from '../game/world';
 import { CourseView } from '../gfx/course';
 import { DollQueenView } from '../gfx/dollQueen';
+import { PterodactylView } from '../gfx/pterodactyl';
 import type { EnemyState, World } from '../game/types';
 import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
 import { GAME_FONT_BOLD, WORLD_TEXT_RESOLUTION } from '../gfx/gameFont';
@@ -48,10 +49,14 @@ import {
   cloudTextureKey,
   enemyTextureKey,
   VILLAIN_TEXTURES,
+  FLYING_VILLAINS,
+  PTERO_DOWN_TEXTURE,
+  PTERO_UP_TEXTURE,
   ZOMBIE_KINDS,
   zombieTextureKey,
   FIREBALL_TEXTURE,
   QUEEN_HEART_TEXTURE,
+  ROCK_TEXTURE,
   playerBodyTextureKey,
   playerHeadTextureKey,
   PLAYER_POSES,
@@ -314,6 +319,8 @@ export class SliceScene extends Phaser.Scene {
   private villainImage!: Phaser.GameObjects.Image;
   /** The Doll Queen, on the level that ends with her (gfx/dollQueen.ts). */
   private queenView!: DollQueenView;
+  /** The Pterodactyl, on the level that ends with her (gfx/pterodactyl.ts). */
+  private pteroView!: PterodactylView;
   private cageBackGraphics!: Phaser.GameObjects.Graphics;
   private cageBarsGraphics!: Phaser.GameObjects.Graphics;
   private rescueCryText!: Phaser.GameObjects.Text;
@@ -433,6 +440,7 @@ export class SliceScene extends Phaser.Scene {
       .setVisible(false);
 
     this.queenView = new DollQueenView(this);
+    this.pteroView = new PterodactylView(this);
 
     this.catPickupImage = this.hiddenImage(CAT_TEXTURE, DEPTH_PICKUP);
     this.catImage = this.hiddenImage(CAT_TEXTURE, DEPTH_CAT);
@@ -899,6 +907,7 @@ export class SliceScene extends Phaser.Scene {
     this.syncRescue();
     this.syncBoss();
     this.queenView.update(this.world);
+    this.pteroView.update(this.world);
     this.syncEnemyProjectiles();
     this.syncArrows();
     this.syncPlayer();
@@ -1064,16 +1073,35 @@ export class SliceScene extends Phaser.Scene {
    */
   private syncVillain(spot: RescueSpot): void {
     const { won, stateTimer, animFrame, level } = this.world;
+    const run = won ? 200 - stateTimer : 0;
+    if (level.villain && FLYING_VILLAINS.has(level.villain)) {
+      // A flier hovers over the spot with the sibling hanging from her feet, wings beating,
+      // and when the hero comes she climbs away, steeply (there is a wall behind her), out of
+      // the top.
+      const x = spot.x + 8 + run * 0.5;
+      const bottom = spot.y + spot.h - 2 - run * 3 + Math.sin(animFrame * 0.12) * 3;
+      const flap = Math.floor(animFrame / (won ? 5 : 8)) % 2 === 1;
+      // Her sprite faces left, at the hero; flying off, she turns to the right.
+      this.villainImage.setTexture(flap ? PTERO_DOWN_TEXTURE : PTERO_UP_TEXTURE).setVisible(true).setFlipX(won);
+      this.villainImage.setScale(spriteScale(this.villainImage));
+      this.villainImage.setPosition(x, bottom - spot.h + 4);
+      this.rescueImage.setPosition(x - 8, bottom - spot.h);
+      this.rescueCryText
+        .setVisible(animFrame % 80 < 50)
+        .setPosition(x - RESCUE_TEXT_OFFSET_X, bottom - spot.h - this.villainImage.displayHeight - 4);
+      return;
+    }
     // Caught at last? No: a little hop of glee where she stands, then a leap up and away over
     // whatever is behind her (a wall, the tower's edge), out of the top of the screen.
-    const run = won ? 200 - stateTimer : 0;
     const leap = Math.max(0, run - 24);
     const x = spot.x + 8 + leap * 1.6;
     const floor = spot.y + spot.h - (run < 24 ? Math.abs(Math.sin(run * 0.4)) * 8 : leap * 3);
     this.villainImage
       .setTexture(VILLAIN_TEXTURES[level.villain ?? 'dollQueen'])
       .setVisible(true)
+      .setFlipX(false)
       .setPosition(x, floor);
+    this.villainImage.setScale(spriteScale(this.villainImage));
     const top = floor - this.villainImage.displayHeight;
     this.rescueImage.setPosition(x - 8, top - spot.h + 6 + Math.sin(animFrame * 0.2) * 2);
     this.rescueCryText
@@ -1317,16 +1345,18 @@ export class SliceScene extends Phaser.Scene {
         FIREBALL_TEXTURE,
         DEPTH_ENEMY_PROJECTILE,
       );
-      // The Doll Queen throws hearts (game/bosses/dollQueen.ts); everything else is a fireball.
+      // The Doll Queen throws hearts and the Pterodactyl drops rocks (game/bosses/); everything
+      // else is a fireball, and only a fireball leaves a trail.
       const heart = shot.type === 'heart';
-      image.setTexture(heart ? QUEEN_HEART_TEXTURE : FIREBALL_TEXTURE);
+      const rock = shot.type === 'rock';
+      image.setTexture(heart ? QUEEN_HEART_TEXTURE : rock ? ROCK_TEXTURE : FIREBALL_TEXTURE);
       image.setScale(spriteScale(image) * (heart ? 0.6 : 1));
       const flicker = Math.sin(animFrame * 0.3 + shot.x) * 0.3;
       image
         .setPosition(shot.x, shot.y)
         .setAlpha(0.8 + flicker * 0.2)
         .setVisible(true);
-      if (!heart) {
+      if (!heart && !rock) {
         const trailX = shot.vx > 0 ? shot.x - 4 : shot.x + 10;
         fillRect(trails, FIREBALL_TRAIL, trailX, shot.y + 2, 4, 4);
       }

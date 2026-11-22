@@ -139,8 +139,9 @@ export const TRANSLATIONS: Record<string, Entry> = {
   level_5:            {et:'Talvine imedemaa',           en:'Winter Wonderland'},
   level_6:            {et:'Mängulossi',                en:'Toy Castle'},
   level_1_2:          {et:'Aiavärav',                 en:'Garden Gate'},
-  level_2_2:          {et:'Dinosauruse kanjon II',    en:'Dinosaur Canyon II'},
+  level_2_2:          {et:'Kaljusein',                en:'Canyon Wall'},
   level_1_3:          {et:'Nukumaja',                 en:'Doll House'},
+  level_2_3:          {et:'Vulkaan',                  en:'Volcano'},
   follow_them:        {et:'JÄLITA NEID!',             en:'FOLLOW THEM!'},
   next_level:         {et:'Järgmine tase...',         en:'Next level...'},
 };

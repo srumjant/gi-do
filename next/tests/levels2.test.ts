@@ -69,7 +69,7 @@ describe('Doll Garden II', () => {
   });
 });
 
-describe('Dinosaur Canyon II', () => {
+describe('Kaljusein (Dinosaur Canyon II)', () => {
   const level = DINO_CANYON_2;
   const [target] = level.course!.targets;
   // Found from the level rather than counted: the wall's fart, the spare fart on its first

@@ -58,7 +58,7 @@ export class DollQueenView {
   /** Once per rendered frame, after the steps. */
   update(world: World): void {
     const q = world.courseBoss;
-    if (!q) {
+    if (!q || q.kind !== 'dollQueen') {
       this.hideAll();
       return;
     }

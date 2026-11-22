@@ -8,6 +8,7 @@ import { DOLL_GARDEN_2 } from '../src/data/levels2/dollGarden2';
 import { NUKUAED } from '../src/data/levels2/nukuaed';
 import { NUKUMAJA } from '../src/data/levels2/nukumaja';
 import { STAGES } from '../src/data/stages';
+import type { DollQueenState } from '../src/game/bosses/dollQueen';
 import { rescueSpot } from '../src/game/world';
 import { TILE } from '../src/config/constants';
 import type { Rect, World } from '../src/game/types';
@@ -142,7 +143,7 @@ describe('Nukumaja', () => {
   it('hangs the Queen\'s last target by the door, where her walk never reaches it', () => {
     // Across the room, her walk covered it, so from the door side she was always in the way,
     // and on hard she could not be jumped over: the fight could not be won (browser, 2026-11-22).
-    const q = quietWorld(level).courseBoss!;
+    const q = quietWorld(level).courseBoss as DollQueenState;
     const last = q.spots[2];
     expect(last.x + last.w).toBeLessThan(q.patrol[0]);
   });
@@ -151,7 +152,7 @@ describe('Nukumaja', () => {
     // Found in the browser (2026-11-22): with the door in the next column, an arrow at the last
     // target touched the shut door first and died before it got there.
     const world = quietWorld(level, 'hard');
-    const q = world.courseBoss!;
+    const q = world.courseBoss as DollQueenState;
     q.phase = 'shielded';
     q.round = 2;
     q.targetUp = true;
@@ -174,7 +175,7 @@ describe('Nukumaja', () => {
   });
 
   it('hangs the Queen\'s second target out of a standing shot, in reach of a jumping one', () => {
-    const spot = quietWorld(level).courseBoss!.spots[1];
+    const spot = (quietWorld(level).courseBoss as DollQueenState).spots[1];
     for (const key of DIFF_KEYS) {
       for (const hero of HEROES) {
         const { standing, highest } = arrowRange(key, hero, 23);
@@ -192,8 +193,8 @@ describe('high targets', () => {
   const boxes: Array<[string, Rect]> = [
     ['the Garden Gate portcullis', quietWorld(DOLL_GARDEN_2).course!.targets[1].box],
     ['the Doll House pair', quietWorld(NUKUMAJA).course!.targets[3].box],
-    ['the Queen\'s second spot', quietWorld(NUKUMAJA).courseBoss!.spots[1]],
-    ['the Queen\'s third spot', quietWorld(NUKUMAJA).courseBoss!.spots[2]],
+    ['the Queen\'s second spot', (quietWorld(NUKUMAJA).courseBoss as DollQueenState).spots[1]],
+    ['the Queen\'s third spot', (quietWorld(NUKUMAJA).courseBoss as DollQueenState).spots[2]],
   ];
   // And hard's low jump must not leave only a few frames at the very top (browser, the same
   // day): anywhere in the top third of the jump counts.

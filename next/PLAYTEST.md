@@ -205,3 +205,36 @@ original level, rebuilt), **Aiavärav** (the Garden Gate, which was Nukuaed II) 
   just inside the door, under it but a step to the right, is the safe place to shoot from.
 - Zombies: fun, or too scary? (They were the child's own word.)
 - Anywhere stuck for more than a minute, or more than three or four deaths in a section.
+
+## Dinosaur Canyon, the whole theme (2026-11-22)
+
+Dinosaur Canyon is now three levels and a boss, right after Doll Garden: **Dinosauruse kanjon**
+(the canyon, rebuilt), **Kaljusein** (the Canyon Wall, which was Dinosaur Canyon II) and
+**Vulkaan** (the Volcano), where the **Pterodactyl** waits. `?level=4`, `?level=5`, `?level=6`
+open each one.
+
+- **The Pterodactyl is the villain now.** She flies off with the sibling at the end of the
+  first two levels, up and away, and in the cutscene she flies with them hanging below her.
+- **Kanjon** hands over the theme's tool: a cliff no plain jump climbs, with the fart station
+  right in front of it. Then the bow comes back for two zombie dinos, and a cannon on a ledge.
+- **Kaljusein** is the old Dinosaur Canyon II, with two zombie dinos by the cannons, and the
+  chase on top of the mesa.
+- **Vulkaan**: lava. Falling in is a fall (Super Easy's cape throws you back out once). Stones
+  over the lava with a vent between two that spits fire straight up, glowing first; a fart up
+  the volcano wall, then rock to rock over more lava past another vent; zombie dinos and a
+  cannon. The fart lasts 15 seconds, so the jumps after the wall are big fart jumps: every rock
+  is wide enough that a jump held to the right still lands on it.
+- **The Pterodactyl.** The arena door shuts behind you. She circles too high for a plain jump;
+  take a fart from one of the two stations and jump when she is over you: you go up past her
+  and land on her back. Three landings. She drops rocks (a shadow on the ground shows where),
+  flies off after each hit and calls zombie dinos, and comes back quicker. The sibling is in a
+  cage on the rock at the end.
+
+### What to watch
+
+- Does your child work out the fart station at the first cliff alone? If they get stuck at
+  the cliff without it, do they think of going back for it?
+- Lava: frightening, or fun? Does the vent's glow read as a warning?
+- The fight: do they find jumping up under her, or do they try to shoot her first? (Arrows
+  bounce off her.)
+- Anywhere stuck for more than a minute, or more than three or four deaths in a section.

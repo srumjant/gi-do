@@ -15,7 +15,9 @@ import {
   HEART_P, HEART_S,
   KIDNAPPERS,
   PARASOL_P, PARASOL_S,
+  PTERO_DOWN_S, PTERO_P, PTERO_UP_S,
   QUEEN_P, QUEEN_S,
+  ROCK_P, ROCK_S,
   type Palette,
   type SpriteData,
   STAR_P, STAR_S,
@@ -249,8 +251,21 @@ export const PARASOL_TEXTURE = 'queen-parasol';
  */
 export const QUEEN_HEART_TEXTURE = 'queen-heart';
 
+/** The Pterodactyl, Dinosaur Canyon's boss and villain: 24x12 at 2, wings up and down. */
+export const PTERO_UP_TEXTURE = 'ptero-up';
+export const PTERO_DOWN_TEXTURE = 'ptero-down';
+export const PTERO_SCALE = 2;
+/** The rocks she drops. */
+export const ROCK_TEXTURE = 'ptero-rock';
+
 /** Each villain's picture, for the end of a chase level and its cutscene. */
-export const VILLAIN_TEXTURES: Readonly<Record<Villain, string>> = { dollQueen: QUEEN_TEXTURE };
+export const VILLAIN_TEXTURES: Readonly<Record<Villain, string>> = {
+  dollQueen: QUEEN_TEXTURE,
+  pterodactyl: PTERO_UP_TEXTURE,
+};
+
+/** The villains that fly: the chase cutscene keeps them off the ground. */
+export const FLYING_VILLAINS: ReadonlySet<Villain> = new Set(['pterodactyl']);
 
 function registerBossTextures(scene: Phaser.Scene): void {
   for (const pose of Object.keys(BOSS_POSES) as BossPose[]) {
@@ -259,6 +274,9 @@ function registerBossTextures(scene: Phaser.Scene): void {
   addSprite(scene, QUEEN_TEXTURE, QUEEN_S, QUEEN_P, QUEEN_SCALE);
   addSprite(scene, PARASOL_TEXTURE, PARASOL_S, PARASOL_P, QUEEN_SCALE);
   addSprite(scene, QUEEN_HEART_TEXTURE, HEART_S, HEART_P, 2);
+  addSprite(scene, PTERO_UP_TEXTURE, PTERO_UP_S, PTERO_P, PTERO_SCALE);
+  addSprite(scene, PTERO_DOWN_TEXTURE, PTERO_DOWN_S, PTERO_P, PTERO_SCALE);
+  addSprite(scene, ROCK_TEXTURE, ROCK_S, ROCK_P, 2);
 }
 
 /**
