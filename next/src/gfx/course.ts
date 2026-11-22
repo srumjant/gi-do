@@ -19,11 +19,11 @@ import { BOW_TEXTURE, SUPER_TEXTURE, spriteScale } from './textures';
  */
 
 export const COURSE_TILES_TEXTURE = 'course-tiles';
-const COURSE_SPARK_TEXTURE = 'course-spark';
-const COURSE_TARGET_TEXTURE = 'course-target';
-const COURSE_GLOW_TEXTURE = 'course-glow';
+export const COURSE_SPARK_TEXTURE = 'course-spark';
+export const COURSE_TARGET_TEXTURE = 'course-target';
+export const COURSE_GLOW_TEXTURE = 'course-glow';
 /** The bullseye's diameter, and how far its post runs down into the chasm below it. */
-const TARGET_PX = 24;
+export const TARGET_PX = 24;
 const POST_PX = 72;
 const GLOW_PX = 48;
 const COURSE_FLAG_TEXTURE = 'course-flag';

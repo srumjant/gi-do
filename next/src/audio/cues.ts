@@ -13,6 +13,7 @@ import {
   sfxCluck,
   sfxCoin,
   sfxFart,
+  sfxGroan,
   sfxHurt,
   sfxJump,
   sfxPickup,
@@ -69,6 +70,7 @@ export function playEffect(cue: EffectCue): void {
     case 'cannon-fire': sfxCannonFire(); break;
     // index.html:2743, learn mode's wrong letter.
     case 'wrong': sfxWrong(); break;
+    case 'groan': sfxGroan(); break;
     default:
       // An effect this switch does not play fails the build here, not silently in play.
       cue satisfies never;

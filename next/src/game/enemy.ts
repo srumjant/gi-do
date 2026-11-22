@@ -92,6 +92,32 @@ export function isGroundPatrol(e: EnemyState): boolean {
     && e.type !== 'cannon' && e.type !== 'bouncer' && e.type !== 'giant';
 }
 
+/** How near, in pixels, a zombie notices the hero and starts after them. */
+export const ZOMBIE_SIGHT = 10 * TILE;
+/** Frames between groans while a zombie keeps pushing. */
+export const ZOMBIE_GROAN_GAP = 60;
+
+/**
+ * A zombie's walk: towards the hero once they are within sight, at its own slow pace, and it
+ * stops at the edge of a drop rather than walking off or turning back, so it waits at a ledge.
+ * Out of sight it patrols like a doll. It groans once, the first time it sees the hero.
+ */
+function shuffleAfterHero(world: World, e: EnemyState): void {
+  if ((e.groanTimer ?? 0) > 0) e.groanTimer = (e.groanTimer ?? 0) - 1;
+  const p = world.player;
+  const dx = p.x + p.w / 2 - (e.x + e.w / 2);
+  if (Math.abs(dx) > ZOMBIE_SIGHT) return;
+  if (!e.noticed) {
+    e.noticed = true;
+    world.sounds.push('groan');
+  }
+  const dir = dx < 0 ? -1 : 1;
+  const ahead = dir > 0 ? e.x + e.w + 2 : e.x - 2;
+  const floor = isSolid(getTile(world.map, ahead, e.y + e.h + 2));
+  const pace = Math.abs(e.vx) || 0.8 * world.dc.enemySpeed;
+  e.vx = floor ? dir * pace : 0;
+}
+
 /**
  * EVERY type the six levels stream: the ground patrollers (doll, car, dino, penguin),
  * the flyers (bat, icebat, ghost), the bouncer and the cannon. The map is complete as of
@@ -155,7 +181,7 @@ export function spawnEnemy(
     noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
     isChicken: false, shootTimer: 0, shootInterval: 0, noStomp: false,
   };
-  if (def.guard) e.guard = true;
+  if (def.zombie) e.zombie = true;
 
   // index.html:1216 — a flyer like the bat below, but only FORTY pixels up rather than
   // sixty, and with NO sineOffset at all: every ghost on screen drifts on the same phase
@@ -264,8 +290,8 @@ export function chickenify(e: EnemyState): void {
   e.noGravity = false;
   e.noStomp = false;
   e.stunTimer = 0;
-  // A chicken is nobody's guard (EnemyState.guard).
-  if (e.guard) e.guard = false;
+  // A chicken is nobody's zombie.
+  if (e.zombie) e.zombie = false;
   e.w = CHICKEN_S[0].length * ENEMY_SCALE;
   e.h = CHICKEN_S.length * ENEMY_SCALE;
 }
@@ -474,6 +500,7 @@ export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
     // wall, so it walks up to one frame's `vx` INTO the wall tile before the flip takes
     // effect and visibly sinks into it. Arcade stops it flush. Same defect the player's
     // own wall snap had, fixed the same way, and a real difference from index.html.
+    if (e.zombie) shuffleAfterHero(world, e);
     const blocked = move?.(world, e);
     const ef2 = e.y + e.h + 2;
     const ef = e.vx > 0 ? e.x + e.w : e.x;
@@ -517,15 +544,19 @@ export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
   //
   // This is NOT the tile-collision box from player.ts: that one insets y by 1-3px too;
   // this one does not.
-  // An obstacle course's guard (EnemyState.guard) bounces the player back out of it, and
-  // that is all it does: no damage, and no stomp either. Ahead of the invincibility gate
-  // below on purpose, so the blink after a cape is spent does not walk you through it.
-  if (e.guard && rectOverlap({ x: p.x, y: p.y, w: p.w, h: p.h }, { x: e.x, y: e.y, w: e.w, h: e.h })) {
+  // A zombie (EnemyState.zombie) pushes the player back out of it, and that is all it does:
+  // no damage, and no stomp either. Ahead of the invincibility gate below on purpose, so the
+  // blink after a cape is spent does not walk you through it. It groans as it shoves, but
+  // not every frame of a long shove.
+  if (e.zombie && rectOverlap({ x: p.x, y: p.y, w: p.w, h: p.h }, { x: e.x, y: e.y, w: e.w, h: e.h })) {
     const fromLeft = p.x + p.w / 2 < e.x + e.w / 2;
     p.x = fromLeft ? e.x - p.w - 1 : e.x + e.w + 1;
     p.vx = fromLeft ? -4 : 4;
     if (p.vy > 0) p.vy = -3;
-    world.sounds.push('boing');
+    if ((e.groanTimer ?? 0) <= 0) {
+      world.sounds.push('groan');
+      e.groanTimer = ZOMBIE_GROAN_GAP;
+    }
     return;
   }
 

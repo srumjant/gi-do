@@ -50,6 +50,18 @@ export function findGroundY(map: TileMap, tx: number): number {
 }
 
 /**
+ * The top of the first solid tile at or below row `fromRow` in column `tx`, in pixels: what
+ * something placed at that row stands on. For hand-built levels, which say where things
+ * stand, and can have a ceiling that `findGroundY`'s search from the top would find first.
+ */
+export function findFloorBelow(map: TileMap, tx: number, fromRow: number): number {
+  for (let ty = Math.max(0, fromRow); ty < map.length; ty++) {
+    if (isSolid(map[ty]?.[tx] ?? 0)) return ty * TILE;
+  }
+  return (map.length - 2) * TILE;
+}
+
+/**
  * Port of index.html:1139. Strict `<` / `>` on every side, so rectangles that merely
  * touch at an edge do not count as overlapping.
  */

@@ -120,3 +120,19 @@ export function cloudPosition(tx: number, ty: number, cameraX: number, animFrame
 export function cloudScale(tx: number): number {
   return tx % 3 ? 6 : 5;
 }
+
+/**
+ * An indoor level's back wall (Level.indoors), in place of the sky and hills: the level's
+ * colour as wallpaper, lighter stripes, and a small flower on each, drawn once.
+ */
+export function drawWallpaper(graphics: Phaser.GameObjects.Graphics, color: string): void {
+  const base = Phaser.Display.Color.HexStringToColor(color);
+  const stripe = base.clone().lighten(8).color;
+  const flower = base.clone().lighten(22).color;
+  graphics.clear();
+  graphics.fillStyle(base.color).fillRect(0, 0, BASE_W, BASE_H);
+  for (let x = 0; x < BASE_W; x += 40) {
+    graphics.fillStyle(stripe).fillRect(x, 0, 16, BASE_H);
+    for (let y = 24; y < BASE_H; y += 48) graphics.fillStyle(flower).fillCircle(x + 8, y, 3);
+  }
+}

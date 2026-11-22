@@ -9,14 +9,20 @@ import {
   CAT_SCRATCH_P, CAT_SCRATCH_S,
   CHICKEN_P, CHICKEN_S,
   CLOUD_P, CLOUD_S,
+  DINO_S,
+  DOLL_S,
   FIREBALL_P, FIREBALL_S,
   HEART_P, HEART_S,
   KIDNAPPERS,
+  PARASOL_P, PARASOL_S,
+  QUEEN_P, QUEEN_S,
   type Palette,
   type SpriteData,
   STAR_P, STAR_S,
   SUPER_P, SUPER_S,
+  ZOMBIE_DINO_P, ZOMBIE_DOLL_P,
 } from '../data/sprites';
+import type { Villain } from '../data/levels';
 import type { Character } from '../game/player';
 import { CHARACTERS, getEnemySpriteInfo, skinsOf } from '../game/run';
 import { bakeScale, rasterise } from './rasterise';
@@ -175,6 +181,17 @@ const ENEMY_TYPES = [
   'car', 'doll', 'dino', 'ghost', 'bat', 'cannon', 'bouncer', 'penguin', 'icebat', 'chicken',
 ];
 
+/** The walkers that have a zombie (data/course.ts's uppercase letters), and its palette. */
+export const ZOMBIE_KINDS: Readonly<Record<string, { sprite: SpriteData; palette: Palette }>> = {
+  doll: { sprite: DOLL_S, palette: ZOMBIE_DOLL_P },
+  dino: { sprite: DINO_S, palette: ZOMBIE_DINO_P },
+};
+
+/** `enemy-zombie-<type>`. */
+export function zombieTextureKey(type: string): string {
+  return `enemy-zombie-${type}`;
+}
+
 /** `enemy-<type>`, e.g. `enemy-car`. */
 export function enemyTextureKey(type: string): string {
   return `enemy-${type}`;
@@ -188,6 +205,9 @@ function registerEnemyTextures(scene: Phaser.Scene): void {
   // The obstacle course's giant: the dino's art, at its own much bigger scale.
   const giant = getEnemySpriteInfo('giant');
   addSprite(scene, enemyTextureKey('giant'), giant.sprite, giant.palette, GIANT_SCALE);
+  for (const [type, { sprite, palette }] of Object.entries(ZOMBIE_KINDS)) {
+    addSprite(scene, zombieTextureKey(type), sprite, palette, ENEMY_SCALE);
+  }
 }
 
 /**
@@ -217,10 +237,28 @@ export function bossTextureKey(pose: BossPose): string {
   return `boss-${pose}`;
 }
 
+/** The Doll Queen, Doll Garden's boss and villain: 12x18 drawn at 4, three times the hero. */
+export const QUEEN_TEXTURE = 'queen';
+export const QUEEN_SCALE = 4;
+/** Her parasol, 14x8 at the same scale. */
+export const PARASOL_TEXTURE = 'queen-parasol';
+/**
+ * Her hearts: the ones she throws and the ones over her head for the hits she has left. Her
+ * own texture, baked here with hers, not the HUD's (which HudScene bakes, later than the
+ * level's first frame, so borrowing it drew Phaser's missing-texture box; browser, 2026-11-22).
+ */
+export const QUEEN_HEART_TEXTURE = 'queen-heart';
+
+/** Each villain's picture, for the end of a chase level and its cutscene. */
+export const VILLAIN_TEXTURES: Readonly<Record<Villain, string>> = { dollQueen: QUEEN_TEXTURE };
+
 function registerBossTextures(scene: Phaser.Scene): void {
   for (const pose of Object.keys(BOSS_POSES) as BossPose[]) {
     addSprite(scene, bossTextureKey(pose), BOSS_POSES[pose], BOSS_P, BOSS_SCALE);
   }
+  addSprite(scene, QUEEN_TEXTURE, QUEEN_S, QUEEN_P, QUEEN_SCALE);
+  addSprite(scene, PARASOL_TEXTURE, PARASOL_S, PARASOL_P, QUEEN_SCALE);
+  addSprite(scene, QUEEN_HEART_TEXTURE, HEART_S, HEART_P, 2);
 }
 
 /**

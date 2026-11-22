@@ -1,12 +1,14 @@
 import { courseLevel } from '../course';
 
 /**
- * Doll Garden's second level: the bow, and everything it can do besides kill — lower a
+ * Doll Garden, level 2 (Aiavärav, the Garden Gate): the bow, and everything it can do besides kill — lower a
  * drawbridge, lift a portcullis, clear a tunnel of guards. The child has met no other tool
  * yet. docs/superpowers/specs/2026-11-22-extra-levels-design.md.
  */
 export const DOLL_GARDEN_2 = courseLevel({
-  name: 'Doll Garden II',
+  name: 'Garden Gate',
+  ending: 'chase',
+  villain: 'dollQueen',
   theme: 0,
   // Earth-brown ground, not the hills' green, so every step and wall stands out against them.
   look: { groundColor: '#9a6a3c', groundTop: '#3fa53a' },
@@ -87,8 +89,8 @@ export const DOLL_GARDEN_2 = courseLevel({
       '................BB............',
       '................BB............',
       '................BB............',
-      '...........T....||............',
       '................||............',
+      '...........T....||............',
       '................||............',
       '................||............',
       '..b....u........||.........F..',

@@ -152,3 +152,12 @@ export function sfxBossRoar(): void {
 export function sfxWrong(): void {
   playTone(150, 0.15, 'triangle', 0.08, 100);
 }
+
+/**
+ * A zombie (game/enemy.ts): a low, wobbling moan, two falling notes. Quiet, because there can
+ * be three of them in a tunnel, and a child should hear them coming, not be startled.
+ */
+export function sfxGroan(): void {
+  playTone(130, 0.45, 'sawtooth', 0.06, 90);
+  setTimeout(() => playTone(110, 0.5, 'triangle', 0.07, 70), 200);
+}

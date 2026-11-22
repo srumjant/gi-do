@@ -1,3 +1,4 @@
+import type { DollQueenState } from './bosses/dollQueen';
 import type { CourseState } from './course';
 import type { TileMap, Level } from '../data/levels';
 import type { DifficultyRecord } from '../config/difficulty';
@@ -343,11 +344,15 @@ export interface EnemyState {
    */
   noStomp: boolean;
   /**
-   * An obstacle course's guard (data/course.ts's uppercase letters): touching it does not
-   * hurt, it bounces you back, invincible or not, so the only way past is to shoot it.
-   * Absent on everything else.
+   * A zombie (data/course.ts's uppercase letters; the owner's child named them): touching it
+   * does not hurt, it pushes you back, invincible or not, and it cannot be stomped, so the
+   * way past is an arrow. It shuffles after the hero once they are near (game/enemy.ts).
    */
-  guard?: boolean;
+  zombie?: boolean;
+  /** Set once a zombie has seen the hero and groaned about it. */
+  noticed?: boolean;
+  /** Frames until a zombie may groan again while it pushes the hero. */
+  groanTimer?: number;
 }
 
 /**
@@ -575,6 +580,7 @@ export type SoundCue =
   | 'boss-roar'
   | 'cannon-fire'
   | 'wrong'
+  | 'groan'
   | 'music-level'
   | 'music-stop';
 
@@ -837,6 +843,11 @@ export interface World {
    */
   course: CourseState | null;
   /**
+   * The boss of a hand-built level that ends with one (game/bosses/), rebuilt with the level
+   * like the blocks; `null` everywhere else. The original Toy Castle's T-Rex is `boss`.
+   */
+  courseBoss: DollQueenState | null;
+  /**
    * The last checkpoint flag touched on a course, in tiles, or `null`. NOT rebuilt by a
    * respawn, which is the whole point: `respawnLevel` puts the player back here.
    */
@@ -849,8 +860,8 @@ export interface PendingEnemy {
   x: number;
   /** The floor row, when the level gives one (data/levels.ts's EnemyDef). */
   floorRow?: number;
-  /** A guard (EnemyState.guard), when the level says so. */
-  guard?: boolean;
+  /** A zombie (EnemyState.zombie), when the level says so. */
+  zombie?: boolean;
   spawned: boolean;
 }
 

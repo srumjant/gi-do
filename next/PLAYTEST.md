@@ -172,3 +172,36 @@ Every obstacle was checked on all four difficulties, by tests and in the browser
 - **The car on the far side of the first drawbridge** walks onto the bridge once it is down:
   jump it or shoot it. Fair, or too mean?
 - **Length**: the demo's 2-3 minutes was "fine"; these are about the same each.
+
+## Doll Garden, the whole theme (2026-11-22)
+
+Doll Garden is now three levels and a boss, at the start of the run: **Nukuaed** (the
+original level, rebuilt), **Aiavärav** (the Garden Gate, which was Nukuaed II) and
+**Nukumaja** (the Doll House), where the **Doll Queen** waits. `?level=1`, `?level=2`,
+`?level=3` open each one.
+
+- **The story is a chase now.** At the end of Nukuaed and Aiavärav the Doll Queen leaps away
+  with the sibling ("JÄLITA NEID!"), and the cutscene shows her running off with them. The
+  sibling is rescued only after she is beaten.
+- **Zombies.** The dark enemies your child called zombies are zombies now: grey-green, red
+  eyes, they sway and groan, and come after you. They still can't be stomped and never
+  hurt; they push you back, and an arrow puts them down. Two appear right after the first
+  bow in Nukuaed.
+- **Nukumaja** is indoors: a target behind three zombies; a gate that needs two targets,
+  one of them high (jump and shoot); a target you can only line up from the top of the
+  stairs. Then the throne room: the door shuts behind you.
+- **The Doll Queen.** Her parasol turns arrows and stomps away. Shoot the target that pops
+  up and the parasol flies off; she sits down dizzy with stars round her head, and a stomp
+  or an arrow then costs her a heart. Three hearts: the first target is low, the second
+  high (jump and shoot), the third high by the door behind you (turn round). She throws
+  slow hearts at you, and calls zombie dolls when she is hit.
+- **The T-Rex** at the very end of the game has a new look: a proper green T-Rex in
+  profile. Its fight is unchanged for now.
+
+### What to watch
+
+- Does your child find the parasol-and-target idea without help? If not, what did they try?
+- The third round: do they think of turning round to the target by the door? Standing
+  just inside the door, under it but a step to the right, is the safe place to shoot from.
+- Zombies: fun, or too scary? (They were the child's own word.)
+- Anywhere stuck for more than a minute, or more than three or four deaths in a section.

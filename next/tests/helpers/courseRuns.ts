@@ -1,8 +1,8 @@
 import { testEnemyMove, testMove } from './testMove';
 import { TILE } from '../../src/config/constants';
 import { DIFFICULTY_CONFIG, type DifficultyKey } from '../../src/config/difficulty';
-import type { Level } from '../../src/data/levels';
-import { createPlayer, stepMotion, type Character } from '../../src/game/player';
+import { TILE_SPRING, type Level } from '../../src/data/levels';
+import { createPlayer, playerSize, stepMotion, type Character } from '../../src/game/player';
 import { createWorld, stepWorld } from '../../src/game/world';
 import type { World } from '../../src/game/types';
 import { emptyInput, type InputState } from '../../src/input/actions';
@@ -50,4 +50,67 @@ export function jumpRise(difficulty: DifficultyKey, fart = false): number {
 /** The y an arrow flies at for a player whose top is `playerY` (player.ts's fireArrow). */
 export function arrowY(playerY: number, h: number): number {
   return playerY + h / 2 - 2;
+}
+
+/** Both heroes: Gigi is 24 tall, Dodo 20, so arrows fly at different heights. */
+export const HEROES: Character[] = ['gigi', 'dodo'];
+
+/** The lowest an arrow flies, from the floor at row `floorRow`, in a held jump (or standing). */
+export function arrowRange(key: DifficultyKey, hero: Character, floorRow: number, fart = false) {
+  const { h } = playerSize(hero);
+  const standing = arrowY(floorRow * TILE - h, h);
+  return { standing, highest: standing - jumpRise(key, fart) };
+}
+
+/** Whether an arrow at height `y` (4 tall) meets a box. */
+export function hits(box: { y: number; h: number }, y: number): boolean {
+  return y < box.y + box.h && y + 4 > box.y;
+}
+
+export function reachesTower(level: Level, key: DifficultyKey, fromSpring: boolean, towerTopRow = 16): boolean {
+  const world = quietWorld(level, key);
+  const spring = world.map[23].lastIndexOf(TILE_SPRING);
+  if (fromSpring) standAt(world, spring - 3, 23);
+  else standAt(world, spring + 1, 23);
+  for (let i = 0; i < 240; i++) {
+    const p = world.player;
+    if (world.won) return true;
+    step(world, { right: true, jump: !fromSpring, jumpPressed: !fromSpring && p.onGround });
+    if (!fromSpring) world.map[23] = world.map[23].map((c) => (c === TILE_SPRING ? 1 : c));
+    if (p.onGround && p.y + p.h <= towerTopRow * TILE) return true;
+  }
+  return world.won;
+}
+
+/** Run right, jumping at every wall or gap ahead, until column `untilX` or `frames` run out. */
+export function runRight(world: ReturnType<typeof quietWorld>, untilX: number, frames = 900): boolean {
+  let holding = 0;
+  for (let i = 0; i < frames && !world.dead; i++) {
+    const p = world.player;
+    const tx = Math.floor((p.x + p.w / 2) / TILE);
+    const rows = [Math.floor((p.y + 2) / TILE), Math.floor((p.y + p.h - 2) / TILE)];
+    const wall = rows.some((r) => (world.map[r]?.[tx + 1] ?? 0) !== 0);
+    const gap = world.map[23][tx + 1] === 0 || world.map[23][tx + 2] === 0;
+    const start = p.onGround && holding === 0 && (wall || gap);
+    if (start) holding = 20;
+    step(world, { right: true, jump: holding > 0, jumpPressed: start });
+    if (holding > 0) holding--;
+    world.player.hasCape = false;
+    if (p.x / TILE >= untilX) return true;
+  }
+  return false;
+}
+
+/** From standing at `tx` on the floor at `floorRow`, does a held jump end up on `topRow` or higher? */
+export function climbs(level: Level, key: DifficultyKey, tx: number, floorRow: number, topRow: number, fart: boolean): boolean {
+  const world = quietWorld(level, key);
+  world.course!.stations.forEach((s) => { s.cooldown = 99999; });
+  standAt(world, tx, floorRow);
+  for (let i = 0; i < 240; i++) {
+    const p = world.player;
+    if (fart) p.fartTimer = 900;
+    step(world, { right: true, jump: true, jumpPressed: p.onGround });
+    if (p.onGround && p.y + p.h <= topRow * TILE) return true;
+  }
+  return false;
 }

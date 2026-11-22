@@ -42,8 +42,11 @@ export interface EnemyDef {
    * Only the obstacle course sets it.
    */
   floorRow?: number;
-  /** A guard: bounces the player back instead of hurting them (EnemyState.guard). */
-  guard?: boolean;
+  /**
+   * A zombie (EnemyState.zombie): it cannot be stomped, pushes the player back instead of
+   * hurting them, and goes down to an arrow. The owner's child named them.
+   */
+  zombie?: boolean;
 }
 
 export interface Level {
@@ -67,6 +70,12 @@ export interface Level {
    * power-up stations and checkpoint flags. Absent on the six adventure levels.
    */
   course?: CourseDef;
+  /** How the level ends. Absent means 'rescue', the original levels' ending. */
+  ending?: LevelEnding;
+  /** Who runs off with the sibling at a 'chase' ending. */
+  villain?: Villain;
+  /** Drawn indoors: a wallpaper instead of the theme's sky, hills and clouds. */
+  indoors?: boolean;
 }
 
 /** Where a course's pieces are, in tiles. Built from the ASCII map in data/course.ts. */
@@ -75,11 +84,21 @@ export interface CourseDef {
    * A target to shoot, and what the shot changes: each cell gets `to` written into it, in
    * order, one at a time — planks laid across a chasm, or a gate's bars taken away.
    */
-  targets: Array<{ x: number; y: number; cells: Array<{ x: number; y: number; to: number }> }>;
+  targets: Array<{
+    x: number;
+    y: number;
+    cells: Array<{ x: number; y: number; to: number }>;
+    /** A lower-case t: the index of the T it helps open. */
+    partOf?: number;
+  }>;
   /** A pickup that comes back a few seconds after it is taken. `y` is the tile row it sits in. */
   stations: Array<{ kind: StationKind; x: number; y: number }>;
   /** Checkpoint flags: touch one and a death brings you back to it. `y` is its ground row. */
   flags: Array<{ x: number; y: number }>;
+  /** Doors (`:`) that shut behind the player once they are through, each a column of cells. */
+  doors: Array<{ x: number; cells: Array<{ x: number; y: number }> }>;
+  /** The boss, on a level that ends with one. */
+  boss?: BossDef;
 }
 
 export type StationKind = 'bow' | 'cape' | 'fart' | 'bighead' | 'chicken';
@@ -209,3 +228,24 @@ export const LEVELS: Level[] = [
   }
 ];
 
+/**
+ * How a level ends (docs/superpowers/specs/2026-11-22-three-levels-and-a-boss-design.md): the
+ * sibling rescued (the original levels), the villain running off with them as the hero arrives
+ * (a theme's first two levels), or a boss to beat before the cage opens (its third).
+ */
+export type LevelEnding = 'rescue' | 'chase' | 'boss';
+
+/** A theme's villain, who carries the sibling through its levels. */
+export type Villain = 'dollQueen';
+
+/** A boss, as a level's ASCII places it. */
+export interface BossDef {
+  kind: 'dollQueen';
+  /** Where she stands: the column, and the floor row under her. */
+  x: number;
+  y: number;
+  /** Where each round's target stands, in order (the level's digits 1, 2, 3...). */
+  spots: Array<{ x: number; y: number }>;
+  /** The columns her walk stays between: a few in from her door, a few short of the cage. */
+  patrol: [number, number];
+}

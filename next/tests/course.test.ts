@@ -3,7 +3,9 @@ import { TILE } from '../src/config/constants';
 import { DIFF_KEYS, DIFFICULTY_CONFIG, type DifficultyKey } from '../src/config/difficulty';
 import { courseLevel, joinSections, parseCourse } from '../src/data/course';
 import { DEMO_COURSE as COURSE_LEVEL } from './helpers/demoCourse';
-import { TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_PLANK, TILE_SPRING, isSolid } from '../src/data/levels';
+import {
+  TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_PLANK, TILE_RAINBOW, TILE_SPRING, isSolid,
+} from '../src/data/levels';
 import {
   LIFT_FRAMES, MIN_STATION_ARROWS, PLANK_INTERVAL, SPRING_FORCE, STATION_COOLDOWN,
 } from '../src/game/course';
@@ -84,6 +86,57 @@ describe('the course map', () => {
     ]);
     expect(bridgeTarget.cells.map((c) => c.x)).toEqual([12, 11, 10, 9]);
     expect(bridgeTarget.cells.every((c) => c.y === 3 && c.to === TILE_PLANK)).toBe(true);
+  });
+
+  it('reads a rainbow block and the cat', () => {
+    const { map, cat } = parseCourse(['P..@..!...R', '###########']);
+    expect(map[0][6]).toBe(TILE_RAINBOW);
+    expect(cat).toBe(3);
+  });
+
+  it('reads a boss, its target spots in number order, and a walk between its door and its cage', () => {
+    const { course, map } = parseCourse([
+      'P..........2.............',
+      '...:.......1...Q....3.R..',
+      '#########################',
+    ]);
+    const b = course.boss!;
+    expect(b.kind).toBe('dollQueen');
+    expect([b.x, b.y]).toEqual([15, 2]);
+    expect(b.spots).toEqual([{ x: 11, y: 1 }, { x: 11, y: 0 }, { x: 20, y: 1 }]);
+    expect(b.patrol).toEqual([7, 19]);
+    expect(course.doors).toEqual([{ x: 3, cells: [{ x: 3, y: 1 }] }]);
+    expect(map[1][3]).toBe(TILE_EMPTY);
+  });
+
+  const GROUP = [
+    'P....T....t.........R',
+    '..................|..',
+    '..................|..',
+    '#####################',
+  ];
+
+  it('lets a lower-case t help the nearest T: their gate opens only once both are hit', () => {
+    expect(parseCourse(GROUP).course.targets.map((t) => t.partOf ?? null)).toEqual([null, 0]);
+    const world = quietWorld(courseLevel({ name: 'group', theme: 0, sections: [GROUP] }));
+    const [big, small] = world.course!.targets;
+    world.arrows.push({ x: big.box.x - 8, y: big.box.y + 10, vx: 6, life: 60, isChicken: false });
+    step(world, {}, 60);
+    expect(world.map[2][18]).toBe(TILE_GATE);
+    world.arrows.push({ x: small.box.x - 8, y: small.box.y + 10, vx: 6, life: 60, isChicken: false });
+    step(world, {}, 60);
+    expect(world.map[2][18]).toBe(TILE_EMPTY);
+  });
+
+  it('shuts a door behind the player once they are through it, and not before', () => {
+    const rows = ['P.....:.......R', '......:........', '###############'];
+    const world = quietWorld(courseLevel({ name: 'door', theme: 0, sections: [rows] }));
+    standAt(world, 4, 2);
+    step(world);
+    expect(world.map[0][6]).toBe(TILE_EMPTY);
+    standAt(world, 8, 2);
+    step(world);
+    expect([world.map[0][6], world.map[1][6]]).toEqual([TILE_GATE, TILE_GATE]);
   });
 
   it('refuses a target that opens nothing', () => {
@@ -349,17 +402,17 @@ describe('the giant', () => {
   });
 });
 
-describe('the tunnel\'s guards', () => {
-  function guardAhead(world: World) {
-    const def = COURSE_LEVEL.enemyDefs.find((d) => d.guard)!;
+describe('zombies', () => {
+  function zombieAhead(world: World) {
+    const def = COURSE_LEVEL.enemyDefs.find((d) => d.zombie)!;
     const e = spawnEnemy(world.map, world.dc, def)!;
     world.enemies.push(e);
     return e;
   }
 
-  it('bounce the player back without hurting, even mid-blink after a cape', () => {
+  it('push the player back without hurting, even mid-blink after a cape', () => {
     const world = quietCourse();
-    const e = guardAhead(world);
+    const e = zombieAhead(world);
     world.player.hasCape = true;
     world.player.invincible = 100;
     standAt(world, 0, 23);
@@ -373,10 +426,33 @@ describe('the tunnel\'s guards', () => {
 
   it('go down to an arrow like anyone else', () => {
     const world = quietCourse();
-    const e = guardAhead(world);
+    const e = zombieAhead(world);
     world.arrows.push({ x: e.x - 6, y: e.y + 8, vx: 6, life: 60, isChicken: false });
     step(world);
     expect(e.alive).toBe(false);
+  });
+
+  it('shuffle after a hero they can see, and groan once when they first do', () => {
+    const world = quietCourse();
+    const e = zombieAhead(world);
+    standAt(world, Math.floor(e.x / TILE) - 5, 23);
+    world.player.invincible = 9999;
+    const x0 = e.x;
+    let groans = 0;
+    for (let i = 0; i < 40; i++) {
+      step(world);
+      groans += world.sounds.filter((s) => s === 'groan').length;
+    }
+    expect(e.x).toBeLessThan(x0);
+    expect(groans).toBe(1);
+  });
+
+  it('leave a hero out of sight alone', () => {
+    const world = quietCourse();
+    const e = zombieAhead(world);
+    standAt(world, Math.floor(e.x / TILE) - 20, 23);
+    step(world, {}, 5);
+    expect(e.noticed).toBeFalsy();
   });
 });
 
@@ -397,5 +473,20 @@ describe('checkpoints', () => {
     expect(world.player.x).toBe(flag.x * TILE);
     expect(world.pending.filter((d) => d.x < flag.x).every((d) => d.spawned)).toBe(true);
     expect(world.camera.x).toBeGreaterThan(0);
+  });
+});
+
+describe('a chase ending', () => {
+  const CHASE = ['P..........R...', '###############'];
+  const level = courseLevel({ name: 'chase', theme: 0, ending: 'chase', villain: 'dollQueen', sections: [CHASE] });
+
+  it('ends the level as the hero gets close, without touching anyone', () => {
+    const world = quietWorld(level);
+    standAt(world, 2, 1);
+    step(world);
+    expect(world.won).toBe(false);
+    standAt(world, 8, 1);
+    step(world);
+    expect(world.won).toBe(true);
   });
 });

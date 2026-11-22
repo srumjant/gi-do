@@ -5,23 +5,18 @@ import { buildStages, STAGES } from '../src/data/stages';
 const named = (name: string) => ({ ...LEVELS[0], name });
 
 describe('the run order', () => {
-  it('is the six classic levels when no theme has a second one', () => {
+  it('is the six classic levels when no theme has a list of its own', () => {
     expect(buildStages({}).map((s) => [s.theme, s.level])).toEqual(LEVELS.map((l, i) => [i, l]));
   });
 
-  it('plays a theme\'s second level right after its classic one', () => {
-    const second = { level: named('Doll Garden II'), nameKey: 'level_1_2' };
-    const stages = buildStages({ 0: second });
+  it('plays a theme\'s own list in place of its classic level', () => {
+    const a = named('A');
+    const b = named('B');
+    const stages = buildStages({ 1: [{ level: a, nameKey: 'x' }, { level: b, nameKey: 'y' }] });
     expect(stages.map((s) => s.level.name)).toEqual([
-      'Doll Garden', 'Doll Garden II', 'Dinosaur Canyon', 'Tallinn Old Town',
-      'Palermo Piazza', 'Winter Wonderland', 'Toy Castle',
+      'Doll Garden', 'A', 'B', 'Tallinn Old Town', 'Palermo Piazza', 'Winter Wonderland', 'Toy Castle',
     ]);
-    expect(stages[1]).toEqual({ theme: 0, level: second.level, nameKey: 'level_1_2' });
-  });
-
-  it('puts Toy Castle\'s second level before the boss, so the boss stays the finale', () => {
-    const stages = buildStages({ 5: { level: named('Toy Castle II'), nameKey: 'level_6_2' } });
-    expect(stages.slice(-2).map((s) => s.level.name)).toEqual(['Toy Castle II', 'Toy Castle']);
+    expect(stages[2]).toEqual({ theme: 1, level: b, nameKey: 'y' });
   });
 
   it('names every classic stage by its classic key, and ends on the boss', () => {

@@ -1,6 +1,6 @@
 import { TILE } from '../config/constants';
 import {
-  TILE_CRACKED, TILE_EMPTY, TILE_PLANK, TILE_SPRING,
+  TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_PLANK, TILE_SPRING,
   type CourseDef, type StationKind,
 } from '../data/levels';
 import { grantSillyPowerup } from './player';
@@ -30,11 +30,14 @@ export const LIFT_FRAMES = 40;
 export const MIN_STATION_ARROWS = 5;
 
 /**
- * A target's box, in pixels: the big bullseye at chest height, 22 wide and 36 tall, its
- * bottom on the row below the T. Any arrow a standing child fires at it goes in.
+ * A target's box, in pixels: 22 wide and 68 tall, its bottom on the row below the T. Sized for
+ * both ends of the jump (browser, 2026-11-22): super easy's high jump carries an arrow over a
+ * short box, and hard's low one reaches a high target only at the very top. At 68, a target
+ * hung at row 19 takes a shot from anywhere in the top third of a jump on every difficulty,
+ * and a standing shot still passes under it.
  */
 const TARGET_W = 22;
-const TARGET_H = 36;
+const TARGET_H = 68;
 
 export interface TargetState {
   /** The target's box, in pixels. */
@@ -46,6 +49,8 @@ export interface TargetState {
   done: number;
   /** Frames until the next one. */
   timer: number;
+  /** A helper's T (data/levels.ts's CourseDef), or null. */
+  partOf: number | null;
 }
 
 export interface StationState {
@@ -71,6 +76,8 @@ export interface CourseState {
   stations: StationState[];
   /** Flags in tiles: `x` the column, `y` the floor row it stands on. */
   flags: Array<{ x: number; y: number }>;
+  /** Doors (`:`), open until the player is through, then shut for good. */
+  doors: Array<{ x: number; cells: Array<{ x: number; y: number }>; shut: boolean }>;
   /**
    * Bumped whenever this module rewrites a map cell, so the scene knows to redraw the
    * tiles it owns (cracked blocks, planks) without comparing the whole map every frame.
@@ -95,12 +102,14 @@ export function buildCourse(def: CourseDef): CourseState {
       hit: false,
       cells: t.cells.map((c) => ({ ...c })),
       done: 0,
+      partOf: t.partOf ?? null,
       timer: 0,
     })),
     stations: def.stations.map((s) => ({
       kind: s.kind, x: s.x * TILE, y: s.y * TILE, cooldown: 0, announced: false,
     })),
     flags: def.flags.map((f) => ({ ...f })),
+    doors: def.doors.map((d) => ({ x: d.x, cells: d.cells.map((c) => ({ ...c })), shut: false })),
     mapVersion: 0,
     fx: [],
   };
@@ -143,30 +152,35 @@ function stepStations(world: World, course: CourseState): void {
   }
 }
 
+/** Whether target `i` and every helper of it have been hit. */
+function groupDone(course: CourseState, i: number): boolean {
+  return course.targets[i].hit && course.targets.every((o) => o.partOf !== i || o.hit);
+}
+
 /**
- * Arrows against targets. Runs after world.ts's stepArrows, so it sees each arrow where it
- * has just flown to; a hit spends the arrow. A chicken ray counts too — a target is not
- * fussy about what hits it.
+ * Arrows against targets, after world.ts's stepArrows, so each arrow is where it has just flown
+ * to; a hit spends the arrow. A T opens what it owns once it and its helpers (t) are all hit:
+ * the first of two chimes, the last one sounds like the gate opening.
  */
 function stepTargets(world: World, course: CourseState): void {
-  for (const t of course.targets) {
-    if (t.hit) continue;
+  course.targets.forEach((t, i) => {
+    if (t.hit) return;
     for (const a of world.arrows) {
       if (a.life <= 0 || !rectOverlap({ x: a.x, y: a.y, w: 12, h: 4 }, t.box)) continue;
       a.life = 0;
       t.hit = true;
       t.timer = PLANK_INTERVAL * 3;
       world.score += Math.round(100 * world.dc.scoreMultiplier);
-      world.sounds.push('win');
+      world.sounds.push(groupDone(course, t.partOf ?? i) ? 'win' : 'coin');
       pushFx(course, { kind: 'target', x: t.box.x + t.box.w / 2, y: t.box.y + t.box.h / 3 });
       break;
     }
-  }
+  });
   world.arrows = world.arrows.filter((a) => a.life > 0);
 
-  for (const t of course.targets) {
-    if (!t.hit || t.done >= t.cells.length) continue;
-    if (--t.timer > 0) continue;
+  course.targets.forEach((t, i) => {
+    if (t.done >= t.cells.length || !groupDone(course, i)) return;
+    if (--t.timer > 0) return;
     t.timer = PLANK_INTERVAL;
     const cell = t.cells[t.done++];
     world.map[cell.y][cell.x] = cell.to;
@@ -177,8 +191,22 @@ function stepTargets(world: World, course: CourseState): void {
       x: cell.x * TILE + TILE / 2,
       y: cell.y * TILE + TILE / 2,
     });
-  }
+  });
+}
 
+/** A door shuts behind the player once they are a step past it, and stays shut. */
+function stepDoors(world: World, course: CourseState): void {
+  const p = world.player;
+  for (const d of course.doors) {
+    if (d.shut || p.x < (d.x + 1) * TILE + 4) continue;
+    d.shut = true;
+    for (const c of d.cells) {
+      world.map[c.y][c.x] = TILE_GATE;
+      pushFx(course, { kind: 'gate', x: c.x * TILE + TILE / 2, y: c.y * TILE + TILE / 2 });
+    }
+    course.mapVersion++;
+    world.sounds.push('block', 'boss-roar');
+  }
 }
 
 /**
@@ -260,6 +288,7 @@ export function stepCourse(world: World): void {
   if (!course) return;
   stepStations(world, course);
   stepTargets(world, course);
+  stepDoors(world, course);
   stepCracked(world, course);
   stepSprings(world, course);
   stepFlags(world, course);
