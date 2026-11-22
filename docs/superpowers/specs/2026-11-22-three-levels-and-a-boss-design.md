@@ -46,8 +46,8 @@ earlier themes come back as reminders.
 | Winter | all four, plus ice | the snow field: slippery ice | the frozen lake | the ice palace | **the Yeti** |
 | Toy Castle | everything | the gate | the halls | the throne room | **the T-Rex**, the final boss, redrawn and with a new fight |
 
-Only Doll Garden is designed in detail now; each later theme is designed after the child has
-played the one before, as this one was.
+Doll Garden and Dinosaur Canyon are designed in detail below; each later theme is designed when
+its batch starts.
 
 ## Doll Garden, in detail
 
@@ -79,6 +79,42 @@ the sibling in a cage behind her. The throne room's door shuts behind you.
 
 On Super Easy her hearts are slow, she waits longer between throws, and the cape every life
 covers one mistake; on Hard she is quick.
+
+## Dinosaur Canyon, in detail (batch 2)
+
+Designed after Doll Garden was built and the owner said to carry on. The tool is the fart
+jump; the bow comes along as a reminder, for zombie dinos. The villain carrying the sibling is
+the Pterodactyl, flying, so the chase endings show her flying off with the sibling in her claws.
+
+**Level 1: Dinosauruse kanjon.** The original level, rebuilt: canyon ledges and gentle pits,
+dinos, bats, `?` blocks. The first cliff, too tall to jump, with the fart station right in
+front of it. Then a bow and two zombie dinos, and a cannon on a ledge. At the end the
+Pterodactyl, perched on a rock with the sibling, flies off as you arrive.
+
+**Level 2: Kaljusein (the Canyon Wall).** Today's Dinosaur Canyon II: the two-step wall, the
+ledge you fart up to so you can shoot the target, the cannons. Two zombie dinos join the
+cannons, and the end becomes the chase: she waits on top of the mesa.
+
+**Level 3: Vulkaan (the Volcano).** New: **lava**, orange and bubbling. Falling in is like a
+pit (the cape throws you out once; without it, back to the flag). **Vents** in the lava spit a
+fireball straight up every few seconds, glowing first so a child can time the jump past them.
+Fart climbs with lava below, stepping stones, zombie dinos on ledges. Then the arena: the door
+shuts behind you, and the Pterodactyl.
+
+**The boss: the Pterodactyl.** She flies back and forth over the arena, 6.5 tiles up, the
+sibling in a cage on a rock at the far end.
+
+- No plain jump reaches her back, on any difficulty; a fart jump does, on every difficulty
+  (Hard's fart jump clears 8.8 tiles). Two fart stations in the arena come back as always.
+- Land on her back: a hit. Jumping up under her, you pass up through her and come down on
+  her back, so a jump when she is overhead works (bouncing off her belly made it the one jump
+  that never did, in the browser). Touch her side on the way down: you are pushed off, no harm,
+  because she is the one to catch, not the one doing the hurting.
+- She drops rocks straight down when she is over you, with a shadow on the ground first, slow
+  on Super Easy. Rocks hurt; an arrow breaks one.
+- Three hits. After each she screeches, flies up out of sight for a moment, calls two zombie
+  dinos (never more than two up), and comes back faster and dropping more.
+- Beaten, she tumbles down and bursts into feathers; the cage opens.
 
 ## The final boss: the T-Rex
 
