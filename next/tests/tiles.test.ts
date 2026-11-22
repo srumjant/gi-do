@@ -13,8 +13,13 @@ const legacy = loadLegacySection({
 const map = LEVELS[0].generate(DIFFICULTY_CONFIG.normal);
 
 describe('isSolid matches the live game', () => {
-  // The live rule is an explicit list of four codes (index.html:1138), not "non-zero".
-  it.each([[0, false], [1, true], [2, true], [3, true], [4, false], [5, true], [6, false]])(
+  // The live rule is an explicit list of four codes (index.html:1138), not "non-zero". The
+  // obstacle course adds four more (cracked 6, spring 7, plank 8, gate 9: data/levels.ts) that
+  // no adventure level writes, so the four the six levels use still mean what they did.
+  it.each([
+    [0, false], [1, true], [2, true], [3, true], [4, false], [5, true],
+    [6, true], [7, true], [8, true], [9, true], [10, false],
+  ])(
     'tile %i solid = %s', (code, expected) => {
       expect(isSolid(code)).toBe(expected);
     },

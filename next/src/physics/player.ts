@@ -38,9 +38,22 @@ export interface WorldEdges {
   down: boolean;
 }
 
+/** Something else the body cannot walk through, and what to do when it walks into it. */
+export interface Solid {
+  target: Phaser.Types.Physics.Arcade.ArcadeColliderType;
+  onHit?: () => void;
+}
+
 export interface BodyMoverOptions {
-  /** The layer the body collides with. The only thing it collides with. */
+  /** The layer the body collides with. */
   layer: Phaser.Tilemaps.TilemapLayer;
+  /**
+   * Bodies the player collides with besides the tiles: the obstacle course's giants
+   * (gfx/course.ts), which are Arcade static bodies. A static body takes part in every
+   * `singleStep`, so it is collided during the player's own step (physics/body.ts) and
+   * Arcade does the separating.
+   */
+  solids?: readonly Solid[];
   /**
    * World bounds to set; left out, the world's bounds are not touched and not used. A top
    * edge (`up`) stops a rising head as a tile does, and the report then names the row just
@@ -109,6 +122,7 @@ export function createBodyMover(
   // A persistent collider rather than a per-step physics.collide call, so that it runs
   // INSIDE the Arcade step, between the body moving and the step ending.
   physics.add.collider(body, options.layer);
+  for (const solid of options.solids ?? []) physics.add.collider(body, solid.target, solid.onHit);
 
   body.enable = false;
 
@@ -147,9 +161,11 @@ export function createPlayerMove(
   scene: Phaser.Scene,
   world: World,
   collisionLayer: Phaser.Tilemaps.TilemapLayer,
+  solids?: readonly Solid[],
 ): PlayerMove {
   const mover = createBodyMover(scene, world.player, {
     layer: collisionLayer,
+    solids,
     edges: {
       width: world.level.width * TILE,
       height: world.level.height * TILE,

@@ -1,5 +1,5 @@
 import { DC } from '../config/difficulty';
-import { LEVELS } from '../data/levels';
+import { STAGES, type Stage } from '../data/stages';
 import type { Character } from './player';
 import {
   BAT_P, BAT_S,
@@ -275,6 +275,11 @@ export function getCurrentLevel(): number {
   return currentLevel;
 }
 
+/** The stage being played, or about to be: its theme and its level (data/stages.ts). */
+export function getCurrentStage(): Stage {
+  return STAGES[currentLevel] ?? STAGES[0];
+}
+
 /** What the next `World` starts with — see `createWorld`'s `start` argument. */
 export function getRunTotals(): RunTotals {
   return { lives, score };
@@ -293,8 +298,9 @@ export function getRunTotals(): RunTotals {
  * chosen by the time anything calls this. On super_easy it is `Infinity`, which is a real
  * setting rather than a debug state; see World.lives in game/types.ts.
  */
-export function startRun(): void {
-  currentLevel = 0;
+export function startRun(firstStage = 0): void {
+  // A playtest can start partway (scenes/startStage.ts's `?level=N`); never past the end.
+  currentLevel = Math.max(0, Math.min(firstStage, STAGES.length - 1));
   lives = DC().lives;
   score = 0;
 }
@@ -316,7 +322,9 @@ export function finishLevel(totals: RunTotals): LevelOutcome {
   lives = totals.lives;
   score = totals.score;
   currentLevel++;
-  return currentLevel >= LEVELS.length ? 'game-won' : 'next-level';
+  // `currentLevel` counts STAGES now, not LEVELS: the run has a second level per theme as
+  // they are built (data/stages.ts).
+  return currentLevel >= STAGES.length ? 'game-won' : 'next-level';
 }
 
 /**
@@ -326,5 +334,6 @@ export function finishLevel(totals: RunTotals): LevelOutcome {
  * and it is also what makes a level the boss level.
  */
 export function isLastLevel(levelIndex: number): boolean {
-  return levelIndex === LEVELS.length - 1;
+  // A stage index, not a LEVELS one: see finishLevel.
+  return levelIndex === STAGES.length - 1;
 }

@@ -11,6 +11,7 @@ import { menuPlayerTextureKey, MENU_PORTRAIT_SCALE, registerMenuTextures } from 
 import { bindMenuKeys, type MenuKeys, justDown, pressedAny } from '../input/menuKeys';
 import { CHARACTER_SCENE_KEY, SLICE_SCENE_KEY } from './keys';
 import { takeBack } from './navigate';
+import { requestedStage } from './startStage';
 
 /** index.html:2152. */
 const BACKGROUND = '#2a2a5a';
@@ -194,7 +195,7 @@ export class CharacterScene extends Phaser.Scene {
    */
   private confirm(): void {
     setSelectedChar(this.chosen());
-    startRun();
+    startRun(requestedStage());
     this.scene.start(SLICE_SCENE_KEY);
   }
 

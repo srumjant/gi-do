@@ -33,6 +33,8 @@ export interface HudData {
   world: World;
   levelIndex: number;
   difficulty: DifficultyKey;
+  /** A name to show instead of the level index's: the obstacle course's. */
+  levelNameKey?: string;
 }
 
 /** Hearts start here and step right (index.html:1855-1856). */
@@ -162,6 +164,7 @@ export class HudScene extends Phaser.Scene {
   private world!: World;
   private levelIndex!: number;
   private difficulty!: DifficultyKey;
+  private levelNameKey: string | undefined;
 
   /** One image per life, grown on demand — see `heartAt`. */
   private readonly hearts: Phaser.GameObjects.Image[] = [];
@@ -197,6 +200,7 @@ export class HudScene extends Phaser.Scene {
     this.world = data.world;
     this.levelIndex = data.levelIndex;
     this.difficulty = data.difficulty;
+    this.levelNameKey = data.levelNameKey;
   }
 
   create(): void {
@@ -218,7 +222,7 @@ export class HudScene extends Phaser.Scene {
     // makes at index.html:1859, just not sixty times a second). The port has no language
     // switch yet; when one lands it will need to rebuild this, exactly as the 'Mjäu!'
     // and the '?' glyphs elsewhere in the port will.
-    const levelName = TStr(LEVEL_NAME_KEYS[this.levelIndex] ?? LEVEL_NAME_KEYS[0]);
+    const levelName = TStr(this.levelNameKey ?? LEVEL_NAME_KEYS[this.levelIndex] ?? LEVEL_NAME_KEYS[0]);
     this.hudText(LEVEL_X, LEVEL_Y, LEVEL_FONT, `${levelName} [${TDiff(this.difficulty)}]`)
       .setVisible(true);
 

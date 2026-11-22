@@ -2,7 +2,9 @@ import type { DifficultyRecord } from '../config/difficulty';
 
 /**
  * Tile codes. 0 empty, 1 ground, 2 brick/platform, 3 question block,
- * 5 rainbow block. 4 is never written by any level.
+ * 5 rainbow block. 4 is never written by any level. 6 to 9 exist only on the hand-built
+ * second levels (data/course.ts): a cracked block a big head smashes, a spring, a drawbridge
+ * plank and a gate's bars.
  *
  * Solidity is whatever `isSolid` says — an explicit list of four codes, not
  * "non-zero". They coincide today only because 4 is unused; write a tile 4 or 6 and
@@ -15,16 +17,33 @@ export const TILE_GROUND = 1;
 export const TILE_BRICK = 2;
 export const TILE_QUESTION = 3;
 export const TILE_RAINBOW = 5;
+/** A cracked block: solid, until a player with a big head touches it. */
+export const TILE_CRACKED = 6;
+/** A spring: solid, and it throws whoever lands on it high into the air. */
+export const TILE_SPRING = 7;
+/** A drawbridge plank: written into the map one cell at a time once its target is shot. */
+export const TILE_PLANK = 8;
+/** A gate's bars: solid until the target nearest them is shot, then they lift away. */
+export const TILE_GATE = 9;
 
 export function isSolid(tile: number): boolean {
   return tile === TILE_GROUND || tile === TILE_BRICK
-      || tile === TILE_QUESTION || tile === TILE_RAINBOW;
+      || tile === TILE_QUESTION || tile === TILE_RAINBOW
+      || tile === TILE_CRACKED || tile === TILE_SPRING || tile === TILE_PLANK || tile === TILE_GATE;
 }
 
 export interface EnemyDef {
   type: string;
   /** Tile column. The row is resolved from the ground at spawn time. */
   x: number;
+  /**
+   * The tile row of the floor this enemy stands on, when the column has something solid
+   * above it (a tunnel's roof) that the usual top-down ground search would find first.
+   * Only the obstacle course sets it.
+   */
+  floorRow?: number;
+  /** A guard: bounces the player back instead of hurting them (EnemyState.guard). */
+  guard?: boolean;
 }
 
 export interface Level {
@@ -41,9 +60,29 @@ export interface Level {
   enemyDefs: EnemyDef[];
   bowPositions: number[];
   superPositions: number[];
-  catPosition: number;
+  catPosition: number | null;
   clouds: Array<[number, number]>;
+  /**
+   * The obstacle course's extra pieces (game/course.ts): targets and their drawbridges,
+   * power-up stations and checkpoint flags. Absent on the six adventure levels.
+   */
+  course?: CourseDef;
 }
+
+/** Where a course's pieces are, in tiles. Built from the ASCII map in data/course.ts. */
+export interface CourseDef {
+  /**
+   * A target to shoot, and what the shot changes: each cell gets `to` written into it, in
+   * order, one at a time — planks laid across a chasm, or a gate's bars taken away.
+   */
+  targets: Array<{ x: number; y: number; cells: Array<{ x: number; y: number; to: number }> }>;
+  /** A pickup that comes back a few seconds after it is taken. `y` is the tile row it sits in. */
+  stations: Array<{ kind: StationKind; x: number; y: number }>;
+  /** Checkpoint flags: touch one and a death brings you back to it. `y` is its ground row. */
+  flags: Array<{ x: number; y: number }>;
+}
+
+export type StationKind = 'bow' | 'cape' | 'fart' | 'bighead' | 'chicken';
 
 export function makeGround(w: number, h: number): TileMap { const m=Array.from({length:h},()=>Array(w).fill(0)); for(let y=h-2;y<h;y++) for(let x=0;x<w;x++) m[y][x]=1; return m; }
 export function addPlats(m: TileMap, ps: Array<[number, number, number]>): void { ps.forEach(([px,py,pw])=>{for(let i=0;i<pw;i++)if(px+i<m[0].length)m[py][px+i]=2;}); }

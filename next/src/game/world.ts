@@ -4,6 +4,7 @@ import { LEVELS, TILE_QUESTION, TILE_RAINBOW, type Level, type TileMap } from '.
 import { BOW_S, CAT_S, SUPER_S } from '../data/sprites';
 import type { InputState } from '../input/actions';
 import { isFinalLevel, spawnBoss, stepBoss } from './boss';
+import { buildCourse, placeAtCheckpoint, stepCourse, type CourseState } from './course';
 import { chickenify, spawnEnemy, stepEnemy, type EnemyMove } from './enemy';
 import { createPlayer, playerHit, stepPlayer, type Character, type PlayerMove } from './player';
 import { random } from './random';
@@ -34,6 +35,17 @@ interface LevelSpawnState {
   bossDefeated: boolean;
   questionBlocks: BlockState[];
   rainbowBlocks: BlockState[];
+  course: CourseState | null;
+}
+
+/** A level's enemy queue, fresh: every def unspawned, carrying its floor row if it has one. */
+function pendingFor(level: Level): World['pending'] {
+  return level.enemyDefs.map((d) => {
+    const pending: World['pending'][number] = { type: d.type, x: d.x, spawned: false };
+    if (d.floorRow !== undefined) pending.floorRow = d.floorRow;
+    if (d.guard) pending.guard = true;
+    return pending;
+  });
 }
 
 /**
@@ -68,7 +80,9 @@ function buildLevelState(level: Level, dc: DifficultyRecord, map: TileMap): Leve
   let superPos = level.superPositions;
   // Covered by world.test.ts's "builds identical pickup, star and block tables for
   // every difficulty and level" — no frame trace reaches this branch.
-  if (dc.enemySkipChance) {
+  // Not on an obstacle course, whose pickups are its puzzle pieces: a free bow every
+  // twenty tiles would open every drawbridge for nothing.
+  if (dc.enemySkipChance && !level.course) {
     const extra: number[] = [];
     for (let i = 10; i < level.width - 10; i += 20) extra.push(i);
     superPos = [...superPos, ...extra];
@@ -120,6 +134,7 @@ function buildLevelState(level: Level, dc: DifficultyRecord, map: TileMap): Leve
     bossDefeated: false,
     questionBlocks,
     rainbowBlocks,
+    course: level.course ? buildCourse(level.course) : null,
   };
 }
 
@@ -151,8 +166,10 @@ export function createWorld(
   difficulty: DifficultyKey,
   character: Character = 'gigi',
   start?: RunTotals,
+  /** A level to play instead of `LEVELS[levelIndex]`: the obstacle course (data/course.ts). */
+  levelOverride?: Level,
 ): World {
-  const level = LEVELS[levelIndex];
+  const level = levelOverride ?? LEVELS[levelIndex];
   const dc = DIFFICULTY_CONFIG[difficulty];
   const map = level.generate(dc);
   return {
@@ -165,7 +182,7 @@ export function createWorld(
     animFrame: 0,
     dead: false,
     camera: { x: 0, y: 0 },
-    pending: level.enemyDefs.map((d) => ({ type: d.type, x: d.x, spawned: false })),
+    pending: pendingFor(level),
     lives: start?.lives ?? dc.lives,
     stateTimer: 0,
     gameOver: false,
@@ -181,6 +198,7 @@ export function createWorld(
     // Empty, and emptied again at the top of every step. See World.sounds in types.ts.
     sounds: [],
     rumbles: [],
+    checkpoint: null,
     ...buildLevelState(level, dc, map),
   };
 }
@@ -201,7 +219,7 @@ export function respawnLevel(world: World): void {
   world.map = world.level.generate(world.dc);
   world.player = createPlayer(world.level, world.dc, world.character);
   world.enemies = [];
-  world.pending = world.level.enemyDefs.map((d) => ({ type: d.type, x: d.x, spawned: false }));
+  world.pending = pendingFor(world.level);
   world.camera = { x: 0, y: 0 };
   world.dead = false;
   // index.html:1188. Dying mid-announcement throws the announcement away with everything
@@ -210,6 +228,12 @@ export function respawnLevel(world: World): void {
   // Rebuilt from the FRESH map above, exactly as initLevel derives them, so a question
   // block bumped before the death is a question block again after it.
   Object.assign(world, buildLevelState(world.level, world.dc, world.map));
+  // On a course, back at the last flag rather than the start (game/course.ts), with the
+  // camera already there instead of sweeping across the whole level to find the player.
+  if (world.checkpoint) {
+    placeAtCheckpoint(world);
+    snapCamera(world);
+  }
   // index.html:1209 — the LAST line of initLevel, and easy to miss from the respawn end
   // of it. Dying stops the music (playerDie, player.ts), and this is what brings it back
   // ninety frames later. Without it the first death leaves the rest of the run silent.
@@ -363,6 +387,9 @@ export function stepWorld(
     stepArrows(world);
     stepStars(world);
     stepEnemies(world, moveEnemy);
+    // The obstacle course, on the one level that has one: after the arrows have flown (a
+    // target is hit by an arrow where it now is) and the enemies have moved.
+    stepCourse(world);
     // index.html:1550-1556 and :1558-1626, in that order and in that place: after the
     // enemies, before the rescue. The order of these two matters to the fight. The
     // projectile pass moves what is ALREADY in the air, so a fireball the boss fires
@@ -582,10 +609,17 @@ export function stepArrows(world: World): void {
       }
       if (a.isChicken && !e.isChicken) {
         chickenify(e);
+        // A giant becomes an ordinary chicken: the course's one way past it.
         a.life = 0;
         world.score += Math.round(100 * world.dc.scoreMultiplier);
         world.sounds.push('cluck'); // index.html:1511
         continue; // the live `return` — this enemy only; see the note above
+      }
+      // The course's giant shrugs an arrow off: only a chicken ray, above, gets past it.
+      if (e.type === 'giant') {
+        a.life = 0;
+        world.sounds.push('block');
+        continue;
       }
       e.alive = false;
       e.squashTimer = 30;
@@ -797,10 +831,24 @@ export function checkRescue(world: World): void {
  * Exponential lerp toward the player, clamped to the level, with a snap inside half a
  * pixel so it does not creep forever. index.html:1634-1640.
  */
+function cameraTarget(world: World): { x: number; y: number } {
+  const { player: p, level: lvl } = world;
+  return {
+    x: Math.max(0, Math.min(p.x - VIEW_W / 2 + p.w / 2, lvl.width * TILE - VIEW_W)),
+    y: Math.max(0, Math.min(p.y - VIEW_H / 2, lvl.height * TILE - VIEW_H)),
+  };
+}
+
+/** The camera straight onto the player, with no lerp: for a respawn somewhere mid-level. */
+export function snapCamera(world: World): void {
+  const t = cameraTarget(world);
+  world.camera.x = t.x;
+  world.camera.y = t.y;
+}
+
 export function stepCamera(world: World): void {
-  const { player: p, level: lvl, camera } = world;
-  const targetX = Math.max(0, Math.min(p.x - VIEW_W / 2 + p.w / 2, lvl.width * TILE - VIEW_W));
-  const targetY = Math.max(0, Math.min(p.y - VIEW_H / 2, lvl.height * TILE - VIEW_H));
+  const { camera } = world;
+  const { x: targetX, y: targetY } = cameraTarget(world);
   camera.x += (targetX - camera.x) * 0.12;
   camera.y += (targetY - camera.y) * 0.12;
   if (Math.abs(camera.x - targetX) < 0.5) camera.x = targetX;
@@ -824,7 +872,9 @@ export function spawnEnemiesInView(world: World): void {
     d.spawned = true;
     // index.html:1359. Through random.ts's seam rather than Math.random() directly, so
     // a super_easy test can pin the roll to the same constant the live driver stubs.
-    if (world.dc.enemySkipChance && random() < world.dc.enemySkipChance) continue;
+    // Never on an obstacle course: its enemies are placed, and a tunnel with a missing
+    // doll in it is a different puzzle.
+    if (world.dc.enemySkipChance && !world.level.course && random() < world.dc.enemySkipChance) continue;
     const enemy = spawnEnemy(world.map, world.dc, d);
     if (enemy) world.enemies.push(enemy);
   }

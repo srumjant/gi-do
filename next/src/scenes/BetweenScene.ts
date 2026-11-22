@@ -1,12 +1,13 @@
 import Phaser from 'phaser';
 import { BASE_H, BASE_W } from '../config/constants';
 import { T, TStr } from '../config/i18n';
-import { LEVELS, LEVEL_NAME_KEYS } from '../data/levels';
+import type { Stage } from '../data/stages';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { siblingOf } from '../game/menu';
 import type { Character } from '../game/player';
 import {
   getCurrentLevel,
+  getCurrentStage,
   getKidnapper,
   getPlayerSprites,
   getRescueSprites,
@@ -154,6 +155,8 @@ export class BetweenScene extends Phaser.Scene {
 
   /** The level being walked INTO — `currentLevel` has already been stepped on (run.ts). */
   private levelIndex = 0;
+  /** The stage being walked INTO: its theme picks the kidnapper, its level the colours. */
+  private stage!: Stage;
   private kidnapper!: Kidnapper;
   /** Where the villain's feet are: the ground, less its own height at its own scale. */
   private villainY = 0;
@@ -197,7 +200,8 @@ export class BetweenScene extends Phaser.Scene {
     // because button 0 synthesises Space in both mappings.
     this.keys = bindMenuKeys(this, padContextFor('between'));
     this.levelIndex = getCurrentLevel();
-    this.kidnapper = getKidnapper(this.levelIndex);
+    this.stage = getCurrentStage();
+    this.kidnapper = getKidnapper(this.stage.theme);
 
     const hero: Character = getSelectedChar();
     const sibling = siblingOf(hero);
@@ -214,7 +218,7 @@ export class BetweenScene extends Phaser.Scene {
     this.hero = this.actor(hero, 'stand', CUTSCENE_SCALE, DEPTH_ACTOR);
     this.sibling = this.actor(sibling, 'stand', CUTSCENE_SCALE, DEPTH_ACTOR);
     this.villain = this.add
-      .image(0, 0, kidnapperTextureKey(kidnapperIndex(this.levelIndex)))
+      .image(0, 0, kidnapperTextureKey(kidnapperIndex(this.stage.theme)))
       .setOrigin(0, 0)
       .setDepth(DEPTH_ACTOR)
       .setVisible(false);
@@ -242,7 +246,7 @@ export class BetweenScene extends Phaser.Scene {
    * of the palette, which is as much of a level as a cutscene can show.
    */
   private drawBackdrop(): void {
-    const level = LEVELS[this.levelIndex];
+    const level = this.stage.level;
     this.add
       .graphics()
       .fillStyle(colour(level.bg))
@@ -292,7 +296,7 @@ export class BetweenScene extends Phaser.Scene {
    */
   private buildHeadline(): Phaser.GameObjects.Container {
     const sibName = getRescueSprites().name.toUpperCase();
-    const nextName = TStr(LEVEL_NAME_KEYS[this.levelIndex] ?? LEVEL_NAME_KEYS[0]);
+    const nextName = TStr(this.stage.nameKey);
     const title = this.add
       .text(0, 0, sibName + TStr('sib_stolen_again'), HEADLINE_FONT)
       .setOrigin(0.5, 0.5);

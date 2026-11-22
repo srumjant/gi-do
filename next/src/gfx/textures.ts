@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ENEMY_SCALE } from '../config/constants';
+import { ENEMY_SCALE, GIANT_SCALE } from '../config/constants';
 import {
   ARROW_P, ARROW_S,
   BOSS_CHARGE, BOSS_IDLE, BOSS_P, BOSS_ROAR, BOSS_WALK,
@@ -185,6 +185,9 @@ function registerEnemyTextures(scene: Phaser.Scene): void {
     const { sprite, palette } = getEnemySpriteInfo(type);
     addSprite(scene, enemyTextureKey(type), sprite, palette, ENEMY_SCALE);
   }
+  // The obstacle course's giant: the dino's art, at its own much bigger scale.
+  const giant = getEnemySpriteInfo('giant');
+  addSprite(scene, enemyTextureKey('giant'), giant.sprite, giant.palette, GIANT_SCALE);
 }
 
 /**

@@ -156,6 +156,16 @@ export function createPlayer(level: Level, dc: DifficultyRecord, character: Char
 export function giveRandomSillyPowerup(world: World): void {
   const types: PowerupType[] = ['fart', 'bighead', 'chicken'];
   const type = types[Math.floor(random() * types.length)];
+  grantSillyPowerup(world, type);
+}
+
+/**
+ * One silly power-up, named rather than rolled: the rainbow block's prize once
+ * `giveRandomSillyPowerup` has picked it, and an obstacle course's station's (game/course.ts).
+ * `announce` false skips the popup and its world-stopping freeze and the fanfare, for a
+ * station a child has already taken once this life and knows.
+ */
+export function grantSillyPowerup(world: World, type: PowerupType, announce = true): void {
   if (type === 'fart') {
     world.player.fartTimer = 900;
   } else if (type === 'bighead') {
@@ -164,6 +174,7 @@ export function giveRandomSillyPowerup(world: World): void {
     world.player.chickenRayCharges = 8;
     world.player.hasBow = true;
   }
+  if (!announce) return;
   world.powerupPopup = { type, timer: 120, maxTimer: 120 };
   // index.html:1155, in this order: the pickup chime and then the win fanfare, both at
   // once, which is what makes a rainbow block sound like more than a pickup. They are
@@ -476,7 +487,11 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
 
   // Running, coyote time, the jump buffer, the jump, the variable-height cut and gravity
   // (index.html:1362-1388 and 1400-1403) — shared with learn mode, see stepMotion above.
-  stepMotion(p, input, dc, world.sounds);
+  // A spring's throw or a cape's rescue is not a jump, and letting go of jump must not
+  // shorten it: see PlayerState.liftTimer. Spent at one a step, and as soon as the rise is.
+  const lifting = (p.liftTimer ?? 0) > 0 && p.vy < 0;
+  stepMotion(p, input, dc, world.sounds, { noJumpCut: lifting });
+  if (p.liftTimer !== undefined) p.liftTimer = lifting ? p.liftTimer - 1 : 0;
 
   // Shooting (index.html:1390-1398). The live source has it between the variable-height
   // cut and gravity; here it runs after gravity, which reads exactly the same values:
@@ -541,6 +556,10 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
       p.invincible = 60;
       p.vy = -10;
       p.y = level.height * TILE - 32;
+      // Without this the very next step's jump cut (stepMotion) clipped the -10 to a short
+      // hop unless jump happened to be held, and a child holding only an arrow rose a tile
+      // and fell straight back into the same pit: the cape that "always saves" did not.
+      p.liftTimer = 30;
       // index.html:1423's `playTone(400,.15,'sawtooth',.12,200)` — a bare tone rather
       // than one of the eleven named effects, which is how it stayed unported when this
       // file was first written. The same four-hundred-hertz slide plays when a cape

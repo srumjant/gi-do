@@ -141,3 +141,34 @@ Worth watching for, and worth not treating as new bugs if they come up:
 
 Anything *else* they notice about movement is new information, and there is no longer a trace
 that can confirm or deny it. That is the cost of the switch, and it was accepted knowingly.
+
+## Second levels, batch 1 (2026-11-22)
+
+Two new levels sit in the run now, each right after its theme's classic level:
+**Nukuaed II** (stage 2) and **Dinosauruse kanjon II** (stage 4). The six classic levels are
+unchanged. To play one straight away, add `?level=N` to the address: `?level=2` is Nukuaed II,
+`?level=4` is Dinosauruse kanjon II (the menus still come first: difficulty and hero).
+
+- **Nukuaed II is about the bow.** A drawbridge lowered by shooting its target; a portcullis
+  whose target hangs too high for a standing shot, so you jump and fire at the top of the
+  jump; a tunnel of red guards that bounce you back until you shoot them; a spring up the
+  sibling's tower.
+- **Dinosauruse kanjon II is about the fart jump.** Canyon ledges and pits first (plain
+  jumping), then two 7-tall steps that only a fart jump climbs (a spare fart waits on the
+  first step), then the two-tool puzzle: fart up to a ledge under a rock overhang, shoot the
+  target hanging over the chasm from there, and the bridge comes down below. Then cannons,
+  and a spring up the mesa.
+
+Every obstacle was checked on all four difficulties, by tests and in the browser.
+
+### What to watch
+
+- **Anywhere stuck for more than a minute,** or **more than three or four deaths in one
+  section**: that section needs changing. Say which one.
+- **Jump and shoot** at the portcullis: do they work it out on their own? A standing shot
+  flies under the target, on purpose.
+- **The two-tool puzzle** in the canyon: do they think of going up to the ledge to shoot?
+  If not, that is the most likely place to need a hint (an arrow sign, a glint on the ledge).
+- **The car on the far side of the first drawbridge** walks onto the bridge once it is down:
+  jump it or shoot it. Fair, or too mean?
+- **Length**: the demo's 2-3 minutes was "fine"; these are about the same each.

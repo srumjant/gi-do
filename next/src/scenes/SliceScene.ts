@@ -12,6 +12,7 @@ import { type Character, PLAYER_DRAW_INSET, type PlayerMove } from '../game/play
 import {
   finishLevel,
   getCurrentLevel,
+  getCurrentStage,
   getPlayerSprites,
   getRescueSprites,
   getRunTotals,
@@ -19,6 +20,7 @@ import {
   getSkinIndex,
 } from '../game/run';
 import { createWorld, rescueSpot, stepWorld } from '../game/world';
+import { CourseView } from '../gfx/course';
 import type { EnemyState, World } from '../game/types';
 import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
 import { GAME_FONT_BOLD, WORLD_TEXT_RESOLUTION } from '../gfx/gameFont';
@@ -343,6 +345,8 @@ export class SliceScene extends Phaser.Scene {
    * audio/cues.ts.
    */
   private levelIndex = 0;
+  /** The obstacle course's tiles, effects and giants, on the one level that has them. */
+  private courseView: CourseView | null = null;
   /** Set once this level's ending has been acted on — see `leaveIfRunOver`. */
   private leaving = false;
 
@@ -356,7 +360,11 @@ export class SliceScene extends Phaser.Scene {
     // here until the run loop landed; it now moves because `finishLevel` (game/run.ts)
     // moved it, and `getRunTotals` is the lives and score the last level ended with — a
     // fresh run's `startRun` having just set them to the difficulty's lives and zero.
-    const levelIndex = getCurrentLevel();
+    // The stage is the level; its THEME is everything a level borrows from its world — the
+    // hills, the music, the kidnapper. A classic level's theme is its own old index.
+    const stageIndex = getCurrentLevel();
+    const stage = getCurrentStage();
+    const levelIndex = stage.theme;
     this.levelIndex = levelIndex;
     // What the two choice screens decided, read back out of the run state they wrote
     // to — the port's equivalents of the live game's `selectedDifficulty`
@@ -367,7 +375,9 @@ export class SliceScene extends Phaser.Scene {
     // between levels: both were chosen once, before the run, and nothing here writes them.
     const difficulty: DifficultyKey = getDifficulty();
     const character: Character = getSelectedChar();
-    this.world = createWorld(levelIndex, difficulty, character, getRunTotals());
+    this.world = createWorld(
+      levelIndex, difficulty, character, getRunTotals(), stage.level,
+    );
 
     registerTextures(this);
 
@@ -386,7 +396,14 @@ export class SliceScene extends Phaser.Scene {
     // doll, the car, the dino, the penguin and any chicken a ray makes of one; the bats,
     // the bouncer and every projectile still move themselves, deliberately.
     this.collisionLayer = createCollisionLayer(this, this.world);
-    this.movePlayer = createPlayerMove(this, this.world, this.collisionLayer);
+    // The course's own tiles go on a Phaser tilemap layer of their own, over the static ones,
+    // and its giants are static bodies the player's mover collides with (gfx/course.ts).
+    const courseView = this.world.course ? new CourseView(this, this.world) : null;
+    this.courseView = courseView;
+    this.movePlayer = createPlayerMove(
+      this, this.world, this.collisionLayer,
+      courseView ? [{ target: courseView.giants, onHit: () => courseView.onGiantBump(this.world) }] : undefined,
+    );
     this.enemyBodies = createEnemyBodies(this, this.world, this.collisionLayer);
 
     this.glowGraphics = this.add.graphics().setDepth(DEPTH_PICKUP_GLOW);
@@ -484,6 +501,7 @@ export class SliceScene extends Phaser.Scene {
       world: this.world,
       levelIndex,
       difficulty,
+      levelNameKey: stage.nameKey,
     } satisfies HudData);
 
     // The two labels the live game lays over the FROZEN world — 'Oops!' while you wait to
@@ -491,7 +509,7 @@ export class SliceScene extends Phaser.Scene {
     // arrangement as the HUD: a parallel scene, a live reference to the World, read-only.
     this.scene.launch(LEVEL_OVERLAY_SCENE_KEY, {
       world: this.world,
-      levelIndex,
+      levelIndex: stageIndex,
     } satisfies LevelOverlayData);
 
     // And the power-up announcement, in front of even the HUD — see main.ts's scene list
@@ -560,6 +578,7 @@ export class SliceScene extends Phaser.Scene {
     this.hillsGraphics = undefined;
     this.accumulator = 0;
     this.leaving = false;
+    this.courseView = null;
   }
 
   /**
@@ -851,6 +870,7 @@ export class SliceScene extends Phaser.Scene {
   private syncSprites(): void {
     const { enemies, camera, animFrame } = this.world;
 
+    this.courseView?.update(this.world);
     this.syncPickups();
     this.syncCat();
     this.syncRescue();
@@ -1415,6 +1435,9 @@ export class SliceScene extends Phaser.Scene {
     // with no per-ghost offset, exactly like its drift, so every ghost on screen pulses
     // together. Everything else draws at 1.
     image.setAlpha(enemy.type === 'ghost' ? 0.6 + Math.sin(animFrame * 0.08) * 0.2 : 1);
+    // An obstacle course's guard is flushed red, so it reads as "not this one, shoot it".
+    if (enemy.guard) image.setTint(0xff8888);
+    else image.clearTint();
     image.setPosition(enemy.x, enemy.y + wobble);
   }
 

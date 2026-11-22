@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  finishLevel, getCurrentLevel, getEnemySpriteInfo, getKidnapper, getPlayerSprites,
+  finishLevel, getCurrentLevel, getCurrentStage, getEnemySpriteInfo, getKidnapper, getPlayerSprites,
   getRescueSprites, getRunTotals, getSelectedChar, isLastLevel, setSelectedChar,
   setGigiSkin, setDodoSkin, startRun,
 } from '../src/game/run';
@@ -10,6 +10,7 @@ import { emptyInput } from '../src/input/actions';
 import { DIFFICULTY_CONFIG, setDifficulty } from '../src/config/difficulty';
 import { DODO_SKINS, GIGI_SKINS, KIDNAPPERS } from '../src/data/sprites';
 import { LEVELS } from '../src/data/levels';
+import { STAGES } from '../src/data/stages';
 
 beforeEach(() => {
   setSelectedChar('gigi');
@@ -72,7 +73,7 @@ describe('the run loop', () => {
     // run to its end. Each entry is what the level was ENTERED with, plus what finishing it
     // decided — so a level's row is the proof that the previous level's numbers arrived.
     const played: Array<Record<string, unknown>> = [];
-    let world = createWorld(getCurrentLevel(), 'normal', 'gigi', getRunTotals());
+    let world = createWorld(getCurrentStage().theme, 'normal', 'gigi', getRunTotals(), getCurrentStage().level);
 
     for (;;) {
       const level = getCurrentLevel();
@@ -84,20 +85,18 @@ describe('the run loop', () => {
       const outcome = finishLevel({ lives: world.lives, score: world.score });
       played[played.length - 1].outcome = outcome;
       if (outcome === 'game-won') break;
-      world = createWorld(getCurrentLevel(), 'normal', 'gigi', getRunTotals());
+      world = createWorld(getCurrentStage().theme, 'normal', 'gigi', getRunTotals(), getCurrentStage().level);
     }
 
-    expect(played).toEqual([
-      { level: 0, livesIn: 3, scoreIn: 0, outcome: 'next-level' },
-      { level: 1, livesIn: 3, scoreIn: 100, outcome: 'next-level' },
-      { level: 2, livesIn: 2, scoreIn: 200, outcome: 'next-level' },
-      { level: 3, livesIn: 2, scoreIn: 300, outcome: 'next-level' },
-      { level: 4, livesIn: 1, scoreIn: 400, outcome: 'next-level' },
-      { level: 5, livesIn: 1, scoreIn: 500, outcome: 'game-won' },
-    ]);
+    expect(played).toEqual(STAGES.map((_, i) => ({
+      level: i,
+      livesIn: 3 - (i > 1 ? 1 : 0) - (i > 3 ? 1 : 0),
+      scoreIn: 100 * i,
+      outcome: i === STAGES.length - 1 ? 'game-won' : 'next-level',
+    })));
     // The run has walked off the end of the table, which is what 'game-won' means. Nothing
     // resets it: the next `startRun` does that.
-    expect(getCurrentLevel()).toBe(LEVELS.length);
+    expect(getCurrentLevel()).toBe(STAGES.length);
   });
 
   it('spends a life per death and ends the run on the death that leaves none', () => {
@@ -140,9 +139,15 @@ describe('the run loop', () => {
     expect(getRunTotals()).toEqual({ lives: DIFFICULTY_CONFIG.hard.lives, score: 0 });
   });
 
-  it('knows which level is the last one', () => {
-    const answers = LEVELS.map((_, index) => isLastLevel(index));
-    expect(answers).toEqual([false, false, false, false, false, true]);
+  it('knows which stage is the last one', () => {
+    expect(STAGES.map((_, i) => isLastLevel(i))).toEqual(STAGES.map((_, i) => i === STAGES.length - 1));
+  });
+
+  it('can start a run partway, for a playtest, but never past the end', () => {
+    startRun(2);
+    expect(getCurrentLevel()).toBe(2);
+    startRun(999);
+    expect(getCurrentLevel()).toBe(STAGES.length - 1);
   });
 });
 

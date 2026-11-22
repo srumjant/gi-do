@@ -1,3 +1,4 @@
+import type { CourseState } from './course';
 import type { TileMap, Level } from '../data/levels';
 import type { DifficultyRecord } from '../config/difficulty';
 
@@ -95,6 +96,13 @@ export interface PlayerState {
    * once BOTH are spent. Do not collapse them into one flag.
    */
   chickenRayCharges: number;
+  /**
+   * Frames left in which letting go of jump does NOT cut the rise short. Set by a spring's
+   * throw and by a cape's rescue from a pit (both of which hand out a velocity no jump
+   * could), so a child holding only an arrow still gets the whole of it. Optional, and
+   * absent means 0, so the adventure's tests that build a player by hand need not name it.
+   */
+  liftTimer?: number;
 }
 
 /**
@@ -334,6 +342,12 @@ export interface EnemyState {
    * makes a cannon stompable: it stops being a cannon.
    */
   noStomp: boolean;
+  /**
+   * An obstacle course's guard (data/course.ts's uppercase letters): touching it does not
+   * hurt, it bounces you back, invincible or not, so the only way past is to shoot it.
+   * Absent on everything else.
+   */
+  guard?: boolean;
 }
 
 /**
@@ -817,12 +831,26 @@ export interface World {
    * motor through there would put the gamepad inside the sound engine.
    */
   rumbles: RumbleCue[];
+  /**
+   * The obstacle course's moving parts (game/course.ts), rebuilt with the level on every
+   * build like the blocks; `null` on the six adventure levels.
+   */
+  course: CourseState | null;
+  /**
+   * The last checkpoint flag touched on a course, in tiles, or `null`. NOT rebuilt by a
+   * respawn, which is the whole point: `respawnLevel` puts the player back here.
+   */
+  checkpoint: { x: number; y: number } | null;
 }
 
 export interface PendingEnemy {
   type: string;
   /** Tile column, from the level's enemyDefs. */
   x: number;
+  /** The floor row, when the level gives one (data/levels.ts's EnemyDef). */
+  floorRow?: number;
+  /** A guard (EnemyState.guard), when the level says so. */
+  guard?: boolean;
   spawned: boolean;
 }
 

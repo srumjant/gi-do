@@ -1,4 +1,4 @@
-import { ENEMY_SCALE, GRAVITY, TILE } from '../config/constants';
+import { ENEMY_SCALE, GIANT_SCALE, GRAVITY, TILE } from '../config/constants';
 import type { DifficultyRecord } from '../config/difficulty';
 import type { EnemyDef, TileMap } from '../data/levels';
 import {
@@ -89,7 +89,7 @@ export type EnemyMove = (world: World, e: EnemyState) => EnemyBlocked;
  */
 export function isGroundPatrol(e: EnemyState): boolean {
   return e.type !== 'ghost' && e.type !== 'bat' && e.type !== 'icebat'
-    && e.type !== 'cannon' && e.type !== 'bouncer';
+    && e.type !== 'cannon' && e.type !== 'bouncer' && e.type !== 'giant';
 }
 
 /**
@@ -119,6 +119,7 @@ const ENEMY_SPRITES: Partial<Record<string, SpriteData>> = {
   icebat: ICEBAT_S,
   cannon: CANNON_S,
   bouncer: BOUNCER_S,
+  giant: DINO_S,
 };
 
 /**
@@ -135,9 +136,12 @@ export function spawnEnemy(
   const sprite = ENEMY_SPRITES[def.type];
   if (!sprite) return undefined;
 
-  const h = sprite.length * ENEMY_SCALE;
-  const w = sprite[0].length * ENEMY_SCALE;
-  const gy = findGroundY(map, def.x);
+  const scale = def.type === 'giant' ? GIANT_SCALE : ENEMY_SCALE;
+  const h = sprite.length * scale;
+  const w = sprite[0].length * scale;
+  // A floor row from the level wins over the search from the top, which would find a
+  // tunnel's roof before its floor (data/levels.ts's EnemyDef).
+  const gy = def.floorRow !== undefined ? def.floorRow * TILE : findGroundY(map, def.x);
   // Every type here defaults to -0.8*enemySpeed (index.html:1215); penguin is the one
   // override baked into the default rather than applied after, since nothing else
   // about the base object changes for it. bat/icebat/bouncer below still read like the
@@ -151,6 +155,7 @@ export function spawnEnemy(
     noGravity: false, originY: 0, sineOffset: 0, bounceTimer: 0, stunTimer: 0,
     isChicken: false, shootTimer: 0, shootInterval: 0, noStomp: false,
   };
+  if (def.guard) e.guard = true;
 
   // index.html:1216 — a flyer like the bat below, but only FORTY pixels up rather than
   // sixty, and with NO sineOffset at all: every ghost on screen drifts on the same phase
@@ -197,6 +202,15 @@ export function spawnEnemy(
     e.vx = 0;
     e.shootTimer = 60 + Math.floor(random() * 60);
     e.shootInterval = dc.enemyShootInterval;
+    e.noStomp = true;
+  } else if (def.type === 'giant') {
+    // The obstacle course's giant (game/course.ts): a dino three times the size that
+    // stands its ground. It cannot be stomped, arrows bounce off it (world.ts's
+    // stepArrows), and an Arcade static body stops the player walking through it
+    // (gfx/course.ts) — so a chicken ray, which makes an ordinary chicken of it, is the
+    // only way past. Not a ground patroller (isGroundPatrol), so it falls and lands by
+    // the same hand-written floor snap a cannon does.
+    e.vx = 0;
     e.noStomp = true;
   } else if (def.type === 'bouncer') {
     // index.html:1219 — starts at rest (vy stays 0, the base object's default, until
@@ -250,6 +264,8 @@ export function chickenify(e: EnemyState): void {
   e.noGravity = false;
   e.noStomp = false;
   e.stunTimer = 0;
+  // A chicken is nobody's guard (EnemyState.guard).
+  if (e.guard) e.guard = false;
   e.w = CHICKEN_S[0].length * ENEMY_SCALE;
   e.h = CHICKEN_S.length * ENEMY_SCALE;
 }
@@ -501,6 +517,18 @@ export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
   //
   // This is NOT the tile-collision box from player.ts: that one insets y by 1-3px too;
   // this one does not.
+  // An obstacle course's guard (EnemyState.guard) bounces the player back out of it, and
+  // that is all it does: no damage, and no stomp either. Ahead of the invincibility gate
+  // below on purpose, so the blink after a cape is spent does not walk you through it.
+  if (e.guard && rectOverlap({ x: p.x, y: p.y, w: p.w, h: p.h }, { x: e.x, y: e.y, w: e.w, h: e.h })) {
+    const fromLeft = p.x + p.w / 2 < e.x + e.w / 2;
+    p.x = fromLeft ? e.x - p.w - 1 : e.x + e.w + 1;
+    p.vx = fromLeft ? -4 : 4;
+    if (p.vy > 0) p.vy = -3;
+    world.sounds.push('boing');
+    return;
+  }
+
   const shm = (dc.stompHitbox || 1) * (p.bigHeadTimer > 0 ? 1.5 : 1);
   const bhx = p.bigHeadTimer > 0 ? 8 : 0;
   if (p.invincible <= 0 && rectOverlap(

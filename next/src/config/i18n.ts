@@ -138,6 +138,8 @@ export const TRANSLATIONS: Record<string, Entry> = {
   level_4:            {et:'Palermo väljak',           en:'Palermo Piazza'},
   level_5:            {et:'Talvine imedemaa',           en:'Winter Wonderland'},
   level_6:            {et:'Mängulossi',                en:'Toy Castle'},
+  level_1_2:          {et:'Nukuaed II',               en:'Doll Garden II'},
+  level_2_2:          {et:'Dinosauruse kanjon II',    en:'Dinosaur Canyon II'},
 };
 
 let lang: Lang = 'et';
