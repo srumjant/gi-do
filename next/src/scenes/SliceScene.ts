@@ -19,13 +19,14 @@ import {
   getSelectedChar,
   getSkinIndex,
 } from '../game/run';
-import { createWorld, rescueSpot, stepWorld } from '../game/world';
+import { createWorld, rescueSpot, stepWorld, type RescueSpot } from '../game/world';
 import { CourseView } from '../gfx/course';
+import { DollQueenView } from '../gfx/dollQueen';
 import type { EnemyState, World } from '../game/types';
 import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
 import { GAME_FONT_BOLD, WORLD_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { RENDER_SCALE } from '../gfx/render';
-import { cloudPosition, cloudScale, drawRidges, drawSky } from '../gfx/parallax';
+import { cloudPosition, cloudScale, drawRidges, drawSky, drawWallpaper } from '../gfx/parallax';
 import {
   type BlockView,
   createRainbowBlocks,
@@ -46,7 +47,11 @@ import {
   CHICKEN_ARROW_TEXTURE,
   cloudTextureKey,
   enemyTextureKey,
+  VILLAIN_TEXTURES,
+  ZOMBIE_KINDS,
+  zombieTextureKey,
   FIREBALL_TEXTURE,
+  QUEEN_HEART_TEXTURE,
   playerBodyTextureKey,
   playerHeadTextureKey,
   PLAYER_POSES,
@@ -305,6 +310,10 @@ export class SliceScene extends Phaser.Scene {
    * and the free call differ in every respect — see the fonts above.
    */
   private rescueImage!: Phaser.GameObjects.Image;
+  /** A chase level's villain, standing with the sibling at the end (Level.villain). */
+  private villainImage!: Phaser.GameObjects.Image;
+  /** The Doll Queen, on the level that ends with her (gfx/dollQueen.ts). */
+  private queenView!: DollQueenView;
   private cageBackGraphics!: Phaser.GameObjects.Graphics;
   private cageBarsGraphics!: Phaser.GameObjects.Graphics;
   private rescueCryText!: Phaser.GameObjects.Text;
@@ -423,6 +432,8 @@ export class SliceScene extends Phaser.Scene {
       .setDepth(DEPTH_BOSS_BAR)
       .setVisible(false);
 
+    this.queenView = new DollQueenView(this);
+
     this.catPickupImage = this.hiddenImage(CAT_TEXTURE, DEPTH_PICKUP);
     this.catImage = this.hiddenImage(CAT_TEXTURE, DEPTH_CAT);
     this.catScratchImage = this.hiddenImage(CAT_SCRATCH_TEXTURE, DEPTH_CAT);
@@ -440,6 +451,12 @@ export class SliceScene extends Phaser.Scene {
     // every frame just below. `rescueTextureKey` at the foot of this file is where the
     // "other character" rule is read, out of game/run.ts rather than worked out again.
     this.rescueImage = this.hiddenImage(rescueTextureKey(), DEPTH_RESCUE);
+    // A chase level's villain (Level.villain), standing with the sibling at the end.
+    this.villainImage = this.add
+      .image(0, 0, VILLAIN_TEXTURES.dollQueen)
+      .setOrigin(0.5, 1)
+      .setDepth(DEPTH_RESCUE)
+      .setVisible(false);
     this.cageBackGraphics = this.add.graphics().setDepth(DEPTH_RESCUE_CAGE_BACK);
     this.cageBarsGraphics = this.add.graphics().setDepth(DEPTH_RESCUE_FRONT);
     this.rescueCryText = this.rescueLabel(TStr('help_cry'), RESCUE_CRY_FONT);
@@ -640,6 +657,12 @@ export class SliceScene extends Phaser.Scene {
    * read defensively in `syncSprites` below.
    */
   private createParallax(levelIndex: number): void {
+    if (this.world.level.indoors) {
+      const wall = this.add.graphics();
+      this.setupFixedLayer(wall);
+      drawWallpaper(wall, this.world.level.bg);
+      return;
+    }
     const parallax = PARALLAX[levelIndex];
     if (!parallax) return;
 
@@ -875,6 +898,7 @@ export class SliceScene extends Phaser.Scene {
     this.syncCat();
     this.syncRescue();
     this.syncBoss();
+    this.queenView.update(this.world);
     this.syncEnemyProjectiles();
     this.syncArrows();
     this.syncPlayer();
@@ -1034,6 +1058,30 @@ export class SliceScene extends Phaser.Scene {
   }
 
   /**
+   * A chase level's end: the villain holding the sibling up while they call for help; once the
+   * hero is near the level is won (game/world.ts's checkRescue) and she runs off to the right
+   * with them, hopping, over the 200 frames the overlay shows.
+   */
+  private syncVillain(spot: RescueSpot): void {
+    const { won, stateTimer, animFrame, level } = this.world;
+    // Caught at last? No: a little hop of glee where she stands, then a leap up and away over
+    // whatever is behind her (a wall, the tower's edge), out of the top of the screen.
+    const run = won ? 200 - stateTimer : 0;
+    const leap = Math.max(0, run - 24);
+    const x = spot.x + 8 + leap * 1.6;
+    const floor = spot.y + spot.h - (run < 24 ? Math.abs(Math.sin(run * 0.4)) * 8 : leap * 3);
+    this.villainImage
+      .setTexture(VILLAIN_TEXTURES[level.villain ?? 'dollQueen'])
+      .setVisible(true)
+      .setPosition(x, floor);
+    const top = floor - this.villainImage.displayHeight;
+    this.rescueImage.setPosition(x - 8, top - spot.h + 6 + Math.sin(animFrame * 0.2) * 2);
+    this.rescueCryText
+      .setVisible(animFrame % 80 < 50)
+      .setPosition(x - RESCUE_TEXT_OFFSET_X, top - spot.h - 4);
+  }
+
+  /**
    * The sibling you came for (index.html:1733-1756) — the whole point of the game, and
    * until now the one thing at the end of a level this port did not draw at all. Walking
    * into the empty air still won, so the bug was invisible to every test in the suite and
@@ -1056,17 +1104,19 @@ export class SliceScene extends Phaser.Scene {
    * source pins them to `rY` rather than `rY+bob`.
    */
   private syncRescue(): void {
-    const { boss, bossDefeated, level, animFrame } = this.world;
+    const { boss, bossDefeated, courseBoss, level, animFrame } = this.world;
     const back = this.cageBackGraphics;
     const bars = this.cageBarsGraphics;
     back.clear();
     bars.clear();
 
-    const caged = boss !== null && boss.alive && isFinalLevel(level);
+    const caged = (boss !== null && boss.alive && isFinalLevel(level))
+      || (courseBoss !== null && courseBoss.phase !== 'defeated');
     const free = !caged && (!boss || bossDefeated);
     this.rescueImage.setVisible(caged || free);
     this.rescueCryText.setVisible(false);
     this.rescueCallText.setVisible(false);
+    this.villainImage.setVisible(false);
     if (!caged && !free) return;
 
     // The one derivation of where the sibling is, shared with the check that hands the
@@ -1074,6 +1124,11 @@ export class SliceScene extends Phaser.Scene {
     // `create` for the same reason that function resolves it per call.
     const spot = rescueSpot(this.world);
     const textX = spot.x - RESCUE_TEXT_OFFSET_X;
+
+    if (level.ending === 'chase') {
+      this.syncVillain(spot);
+      return;
+    }
 
     if (!caged) {
       this.rescueImage.setPosition(spot.x, spot.y + Math.sin(animFrame * 0.05) * 2);
@@ -1262,13 +1317,19 @@ export class SliceScene extends Phaser.Scene {
         FIREBALL_TEXTURE,
         DEPTH_ENEMY_PROJECTILE,
       );
+      // The Doll Queen throws hearts (game/bosses/dollQueen.ts); everything else is a fireball.
+      const heart = shot.type === 'heart';
+      image.setTexture(heart ? QUEEN_HEART_TEXTURE : FIREBALL_TEXTURE);
+      image.setScale(spriteScale(image) * (heart ? 0.6 : 1));
       const flicker = Math.sin(animFrame * 0.3 + shot.x) * 0.3;
       image
         .setPosition(shot.x, shot.y)
         .setAlpha(0.8 + flicker * 0.2)
         .setVisible(true);
-      const trailX = shot.vx > 0 ? shot.x - 4 : shot.x + 10;
-      fillRect(trails, FIREBALL_TRAIL, trailX, shot.y + 2, 4, 4);
+      if (!heart) {
+        const trailX = shot.vx > 0 ? shot.x - 4 : shot.x + 10;
+        fillRect(trails, FIREBALL_TRAIL, trailX, shot.y + 2, 4, 4);
+      }
     }
     hideSurplus(this.fireballImages, enemyProjectiles.length);
   }
@@ -1399,7 +1460,11 @@ export class SliceScene extends Phaser.Scene {
     // chickenify), and the live game looks the sprite up by type on every frame it
     // draws (index.html:1760's `getEnemySpriteInfo(e.type)`). Fix the texture at
     // creation instead and a converted doll goes on being a doll for ever.
-    image.setTexture(enemyTextureKey(enemy.type));
+    image.setTexture(enemy.zombie && enemy.type in ZOMBIE_KINDS
+      ? zombieTextureKey(enemy.type)
+      : enemyTextureKey(enemy.type));
+    // A zombie sways as it shuffles, so it reads as one before it is close enough to groan.
+    image.setAngle(enemy.alive && enemy.zombie ? Math.sin(animFrame * 0.12 + enemy.x * 0.05) * 5 : 0);
     image.setFlipX(enemy.vx > 0);
     // Enemies draw at ENEMY_SCALE's 1.8, so their textures are baked a pixel a cell and
     // scaled here (gfx/rasterise.ts's bakeScale says why).
@@ -1435,9 +1500,6 @@ export class SliceScene extends Phaser.Scene {
     // with no per-ghost offset, exactly like its drift, so every ghost on screen pulses
     // together. Everything else draws at 1.
     image.setAlpha(enemy.type === 'ghost' ? 0.6 + Math.sin(animFrame * 0.08) * 0.2 : 1);
-    // An obstacle course's guard is flushed red, so it reads as "not this one, shoot it".
-    if (enemy.guard) image.setTint(0xff8888);
-    else image.clearTint();
     image.setPosition(enemy.x, enemy.y + wobble);
   }
 

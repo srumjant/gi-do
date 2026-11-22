@@ -1,41 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { quietWorld, standAt, step, jumpRise, arrowY } from './helpers/courseRuns';
-import { TILE } from '../src/config/constants';
-import { DIFF_KEYS, type DifficultyKey } from '../src/config/difficulty';
-import { TILE_EMPTY, TILE_GATE, TILE_PLANK, TILE_SPRING, type Level } from '../src/data/levels';
+import {
+  arrowRange, climbs, HEROES, hits, quietWorld, reachesTower, runRight, standAt, step,
+} from './helpers/courseRuns';
+import { DIFF_KEYS } from '../src/config/difficulty';
+import { TILE_EMPTY, TILE_GATE, TILE_PLANK } from '../src/data/levels';
 import { DOLL_GARDEN_2 } from '../src/data/levels2/dollGarden2';
 import { DINO_CANYON_2 } from '../src/data/levels2/dinoCanyon2';
 import { STAGES } from '../src/data/stages';
-import { playerSize, type Character } from '../src/game/player';
-import type { TargetState } from '../src/game/course';
-
-const HEROES: Character[] = ['gigi', 'dodo'];
-
-/** The lowest an arrow flies, from the floor at row `floorRow`, in a held jump (or standing). */
-function arrowRange(key: DifficultyKey, hero: Character, floorRow: number, fart = false) {
-  const { h } = playerSize(hero);
-  const standing = arrowY(floorRow * TILE - h, h);
-  return { standing, highest: standing - jumpRise(key, fart) };
-}
-
-function hits(t: TargetState, y: number): boolean {
-  return y < t.box.y + t.box.h && y + 4 > t.box.y;
-}
-
-function reachesTower(level: Level, key: DifficultyKey, fromSpring: boolean, towerTopRow = 16): boolean {
-  const world = quietWorld(level, key);
-  const spring = world.map[23].lastIndexOf(TILE_SPRING);
-  if (fromSpring) standAt(world, spring - 3, 23);
-  else standAt(world, spring + 1, 23);
-  for (let i = 0; i < 240; i++) {
-    const p = world.player;
-    if (world.won) return true;
-    step(world, { right: true, jump: !fromSpring, jumpPressed: !fromSpring && p.onGround });
-    if (!fromSpring) world.map[23] = world.map[23].map((c) => (c === TILE_SPRING ? 1 : c));
-    if (p.onGround && p.y + p.h <= towerTopRow * TILE) return true;
-  }
-  return world.won;
-}
 
 describe('Doll Garden II', () => {
   const level = DOLL_GARDEN_2;
@@ -66,7 +37,7 @@ describe('Doll Garden II', () => {
     for (const key of DIFF_KEYS) {
       for (const hero of HEROES) {
         const { standing, highest } = arrowRange(key, hero, 23);
-        expect({ key, hero, standing: hits(t, standing) }).toEqual({ key, hero, standing: false });
+        expect({ key, hero, standing: hits(t.box, standing) }).toEqual({ key, hero, standing: false });
         expect({ key, hero, jumping: highest < t.box.y + t.box.h }).toEqual({ key, hero, jumping: true });
       }
     }
@@ -87,7 +58,7 @@ describe('Doll Garden II', () => {
   });
 
   it('has three guards in its tunnel', () => {
-    expect(level.enemyDefs.filter((d) => d.guard)).toHaveLength(3);
+    expect(level.enemyDefs.filter((d) => d.zombie)).toHaveLength(3);
   });
 
   it('puts the sibling on a tower only the spring reaches, on every difficulty', () => {
@@ -98,39 +69,6 @@ describe('Doll Garden II', () => {
   });
 });
 
-/** Run right, jumping at every wall or gap ahead, until column `untilX` or `frames` run out. */
-function runRight(world: ReturnType<typeof quietWorld>, untilX: number, frames = 900): boolean {
-  let holding = 0;
-  for (let i = 0; i < frames && !world.dead; i++) {
-    const p = world.player;
-    const tx = Math.floor((p.x + p.w / 2) / TILE);
-    const rows = [Math.floor((p.y + 2) / TILE), Math.floor((p.y + p.h - 2) / TILE)];
-    const wall = rows.some((r) => (world.map[r]?.[tx + 1] ?? 0) !== 0);
-    const gap = world.map[23][tx + 1] === 0 || world.map[23][tx + 2] === 0;
-    const start = p.onGround && holding === 0 && (wall || gap);
-    if (start) holding = 20;
-    step(world, { right: true, jump: holding > 0, jumpPressed: start });
-    if (holding > 0) holding--;
-    world.player.hasCape = false;
-    if (p.x / TILE >= untilX) return true;
-  }
-  return false;
-}
-
-/** From standing at `tx` on the floor at `floorRow`, does a held jump end up on `topRow` or higher? */
-function climbs(level: Level, key: DifficultyKey, tx: number, floorRow: number, topRow: number, fart: boolean): boolean {
-  const world = quietWorld(level, key);
-  world.course!.stations.forEach((s) => { s.cooldown = 99999; });
-  standAt(world, tx, floorRow);
-  for (let i = 0; i < 240; i++) {
-    const p = world.player;
-    if (fart) p.fartTimer = 900;
-    step(world, { right: true, jump: true, jumpPressed: p.onGround });
-    if (p.onGround && p.y + p.h <= topRow * TILE) return true;
-  }
-  return false;
-}
-
 describe('Dinosaur Canyon II', () => {
   const level = DINO_CANYON_2;
   const [target] = level.course!.targets;
@@ -140,7 +78,7 @@ describe('Dinosaur Canyon II', () => {
   const firstFlag = level.course!.flags[0];
 
   it('is in the run, right after Dinosaur Canyon', () => {
-    expect(STAGES[3]).toEqual({ theme: 1, level, nameKey: 'level_2_2' });
+    expect(STAGES[4]).toEqual({ theme: 1, level, nameKey: 'level_2_2' });
   });
 
   it('teaches the fart jump, then mixes in the bow', () => {
@@ -175,7 +113,7 @@ describe('Dinosaur Canyon II', () => {
         const ground = arrowRange(key, hero, 23);
         expect({ key, hero, fromGround: ground.highest < t.box.y + t.box.h }).toEqual({ key, hero, fromGround: false });
         const ledge = arrowRange(key, hero, 15);
-        expect({ key, hero, fromLedge: hits(t, ledge.standing) }).toEqual({ key, hero, fromLedge: true });
+        expect({ key, hero, fromLedge: hits(t.box, ledge.standing) }).toEqual({ key, hero, fromLedge: true });
       }
     }
     expect(target.cells).toHaveLength(26);

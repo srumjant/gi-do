@@ -138,8 +138,11 @@ export const TRANSLATIONS: Record<string, Entry> = {
   level_4:            {et:'Palermo väljak',           en:'Palermo Piazza'},
   level_5:            {et:'Talvine imedemaa',           en:'Winter Wonderland'},
   level_6:            {et:'Mängulossi',                en:'Toy Castle'},
-  level_1_2:          {et:'Nukuaed II',               en:'Doll Garden II'},
+  level_1_2:          {et:'Aiavärav',                 en:'Garden Gate'},
   level_2_2:          {et:'Dinosauruse kanjon II',    en:'Dinosaur Canyon II'},
+  level_1_3:          {et:'Nukumaja',                 en:'Doll House'},
+  follow_them:        {et:'JÄLITA NEID!',             en:'FOLLOW THEM!'},
+  next_level:         {et:'Järgmine tase...',         en:'Next level...'},
 };
 
 let lang: Lang = 'et';

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { BASE_H, BASE_W } from '../config/constants';
 import { T, TStr } from '../config/i18n';
-import type { Stage } from '../data/stages';
+import type { Villain } from '../data/levels';
+import { STAGES, type Stage } from '../data/stages';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { siblingOf } from '../game/menu';
 import type { Character } from '../game/player';
@@ -24,6 +25,7 @@ import {
   registerKidnapperTextures,
   registerScaledPlayerTextures,
   scaledPlayerTextureKey,
+  VILLAIN_TEXTURES,
 } from '../gfx/textures';
 import {
   bindMenuKeys, justDown, type MenuKeys, padContextFor, pressedAny,
@@ -157,6 +159,9 @@ export class BetweenScene extends Phaser.Scene {
   private levelIndex = 0;
   /** The stage being walked INTO: its theme picks the kidnapper, its level the colours. */
   private stage!: Stage;
+  /** Set when the level just finished ended in a chase: whose chase it is. */
+  private chase: Villain | null = null;
+  private runner?: Phaser.GameObjects.Image;
   private kidnapper!: Kidnapper;
   /** Where the villain's feet are: the ground, less its own height at its own scale. */
   private villainY = 0;
@@ -201,6 +206,8 @@ export class BetweenScene extends Phaser.Scene {
     this.keys = bindMenuKeys(this, padContextFor('between'));
     this.levelIndex = getCurrentLevel();
     this.stage = getCurrentStage();
+    const finished = STAGES[this.levelIndex - 1];
+    this.chase = finished?.level.ending === 'chase' ? finished.level.villain ?? 'dollQueen' : null;
     this.kidnapper = getKidnapper(this.stage.theme);
 
     const hero: Character = getSelectedChar();
@@ -223,6 +230,14 @@ export class BetweenScene extends Phaser.Scene {
       .setDepth(DEPTH_ACTOR)
       .setVisible(false);
     this.carried = this.actor(sibling, 'jump', CARRIED_SCALE, DEPTH_CARRIED);
+    if (this.chase) {
+      this.runner = this.add
+        .image(0, 0, VILLAIN_TEXTURES[this.chase])
+        .setOrigin(0.5, 1)
+        .setScale(0.75)
+        .setDepth(DEPTH_ACTOR)
+        .setVisible(false);
+    }
 
     this.bubble = this.add.graphics().setDepth(DEPTH_BUBBLE).setVisible(false);
     this.taunt = this.label({ ...BUBBLE_FONT, color: this.kidnapper.color });
@@ -298,7 +313,7 @@ export class BetweenScene extends Phaser.Scene {
     const sibName = getRescueSprites().name.toUpperCase();
     const nextName = TStr(this.stage.nameKey);
     const title = this.add
-      .text(0, 0, sibName + TStr('sib_stolen_again'), HEADLINE_FONT)
+      .text(0, 0, this.chase ? TStr('follow_them') : sibName + TStr('sib_stolen_again'), HEADLINE_FONT)
       .setOrigin(0.5, 0.5);
     const sub = this.add
       .text(0, 35, `${TStr('keep_going')} → ${nextName}`, SUBHEAD_FONT)
@@ -339,12 +354,35 @@ export class BetweenScene extends Phaser.Scene {
       return;
     }
 
-    this.drawTogether(t);
-    this.drawSnatch(t);
+    if (this.chase) {
+      this.drawChase(t);
+    } else {
+      this.drawTogether(t);
+      this.drawSnatch(t);
+    }
     this.drawHeadline(t);
 
     // :2372-2376. A slow pulse between alpha 0.1 and 0.5, not a blink.
     this.hint.setVisible(t > HINT_AT).setAlpha(0.3 + Math.sin(t * 0.06) * 0.2);
+  }
+
+  /**
+   * After a chase level: the villain runs across with the sibling held up, calling for help,
+   * and the hero after them, both gone before the headline says to follow.
+   */
+  private drawChase(t: number): void {
+    const runner = this.runner;
+    if (!runner) return;
+    const bob = Math.abs(Math.sin(t * 0.3)) * 4;
+    const runnerX = 170 + t * 2.4;
+    runner.setVisible(true).setPosition(runnerX, GROUND_Y - bob);
+    const top = GROUND_Y - runner.displayHeight - bob;
+    this.carried.setVisible(true).setPosition(runnerX - 12, top - this.siblingH + 8);
+    this.help.setVisible(t % 60 < 40).setPosition(runnerX, top - this.siblingH - 4);
+    this.hero.setVisible(true).setPosition(30 + t * 2.4, this.heroY - bob);
+    this.hearts.setVisible(false);
+    this.sibling.setVisible(false);
+    this.villain.setVisible(false);
   }
 
   /** Phase one (index.html:2308-2314): the two of them together, bobbing, and three hearts. */

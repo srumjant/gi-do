@@ -84,9 +84,13 @@ export class LevelOverlayScene extends Phaser.Scene {
     // can which level this is. `is_safe` starts with its own space, like every other label
     // in i18n.ts that follows a name, so this really is a bare concatenation.
     const sibling = getRescueSprites().name.toUpperCase();
-    this.rescueTitle = this.centred(RESCUE_TITLE_DY, RESCUE_TITLE_FONT, sibling + TStr('is_safe'));
+    // A chase level ends with the villain getting away (Level.ending): no "is safe" yet.
+    const chase = this.world.level.ending === 'chase';
+    this.rescueTitle = this.centred(
+      RESCUE_TITLE_DY, RESCUE_TITLE_FONT, chase ? TStr('follow_them') : sibling + TStr('is_safe'),
+    );
     // 'Next world...' or 'You did it!', decided by whether there is a level after this one.
-    const closing = isLastLevel(this.levelIndex) ? 'you_did_it' : 'next_world';
+    const closing = chase ? 'next_level' : isLastLevel(this.levelIndex) ? 'you_did_it' : 'next_world';
     this.rescueSub = this.centred(RESCUE_SUB_DY, RESCUE_SUB_FONT, TStr(closing));
     this.deathText = this.centred(0, DEATH_FONT, TStr('oops'));
   }

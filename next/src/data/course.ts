@@ -1,7 +1,9 @@
-import type { CourseDef, EnemyDef, Level, StationKind, TileMap } from './levels';
+import type {
+  BossDef, CourseDef, EnemyDef, Level, LevelEnding, StationKind, TileMap, Villain,
+} from './levels';
 import {
   isSolid, LEVELS, TILE_BRICK, TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_GROUND, TILE_PLANK,
-  TILE_QUESTION, TILE_SPRING,
+  TILE_QUESTION, TILE_RAINBOW, TILE_SPRING,
 } from './levels';
 
 /**
@@ -21,12 +23,16 @@ import {
  *   T  target: shoot it with the bow. It opens every = and | run nearer to it than to any
  *      other target, so put a target next to what it opens. Keep it within about 10 tiles of
  *      where the player stands to shoot: the camera shows ~13 ahead.
+ *   !  rainbow block: a random silly power-up    @  the cat
+ *   t  a helper target: the T nearest it opens only once this is hit too
+ *   :  door: open until the player is through it, then it shuts behind them
+ *   Q  the boss, where she stands    1 2 3  where her targets stand, round by round
  *   b  bow       c  cape       f  fart jump     h  big head     k  chicken ray
  *      (these come back a few seconds after they are taken)
  *   F  checkpoint flag: a death brings you back to the last one you touched
  *   P  where the hero starts     R  where the sibling waits
  *   d  doll   n  dino   a  bat   x  car   o  cannon   u  bouncer   p  penguin
- *   D  N  a doll or dino GUARD: it doesn't hurt, it bounces you back, so you shoot it
+ *   D  N  a ZOMBIE doll or dino: it can't be stomped, it pushes you back, an arrow puts it down
  *   g  giant: stomping hurts, arrows bounce off, only a chicken ray moves it
  *
  * Size obstacles from the jump itself (tests/helpers/courseRuns.ts's jumpRise): a held jump
@@ -38,8 +44,8 @@ import {
 const ENEMY_LETTERS: Record<string, string> = {
   d: 'doll', n: 'dino', a: 'bat', x: 'car', o: 'cannon', u: 'bouncer', p: 'penguin', g: 'giant',
 };
-/** Upper case is the same enemy as a guard: it bounces you back instead of hurting you. */
-const GUARD_LETTERS: Record<string, string> = { D: 'doll', N: 'dino' };
+/** Upper case is the same walker as a zombie (EnemyState.zombie). */
+const ZOMBIE_LETTERS: Record<string, string> = { D: 'doll', N: 'dino' };
 
 const STATION_LETTERS: Record<string, StationKind> = {
   b: 'bow', c: 'cape', f: 'fart', h: 'bighead', k: 'chicken',
@@ -47,6 +53,7 @@ const STATION_LETTERS: Record<string, StationKind> = {
 
 const TILE_LETTERS: Record<string, number> = {
   '#': TILE_GROUND, B: TILE_BRICK, '?': TILE_QUESTION, C: TILE_CRACKED, S: TILE_SPRING, '|': TILE_GATE,
+  '!': TILE_RAINBOW,
 };
 
 /** The sections laid side by side into one picture, a string per row. */
@@ -68,6 +75,8 @@ export interface ParsedCourse {
   playerStart: [number, number];
   rescuePos: [number, number];
   enemyDefs: EnemyDef[];
+  /** The column the cat waits in (@), or null. */
+  cat: number | null;
   course: CourseDef;
 }
 
@@ -101,9 +110,28 @@ function mechanisms(rows: readonly string[]): Cell[][] {
   return runs;
 }
 
-/** How far a target is from a run: the nearest cell, counting a diagonal step as one. */
+/** Tiles apart, counting a diagonal step as one. */
+function chebyshev(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+}
+
+/** How far a target is from a run: its nearest cell. */
 function distance(t: { x: number; y: number }, run: Cell[]): number {
-  return Math.min(...run.map((c) => Math.max(Math.abs(c.x - t.x), Math.abs(c.y - t.y))));
+  return Math.min(...run.map((c) => chebyshev(c, t)));
+}
+
+/** Every run of `:` (a column): a door that shuts once the player is through it. */
+function doorsIn(rows: readonly string[]): CourseDef['doors'] {
+  const doors: CourseDef['doors'] = [];
+  for (let x = 0; x < rows[0].length; x++) {
+    for (let y = 0; y < rows.length; y++) {
+      if (rows[y][x] !== ':' || rows[y - 1]?.[x] === ':') continue;
+      const cells: Array<{ x: number; y: number }> = [];
+      for (let y1 = y; rows[y1]?.[x] === ':'; y1++) cells.push({ x, y: y1 });
+      doors.push({ x, cells });
+    }
+  }
+  return doors;
 }
 
 export function parseCourse(rows: readonly string[]): ParsedCourse {
@@ -112,6 +140,10 @@ export function parseCourse(rows: readonly string[]): ParsedCourse {
   let rescuePos: [number, number] | null = null;
   const enemyDefs: EnemyDef[] = [];
   const targets: Array<{ x: number; y: number }> = [];
+  let queen: { x: number; y: number } | null = null;
+  let cat: number | null = null;
+  const helpers: Array<{ x: number; y: number }> = [];
+  const spots: Array<{ n: number; x: number; y: number }> = [];
   const stations: CourseDef['stations'] = [];
   const flags: CourseDef['flags'] = [];
 
@@ -120,13 +152,17 @@ export function parseCourse(rows: readonly string[]): ParsedCourse {
       const ch = row[x];
       if (ch === 'P') playerStart = [x, y];
       else if (ch === 'R') rescuePos = [x, y];
+      else if (ch === 'Q') queen = { x, y: floorBelow(map, x, y) };
+      else if (ch === '@') cat = x;
+      else if (ch === 't') helpers.push({ x, y });
+      else if (ch >= '1' && ch <= '9') spots.push({ n: Number(ch), x, y });
       else if (ch === 'T') targets.push({ x, y });
       else if (ch === 'F') flags.push({ x, y: floorBelow(map, x, y) });
       else if (ch in STATION_LETTERS) stations.push({ kind: STATION_LETTERS[ch], x, y });
       else if (ch in ENEMY_LETTERS) {
         enemyDefs.push({ type: ENEMY_LETTERS[ch], x, floorRow: floorBelow(map, x, y) });
-      } else if (ch in GUARD_LETTERS) {
-        enemyDefs.push({ type: GUARD_LETTERS[ch], x, floorRow: floorBelow(map, x, y), guard: true });
+      } else if (ch in ZOMBIE_LETTERS) {
+        enemyDefs.push({ type: ZOMBIE_LETTERS[ch], x, floorRow: floorBelow(map, x, y), zombie: true });
       }
     }
   });
@@ -149,9 +185,44 @@ export function parseCourse(rows: readonly string[]): ParsedCourse {
     if (owned[i].length === 0) throw new Error(`the target at ${t.x},${t.y} opens nothing`);
   });
 
+  helpers.sort((a, b) => a.x - b.x);
+  const partOf = helpers.map((h) => {
+    if (targets.length === 0) throw new Error(`the helper target at ${h.x},${h.y} has no T to help`);
+    let best = 0;
+    targets.forEach((t, i) => { if (chebyshev(h, t) < chebyshev(h, targets[best])) best = i; });
+    return best;
+  });
+
+  const doors = doorsIn(rows);
+  let boss: BossDef | undefined;
+  const found = queen as { x: number; y: number } | null;
+  if (found) {
+    if (spots.length === 0) throw new Error('a boss needs its target spots, 1, 2, 3');
+    spots.sort((a, b) => a.n - b.n);
+    const behind = doors.filter((d) => d.x < found.x).map((d) => d.x + 4);
+    const rx = (rescuePos as [number, number])[0];
+    boss = {
+      kind: 'dollQueen',
+      x: found.x,
+      y: found.y,
+      spots: spots.map(({ x, y }) => ({ x, y })),
+      // From just inside her door (or ten tiles before her, with no door) to just short of the cage.
+      patrol: [behind.length > 0 ? Math.max(...behind) : found.x - 10, rx > found.x ? rx - 3 : rows[0].length - 3],
+    };
+  }
+
   return {
-    map, playerStart, rescuePos, enemyDefs,
-    course: { targets: targets.map((t, i) => ({ ...t, cells: owned[i] })), stations, flags },
+    map, playerStart, rescuePos, enemyDefs, cat: cat as number | null,
+    course: {
+      targets: [
+        ...targets.map((t, i) => ({ ...t, cells: owned[i] })),
+        ...helpers.map((h, i) => ({ ...h, cells: [], partOf: partOf[i] })),
+      ],
+      stations,
+      flags,
+      doors,
+      ...(boss ? { boss } : {}),
+    },
   };
 }
 
@@ -164,6 +235,9 @@ export interface CourseLevelSpec {
   sections: readonly (readonly string[])[];
   /** Colours instead of the theme's, for a ground that stands out against its hills. */
   look?: Partial<Pick<Level, 'bg' | 'groundColor' | 'brickColor' | 'groundTop'>>;
+  ending?: LevelEnding;
+  villain?: Villain;
+  indoors?: boolean;
 }
 
 /**
@@ -189,9 +263,12 @@ export function courseLevel(spec: CourseLevelSpec): Level {
     enemyDefs: parsed.enemyDefs,
     bowPositions: [],
     superPositions: [],
-    // No cat: it scratches enemies for you, and these levels are about doing that yourself.
-    catPosition: null,
+    // The cat, where the level puts one (@).
+    catPosition: parsed.cat,
     clouds: theme.clouds,
     course: parsed.course,
+    ...(spec.ending ? { ending: spec.ending } : {}),
+    ...(spec.villain ? { villain: spec.villain } : {}),
+    ...(spec.indoors ? { indoors: true } : {}),
   };
 }

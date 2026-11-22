@@ -29,12 +29,24 @@ const legacy = loadLegacySection({
 
 const legacySpritesSource = () => legacySectionSource('//  SPRITES', '//  LEVELS');
 
+/** Redrawn for the port at the owner's request (2026-11-22): it did not read as a dinosaur. */
+const REDRAWN = new Set(['BOSS_IDLE', 'BOSS_WALK', 'BOSS_CHARGE', 'BOSS_ROAR', 'BOSS_P']);
+
 describe('sprite data matches the live game', () => {
-  for (const name of NAMES) {
+  for (const name of NAMES.filter((n) => !REDRAWN.has(n))) {
     it(`${name} is identical`, () => {
       expect((ported as Record<string, unknown>)[name]).toEqual(legacy[name]);
     });
   }
+
+  it('redraws the T-Rex at the same size, so its fight is unchanged', () => {
+    for (const name of ['BOSS_IDLE', 'BOSS_WALK', 'BOSS_CHARGE', 'BOSS_ROAR']) {
+      const mine = (ported as unknown as Record<string, number[][]>)[name];
+      const theirs = legacy[name] as number[][];
+      expect([mine.length, mine[0].length]).toEqual([theirs.length, theirs[0].length]);
+      expect(mine).not.toEqual(theirs);
+    }
+  });
 
   // NAMES is hand-written, so it cannot catch its own omissions — the first draft of
   // this plan silently missed CHICKEN_S, CHICKEN_P and KIDNAPPERS. Derive the expected

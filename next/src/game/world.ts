@@ -4,12 +4,13 @@ import { LEVELS, TILE_QUESTION, TILE_RAINBOW, type Level, type TileMap } from '.
 import { BOW_S, CAT_S, SUPER_S } from '../data/sprites';
 import type { InputState } from '../input/actions';
 import { isFinalLevel, spawnBoss, stepBoss } from './boss';
+import { buildDollQueen, stepDollQueen, type DollQueenState } from './bosses/dollQueen';
 import { buildCourse, placeAtCheckpoint, stepCourse, type CourseState } from './course';
 import { chickenify, spawnEnemy, stepEnemy, type EnemyMove } from './enemy';
 import { createPlayer, playerHit, stepPlayer, type Character, type PlayerMove } from './player';
 import { random } from './random';
 import { getRescueSprites, type RunTotals } from './run';
-import { findGroundY, getTile, isSolid, rectOverlap } from './tiles';
+import { findFloorBelow, findGroundY, getTile, isSolid, rectOverlap } from './tiles';
 import {
   PICKUP_RUMBLE,
   type Arrow, type BlockState, type BossState, type CatState, type EnemyProjectile,
@@ -36,6 +37,7 @@ interface LevelSpawnState {
   questionBlocks: BlockState[];
   rainbowBlocks: BlockState[];
   course: CourseState | null;
+  courseBoss: DollQueenState | null;
 }
 
 /** A level's enemy queue, fresh: every def unspawned, carrying its floor row if it has one. */
@@ -43,7 +45,7 @@ function pendingFor(level: Level): World['pending'] {
   return level.enemyDefs.map((d) => {
     const pending: World['pending'][number] = { type: d.type, x: d.x, spawned: false };
     if (d.floorRow !== undefined) pending.floorRow = d.floorRow;
-    if (d.guard) pending.guard = true;
+    if (d.zombie) pending.zombie = true;
     return pending;
   });
 }
@@ -135,6 +137,7 @@ function buildLevelState(level: Level, dc: DifficultyRecord, map: TileMap): Leve
     questionBlocks,
     rainbowBlocks,
     course: level.course ? buildCourse(level.course) : null,
+    courseBoss: level.course?.boss ? buildDollQueen(level.course.boss, dc) : null,
   };
 }
 
@@ -390,6 +393,7 @@ export function stepWorld(
     // The obstacle course, on the one level that has one: after the arrows have flown (a
     // target is hit by an arrow where it now is) and the enemies have moved.
     stepCourse(world);
+    if (world.courseBoss) stepDollQueen(world, world.courseBoss);
     // index.html:1550-1556 and :1558-1626, in that order and in that place: after the
     // enemies, before the rescue. The order of these two matters to the fight. The
     // projectile pass moves what is ALREADY in the air, so a fireball the boss fires
@@ -779,8 +783,16 @@ export function rescueSpot(world: World): RescueSpot {
   const { level: lvl, map } = world;
   const rTX = lvl.rescuePos[0];
   const rDH = getRescueSprites().sprite.length * 2;
-  return { x: rTX * TILE, y: findGroundY(map, rTX) - rDH, h: rDH };
+  // A hand-built level says where the sibling stands (its R), and may have a ceiling above
+  // them that the original levels' search from the top would land on instead: indoors, that
+  // put the sibling and the rescue up on the roof (browser, 2026-11-22). The original levels
+  // keep the original search, row unread, exactly as before.
+  const floor = lvl.course ? findFloorBelow(map, rTX, lvl.rescuePos[1]) : findGroundY(map, rTX);
+  return { x: rTX * TILE, y: floor - rDH, h: rDH };
 }
+
+/** How near the hero gets before a chase level's villain runs off (Level.ending). */
+export const CHASE_REACH = 4 * TILE;
 
 /**
  * Port of the rescue check at index.html:1629-1631, run after the enemies step and
@@ -799,6 +811,19 @@ export function rescueSpot(world: World): RescueSpot {
 export function checkRescue(world: World): void {
   const { player: p } = world;
   const { x: rX, y: rY, h: rDH } = rescueSpot(world);
+  // A chase level's villain runs off with the sibling as the hero arrives: nothing to touch,
+  // nothing to beat. The level is won all the same, and the next one carries on the chase.
+  if (world.level.ending === 'chase') {
+    const near = Math.abs(p.x + p.w / 2 - (rX + 8)) < CHASE_REACH
+      && Math.abs(p.y + p.h - (rY + rDH)) < 3 * TILE;
+    if (near) {
+      world.won = true;
+      world.stateTimer = 200;
+      world.score += Math.round(250 * world.dc.scoreMultiplier);
+      world.sounds.push('boss-roar', 'music-stop');
+    }
+    return;
+  }
   // index.html:1630, and the whole reason the boss exists: until it falls, walking into
   // your sibling does nothing at all. On the five levels with no boss the left half is
   // true and this is a no-op, exactly as it is in the live game.
@@ -806,7 +831,8 @@ export function checkRescue(world: World): void {
   // It reads `bossDefeated` rather than `!boss.alive` deliberately. The two are set on the
   // same line and are the same thing in practice, but only one of them survives — see
   // World.bossDefeated in types.ts — and this is the live source's own choice of test.
-  const canRescue = !world.boss || world.bossDefeated;
+  const canRescue = (!world.boss || world.bossDefeated)
+    && (!world.courseBoss || world.courseBoss.phase === 'defeated');
   if (canRescue && rectOverlap(
     { x: p.x, y: p.y, w: p.w, h: p.h },
     { x: rX, y: rY, w: 16, h: rDH },
