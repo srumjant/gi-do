@@ -32,7 +32,7 @@ function inRoom(difficulty: keyof typeof DIFFICULTY_CONFIG = 'super_easy'): { wo
   standAt(world, 8, 23);
   world.player.invincible = 99999;
   step(world);
-  return { world, q: world.courseBoss! };
+  return { world, q: world.courseBoss as DollQueenState };
 }
 
 function shoot(world: World, box: Rect): void {
@@ -60,11 +60,11 @@ describe('the Doll Queen', () => {
     const world = quietWorld(ROOM);
     standAt(world, 2, 23);
     step(world);
-    expect(world.courseBoss!.phase).toBe('asleep');
+    expect((world.courseBoss as DollQueenState).phase).toBe('asleep');
     standAt(world, 8, 23);
     step(world);
-    expect(world.courseBoss!.phase).toBe('shielded');
-    expect(world.courseBoss!.targetUp).toBe(true);
+    expect((world.courseBoss as DollQueenState).phase).toBe('shielded');
+    expect((world.courseBoss as DollQueenState).targetUp).toBe(true);
   });
 
   it('turns arrows and stomps away with her parasol', () => {

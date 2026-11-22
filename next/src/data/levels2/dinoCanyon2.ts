@@ -1,13 +1,18 @@
 import { courseLevel } from '../course';
 
 /**
- * Dinosaur Canyon's second level: the fart jump, up the canyon's walls, and then the fart and
- * the bow together — a target only seen from a ledge only a fart reaches.
- * docs/superpowers/specs/2026-11-22-extra-levels-design.md.
+ * Dinosaur Canyon, level 2, Kaljusein (the canyon wall): the fart jump, up the canyon's walls,
+ * and then the fart and the bow together — a target only seen from a ledge only a fart reaches.
+ * Zombie dinos by the cannons; at the top of the mesa the Pterodactyl flies off again with the
+ * sibling. docs/superpowers/specs/2026-11-22-three-levels-and-a-boss-design.md.
  */
 export const DINO_CANYON_2 = courseLevel({
-  name: 'Dinosaur Canyon II',
+  name: 'Canyon Wall',
   theme: 1,
+  // Dark canyon rock, not the hills' orange-brown, so every cliff and ledge stands out.
+  look: { groundColor: '#5e4030', groundTop: '#d0a060' },
+  ending: 'chase',
+  villain: 'pterodactyl',
   sections: [
     // canyon ledges and pits
     [
@@ -93,7 +98,7 @@ export const DINO_CANYON_2 = courseLevel({
       '##########==========================##########',
       '##########..........................##########',
     ],
-    // cannons: jump their fireballs, or shoot them
+    // cannons, and zombie dinos by them: jump the fireballs, shoot the zombies
     [
       '..............................',
       '..............................',
@@ -117,7 +122,7 @@ export const DINO_CANYON_2 = courseLevel({
       '..............................',
       '....................o.........',
       '...................###........',
-      '..b.......o........###...u..F.',
+      '..b...N...o........###.N.u..F.',
       '##############################',
       '##############################',
     ],

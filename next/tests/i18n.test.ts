@@ -34,7 +34,7 @@ const PORT_ONLY_KEYS = [
   'learn_find_letter', 'learn_find_syllable', 'learn_find_letters',
   'learn_speak', 'learn_cheers', 'learn_found', 'learn_result_hint',
   'fullscreen_on', 'fullscreen_off',
-  'level_1_2', 'level_2_2', 'level_1_3', 'follow_them', 'next_level',
+  'level_1_2', 'level_2_2', 'level_1_3', 'level_2_3', 'follow_them', 'next_level',
 ];
 
 describe('translations match the live game', () => {

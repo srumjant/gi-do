@@ -25,6 +25,7 @@ import {
   registerKidnapperTextures,
   registerScaledPlayerTextures,
   scaledPlayerTextureKey,
+  FLYING_VILLAINS,
   VILLAIN_TEXTURES,
 } from '../gfx/textures';
 import {
@@ -234,7 +235,11 @@ export class BetweenScene extends Phaser.Scene {
       this.runner = this.add
         .image(0, 0, VILLAIN_TEXTURES[this.chase])
         .setOrigin(0.5, 1)
-        .setScale(0.75)
+        // The Queen is drawn big (4 to a pixel) and shrinks to fit; the Pterodactyl is drawn
+        // small (3) and needs her wings spread wider than the sibling she carries.
+        .setScale(FLYING_VILLAINS.has(this.chase) ? 1.6 : 0.75)
+        // A flier's sprite is in profile, facing left; she flies off to the right.
+        .setFlipX(FLYING_VILLAINS.has(this.chase))
         .setDepth(DEPTH_ACTOR)
         .setVisible(false);
     }
@@ -375,10 +380,15 @@ export class BetweenScene extends Phaser.Scene {
     if (!runner) return;
     const bob = Math.abs(Math.sin(t * 0.3)) * 4;
     const runnerX = 170 + t * 2.4;
-    runner.setVisible(true).setPosition(runnerX, GROUND_Y - bob);
-    const top = GROUND_Y - runner.displayHeight - bob;
-    this.carried.setVisible(true).setPosition(runnerX - 12, top - this.siblingH + 8);
-    this.help.setVisible(t % 60 < 40).setPosition(runnerX, top - this.siblingH - 4);
+    // A flying villain goes over the hero's head with the sibling hanging below; one on foot
+    // runs with them held up.
+    const flying = this.chase !== null && FLYING_VILLAINS.has(this.chase);
+    const feet = flying ? GROUND_Y - 80 - bob * 2 : GROUND_Y - bob;
+    runner.setVisible(true).setPosition(runnerX, feet);
+    const top = feet - runner.displayHeight;
+    const siblingY = flying ? feet - 4 : top - this.siblingH + 8;
+    this.carried.setVisible(true).setPosition(runnerX - 12, siblingY);
+    this.help.setVisible(t % 60 < 40).setPosition(runnerX, (flying ? top : siblingY) - 4);
     this.hero.setVisible(true).setPosition(30 + t * 2.4, this.heroY - bob);
     this.hearts.setVisible(false);
     this.sibling.setVisible(false);

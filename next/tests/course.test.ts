@@ -7,7 +7,8 @@ import {
   TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_PLANK, TILE_RAINBOW, TILE_SPRING, isSolid,
 } from '../src/data/levels';
 import {
-  LIFT_FRAMES, MIN_STATION_ARROWS, PLANK_INTERVAL, SPRING_FORCE, STATION_COOLDOWN,
+  LIFT_FRAMES, MIN_STATION_ARROWS, PLANK_INTERVAL, SPRING_FORCE, STATION_COOLDOWN, VENT_REACH,
+  VENT_WARN_FRAMES, ventWarning,
 } from '../src/game/course';
 import { spawnEnemy } from '../src/game/enemy';
 import { setRandom } from '../src/game/random';
@@ -488,5 +489,72 @@ describe('a chase ending', () => {
     standAt(world, 8, 1);
     step(world);
     expect(world.won).toBe(true);
+  });
+});
+
+describe('lava and vents', () => {
+  const POOL = [
+    'P............R',
+    '..............',
+    '###~~v~~~v~###',
+    '##############',
+  ];
+  const level = courseLevel({ name: 'pool', theme: 1, sections: [POOL] });
+
+  it('throws a hero with a cape up out of the lava, and spends the cape', () => {
+    const world = quietWorld(level);
+    world.player.hasCape = true;
+    standAt(world, 4, 3);
+    step(world);
+    expect(world.dead).toBe(false);
+    expect(world.player.hasCape).toBe(false);
+    expect(world.player.vy).toBeLessThan(0);
+    expect(world.player.y + world.player.h).toBeLessThanOrEqual(2 * TILE);
+  });
+
+  it('is the end of a life without a cape', () => {
+    const world = quietWorld(level);
+    world.player.hasCape = false;
+    standAt(world, 4, 3);
+    step(world);
+    expect(world.dead).toBe(true);
+  });
+
+  it('warns before a vent erupts, then sends a fireball straight up', () => {
+    const world = quietWorld(level);
+    const vent = world.course!.vents[0];
+    vent.timer = VENT_WARN_FRAMES + 1;
+    step(world);
+    expect(ventWarning(vent)).toBe(true);
+    expect(world.enemyProjectiles).toHaveLength(0);
+    step(world, {}, VENT_WARN_FRAMES);
+    const shot = world.enemyProjectiles[0];
+    expect(shot.vx).toBe(0);
+    expect(shot.vy).toBeLessThan(0);
+  });
+
+  it('starts its vents out of step with each other', () => {
+    const [a, b] = quietWorld(level).course!.vents;
+    expect(a.timer).not.toBe(b.timer);
+  });
+
+  it('keeps a vent far from the hero quiet', () => {
+    const wide = courseLevel({
+      name: 'wide pool',
+      theme: 1,
+      sections: [['P'.padEnd(59, '.') + 'R', '.'.repeat(60), '##~v~'.padEnd(60, '#'), '#'.repeat(60)]],
+    });
+    const world = quietWorld(wide);
+    const vent = world.course!.vents[0];
+    standAt(world, 3 + VENT_REACH / TILE + 4, 2);
+    vent.timer = 1;
+    const sounds: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      step(world);
+      sounds.push(...world.sounds);
+    }
+    expect(world.dead).toBe(false);
+    expect(world.enemyProjectiles).toHaveLength(0);
+    expect(sounds).not.toContain('cannon-fire');
   });
 });

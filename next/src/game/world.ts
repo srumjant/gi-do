@@ -4,7 +4,7 @@ import { LEVELS, TILE_QUESTION, TILE_RAINBOW, type Level, type TileMap } from '.
 import { BOW_S, CAT_S, SUPER_S } from '../data/sprites';
 import type { InputState } from '../input/actions';
 import { isFinalLevel, spawnBoss, stepBoss } from './boss';
-import { buildDollQueen, stepDollQueen, type DollQueenState } from './bosses/dollQueen';
+import { buildCourseBoss, stepCourseBoss, type CourseBoss } from './bosses';
 import { buildCourse, placeAtCheckpoint, stepCourse, type CourseState } from './course';
 import { chickenify, spawnEnemy, stepEnemy, type EnemyMove } from './enemy';
 import { createPlayer, playerHit, stepPlayer, type Character, type PlayerMove } from './player';
@@ -37,7 +37,7 @@ interface LevelSpawnState {
   questionBlocks: BlockState[];
   rainbowBlocks: BlockState[];
   course: CourseState | null;
-  courseBoss: DollQueenState | null;
+  courseBoss: CourseBoss | null;
 }
 
 /** A level's enemy queue, fresh: every def unspawned, carrying its floor row if it has one. */
@@ -137,7 +137,7 @@ function buildLevelState(level: Level, dc: DifficultyRecord, map: TileMap): Leve
     questionBlocks,
     rainbowBlocks,
     course: level.course ? buildCourse(level.course) : null,
-    courseBoss: level.course?.boss ? buildDollQueen(level.course.boss, dc) : null,
+    courseBoss: level.course?.boss ? buildCourseBoss(level.course.boss, dc) : null,
   };
 }
 
@@ -393,7 +393,7 @@ export function stepWorld(
     // The obstacle course, on the one level that has one: after the arrows have flown (a
     // target is hit by an arrow where it now is) and the enemies have moved.
     stepCourse(world);
-    if (world.courseBoss) stepDollQueen(world, world.courseBoss);
+    if (world.courseBoss) stepCourseBoss(world, world.courseBoss);
     // index.html:1550-1556 and :1558-1626, in that order and in that place: after the
     // enemies, before the rescue. The order of these two matters to the fight. The
     // projectile pass moves what is ALREADY in the air, so a fireball the boss fires

@@ -1,7 +1,7 @@
 import { testEnemyMove, testMove } from './testMove';
 import { TILE } from '../../src/config/constants';
 import { DIFFICULTY_CONFIG, type DifficultyKey } from '../../src/config/difficulty';
-import { TILE_SPRING, type Level } from '../../src/data/levels';
+import { TILE_LAVA, TILE_SPRING, type Level } from '../../src/data/levels';
 import { createPlayer, playerSize, stepMotion, type Character } from '../../src/game/player';
 import { createWorld, stepWorld } from '../../src/game/world';
 import type { World } from '../../src/game/types';
@@ -90,7 +90,8 @@ export function runRight(world: ReturnType<typeof quietWorld>, untilX: number, f
     const tx = Math.floor((p.x + p.w / 2) / TILE);
     const rows = [Math.floor((p.y + 2) / TILE), Math.floor((p.y + p.h - 2) / TILE)];
     const wall = rows.some((r) => (world.map[r]?.[tx + 1] ?? 0) !== 0);
-    const gap = world.map[23][tx + 1] === 0 || world.map[23][tx + 2] === 0;
+    const open = (c: number | undefined) => c === 0 || c === TILE_LAVA;
+    const gap = open(world.map[23][tx + 1]) || open(world.map[23][tx + 2]);
     const start = p.onGround && holding === 0 && (wall || gap);
     if (start) holding = 20;
     step(world, { right: true, jump: holding > 0, jumpPressed: start });

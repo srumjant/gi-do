@@ -25,6 +25,8 @@ export const TILE_SPRING = 7;
 export const TILE_PLANK = 8;
 /** A gate's bars: solid until the target nearest them is shot, then they lift away. */
 export const TILE_GATE = 9;
+/** Lava: not solid, and falling into it is a fall (game/course.ts). Only on hand-built levels. */
+export const TILE_LAVA = 10;
 
 export function isSolid(tile: number): boolean {
   return tile === TILE_GROUND || tile === TILE_BRICK
@@ -97,6 +99,8 @@ export interface CourseDef {
   flags: Array<{ x: number; y: number }>;
   /** Doors (`:`) that shut behind the player once they are through, each a column of cells. */
   doors: Array<{ x: number; cells: Array<{ x: number; y: number }> }>;
+  /** Vents (`v`) in the lava, each a cell that spits fireballs straight up. */
+  vents: Array<{ x: number; y: number }>;
   /** The boss, on a level that ends with one. */
   boss?: BossDef;
 }
@@ -236,11 +240,14 @@ export const LEVELS: Level[] = [
 export type LevelEnding = 'rescue' | 'chase' | 'boss';
 
 /** A theme's villain, who carries the sibling through its levels. */
-export type Villain = 'dollQueen';
+export type Villain = 'dollQueen' | 'pterodactyl';
+
+/** Each theme's boss. */
+export type BossKind = 'dollQueen' | 'pterodactyl';
 
 /** A boss, as a level's ASCII places it. */
 export interface BossDef {
-  kind: 'dollQueen';
+  kind: BossKind;
   /** Where she stands: the column, and the floor row under her. */
   x: number;
   y: number;
