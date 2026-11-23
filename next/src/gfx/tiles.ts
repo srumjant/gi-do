@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { TILE } from '../config/constants';
-import { isSolid, TILE_BRICK, TILE_GROUND, TILE_QUESTION, TILE_RAINBOW } from '../data/levels';
+import { TILE_QUESTION, TILE_RAINBOW } from '../data/levels';
+import { FRAME_BRICK, FRAME_GROUND, FRAME_GROUND_TOP, FRAME_QUESTION, STATIC_FRAMES, staticTileFrames } from './tileFrames';
 import type { BlockState, World } from '../game/types';
 import { GAME_FONT, GAME_FONT_BOLD, WORLD_TEXT_RESOLUTION } from './gameFont';
 
@@ -75,42 +76,48 @@ export interface BlockView {
  * renderer does not share.
  */
 export function drawStaticTiles(scene: Phaser.Scene, world: World): BlockView[] {
-  const graphics = scene.add.graphics();
   const { level, map } = world;
-  const groundColor = Phaser.Display.Color.HexStringToColor(level.groundColor).color;
-  const groundTopColor = Phaser.Display.Color.HexStringToColor(level.groundTop || '#2d8a2d').color;
-  const brickColor = Phaser.Display.Color.HexStringToColor(level.brickColor).color;
-  const questionBlocks: BlockView[] = [];
+  // A tilemap layer on a tileset of the four tiles in this level's colours (gfx/tileFrames.ts):
+  // Phaser draws only the tiles on screen, where one Graphics of the whole level was replayed
+  // in full every frame.
+  const key = bakeStaticTiles(scene, level.groundColor, level.groundTop || '#2d8a2d', level.brickColor);
+  const tilemap = scene.make.tilemap({ data: staticTileFrames(map), tileWidth: TILE, tileHeight: TILE });
+  const tileset = tilemap.addTilesetImage(key, key, TILE, TILE, 0, 0);
+  if (!tileset) throw new Error('the static tileset is not a texture');
+  if (!tilemap.createLayer(0, tileset, 0, 0, false)) throw new Error('the static tilemap has no layer 0');
 
-  for (let ty = 0; ty < map.length; ty++) {
-    const row = map[ty];
-    for (let tx = 0; tx < row.length; tx++) {
-      const dx = tx * TILE;
-      const dy = ty * TILE;
-      switch (row[tx]) {
-        case TILE_GROUND:
-          graphics.fillStyle(groundColor).fillRect(dx, dy, TILE, TILE);
-          if (ty > 0 && !isSolid(map[ty - 1][tx])) {
-            graphics.fillStyle(groundTopColor).fillRect(dx, dy, TILE, GROUND_TOP_HEIGHT);
-          }
-          break;
-        case TILE_BRICK:
-          drawBrick(graphics, dx, dy, brickColor);
-          break;
-        case TILE_QUESTION: {
-          graphics.fillStyle(QUESTION_FILL).fillRect(dx, dy, TILE, TILE);
-          graphics.lineStyle(1, QUESTION_STROKE).strokeRect(dx + 0.5, dy + 0.5, TILE - 1, TILE - 1);
-          const glyph = scene.add.text(dx + TILE / 2, dy + TILE / 2, '?', QUESTION_FONT);
-          glyph.setOrigin(0.5, 0.5);
-          questionBlocks.push({ tx, ty, glyph, spent: false });
-          break;
-        }
-        default:
-          break;
-      }
-    }
-  }
+  const questionBlocks: BlockView[] = [];
+  map.forEach((row, ty) => row.forEach((code, tx) => {
+    if (code !== TILE_QUESTION) return;
+    const glyph = scene.add.text(tx * TILE + TILE / 2, ty * TILE + TILE / 2, '?', QUESTION_FONT);
+    glyph.setOrigin(0.5, 0.5);
+    questionBlocks.push({ tx, ty, glyph, spent: false });
+  }));
   return questionBlocks;
+}
+
+/**
+ * The four static tiles in one level's colours, side by side in the frame order of
+ * gfx/tileFrames.ts, baked once per set of colours. Each is drawn exactly as the whole-level
+ * Graphics drew it: the ground, the ground with its grass strip, the brick, the ? block.
+ */
+function bakeStaticTiles(scene: Phaser.Scene, ground: string, groundTop: string, brick: string): string {
+  const key = `static-tiles-${ground}-${groundTop}-${brick}`;
+  if (scene.textures.exists(key)) return key;
+  const groundColor = Phaser.Display.Color.HexStringToColor(ground).color;
+  const groundTopColor = Phaser.Display.Color.HexStringToColor(groundTop).color;
+  const brickColor = Phaser.Display.Color.HexStringToColor(brick).color;
+  const g = scene.make.graphics({}, false);
+  g.fillStyle(groundColor).fillRect(FRAME_GROUND * TILE, 0, TILE, TILE);
+  g.fillStyle(groundColor).fillRect(FRAME_GROUND_TOP * TILE, 0, TILE, TILE);
+  g.fillStyle(groundTopColor).fillRect(FRAME_GROUND_TOP * TILE, 0, TILE, GROUND_TOP_HEIGHT);
+  drawBrick(g, FRAME_BRICK * TILE, 0, brickColor);
+  const q = FRAME_QUESTION * TILE;
+  g.fillStyle(QUESTION_FILL).fillRect(q, 0, TILE, TILE);
+  g.lineStyle(1, QUESTION_STROKE).strokeRect(q + 0.5, 0.5, TILE - 1, TILE - 1);
+  g.generateTexture(key, STATIC_FRAMES * TILE, TILE);
+  g.destroy();
+  return key;
 }
 
 /**
