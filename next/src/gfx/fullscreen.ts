@@ -20,8 +20,7 @@ const IDLE_MS = 3000;
  * - It never keeps the keyboard focus: a focused button is pressed by Space, the jump key.
  * - A browser with no full-screen support (an iPhone) gets no button at all.
  *
- * The live game also turns a phone to landscape on the way in (:1122). That belongs with the
- * touch controls, which the port does not have yet.
+ * - On a touch screen it also turns to landscape on the way in, as the live game did (:1122).
  */
 export function installFullscreenButton(game: Phaser.Game): void {
   const button = document.getElementById('fullscreen');
@@ -35,6 +34,11 @@ export function installFullscreenButton(game: Phaser.Game): void {
     button.setAttribute('aria-label', button.title);
   };
   scale.on(Phaser.Scale.Events.ENTER_FULLSCREEN, label);
+  // On a phone or tablet, full screen also turns to landscape, as the live game's did (:1122),
+  // so the touch buttons (input/touchControls.ts) sit either side of the game, not under it.
+  scale.on(Phaser.Scale.Events.ENTER_FULLSCREEN, () => {
+    if (window.matchMedia('(pointer: coarse)').matches) scale.lockOrientation('landscape');
+  });
   scale.on(Phaser.Scale.Events.LEAVE_FULLSCREEN, label);
 
   button.addEventListener('click', () => {
