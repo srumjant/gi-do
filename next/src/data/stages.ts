@@ -1,4 +1,4 @@
-import { LEVELS, LEVEL_NAME_KEYS, type Level } from './levels';
+import { LEVELS, LEVEL_NAME_KEYS, type Level, type Villain } from './levels';
 import { DINO_CANYON_2 } from './levels2/dinoCanyon2';
 import { DOLL_GARDEN_2 } from './levels2/dollGarden2';
 import { JAALOSS } from './levels2/jaaloss';
@@ -79,3 +79,13 @@ export const STAGES: readonly Stage[] = buildStages({
     { level: TROONISAAL, nameKey: 'level_6_3' },
   ],
 });
+
+/**
+ * Who snatches the sibling in the cutscene before `stage`: its villain, the one who runs off
+ * with them at the end of the theme's first two levels and is fought at the end of its third.
+ * Null on a classic level, which keeps the original game's kidnapper (game/run.ts's
+ * getKidnapper).
+ */
+export function snatcher(stage: Stage): Villain | null {
+  return stage.level.villain ?? null;
+}

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { BASE_H, BASE_W } from '../config/constants';
 import { T, TStr } from '../config/i18n';
 import type { Villain } from '../data/levels';
-import { STAGES, type Stage } from '../data/stages';
+import { snatcher, STAGES, type Stage } from '../data/stages';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { siblingOf } from '../game/menu';
 import type { Character } from '../game/player';
@@ -21,12 +21,14 @@ import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont
 import { fitScreenCamera } from '../gfx/render';
 import {
   KIDNAPPER_SCALE,
+  registerBossTextures,
   kidnapperTextureKey,
   registerKidnapperTextures,
   registerScaledPlayerTextures,
   scaledPlayerTextureKey,
   FLYING_VILLAINS,
   PROFILE_VILLAINS,
+  VILLAIN_COLORS,
   VILLAIN_TEXTURES,
 } from '../gfx/textures';
 import {
@@ -165,6 +167,11 @@ export class BetweenScene extends Phaser.Scene {
   private chase: Villain | null = null;
   private runner?: Phaser.GameObjects.Image;
   private kidnapper!: Kidnapper;
+  /**
+   * Who snatches the sibling into this theme, when it is not a chase: the theme's own villain
+   * (data/stages.ts's snatcher), or null for the original game's kidnapper.
+   */
+  private snatching: Villain | null = null;
   /** Where the villain's feet are: the ground, less its own height at its own scale. */
   private villainY = 0;
   /** The hero's top-left, and the two sprite heights the sibling's placing is measured in. */
@@ -198,6 +205,8 @@ export class BetweenScene extends Phaser.Scene {
     fitScreenCamera(this);
     registerScaledPlayerTextures(this, [['stand', CUTSCENE_SCALE], ['jump', CARRIED_SCALE]]);
     registerKidnapperTextures(this);
+    // The villains, whom a level registers too: the cutscene must not depend on one having run.
+    registerBossTextures(this);
 
     this.clock = createFrameClock();
     // The PLAY mapping, not the menu one, and that is the live game's own answer: `between`
@@ -211,6 +220,7 @@ export class BetweenScene extends Phaser.Scene {
     const finished = STAGES[this.levelIndex - 1];
     this.chase = finished?.level.ending === 'chase' ? finished.level.villain ?? 'dollQueen' : null;
     this.kidnapper = getKidnapper(this.stage.theme);
+    this.snatching = this.chase ? null : snatcher(this.stage);
 
     const hero: Character = getSelectedChar();
     const sibling = siblingOf(hero);
@@ -221,6 +231,12 @@ export class BetweenScene extends Phaser.Scene {
     // jump sprite it then draws. Reproduced as written; the two differ by a row.
     this.siblingH = siblingSprite.length * CARRIED_SCALE;
     this.villainY = GROUND_Y - this.kidnapper.s.length * KIDNAPPER_SCALE;
+    // A villain on foot runs as tall as the Queen does here (drawn big, at 4, she shrinks to
+    // three quarters), whatever it was drawn at; the Pterodactyl needs her wings spread wider
+    // than the sibling she carries.
+    const villainScale = (v: Villain) => (FLYING_VILLAINS.has(v)
+      ? 1.6
+      : (0.75 * this.textures.getFrame(VILLAIN_TEXTURES.dollQueen).height) / this.textures.getFrame(VILLAIN_TEXTURES[v]).height);
 
     this.drawBackdrop();
 
@@ -231,18 +247,17 @@ export class BetweenScene extends Phaser.Scene {
       .setOrigin(0, 0)
       .setDepth(DEPTH_ACTOR)
       .setVisible(false);
+    if (this.snatching) {
+      this.villain.setTexture(VILLAIN_TEXTURES[this.snatching]).setScale(villainScale(this.snatching));
+      // On foot, on the ground; a flier a little above it, the sibling hanging below.
+      this.villainY = GROUND_Y - this.villain.displayHeight - (FLYING_VILLAINS.has(this.snatching) ? 34 : 0);
+    }
     this.carried = this.actor(sibling, 'jump', CARRIED_SCALE, DEPTH_CARRIED);
     if (this.chase) {
       this.runner = this.add
         .image(0, 0, VILLAIN_TEXTURES[this.chase])
         .setOrigin(0.5, 1)
-        // A villain on foot runs as tall as the Queen does here (drawn big, at 4, she shrinks to
-        // three quarters), whatever it was drawn at; the Pterodactyl needs her wings spread
-        // wider than the sibling she carries.
-        .setScale(FLYING_VILLAINS.has(this.chase)
-          ? 1.6
-          : (0.75 * this.textures.getFrame(VILLAIN_TEXTURES.dollQueen).height)
-            / this.textures.getFrame(VILLAIN_TEXTURES[this.chase]).height)
+        .setScale(villainScale(this.chase))
         // A villain drawn in profile faces left; this one is off to the right.
         .setFlipX(PROFILE_VILLAINS.has(this.chase))
         .setDepth(DEPTH_ACTOR)
@@ -250,7 +265,9 @@ export class BetweenScene extends Phaser.Scene {
     }
 
     this.bubble = this.add.graphics().setDepth(DEPTH_BUBBLE).setVisible(false);
-    this.taunt = this.label({ ...BUBBLE_FONT, color: this.kidnapper.color });
+    this.taunt = this.label({
+      ...BUBBLE_FONT, color: this.snatching ? VILLAIN_COLORS[this.snatching] : this.kidnapper.color,
+    });
     this.taunt.setDepth(DEPTH_BUBBLE);
     this.hearts = this.label(HEART_FONT, '♥ ♥ ♥');
     this.confused = this.label(CONFUSED_FONT, '???');
@@ -436,11 +453,14 @@ export class BetweenScene extends Phaser.Scene {
     this.hero.setVisible(true).setPosition(HERO_X, this.heroY);
     const grabT = t - GRAB_AT;
 
+    // A theme's own villain drawn in profile faces left already: coming in it is as drawn, and
+    // turns to run off. The original kidnappers face right, so it is the other way round.
+    const profile = this.snatching !== null && PROFILE_VILLAINS.has(this.snatching);
     if (grabT < CARRY_AFTER) {
       // Swooping in, facing left — the enemy art faces left already, so `fl` true at :2325
       // is the flip, matching SliceScene's own `setFlipX` convention for enemies.
       this.villain
-        .setFlipX(true)
+        .setFlipX(this.snatching === null)
         .setPosition(BASE_W + 20 - grabT * 4, this.villainY + Math.sin(t * 0.3) * 2);
       this.sibling.setVisible(true).setPosition(HERO_X + SIBLING_DX, this.heroY + SIBLING_DY);
       this.confused.setVisible(grabT > 40).setPosition(HERO_X + 75, this.heroY - 5);
@@ -448,15 +468,23 @@ export class BetweenScene extends Phaser.Scene {
       this.sibling.setVisible(false);
       const runX = HERO_X + SIBLING_DX + (grabT - CARRY_AFTER) * 3;
       const bounce = Math.abs(Math.sin(t * 0.15)) * 4;
-      this.villain.setFlipX(false).setPosition(runX, this.villainY + bounce);
+      this.villain.setFlipX(profile).setPosition(runX, this.villainY + bounce);
+      // Held up on top, or, from a flier, hanging below her.
+      const flying = this.snatching !== null && FLYING_VILLAINS.has(this.snatching);
       this.carried
         .setVisible(true)
-        .setPosition(runX + 10, this.villainY - this.siblingH + 5 + bounce);
+        .setPosition(runX + 10, flying
+          ? this.villainY + this.villain.displayHeight - 6 + bounce
+          : this.villainY - this.siblingH + 5 + bounce);
       if (grabT < 200) this.drawTaunt(runX);
       // :2343. Twenty frames on, ten off — a cry, not a steady label.
+      // From a flier the sibling hangs below her, so the cry goes beside them, out from under
+      // her speech bubble.
       this.help
         .setVisible(grabT % 30 < 20)
-        .setPosition(runX + 20, this.villainY - this.siblingH - 5);
+        .setPosition(runX + (flying ? 46 : 20), flying
+          ? this.villainY + this.villain.displayHeight + this.siblingH / 2
+          : this.villainY - this.siblingH - 5);
     }
 
     this.ohNo.setVisible(grabT > 50).setPosition(HERO_X + 15, this.heroY - 15);

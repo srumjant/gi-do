@@ -320,13 +320,24 @@ export const VILLAIN_TEXTURES: Readonly<Record<Villain, string>> = {
   tRex: bossTextureKey('idle'),
 };
 
+/** Each villain's colour, for the speech bubble's words when it snatches the sibling. */
+export const VILLAIN_COLORS: Readonly<Record<Villain, string>> = {
+  dollQueen: '#ff66aa',
+  pterodactyl: '#cc8855',
+  vanaToomas: '#5577aa',
+  pizzaChef: '#dd2222',
+  yeti: '#77aadd',
+  tRex: '#44bb44',
+};
+
 /** The villains that fly: the chase cutscene keeps them off the ground. */
 export const FLYING_VILLAINS: ReadonlySet<Villain> = new Set(['pterodactyl']);
 
 /** The villains drawn in profile, facing left: running off to the right, they turn round. */
 export const PROFILE_VILLAINS: ReadonlySet<Villain> = new Set(['pterodactyl', 'vanaToomas', 'pizzaChef', 'tRex']);
 
-function registerBossTextures(scene: Phaser.Scene): void {
+/** Every boss's and villain's textures: the levels draw them, and so does the cutscene. */
+export function registerBossTextures(scene: Phaser.Scene): void {
   for (const pose of Object.keys(BOSS_POSES) as BossPose[]) {
     addSprite(scene, bossTextureKey(pose), BOSS_POSES[pose], BOSS_P, BOSS_SCALE);
   }
