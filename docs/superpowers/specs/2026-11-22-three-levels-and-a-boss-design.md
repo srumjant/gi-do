@@ -319,7 +319,10 @@ A level says how it ends:
 - **rescue**: today's ending, for the levels not yet reworked.
 
 Each theme's villain is its boss, so the one carrying the sibling through Doll Garden is the
-Doll Queen. Until a theme is reworked it keeps today's kidnapper.
+Doll Queen. Until a theme is reworked it keeps today's kidnapper. With every theme reworked (2026-11-23), the snatch
+between themes is always the next theme's villain: the Pterodactyl takes the sibling into
+Dinosaur Canyon, Vana Toomas into Tallinn, and so on to the T-Rex into Toy Castle, the
+Pterodactyl with the sibling hanging below her.
 
 ## What gets built (batch 1)
 

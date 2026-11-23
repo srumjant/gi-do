@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LEVELS, LEVEL_NAME_KEYS } from '../src/data/levels';
-import { buildStages, STAGES } from '../src/data/stages';
+import { buildStages, snatcher, STAGES } from '../src/data/stages';
 
 const named = (name: string) => ({ ...LEVELS[0], name });
 
@@ -26,5 +26,20 @@ describe('the run order', () => {
     expect(last.ending).toBe('boss');
     expect(last.course?.boss?.kind).toBe('tRex');
     expect(STAGES.some((s) => LEVELS.includes(s.level))).toBe(false);
+  });
+
+  it('has each theme snatched into by its own villain, the one its last level ends with', () => {
+    // Every theme is reworked (2026-11-23): the cutscene before a theme's first level shows
+    // that theme's villain taking the sibling, not the original game's kidnapper.
+    const themes = [...new Set(STAGES.map((s) => s.theme))];
+    for (const theme of themes) {
+      const stages = STAGES.filter((s) => s.theme === theme);
+      const boss = stages[stages.length - 1].level.course?.boss?.kind;
+      expect({ theme, villain: snatcher(stages[0]) }).toEqual({ theme, villain: boss });
+    }
+  });
+
+  it('has no villain for a classic level, which keeps the original kidnapper', () => {
+    expect(snatcher({ theme: 0, level: LEVELS[0], nameKey: 'level_1' })).toBeNull();
   });
 });
