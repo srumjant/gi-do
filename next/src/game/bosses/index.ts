@@ -3,15 +3,23 @@ import type { BossDef } from '../../data/levels';
 import type { World } from '../types';
 import { buildDollQueen, stepDollQueen, type DollQueenState } from './dollQueen';
 import { buildPterodactyl, stepPterodactyl, type PterodactylState } from './pterodactyl';
+import { buildVanaToomas, stepVanaToomas, type VanaToomasState } from './vanaToomas';
 
 /** A hand-built level's boss, whichever it is: each theme has its own. */
-export type CourseBoss = DollQueenState | PterodactylState;
+export type CourseBoss = DollQueenState | PterodactylState | VanaToomasState;
 
 export function buildCourseBoss(def: BossDef, dc: DifficultyRecord): CourseBoss {
-  return def.kind === 'pterodactyl' ? buildPterodactyl(def, dc) : buildDollQueen(def, dc);
+  switch (def.kind) {
+    case 'pterodactyl': return buildPterodactyl(def, dc);
+    case 'vanaToomas': return buildVanaToomas(def, dc);
+    default: return buildDollQueen(def, dc);
+  }
 }
 
 export function stepCourseBoss(world: World, boss: CourseBoss): void {
-  if (boss.kind === 'pterodactyl') stepPterodactyl(world, boss);
-  else stepDollQueen(world, boss);
+  switch (boss.kind) {
+    case 'pterodactyl': stepPterodactyl(world, boss); break;
+    case 'vanaToomas': stepVanaToomas(world, boss); break;
+    default: stepDollQueen(world, boss);
+  }
 }

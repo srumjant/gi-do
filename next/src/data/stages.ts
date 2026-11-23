@@ -4,6 +4,9 @@ import { DOLL_GARDEN_2 } from './levels2/dollGarden2';
 import { KANJON } from './levels2/kanjon';
 import { NUKUAED } from './levels2/nukuaed';
 import { NUKUMAJA } from './levels2/nukumaja';
+import { RAEKODA } from './levels2/raekoda';
+import { TORNID } from './levels2/tornid';
+import { VANALINN } from './levels2/vanalinn';
 import { VULKAAN } from './levels2/vulkaan';
 
 /** One level of the run: which theme it belongs to, the level itself, and its name's key. */
@@ -44,5 +47,10 @@ export const STAGES: readonly Stage[] = buildStages({
     { level: KANJON, nameKey: LEVEL_NAME_KEYS[1] },
     { level: DINO_CANYON_2, nameKey: 'level_2_2' },
     { level: VULKAAN, nameKey: 'level_2_3' },
+  ],
+  2: [
+    { level: VANALINN, nameKey: LEVEL_NAME_KEYS[2] },
+    { level: TORNID, nameKey: 'level_3_2' },
+    { level: RAEKODA, nameKey: 'level_3_3' },
   ],
 });

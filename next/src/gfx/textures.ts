@@ -14,15 +14,19 @@ import {
   FIREBALL_P, FIREBALL_S,
   HEART_P, HEART_S,
   KIDNAPPERS,
+  KNIGHT_S,
   PARASOL_P, PARASOL_S,
   PTERO_DOWN_S, PTERO_P, PTERO_UP_S,
   QUEEN_P, QUEEN_S,
   ROCK_P, ROCK_S,
+  TOOMAS_BODY_S, TOOMAS_FULL_S, TOOMAS_HELMET_S, TOOMAS_P, TOOMAS_PLATE_S, TOOMAS_POLE_P,
+  TOOMAS_POLE_S, TOOMAS_SHIELD_S,
   type Palette,
   type SpriteData,
   STAR_P, STAR_S,
   SUPER_P, SUPER_S,
-  ZOMBIE_DINO_P, ZOMBIE_DOLL_P,
+  WAVE_P, WAVE_S,
+  ZOMBIE_DINO_P, ZOMBIE_DOLL_P, ZOMBIE_KNIGHT_P,
 } from '../data/sprites';
 import type { Villain } from '../data/levels';
 import type { Character } from '../game/player';
@@ -180,13 +184,14 @@ function registerPlayerTextures(scene: Phaser.Scene): void {
  * turned out to be the right call: neither of them needed a texture change.
  */
 const ENEMY_TYPES = [
-  'car', 'doll', 'dino', 'ghost', 'bat', 'cannon', 'bouncer', 'penguin', 'icebat', 'chicken',
+  'car', 'doll', 'dino', 'ghost', 'bat', 'cannon', 'bouncer', 'penguin', 'icebat', 'chicken', 'knight',
 ];
 
 /** The walkers that have a zombie (data/course.ts's uppercase letters), and its palette. */
 export const ZOMBIE_KINDS: Readonly<Record<string, { sprite: SpriteData; palette: Palette }>> = {
   doll: { sprite: DOLL_S, palette: ZOMBIE_DOLL_P },
   dino: { sprite: DINO_S, palette: ZOMBIE_DINO_P },
+  knight: { sprite: KNIGHT_S, palette: ZOMBIE_KNIGHT_P },
 };
 
 /** `enemy-zombie-<type>`. */
@@ -258,14 +263,33 @@ export const PTERO_SCALE = 2;
 /** The rocks she drops. */
 export const ROCK_TEXTURE = 'ptero-rock';
 
+/**
+ * Vana Toomas, Tallinn's boss and villain: 16x24 at 2. His body and each piece of armour, a
+ * layer each; all of him at once; his flag pole; the dust his stamp rolls along the floor.
+ */
+export const TOOMAS_BODY_TEXTURE = 'toomas-body';
+export const TOOMAS_ARMOUR_TEXTURES = {
+  helmet: 'toomas-helmet',
+  plate: 'toomas-plate',
+  shield: 'toomas-shield',
+} as const;
+export const TOOMAS_FULL_TEXTURE = 'toomas-full';
+export const TOOMAS_POLE_TEXTURE = 'toomas-pole';
+export const WAVE_TEXTURE = 'toomas-wave';
+export const TOOMAS_SCALE = 2;
+
 /** Each villain's picture, for the end of a chase level and its cutscene. */
 export const VILLAIN_TEXTURES: Readonly<Record<Villain, string>> = {
   dollQueen: QUEEN_TEXTURE,
   pterodactyl: PTERO_UP_TEXTURE,
+  vanaToomas: TOOMAS_FULL_TEXTURE,
 };
 
 /** The villains that fly: the chase cutscene keeps them off the ground. */
 export const FLYING_VILLAINS: ReadonlySet<Villain> = new Set(['pterodactyl']);
+
+/** The villains drawn in profile, facing left: running off to the right, they turn round. */
+export const PROFILE_VILLAINS: ReadonlySet<Villain> = new Set(['pterodactyl', 'vanaToomas']);
 
 function registerBossTextures(scene: Phaser.Scene): void {
   for (const pose of Object.keys(BOSS_POSES) as BossPose[]) {
@@ -277,6 +301,13 @@ function registerBossTextures(scene: Phaser.Scene): void {
   addSprite(scene, PTERO_UP_TEXTURE, PTERO_UP_S, PTERO_P, PTERO_SCALE);
   addSprite(scene, PTERO_DOWN_TEXTURE, PTERO_DOWN_S, PTERO_P, PTERO_SCALE);
   addSprite(scene, ROCK_TEXTURE, ROCK_S, ROCK_P, 2);
+  addSprite(scene, TOOMAS_BODY_TEXTURE, TOOMAS_BODY_S, TOOMAS_P, TOOMAS_SCALE);
+  addSprite(scene, TOOMAS_ARMOUR_TEXTURES.helmet, TOOMAS_HELMET_S, TOOMAS_P, TOOMAS_SCALE);
+  addSprite(scene, TOOMAS_ARMOUR_TEXTURES.plate, TOOMAS_PLATE_S, TOOMAS_P, TOOMAS_SCALE);
+  addSprite(scene, TOOMAS_ARMOUR_TEXTURES.shield, TOOMAS_SHIELD_S, TOOMAS_P, TOOMAS_SCALE);
+  addSprite(scene, TOOMAS_FULL_TEXTURE, TOOMAS_FULL_S, TOOMAS_P, TOOMAS_SCALE);
+  addSprite(scene, TOOMAS_POLE_TEXTURE, TOOMAS_POLE_S, TOOMAS_POLE_P, TOOMAS_SCALE);
+  addSprite(scene, WAVE_TEXTURE, WAVE_S, WAVE_P, 2);
 }
 
 /**

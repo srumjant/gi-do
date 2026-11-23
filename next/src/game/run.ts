@@ -14,6 +14,7 @@ import {
   GIGI_SKINS,
   ICEBAT_P, ICEBAT_S,
   KIDNAPPERS,
+  KNIGHT_P, KNIGHT_S,
   PENGUIN_P, PENGUIN_S,
   type Palette,
   type Skin,
@@ -140,6 +141,7 @@ export function getEnemySpriteInfo(type: string): EnemySpriteInfo {
     case 'penguin': return { sprite: PENGUIN_S, palette: PENGUIN_P };
     case 'icebat': return { sprite: ICEBAT_S, palette: ICEBAT_P };
     case 'chicken': return { sprite: CHICKEN_S, palette: CHICKEN_P };
+    case 'knight': return { sprite: KNIGHT_S, palette: KNIGHT_P };
     default: return { sprite: DINO_S, palette: DINO_P };
   }
 }

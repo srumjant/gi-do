@@ -238,3 +238,36 @@ open each one.
 - The fight: do they find jumping up under her, or do they try to shoot her first? (Arrows
   bounce off her.)
 - Anywhere stuck for more than a minute, or more than three or four deaths in a section.
+
+## Tallinn, the whole theme (2026-11-22)
+
+Tallinn is now three levels and a boss, right after Dinosaur Canyon: **Tallinna vanalinn**
+(the Old Town, rebuilt), **Tornid** (the Towers) and **Raekoja plats** (Town Hall Square),
+where **Vana Toomas** waits. `?level=7`, `?level=8`, `?level=9` open each one.
+
+- **The big head is the tool.** It smashes cracked stone (the brown, cracked blocks). The town
+  gate is a tower too tall to jump whose doorway is bricked up with it, and the big head
+  station stands in front.
+- **Zombie knights** are Tallinn's zombies: little rusty knights. Same rule as ever: they
+  push, never hurt, and an arrow puts them down.
+- **Vana Toomas** runs off with the sibling at the end of the first two levels.
+- **Tornid**: a spring onto the town wall; a tower on the wall walk with a cracked door; a
+  tower whose floors are cracked, so the big head drops you through them; a target behind a
+  cracked tower door that opens a gate; zombie knights in a low passage; a spring up the last
+  tower.
+- **Raekoja plats**: zombie knights in front of a cracked door (shoot them first); a spring
+  onto the town wall, where a cracked wall hides the target for the gate below (if you drop
+  down before shooting it, a second spring takes you back up); cannons behind low walls.
+- **Vana Toomas.** The square's door shuts behind you. Without a big head he is all armour:
+  you bounce off, nothing hurts. With one, land on him (or run into his back) and a piece of
+  armour flies off: helmet, breastplate, shield. Not while his flag pole is up: then he is
+  braced, and he slams it down, sending a shockwave along the ground to jump. After each hit
+  he staggers away and calls two zombie knights. Beaten, he sits down in his striped vest.
+
+### What to watch
+
+- Does your child think of the big head at the first tower, or try to jump it?
+- The falling tower in Tornid: fun, or confusing?
+- The fight: do they find landing on his helmet? Do they jump the shockwave, and wait while
+  the flag pole is up?
+- Anywhere stuck for more than a minute, or more than three or four deaths in a section.
