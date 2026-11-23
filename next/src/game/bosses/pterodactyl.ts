@@ -2,7 +2,7 @@ import { TILE } from '../../config/constants';
 import type { DifficultyRecord } from '../../config/difficulty';
 import type { BossDef } from '../../data/levels';
 import { spawnEnemy } from '../enemy';
-import { rectOverlap } from '../tiles';
+import { boxHitsSolid, rectOverlap } from '../tiles';
 import type { World } from '../types';
 
 /**
@@ -212,7 +212,9 @@ function contact(world: World, b: PterodactylState): void {
     return;
   }
   const fromLeft = p.x + p.w / 2 < b.x + b.w / 2;
-  p.x = fromLeft ? b.x - p.w - 1 : b.x + b.w + 1;
+  const pushedX = fromLeft ? b.x - p.w - 1 : b.x + b.w + 1;
+  // Never into a wall (see enemy.ts's zombie push).
+  if (!boxHitsSolid(world.map, { x: pushedX, y: p.y, w: p.w, h: p.h })) p.x = pushedX;
   p.vx = fromLeft ? -3 : 3;
   world.sounds.push('boing');
   pushFx(b, { kind: 'bounce', x: p.x + p.w / 2, y: p.y });

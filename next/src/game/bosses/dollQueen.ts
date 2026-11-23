@@ -3,7 +3,7 @@ import type { DifficultyRecord } from '../../config/difficulty';
 import type { BossDef } from '../../data/levels';
 import { spawnEnemy } from '../enemy';
 import { playerHit } from '../player';
-import { rectOverlap } from '../tiles';
+import { boxHitsSolid, rectOverlap } from '../tiles';
 import type { Rect, World } from '../types';
 
 /**
@@ -263,7 +263,9 @@ function contact(world: World, q: DollQueenState): void {
     return;
   }
   const fromLeft = p.x + p.w / 2 < q.x + q.w / 2;
-  p.x = fromLeft ? q.x - p.w - 1 : q.x + q.w + 1;
+  const pushedX = fromLeft ? q.x - p.w - 1 : q.x + q.w + 1;
+  // Never into a wall (see enemy.ts's zombie push).
+  if (!boxHitsSolid(world.map, { x: pushedX, y: p.y, w: p.w, h: p.h })) p.x = pushedX;
   p.vx = fromLeft ? -3 : 3;
   if (q.phase === 'shielded' && p.invincible <= 0) playerHit(world);
 }

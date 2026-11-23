@@ -2,12 +2,13 @@ import { ENEMY_SCALE, GIANT_SCALE, GRAVITY, TILE } from '../config/constants';
 import type { DifficultyRecord } from '../config/difficulty';
 import type { EnemyDef, TileMap } from '../data/levels';
 import {
-  BAT_S, BOUNCER_S, CANNON_S, CAR_S, CHICKEN_S, DINO_S, DOLL_S, GHOST_S, ICEBAT_S, PENGUIN_S,
+  BAT_S, BOUNCER_S, CANNON_S, CAR_S, CHICKEN_S, DINO_S, DOLL_S, GHOST_S, ICEBAT_S, KNIGHT_S,
+  PENGUIN_S,
   type SpriteData,
 } from '../data/sprites';
 import { playerHit } from './player';
 import { random } from './random';
-import { findGroundY, getTile, isSolid, rectOverlap } from './tiles';
+import { boxHitsSolid, findGroundY, getTile, isSolid, rectOverlap } from './tiles';
 import type { EnemyState, World } from './types';
 
 /**
@@ -146,6 +147,7 @@ const ENEMY_SPRITES: Partial<Record<string, SpriteData>> = {
   cannon: CANNON_S,
   bouncer: BOUNCER_S,
   giant: DINO_S,
+  knight: KNIGHT_S,
 };
 
 /**
@@ -550,8 +552,16 @@ export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
   // not every frame of a long shove.
   if (e.zombie && rectOverlap({ x: p.x, y: p.y, w: p.w, h: p.h }, { x: e.x, y: e.y, w: e.w, h: e.h })) {
     const fromLeft = p.x + p.w / 2 < e.x + e.w / 2;
-    p.x = fromLeft ? e.x - p.w - 1 : e.x + e.w + 1;
-    p.vx = fromLeft ? -4 : 4;
+    const pushedX = fromLeft ? e.x - p.w - 1 : e.x + e.w + 1;
+    if (!boxHitsSolid(world.map, { x: pushedX, y: p.y, w: p.w, h: p.h })) {
+      p.x = pushedX;
+      p.vx = fromLeft ? -4 : 4;
+    } else {
+      // Pinned against a wall, the hero holds the zombie back instead: shoved into a tower's
+      // door, the hero fell through the floor (browser, 2026-11-22).
+      e.x = fromLeft ? p.x + p.w + 1 : p.x - e.w - 1;
+      p.vx = 0;
+    }
     if (p.vy > 0) p.vy = -3;
     if ((e.groanTimer ?? 0) <= 0) {
       world.sounds.push('groan');
@@ -559,6 +569,10 @@ export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
     }
     return;
   }
+  // And short of touching, a zombie does nothing at all: the hit box below is wider with a big
+  // head, and took a zombie just out of the push's reach for an ordinary enemy, which killed
+  // the hero (browser, 2026-11-22).
+  if (e.zombie) return;
 
   const shm = (dc.stompHitbox || 1) * (p.bigHeadTimer > 0 ? 1.5 : 1);
   const bhx = p.bigHeadTimer > 0 ? 8 : 0;

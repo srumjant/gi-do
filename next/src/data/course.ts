@@ -33,7 +33,8 @@ import {
  *   F  checkpoint flag: a death brings you back to the last one you touched
  *   P  where the hero starts     R  where the sibling waits
  *   d  doll   n  dino   a  bat   x  car   o  cannon   u  bouncer   p  penguin
- *   D  N  a ZOMBIE doll or dino: it can't be stomped, it pushes you back, an arrow puts it down
+ *   D  N  K  a ZOMBIE doll, dino or knight: it can't be stomped, it pushes you back, an arrow
+ *      puts it down. Only zombies wear a knight's armour, so K has no lower case.
  *   g  giant: stomping hurts, arrows bounce off, only a chicken ray moves it
  *
  * Size obstacles from the jump itself (tests/helpers/courseRuns.ts's jumpRise): a held jump
@@ -46,7 +47,7 @@ const ENEMY_LETTERS: Record<string, string> = {
   d: 'doll', n: 'dino', a: 'bat', x: 'car', o: 'cannon', u: 'bouncer', p: 'penguin', g: 'giant',
 };
 /** Upper case is the same walker as a zombie (EnemyState.zombie). */
-const ZOMBIE_LETTERS: Record<string, string> = { D: 'doll', N: 'dino' };
+const ZOMBIE_LETTERS: Record<string, string> = { D: 'doll', N: 'dino', K: 'knight' };
 
 const STATION_LETTERS: Record<string, StationKind> = {
   b: 'bow', c: 'cape', f: 'fart', h: 'bighead', k: 'chicken',

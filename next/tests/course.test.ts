@@ -455,6 +455,67 @@ describe('zombies', () => {
     step(world, {}, 5);
     expect(e.noticed).toBeFalsy();
   });
+
+  it('never hurt a hero with a big head either, however close', () => {
+    // Found in the browser (2026-11-22): the big head widens the hero's hit box, so a zombie
+    // just short of the push's reach was taken for an ordinary enemy, and killed them.
+    const world = quietCourse();
+    const e = zombieAhead(world);
+    const p = world.player;
+    p.hasCape = false;
+    p.invincible = 0;
+    p.bigHeadTimer = 600;
+    standAt(world, 0, 23);
+    p.x = e.x - p.w - 4; // inside the big head's reach, outside the body's
+    step(world);
+    expect(world.dead).toBe(false);
+  });
+
+  it('never push the hero into a wall: pinned against one, the hero holds the zombie back', () => {
+    // Found in the browser (2026-11-22): a zombie knight shoved the hero into a tower's door,
+    // and the hero fell through the floor.
+    const rows = ['P'.padEnd(39, '.') + 'R', '.....B'.padEnd(40, '.'), '.....B'.padEnd(40, '.')];
+    rows.push('.....B' + '..K'.padEnd(34, '.'));
+    rows.push('#'.repeat(40), '#'.repeat(40));
+    const wall = courseLevel({ name: 'wall', theme: 2, sections: [rows] });
+    const world = createWorld(0, 'super_easy', 'gigi', undefined, wall);
+    standAt(world, 6, 4);
+    world.player.invincible = 9999;
+    const p = world.player;
+    let leftmost = p.x;
+    for (let i = 0; i < 180; i++) {
+      step(world, { right: i % 40 < 20 });
+      leftmost = Math.min(leftmost, p.x);
+    }
+    // The tests' mover puts a hero back out of a wall; Arcade, in the game, dropped them
+    // through the floor. So not even for a step may the push put them in it.
+    expect(world.dead).toBe(false);
+    expect(leftmost).toBeGreaterThanOrEqual(6 * TILE);
+    expect(p.y + p.h).toBe(4 * TILE);
+  });
+
+  it('come as knights too (Tallinn\'s K): pushing, shuffling after the hero, down to an arrow', () => {
+    const knights = courseLevel({
+      name: 'knights',
+      theme: 2,
+      sections: [['P'.padEnd(39, '.') + 'R', '.'.repeat(40), '.'.repeat(14) + 'K'.padEnd(26, '.'), '#'.repeat(40), '#'.repeat(40)]],
+    });
+    expect(knights.enemyDefs).toEqual([{ type: 'knight', x: 14, floorRow: 3, zombie: true }]);
+    const world = createWorld(0, 'super_easy', 'gigi', undefined, knights);
+    standAt(world, 9, 3);
+    world.player.invincible = 9999;
+    step(world, {}, 30);
+    const e = world.enemies.find((z) => z.type === 'knight')!;
+    expect(e.zombie).toBe(true);
+    expect(e.x).toBeLessThan(14 * TILE);
+    world.player.x = e.x - world.player.w + 2;
+    step(world);
+    expect(world.dead).toBe(false);
+    expect(world.player.x + world.player.w).toBeLessThanOrEqual(e.x);
+    world.arrows.push({ x: e.x - 6, y: e.y + 8, vx: 6, life: 60, isChicken: false });
+    step(world);
+    expect(e.alive).toBe(false);
+  });
 });
 
 describe('checkpoints', () => {

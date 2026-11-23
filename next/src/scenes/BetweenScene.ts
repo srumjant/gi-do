@@ -26,6 +26,7 @@ import {
   registerScaledPlayerTextures,
   scaledPlayerTextureKey,
   FLYING_VILLAINS,
+  PROFILE_VILLAINS,
   VILLAIN_TEXTURES,
 } from '../gfx/textures';
 import {
@@ -235,11 +236,15 @@ export class BetweenScene extends Phaser.Scene {
       this.runner = this.add
         .image(0, 0, VILLAIN_TEXTURES[this.chase])
         .setOrigin(0.5, 1)
-        // The Queen is drawn big (4 to a pixel) and shrinks to fit; the Pterodactyl is drawn
-        // small (3) and needs her wings spread wider than the sibling she carries.
-        .setScale(FLYING_VILLAINS.has(this.chase) ? 1.6 : 0.75)
-        // A flier's sprite is in profile, facing left; she flies off to the right.
-        .setFlipX(FLYING_VILLAINS.has(this.chase))
+        // A villain on foot runs as tall as the Queen does here (drawn big, at 4, she shrinks to
+        // three quarters), whatever it was drawn at; the Pterodactyl needs her wings spread
+        // wider than the sibling she carries.
+        .setScale(FLYING_VILLAINS.has(this.chase)
+          ? 1.6
+          : (0.75 * this.textures.getFrame(VILLAIN_TEXTURES.dollQueen).height)
+            / this.textures.getFrame(VILLAIN_TEXTURES[this.chase]).height)
+        // A villain drawn in profile faces left; this one is off to the right.
+        .setFlipX(PROFILE_VILLAINS.has(this.chase))
         .setDepth(DEPTH_ACTOR)
         .setVisible(false);
     }
