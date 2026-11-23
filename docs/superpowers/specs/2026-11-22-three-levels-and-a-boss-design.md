@@ -46,7 +46,7 @@ earlier themes come back as reminders.
 | Winter | all four, plus ice | the snow field: slippery ice | the frozen lake | the ice palace | **the Yeti** |
 | Toy Castle | everything | the gate | the halls | the throne room | **the T-Rex**, the final boss, redrawn and with a new fight |
 
-Doll Garden, Dinosaur Canyon and Tallinn are designed in detail below; each later theme is designed when
+Doll Garden, Dinosaur Canyon, Tallinn and Palermo are designed in detail below; each later theme is designed when
 its batch starts.
 
 ## Doll Garden, in detail
@@ -156,6 +156,57 @@ flag on a pole, marching up and down the square; the sibling in a cage on the to
   recovers; then he marches faster, stamping more often. (Without the stagger and the brace,
   in the browser, bouncing on his helmet won the fight in seconds.)
 - With the shield gone he sits down in his underclothes, beaten; the cage opens.
+
+## Palermo, in detail (batch 4)
+
+The tool is the **chicken ray**: eight shots from a station, fired in place of arrows while any
+are left, and whatever it hits becomes a chicken. The theme's zombies are **zombie cooks**:
+little cooks in tall white hats gone grey, green faces, red eyes, the usual zombie rule. The
+villain is **Pitsakokk, the Pizza Chef**, guarded by **giants**.
+
+Two rules change on the hand-built levels, so the tool reads plainly to a child:
+
+- **A chicken never hurts.** What a ray makes is a chicken that clucks about and does no harm;
+  jump on it for points. (A chicken hurt like any enemy, so a ray made a harmless zombie
+  dangerous.) The six original levels keep the original rule.
+- **Giants never hurt either; they are in the way.** A giant is three tiles tall with his arms
+  folded: you cannot walk through him, a stomp bounces you off, an arrow bounces off, and a
+  chicken ray makes a chicken of him. Giants stand where a jump cannot get over them: in an
+  archway, under a roof, in a lane. (The giant was a dino drawn big, and landing on him hurt.)
+
+**Level 1: Palermo väljak (the Piazza).** The original level, rebuilt by hand: the sunny
+piazza, arches and balconies, pits, `?` blocks, the rainbow block, dolls, cars, a bouncer. The
+chicken ray station, and just after it two zombie cooks out in the open; then the first giant,
+in a low archway, a station in front of him. At the end the Pizza Chef runs off with the sibling.
+
+**Level 2: Turg (the Market).** Giants open things. Market stalls to climb; a giant in a lane
+between stalls; a giant standing in front of a target, so the ray goes to him first and then
+to the target, which lifts a gate; zombie cooks in a covered passage; a spring up onto the
+market roofs and a giant up there under the awning. The Chef runs off over the roofs.
+
+**Level 3: Katedraal (the Cathedral).** Harder together: the cathedral steps; two giants in a
+row in a portico, so two rays; zombie cooks in front of a giant; a gate that needs two targets,
+one behind a giant. Then the square in front of the cathedral: the door shuts behind you, and
+the Pizza Chef.
+
+**The boss: Pitsakokk.** A cook two tiles wide and three tall in a white hat and apron, with a
+moustache, at his pizza oven; the sibling in a cage on the cathedral steps. The square is
+small enough to keep him in view. Two chicken ray
+stations in the square, coming back as always.
+
+- He tosses pizzas: each flies in an arc to where the hero stands and splats. Move and it
+  misses; an arrow or a ray knocks one out of the air. Slow and rare on Super Easy.
+- He is **guarded by giants**, one in the first round and two after, always between the hero
+  and him (never behind the hero: in the browser two came down either side of a hero and boxed
+  them in). While any giant stands, or one he called has not come yet, he bats a ray away with
+  his pizza peel; a ray makes a chicken of the giant.
+- With no giant left, **ray him: he turns into a big chicken in a chef's hat** and runs about
+  the square, clucking, for a few seconds (ten on Super Easy, fewer on Hard). **Jump on the
+  chicken**: a hit. He pops back into himself, sits dazed, walks back to his oven and calls
+  more giants. Not caught in time, he pops back unhurt, and you ray him again.
+- He never hurts by touch: walking into him pushes you off, a stomp on the cook bounces you
+  off; only the pizzas hurt.
+- Three hits. Then he flops over in a cloud of flour, his hat rolls off, the cage opens.
 
 ## The final boss: the T-Rex
 
