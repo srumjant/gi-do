@@ -15,6 +15,7 @@ import {
   HEART_P, HEART_S,
   KIDNAPPERS,
   KNIGHT_S,
+  COOK_S,
   PARASOL_P, PARASOL_S,
   PTERO_DOWN_S, PTERO_P, PTERO_UP_S,
   QUEEN_P, QUEEN_S,
@@ -26,7 +27,9 @@ import {
   STAR_P, STAR_S,
   SUPER_P, SUPER_S,
   WAVE_P, WAVE_S,
-  ZOMBIE_DINO_P, ZOMBIE_DOLL_P, ZOMBIE_KNIGHT_P,
+  CHEF_BARE_S, CHEF_CHICKEN_P, CHEF_CHICKEN_S, CHEF_HAT_S, CHEF_P, CHEF_PEEL_P, CHEF_PEEL_S, CHEF_S,
+  PIZZA_P, PIZZA_S,
+  ZOMBIE_COOK_P, ZOMBIE_DINO_P, ZOMBIE_DOLL_P, ZOMBIE_KNIGHT_P,
 } from '../data/sprites';
 import type { Villain } from '../data/levels';
 import type { Character } from '../game/player';
@@ -184,7 +187,7 @@ function registerPlayerTextures(scene: Phaser.Scene): void {
  * turned out to be the right call: neither of them needed a texture change.
  */
 const ENEMY_TYPES = [
-  'car', 'doll', 'dino', 'ghost', 'bat', 'cannon', 'bouncer', 'penguin', 'icebat', 'chicken', 'knight',
+  'car', 'doll', 'dino', 'ghost', 'bat', 'cannon', 'bouncer', 'penguin', 'icebat', 'chicken', 'knight', 'cook',
 ];
 
 /** The walkers that have a zombie (data/course.ts's uppercase letters), and its palette. */
@@ -192,6 +195,7 @@ export const ZOMBIE_KINDS: Readonly<Record<string, { sprite: SpriteData; palette
   doll: { sprite: DOLL_S, palette: ZOMBIE_DOLL_P },
   dino: { sprite: DINO_S, palette: ZOMBIE_DINO_P },
   knight: { sprite: KNIGHT_S, palette: ZOMBIE_KNIGHT_P },
+  cook: { sprite: COOK_S, palette: ZOMBIE_COOK_P },
 };
 
 /** `enemy-zombie-<type>`. */
@@ -209,7 +213,7 @@ function registerEnemyTextures(scene: Phaser.Scene): void {
     const { sprite, palette } = getEnemySpriteInfo(type);
     addSprite(scene, enemyTextureKey(type), sprite, palette, ENEMY_SCALE);
   }
-  // The obstacle course's giant: the dino's art, at its own much bigger scale.
+  // The giant: his own art, at his own bigger scale.
   const giant = getEnemySpriteInfo('giant');
   addSprite(scene, enemyTextureKey('giant'), giant.sprite, giant.palette, GIANT_SCALE);
   for (const [type, { sprite, palette }] of Object.entries(ZOMBIE_KINDS)) {
@@ -278,18 +282,31 @@ export const TOOMAS_POLE_TEXTURE = 'toomas-pole';
 export const WAVE_TEXTURE = 'toomas-wave';
 export const TOOMAS_SCALE = 2;
 
+/**
+ * Pitsakokk, the Pizza Chef, Palermo's boss and villain: 16x24 at 2. Himself; bare-headed, once
+ * beaten, and the hat that rolls off; the chicken a ray makes of him; his peel; his pizzas.
+ */
+export const CHEF_TEXTURE = 'chef';
+export const CHEF_BARE_TEXTURE = 'chef-bare';
+export const CHEF_HAT_TEXTURE = 'chef-hat';
+export const CHEF_CHICKEN_TEXTURE = 'chef-chicken';
+export const CHEF_PEEL_TEXTURE = 'chef-peel';
+export const PIZZA_TEXTURE = 'chef-pizza';
+export const CHEF_SCALE = 2;
+
 /** Each villain's picture, for the end of a chase level and its cutscene. */
 export const VILLAIN_TEXTURES: Readonly<Record<Villain, string>> = {
   dollQueen: QUEEN_TEXTURE,
   pterodactyl: PTERO_UP_TEXTURE,
   vanaToomas: TOOMAS_FULL_TEXTURE,
+  pizzaChef: CHEF_TEXTURE,
 };
 
 /** The villains that fly: the chase cutscene keeps them off the ground. */
 export const FLYING_VILLAINS: ReadonlySet<Villain> = new Set(['pterodactyl']);
 
 /** The villains drawn in profile, facing left: running off to the right, they turn round. */
-export const PROFILE_VILLAINS: ReadonlySet<Villain> = new Set(['pterodactyl', 'vanaToomas']);
+export const PROFILE_VILLAINS: ReadonlySet<Villain> = new Set(['pterodactyl', 'vanaToomas', 'pizzaChef']);
 
 function registerBossTextures(scene: Phaser.Scene): void {
   for (const pose of Object.keys(BOSS_POSES) as BossPose[]) {
@@ -308,6 +325,12 @@ function registerBossTextures(scene: Phaser.Scene): void {
   addSprite(scene, TOOMAS_FULL_TEXTURE, TOOMAS_FULL_S, TOOMAS_P, TOOMAS_SCALE);
   addSprite(scene, TOOMAS_POLE_TEXTURE, TOOMAS_POLE_S, TOOMAS_POLE_P, TOOMAS_SCALE);
   addSprite(scene, WAVE_TEXTURE, WAVE_S, WAVE_P, 2);
+  addSprite(scene, CHEF_TEXTURE, CHEF_S, CHEF_P, CHEF_SCALE);
+  addSprite(scene, CHEF_BARE_TEXTURE, CHEF_BARE_S, CHEF_P, CHEF_SCALE);
+  addSprite(scene, CHEF_HAT_TEXTURE, CHEF_HAT_S, CHEF_P, CHEF_SCALE);
+  addSprite(scene, CHEF_CHICKEN_TEXTURE, CHEF_CHICKEN_S, CHEF_CHICKEN_P, CHEF_SCALE);
+  addSprite(scene, CHEF_PEEL_TEXTURE, CHEF_PEEL_S, CHEF_PEEL_P, CHEF_SCALE);
+  addSprite(scene, PIZZA_TEXTURE, PIZZA_S, PIZZA_P, 2);
 }
 
 /**

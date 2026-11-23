@@ -13,8 +13,8 @@ export const GRAVITY = 0.4;
 
 /** Enemy sprites render larger than their source grid. */
 export const ENEMY_SCALE = 1.8;
-/** The obstacle course's giant: a dino drawn at 6 instead of 1.8, 48x54 (game/enemy.ts). */
-export const GIANT_SCALE = 6;
+/** The giant (data/sprites.ts's GIANT_S, 16x18) drawn at 3: 48x54, three tiles tall (game/enemy.ts). */
+export const GIANT_SCALE = 3;
 
 /** The simulation runs at exactly this rate regardless of display refresh. */
 export const STEP_HZ = 60;

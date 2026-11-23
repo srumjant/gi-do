@@ -271,3 +271,38 @@ where **Vana Toomas** waits. `?level=7`, `?level=8`, `?level=9` open each one.
 - The fight: do they find landing on his helmet? Do they jump the shockwave, and wait while
   the flag pole is up?
 - Anywhere stuck for more than a minute, or more than three or four deaths in a section.
+
+## Palermo, the whole theme (2026-11-23)
+
+Palermo is now three levels and a boss, right after Tallinn: **Palermo väljak** (the Piazza,
+rebuilt), **Turg** (the Market) and **Katedraal** (the Cathedral), where **the Pizza Chef**
+waits. `?level=10`, `?level=11`, `?level=12` open each one.
+
+- **The chicken ray is the tool.** Eight shots from a station, fired instead of arrows while
+  any are left; whatever a ray hits becomes a chicken.
+- **Chickens never hurt now**, on all the new levels: a ray turns a zombie or a giant into a
+  chicken that clucks about harmlessly (jump on it for points). On the old levels a chicken
+  still hurt.
+- **Giants** stand in the way with their arms folded, under a roof so nobody jumps over. You
+  bounce off them, they never hurt, arrows bounce off; a ray makes a chicken of them. (A giant
+  used to hurt if you landed on him.)
+- **Zombie cooks** are Palermo's zombies: little cooks in dirty white hats. Same rule: they
+  push, never hurt, an arrow or a ray puts them down.
+- **The Pizza Chef** runs off with the sibling at the end of the first two levels.
+- **Turg**: a giant in a lane; a giant in front of a target that lifts a gate (ray him, then
+  the target); zombie cooks in a passage; a spring onto the market roofs, a giant up there.
+- **Katedraal**: the cathedral steps; two giants in a row; zombie cooks in front of a giant; a
+  gate that needs two targets, one behind a giant.
+- **The Pizza Chef.** The square's door shuts behind you. He tosses pizzas that come down
+  where you stand (move!), and a giant guards him. While a giant stands he bats your ray away
+  with his peel. Ray the giant, then ray him: he turns into a big chicken in a chef's hat and
+  runs about. Jump on the chicken. He pops back, sits dazed, walks back to his oven and calls
+  more giants (two from then on). Three hits and he flops over; his hat rolls away.
+
+### What to watch
+
+- Does your child think of the chicken ray at the first giant, or try to jump him?
+- Do they understand that a chicken is harmless now, or still run from them?
+- The fight: do they ray the giant first? Do they find jumping on the chicken? Too quick, too
+  long (about 14 seconds of fighting on Super Easy when it goes well)?
+- Anywhere stuck for more than a minute, or more than three or four deaths in a section.
