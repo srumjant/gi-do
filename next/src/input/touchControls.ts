@@ -40,11 +40,21 @@ export const TOUCH_BUTTONS: Readonly<Record<string, TouchKey>> = {
  */
 export const MIN_PRESS_MS = 80;
 
+/**
+ * A key press as a real KeyboardEvent. Phaser matches keys on `keyCode` (KeyboardPlugin), and a
+ * script cannot count on setting that through the event's options: Firefox ignores it there,
+ * and so may other browsers, which left the buttons pressing nothing. So the event is made with
+ * the standard `key` and `code`, and `keyCode` and `which` are put on it directly.
+ */
+export function keyEvent(type: 'keydown' | 'keyup', k: TouchKey): KeyboardEvent {
+  const event = new KeyboardEvent(type, { key: k.key, code: k.code, bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'keyCode', { get: () => k.keyCode });
+  Object.defineProperty(event, 'which', { get: () => k.keyCode });
+  return event;
+}
+
 function send(type: 'keydown' | 'keyup', k: TouchKey): void {
-  // keyCode and which are what Phaser's Key objects match on; key and code for anything else.
-  window.dispatchEvent(new KeyboardEvent(type, {
-    key: k.key, code: k.code, keyCode: k.keyCode, which: k.keyCode, bubbles: true, cancelable: true,
-  }));
+  window.dispatchEvent(keyEvent(type, k));
 }
 
 export function installTouchControls(): void {
