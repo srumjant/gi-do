@@ -439,3 +439,25 @@ world's villain is one of his helpers.
 
 - Does your child pick the new skins, and recognise them in the cutscenes?
 - Does the fall off the screen read as funny, not scary?
+
+## Smoother on a TV (2026-11-23)
+
+You found the game "glitchy and slow" in the TV's browser, with the music late. The ground,
+bricks and `?` blocks of a whole level were drawn as one picture that the game rebuilt in full
+every frame, up to 43,000 pieces on the big levels, even off screen. On a laptop that was
+most of each frame's drawing; on a TV's slower processor it was enough to drop the game
+below the speed it can catch up from, and to hold up the music. Now only the tiles on screen
+are drawn: on the laptop, a big level's frame went from about 6 ms to under 1 ms. The levels
+look exactly the same.
+
+### Checking it on the TV
+
+Open the game with `?fps` at the end of the address
+(`https://srumjant.github.io/gi-do/next/?fps`). A small line in the top corner shows:
+
+- **FPS**: frames per second. 60 is smooth; under about 30 it will feel choppy.
+- **WEBGL** or **CANVAS**: CANVAS means the TV's browser could not use its graphics chip, which
+  is much slower whatever the game does.
+- **HELI ... MS**: how late the TV itself plays sound, once the game has made one. Over about
+  150 ms, the music and sounds will feel late, and that delay is the TV's own (try its game
+  mode, or a setting for sound delay or "lip sync").

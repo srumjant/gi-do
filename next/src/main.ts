@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import { installVoice } from './audio/voice';
 import { BASE_W, BASE_H, STEP_HZ } from './config/constants';
 import { installGlyphs } from './config/glyphs';
+import { installFpsMeter } from './debug/fpsMeter';
 import { installFullscreenButton } from './gfx/fullscreen';
 import { setInputSource } from './input/source';
 import { installTouchControls } from './input/touchControls';
@@ -132,6 +133,8 @@ installVoice(game.sound, (key) => game.cache.audio.exists(key));
 // The live game's full-screen button, in the page's corner. See gfx/fullscreen.ts.
 installFullscreenButton(game);
 installTouchControls();
+// `?fps` on the address: frames per second, renderer and sound delay. See debug/fpsMeter.ts.
+installFpsMeter(game);
 // Which device the prompts name (input/source.ts): a phone or tablet starts on its touch
 // buttons; a real key press (not one the touch buttons send) means the keyboard.
 if (window.matchMedia('(pointer: coarse)').matches) setInputSource('touch');
