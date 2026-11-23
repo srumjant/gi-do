@@ -369,3 +369,21 @@ rebuilt), **Lossisaalid** (the Castle Halls) and **Troonisaal** (the Throne Room
 - The block: do they wait for him to be under it?
 - About 20 to 40 seconds of fighting when it goes well. Too long, too short?
 - The ending: is shrinking him into a tiny toy a good enough finale?
+
+## The whole run, and some older levels touched (2026-11-23)
+
+All 18 levels played in one run, Super Easy and Hard, through every cutscene to the Win
+screen. A new check jumps off every step and block in every level, on every difficulty; it
+found jumps that came down in a pit a few tiles on, so a few levels you have already seen
+changed a little:
+
+- **Nukuaed, Kanjon, Tallinna vanalinn, Palermo väljak**: the first pit now comes before the
+  first big step, not just after it (jumping off the step landed in it on some difficulties);
+  their first `?` blocks moved past the pit. Nukuaed's high platform over the stepping-stone pit
+  is gone, its `?` lower down.
+- **Aiavärav, Vulkaan**: a `?` block you could stand on and jump from into a pit or lava is gone.
+- **Vulkaan**: the one-tile hole between the cage's step and the wall is filled.
+- **Jäätunud järv**: the ice floes sit level with the shore; before, the water was a tile higher
+  than the shore, and walking right up to the edge was a fall.
+- **The giants' roofs** (Palermo, Winter, Toy Castle) have arched corners now, so they read as
+  archways and halls rather than floating blocks.

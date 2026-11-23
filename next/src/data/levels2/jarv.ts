@@ -40,7 +40,8 @@ export const JARV = courseLevel({
       '##############################',
       '##############################',
     ],
-    // the frozen lake: ice floes on icy water, jump to jump, each long enough to land and slide to a stop on
+    // the frozen lake: ice floes on icy water, level with the shore (a tile higher, walking to the edge
+    // touched it: browser, 2026-11-23), each long enough to land and slide to a stop on
     [
       '............................................',
       '............................................',
@@ -64,8 +65,8 @@ export const JARV = courseLevel({
       '............................................',
       '............................................',
       '............................................',
+      '............................................',
       '__IIIIIIIIIIII___IIIIIIIIIII__IIIIIIIIIII___',
-      '____________________________________________',
       '____________________________________________',
     ],
     // the far shore, and a cliff of ice only a fart jump climbs
