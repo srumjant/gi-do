@@ -14,7 +14,7 @@ import {
   GIGI_SKINS,
   ICEBAT_P, ICEBAT_S,
   KIDNAPPERS,
-  KNIGHT_P, KNIGHT_S,
+  KNIGHT_P, KNIGHT_S, COOK_P, COOK_S, GIANT_P, GIANT_S, SOLDIER_P, SOLDIER_S,
   PENGUIN_P, PENGUIN_S,
   type Palette,
   type Skin,
@@ -142,6 +142,9 @@ export function getEnemySpriteInfo(type: string): EnemySpriteInfo {
     case 'icebat': return { sprite: ICEBAT_S, palette: ICEBAT_P };
     case 'chicken': return { sprite: CHICKEN_S, palette: CHICKEN_P };
     case 'knight': return { sprite: KNIGHT_S, palette: KNIGHT_P };
+    case 'cook': return { sprite: COOK_S, palette: COOK_P };
+    case 'soldier': return { sprite: SOLDIER_S, palette: SOLDIER_P };
+    case 'giant': return { sprite: GIANT_S, palette: GIANT_P };
     default: return { sprite: DINO_S, palette: DINO_P };
   }
 }

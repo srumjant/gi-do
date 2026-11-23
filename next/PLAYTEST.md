@@ -271,3 +271,119 @@ where **Vana Toomas** waits. `?level=7`, `?level=8`, `?level=9` open each one.
 - The fight: do they find landing on his helmet? Do they jump the shockwave, and wait while
   the flag pole is up?
 - Anywhere stuck for more than a minute, or more than three or four deaths in a section.
+
+## Palermo, the whole theme (2026-11-23)
+
+Palermo is now three levels and a boss, right after Tallinn: **Palermo väljak** (the Piazza,
+rebuilt), **Turg** (the Market) and **Katedraal** (the Cathedral), where **the Pizza Chef**
+waits. `?level=10`, `?level=11`, `?level=12` open each one.
+
+- **The chicken ray is the tool.** Eight shots from a station, fired instead of arrows while
+  any are left; whatever a ray hits becomes a chicken.
+- **Chickens never hurt now**, on all the new levels: a ray turns a zombie or a giant into a
+  chicken that clucks about harmlessly (jump on it for points). On the old levels a chicken
+  still hurt.
+- **Giants** stand in the way with their arms folded, under a roof so nobody jumps over. You
+  bounce off them, they never hurt, arrows bounce off; a ray makes a chicken of them. (A giant
+  used to hurt if you landed on him.)
+- **Zombie cooks** are Palermo's zombies: little cooks in dirty white hats. Same rule: they
+  push, never hurt, an arrow or a ray puts them down.
+- **The Pizza Chef** runs off with the sibling at the end of the first two levels.
+- **Turg**: a giant in a lane; a giant in front of a target that lifts a gate (ray him, then
+  the target); zombie cooks in a passage; a spring onto the market roofs, a giant up there.
+- **Katedraal**: the cathedral steps; two giants in a row; zombie cooks in front of a giant; a
+  gate that needs two targets, one behind a giant.
+- **The Pizza Chef.** The square's door shuts behind you. He tosses pizzas that come down
+  where you stand (move!), and a giant guards him. While a giant stands he bats your ray away
+  with his peel. Ray the giant, then ray him: he turns into a big chicken in a chef's hat and
+  runs about. Jump on the chicken. He pops back, sits dazed, walks back to his oven and calls
+  more giants (two from then on). Three hits and he flops over; his hat rolls away.
+
+### What to watch
+
+- Does your child think of the chicken ray at the first giant, or try to jump him?
+- Do they understand that a chicken is harmless now, or still run from them?
+- The fight: do they ray the giant first? Do they find jumping on the chicken? Too quick, too
+  long (about 14 seconds of fighting on Super Easy when it goes well)?
+- Anywhere stuck for more than a minute, or more than three or four deaths in a section.
+
+## Winter, the whole theme (2026-11-23)
+
+Winter is now three levels and a boss, right after Palermo: **Talvine imedemaa** (Winter
+Wonderland, rebuilt), **Jäätunud järv** (the Frozen Lake) and **Jääloss** (the Ice Palace),
+where **the Yeti** waits. `?level=13`, `?level=14`, `?level=15` open each one.
+
+- **Ice is new.** The pale blue floor is slippery: you speed up slowly, and when you let go you
+  slide three or four tiles. Jumping off ice is a normal jump.
+- **Icy water** under the frozen lake is like a pit: fall in and you lose a life (the cape
+  throws you out once).
+- **Zombie penguins** are Winter's zombies: grey-green penguins with red eyes. Same rule:
+  they push, never hurt, an arrow puts them down.
+- **All four tools come back**, one or two at a time: the bow for zombie penguins, the fart
+  jump for ice cliffs, the big head for cracked ice, the chicken ray for the palace giant.
+- **The Yeti** runs off with the sibling at the end of the first two levels.
+- **The Yeti fight.** The throne room's door shuts behind you. He roars and paws the floor,
+  then charges and can't stop until he slams into a wall: jump over him (running at him is
+  easiest). The slam shakes icicles loose from the ceiling: each one shakes over its shadow
+  before it falls. Then he sits dizzy with stars round his head: jump on his head. After
+  each hit two zombie penguins come in (there is a bow in the room) and he charges faster.
+  Three hits and he flops over.
+
+### What to watch
+
+- Does the ice feel fun or frustrating? Does your child slide into the water on the lake?
+- Do they remember the old tools (fart at the ice cliff, big head at the cracked ice)?
+- The Yeti: do they find jumping over the charge, and running to jump on him while he's dizzy?
+  About 20 to 40 seconds of fighting when it goes well.
+- Anywhere stuck for more than a minute, or more than three or four deaths in a section.
+
+## Toy Castle, the end of the game (2026-11-23)
+
+Toy Castle is now three levels and the T-Rex's new final fight: **Mängulossi** (Toy Castle,
+rebuilt), **Lossisaalid** (the Castle Halls) and **Troonisaal** (the Throne Room).
+`?level=16`, `?level=17`, `?level=18` open each one. Beating the T-Rex wins the game.
+
+- **Every tool comes back.** The bow, the fart jump, the big head and the chicken ray, each
+  with its station just before what needs it.
+- **Zombie toy soldiers** are Toy Castle's zombies: tin soldiers gone green.
+- **Mängulossi**: the bow and the first toy soldiers; a moat too wide to jump with its
+  drawbridge up (shoot the target and the planks come down); the castle gate with its own
+  target. The T-Rex runs off with the sibling.
+- **Lossisaalid**: a spring up onto the gallery and toy soldiers up there; a cracked wall (big
+  head); a wall only a fart jump gets over; a giant in a corridor (chicken ray).
+- **Troonisaal**: a gate that needs both its targets; toy soldiers in front of a giant; a
+  cracked tower door and a fart wall. Then the throne room.
+- **The T-Rex.** He walks up and down; now and then he stops in the middle, roars and breathes
+  a fireball (jump it or shoot it). His touch never hurts. A bubble over his head shows the
+  tool for the next hit, and its station glows:
+  1. **Bow**: shoot the target by the door when he's under the big toy block; it drops on his
+     head.
+  2. **Fart**: jump on his head with the fart on.
+  3. **Big head**: touch him with a big head and his crown smashes.
+  4. **Chicken ray**: he calls two little dinos; ray them into chickens, then ray him. He
+     shrinks into a tiny toy, the cage opens, and the game is won.
+
+### What to watch
+
+- Does your child read the bubble over the T-Rex, and go for the right station?
+- The block: do they wait for him to be under it?
+- About 20 to 40 seconds of fighting when it goes well. Too long, too short?
+- The ending: is shrinking him into a tiny toy a good enough finale?
+
+## The whole run, and some older levels touched (2026-11-23)
+
+All 18 levels played in one run, Super Easy and Hard, through every cutscene to the Win
+screen. A new check jumps off every step and block in every level, on every difficulty; it
+found jumps that came down in a pit a few tiles on, so a few levels you have already seen
+changed a little:
+
+- **Nukuaed, Kanjon, Tallinna vanalinn, Palermo väljak**: the first pit now comes before the
+  first big step, not just after it (jumping off the step landed in it on some difficulties);
+  their first `?` blocks moved past the pit. Nukuaed's high platform over the stepping-stone pit
+  is gone, its `?` lower down.
+- **Aiavärav, Vulkaan**: a `?` block you could stand on and jump from into a pit or lava is gone.
+- **Vulkaan**: the one-tile hole between the cage's step and the wall is filled.
+- **Jäätunud järv**: the ice floes sit level with the shore; before, the water was a tile higher
+  than the shore, and walking right up to the edge was a fall.
+- **The giants' roofs** (Palermo, Winter, Toy Castle) have arched corners now, so they read as
+  archways and halls rather than floating blocks.

@@ -10,7 +10,7 @@ import {
   LIFT_FRAMES, MIN_STATION_ARROWS, PLANK_INTERVAL, SPRING_FORCE, STATION_COOLDOWN, VENT_REACH,
   VENT_WARN_FRAMES, ventWarning,
 } from '../src/game/course';
-import { spawnEnemy } from '../src/game/enemy';
+import { chickenify, spawnEnemy } from '../src/game/enemy';
 import { setRandom } from '../src/game/random';
 import { createWorld } from '../src/game/world';
 import type { World } from '../src/game/types';
@@ -391,6 +391,56 @@ describe('the giant', () => {
     expect(e.h).toBeLessThan(TILE);
   });
 
+  it('becomes a chicken at his feet, not up at his head', () => {
+    const world = quietCourse();
+    const e = giant(world);
+    const feet = e.y + e.h;
+    const middle = e.x + e.w / 2;
+    world.arrows.push({ x: e.x - 6, y: e.y + 20, vx: 6, life: 60, isChicken: true });
+    step(world);
+    expect(feet - (e.y + e.h)).toBeLessThan(4);
+    expect(Math.abs(e.x + e.w / 2 - middle)).toBeLessThan(4);
+  });
+
+  it('bounces a stomp off, and never hurts (Palermo, 2026-11-23: landing on him used to)', () => {
+    // Out in the open, where the demo's corridor roof is not in the way of the landing.
+    const open = courseLevel({
+      name: 'open giant',
+      theme: 3,
+      sections: [['P'.padEnd(39, '.') + 'R', ...Array.from({ length: 5 }, () => '.'.repeat(40)), '.'.repeat(14) + 'g'.padEnd(26, '.'), '#'.repeat(40), '#'.repeat(40)]],
+    });
+    const world = quietWorld(open);
+    const e = spawnEnemy(world.map, world.dc, open.enemyDefs[0])!;
+    world.enemies.push(e);
+    const p = world.player;
+    p.hasCape = false;
+    p.invincible = 0;
+    p.x = e.x + e.w / 2 - p.w / 2;
+    p.y = e.y - p.h + 3;
+    p.vy = 4;
+    p.onGround = false;
+    step(world);
+    expect(world.dead).toBe(false);
+    expect(p.vy).toBeLessThan(0);
+    expect(e.type).toBe('giant');
+  });
+
+  it('pushes a hero walking into him back out, unhurt, from either side', () => {
+    for (const fromLeft of [true, false]) {
+      const world = quietCourse();
+      const e = giant(world);
+      const p = world.player;
+      p.hasCape = false;
+      p.invincible = 0;
+      p.x = fromLeft ? e.x - p.w + 3 : e.x + e.w - 3;
+      p.y = e.y + e.h - p.h;
+      p.onGround = true;
+      step(world, fromLeft ? { right: true } : { left: true });
+      expect({ fromLeft, dead: world.dead, out: p.x + p.w <= e.x || p.x >= e.x + e.w })
+        .toEqual({ fromLeft, dead: false, out: true });
+    }
+  });
+
   it('cannot be jumped over in its corridor', () => {
     const def = COURSE_LEVEL.enemyDefs.find((d) => d.type === 'giant')!;
     const map = COURSE_LEVEL.generate(DIFFICULTY_CONFIG.normal);
@@ -400,6 +450,144 @@ describe('the giant', () => {
     const headroom = (def.floorRow! - ceiling - 1) * TILE;
     expect(headroom).toBeGreaterThanOrEqual(e.h);
     expect(headroom).toBeLessThan(e.h + 20); // Dodo, the shorter hero, is 20 tall
+  });
+});
+
+describe('ice and icy water (Winter, 2026-11-23)', () => {
+  /** A floor of snow (`#`) or of ice (`I`), 60 wide, the hero at its start. */
+  function floor(top: string): World {
+    const level = courseLevel({
+      name: 'rink',
+      theme: 4,
+      sections: [['P'.padEnd(59, '.') + 'R', '.'.repeat(60), '.'.repeat(60), top.repeat(60), '#'.repeat(60)]],
+    });
+    const world = quietWorld(level);
+    standAt(world, 2, 3);
+    return world;
+  }
+
+  /** Frames to full speed from standing, and how far the hero slides once they let go. */
+  function grip(top: string): { frames: number; slide: number } {
+    const world = floor(top);
+    const p = world.player;
+    let frames = 0;
+    while (p.vx < world.dc.playerSpeed && frames < 200) {
+      step(world, { right: true });
+      frames++;
+    }
+    step(world, { right: true }, 10);
+    const x0 = p.x;
+    step(world, {}, 200);
+    return { frames, slide: p.x - x0 };
+  }
+
+  it('makes a floor of ice slow to speed up on, and slide for tiles when the hero lets go', () => {
+    const snow = grip('#');
+    const ice = grip('I');
+    expect(ice.frames).toBeGreaterThan(snow.frames * 2);
+    expect(ice.slide).toBeGreaterThan(snow.slide + 2 * TILE);
+    expect(ice.slide).toBeLessThan(8 * TILE);
+  });
+
+  it('jumps off ice as high as off snow', () => {
+    const top = (t: string) => {
+      const world = floor(t);
+      let y = world.player.y;
+      step(world, { jump: true, jumpPressed: true });
+      for (let i = 0; i < 60; i++) {
+        step(world, { jump: true });
+        y = Math.min(y, world.player.y);
+      }
+      return y;
+    };
+    expect(top('I')).toBe(top('#'));
+  });
+
+  it('is a fall into icy water: the cape throws the hero out once, without it a life is gone', () => {
+    const lake = courseLevel({
+      name: 'lake',
+      theme: 4,
+      sections: [['P'.padEnd(29, '.') + 'R', '.'.repeat(30), '.'.repeat(30), '#'.repeat(10) + '_'.repeat(10) + '#'.repeat(10), '#'.repeat(10) + '_'.repeat(10) + '#'.repeat(10)]],
+    });
+    for (const cape of [true, false]) {
+      const world = quietWorld(lake);
+      standAt(world, 14, 2);
+      world.player.hasCape = cape;
+      world.player.invincible = 0;
+      let deepest = 0;
+      for (let i = 0; i < 30; i++) {
+        step(world);
+        deepest = Math.max(deepest, world.player.y + world.player.h);
+      }
+      expect({ cape, dead: world.dead, capeLeft: world.player.hasCape }).toEqual({ cape, dead: !cape, capeLeft: false });
+      // Caught at the surface, not fallen out through the bottom of the level as from a pit.
+      expect(deepest).toBeLessThan(5 * TILE);
+      expect(world.course!.fx.some((f) => f.kind === 'splash')).toBe(true);
+    }
+  });
+});
+
+describe('chickens', () => {
+  /** A zombie from the course, rayed into a chicken, with the hero at its side. */
+  function rayedZombie(world: World) {
+    const def = COURSE_LEVEL.enemyDefs.find((d) => d.zombie)!;
+    const e = spawnEnemy(world.map, world.dc, def)!;
+    world.enemies.push(e);
+    world.arrows.push({ x: e.x - 6, y: e.y + 8, vx: 6, life: 60, isChicken: true });
+    step(world);
+    // Smaller than the zombie was, it drops to the floor first.
+    step(world, {}, 10);
+    return e;
+  }
+
+  it('never hurt on a hand-built level: a zombie rayed into a chicken is harmless', () => {
+    // Palermo (2026-11-23): a chicken hurt like any enemy, so a ray made a harmless zombie
+    // dangerous.
+    const world = quietCourse();
+    const e = rayedZombie(world);
+    expect(e.type).toBe('chicken');
+    const p = world.player;
+    p.hasCape = false;
+    p.invincible = 0;
+    for (const dx of [-p.w + 4, e.w - 4]) {
+      p.x = e.x + dx;
+      p.y = e.y + e.h - p.h;
+      p.vy = 0;
+      p.onGround = true;
+      step(world, {}, 20);
+      expect({ dx, dead: world.dead }).toEqual({ dx, dead: false });
+    }
+  });
+
+  it('still pop under a stomp, for points', () => {
+    const world = quietCourse();
+    const e = rayedZombie(world);
+    const p = world.player;
+    const score = world.score;
+    p.x = e.x + e.w / 2 - p.w / 2;
+    p.y = e.y - p.h + 3;
+    p.vy = 4;
+    p.onGround = false;
+    step(world);
+    expect(e.alive).toBe(false);
+    expect(world.score).toBeGreaterThan(score);
+  });
+
+  it('still hurt on the six original levels', () => {
+    const world = createWorld(0, 'super_easy');
+    for (const d of world.pending) d.spawned = true;
+    const e = spawnEnemy(world.map, world.dc, { type: 'doll', x: 8 })!;
+    world.enemies.push(e);
+    chickenify(e);
+    step(world, {}, 10);
+    const p = world.player;
+    p.hasCape = false;
+    p.invincible = 0;
+    p.x = e.x + e.w / 2 - p.w / 2;
+    p.y = e.y + e.h - p.h;
+    p.vy = 0;
+    step(world);
+    expect(world.dead).toBe(true);
   });
 });
 
@@ -492,6 +680,75 @@ describe('zombies', () => {
     expect(world.dead).toBe(false);
     expect(leftmost).toBeGreaterThanOrEqual(6 * TILE);
     expect(p.y + p.h).toBe(4 * TILE);
+  });
+
+  it('come as toy soldiers too (Toy Castle\'s L): pushing, shuffling after the hero, down to an arrow', () => {
+    const soldiers = courseLevel({
+      name: 'soldiers',
+      theme: 5,
+      sections: [['P'.padEnd(39, '.') + 'R', '.'.repeat(40), '.'.repeat(14) + 'L'.padEnd(26, '.'), '#'.repeat(40), '#'.repeat(40)]],
+    });
+    expect(soldiers.enemyDefs).toEqual([{ type: 'soldier', x: 14, floorRow: 3, zombie: true }]);
+    const world = createWorld(0, 'super_easy', 'gigi', undefined, soldiers);
+    standAt(world, 9, 3);
+    world.player.invincible = 9999;
+    step(world, {}, 30);
+    const e = world.enemies.find((z) => z.type === 'soldier')!;
+    expect(e.zombie).toBe(true);
+    expect(e.x).toBeLessThan(14 * TILE);
+    world.player.x = e.x - world.player.w + 2;
+    step(world);
+    expect(world.dead).toBe(false);
+    expect(world.player.x + world.player.w).toBeLessThanOrEqual(e.x);
+    world.arrows.push({ x: e.x - 6, y: e.y + 6, vx: 6, life: 60, isChicken: false });
+    step(world);
+    expect(e.alive).toBe(false);
+  });
+
+  it('come as penguins too (Winter\'s W): pushing, shuffling after the hero, down to an arrow', () => {
+    const waddlers = courseLevel({
+      name: 'waddlers',
+      theme: 4,
+      sections: [['P'.padEnd(39, '.') + 'R', '.'.repeat(40), '.'.repeat(14) + 'W'.padEnd(26, '.'), '#'.repeat(40), '#'.repeat(40)]],
+    });
+    expect(waddlers.enemyDefs).toEqual([{ type: 'penguin', x: 14, floorRow: 3, zombie: true }]);
+    const world = createWorld(0, 'super_easy', 'gigi', undefined, waddlers);
+    standAt(world, 9, 3);
+    world.player.invincible = 9999;
+    step(world, {}, 30);
+    const e = world.enemies.find((z) => z.type === 'penguin')!;
+    expect(e.zombie).toBe(true);
+    expect(e.x).toBeLessThan(14 * TILE);
+    world.player.x = e.x - world.player.w + 2;
+    step(world);
+    expect(world.dead).toBe(false);
+    expect(world.player.x + world.player.w).toBeLessThanOrEqual(e.x);
+    world.arrows.push({ x: e.x - 6, y: e.y + 6, vx: 6, life: 60, isChicken: false });
+    step(world);
+    expect(e.alive).toBe(false);
+  });
+
+  it('come as cooks too (Palermo\'s Z): pushing, and a ray makes a harmless chicken of one', () => {
+    const cooks = courseLevel({
+      name: 'cooks',
+      theme: 3,
+      sections: [['P'.padEnd(39, '.') + 'R', '.'.repeat(40), '.'.repeat(14) + 'Z'.padEnd(26, '.'), '#'.repeat(40), '#'.repeat(40)]],
+    });
+    expect(cooks.enemyDefs).toEqual([{ type: 'cook', x: 14, floorRow: 3, zombie: true }]);
+    const world = createWorld(0, 'super_easy', 'gigi', undefined, cooks);
+    standAt(world, 9, 3);
+    world.player.invincible = 9999;
+    step(world, {}, 30);
+    const e = world.enemies.find((z) => z.type === 'cook')!;
+    expect(e.zombie).toBe(true);
+    world.player.x = e.x - world.player.w + 2;
+    step(world);
+    expect(world.dead).toBe(false);
+    expect(world.player.x + world.player.w).toBeLessThanOrEqual(e.x);
+    world.arrows.push({ x: e.x - 6, y: e.y + 8, vx: 6, life: 60, isChicken: true });
+    step(world);
+    expect(e.type).toBe('chicken');
+    expect(e.zombie).toBe(false);
   });
 
   it('come as knights too (Tallinn\'s K): pushing, shuffling after the hero, down to an arrow', () => {
