@@ -3,7 +3,7 @@ import { arrowY, standAt, step } from './helpers/courseRuns';
 import { TILE } from '../src/config/constants';
 import { DIFF_KEYS, type DifficultyKey } from '../src/config/difficulty';
 import {
-  isSolid, TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_ICE, TILE_LAVA, TILE_WATER, type Level, type StationKind,
+  isSolid, TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_GROUND, TILE_ICE, TILE_LAVA, TILE_WATER, type Level, type StationKind,
 } from '../src/data/levels';
 import { JAALOSS } from '../src/data/levels2/jaaloss';
 import { JARV } from '../src/data/levels2/jarv';
@@ -193,7 +193,7 @@ describe('Talvine imedemaa', () => {
 
 describe('Jäätunud järv', () => {
   const level = JARV;
-  const floes = () => runs(mapOf(level), 22, TILE_ICE).filter(([x]) => mapOf(level)[23][x] === TILE_WATER);
+  const floes = () => runs(mapOf(level), 23, TILE_ICE).filter(([x]) => mapOf(level)[24][x] === TILE_WATER);
 
   it('floats its floes on icy water, each long enough to land on from a full jump and slide to a stop', () => {
     // Found by this test (2026-11-23): on six-tile floes, super easy's long jump came down near
@@ -205,7 +205,7 @@ describe('Jäätunud järv', () => {
         // everything the moment you land.
         const world = guardedWorld(level, key);
         const before = floes().filter(([, e]) => e < a).pop()!;
-        standAt(world, before[0] + 1, 22);
+        standAt(world, before[0] + 1, 23);
         let jumped = false;
         let landed = false;
         for (let i = 0; i < 300 && !world.dead; i++) {
@@ -222,10 +222,26 @@ describe('Jäätunud järv', () => {
     }
   });
 
+  it('lets a hero walk right up to the water\'s edge on the shore without touching it', () => {
+    // Found by a scan of every ledge (2026-11-23): with the water a tile above the shore, walking
+    // to the edge touched it, and was a fall.
+    const map = mapOf(level);
+    const shore = map[23].findIndex((c, x) => c === TILE_GROUND && map[23][x + 1] === TILE_WATER);
+    const world = guardedWorld(level);
+    standAt(world, shore - 2, 23);
+    world.player.hasCape = false;
+    world.player.invincible = 0;
+    for (let i = 0; i < 60; i++) {
+      const p = world.player;
+      step(world, { right: p.x + p.w < (shore + 1) * TILE - 1 });
+    }
+    expect(world.dead).toBe(false);
+  });
+
   it('drops a hero who falls between the floes into the water', () => {
     const world = guardedWorld(level);
     const [first] = floes();
-    standAt(world, first[1] + 2, 22);
+    standAt(world, first[1] + 2, 23);
     world.player.hasCape = false;
     world.player.invincible = 0;
     step(world, {}, 40);
