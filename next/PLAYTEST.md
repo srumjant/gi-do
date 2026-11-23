@@ -383,6 +383,10 @@ changed a little:
   is gone, its `?` lower down.
 - **Aiavärav, Vulkaan**: a `?` block you could stand on and jump from into a pit or lava is gone.
 - **Vulkaan**: the one-tile hole between the cage's step and the wall is filled.
+- **Nukumaja**: the stairs up to the high target now go down the far side too. Stepping off the
+  top before shooting the target left you stuck on the floor below it, between a sheer wall and
+  the shut gate (found by you, 2026-11-23). A new check looks for any such dead end in every
+  level, on every difficulty, and this was the only one.
 - **Jäätunud järv**: the ice floes sit level with the shore; before, the water was a tile higher
   than the shore, and walking right up to the edge was a fall.
 - **The giants' roofs** (Palermo, Winter, Toy Castle) have arched corners now, so they read as

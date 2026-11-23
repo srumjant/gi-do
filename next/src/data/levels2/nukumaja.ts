@@ -68,7 +68,9 @@ export const NUKUMAJA = courseLevel({
       '##################################',
       '##################################',
     ],
-    // a target only lined up from the top of the stairs
+    // a target only lined up from the top of the stairs, which go down the far side too: step off
+    // the top before shooting it, and you can climb back (owner, 2026-11-23: a sheer drop left you
+    // stuck between it and the gate)
     [
       '..................................',
       '..................................',
@@ -87,12 +89,12 @@ export const NUKUMAJA = courseLevel({
       '..........BBBBBBB.............BB..',
       '..........BBBBBBB.............BB..',
       '..........BBBBBBB.............BB..',
-      '........BBBBBBBBB.............||..',
-      '........BBBBBBBBB.............||..',
-      '........BBBBBBBBB.............||..',
-      '......BBBBBBBBBBB.............||..',
-      '......BBBBBBBBBBB.............||..',
-      '..b...BBBBBBBBBBB.............||..',
+      '........BBBBBBBBBBB...........||..',
+      '........BBBBBBBBBBB...........||..',
+      '........BBBBBBBBBBB...........||..',
+      '......BBBBBBBBBBBBBBB.........||..',
+      '......BBBBBBBBBBBBBBB.........||..',
+      '..b...BBBBBBBBBBBBBBB.........||..',
       '##################################',
       '##################################',
     ],
