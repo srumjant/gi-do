@@ -20,6 +20,8 @@ import {
   getSkinIndex,
 } from '../game/run';
 import { createWorld, rescueSpot, stepWorld, type RescueSpot } from '../game/world';
+import { createHeroAnim, heroStateOf, stepHeroAnim, type HeroAnim, type HeroLook } from '../game/heroAnim';
+import { ARM_ROW } from '../game/heroFrames';
 import { CourseView } from '../gfx/course';
 import { DollQueenView } from '../gfx/dollQueen';
 import { PterodactylView } from '../gfx/pterodactyl';
@@ -167,6 +169,8 @@ const DEPTH_ARROW = 20;
 const DEPTH_ARROW_TRAIL = 21;
 const DEPTH_CAPE = 22;
 const DEPTH_PLAYER = 23;
+/** The bow in the hero's hand is drawn smaller than the one lying in the level. */
+const HELD_BOW_SCALE = 0.75;
 
 /** The four pickup glows (index.html:1699, 1704, 1709-1710, 1717), as colour + alpha. */
 const STAR_GLOW = { color: 0xffdd00, alpha: 0.2 };
@@ -295,6 +299,11 @@ export class SliceScene extends Phaser.Scene {
   private headImage!: Phaser.GameObjects.Image;
   private bodyImage!: Phaser.GameObjects.Image;
   private capeImage!: Phaser.GameObjects.Image;
+  /** The bow in the hero's hand for a moment after each shot (game/heroAnim.ts). */
+  private heldBowImage!: Phaser.GameObjects.Image;
+  /** The hero's animation, stepped with the world, and how they look this step. */
+  private heroAnim: HeroAnim = createHeroAnim();
+  private heroLook: HeroLook = stepHeroAnim(createHeroAnim(), { frame: 0, facing: 1, hasCape: false, arrowCooldown: 0, dead: false });
   private readonly enemyImages: Phaser.GameObjects.Image[] = [];
   private readonly starImages: Phaser.GameObjects.Image[] = [];
   private readonly bowImages: Phaser.GameObjects.Image[] = [];
@@ -388,6 +397,7 @@ export class SliceScene extends Phaser.Scene {
 
   create(): void {
     this.resetForNewLevel();
+    this.heroAnim = createHeroAnim();
     // Which level, and what the run brings into it. `getCurrentLevel` was a hard-coded 0
     // here until the run loop landed; it now moves because `finishLevel` (game/run.ts)
     // moved it, and `getRunTotals` is the lives and score the last level ended with — a
@@ -498,8 +508,11 @@ export class SliceScene extends Phaser.Scene {
         player.y - PLAYER_DRAW_INSET,
         resolvePlayerTextureKey(player.frame),
       )
-      .setOrigin(0, 0)
+      // By the middle of the feet, so a wince tilts about where the hero stands (syncPlayer).
+      .setOrigin(0.5, 1)
       .setDepth(DEPTH_PLAYER);
+    this.heldBowImage = this.hiddenImage(BOW_TEXTURE, DEPTH_PLAYER).setOrigin(0.5, 0.5);
+    this.heldBowImage.setScale(this.heldBowImage.scaleX * HELD_BOW_SCALE);
     this.bodyImage = this.hiddenImage(playerBodyTextureKey(...currentSkin(), 'stand'), DEPTH_PLAYER);
     this.headImage = this.hiddenImage(playerHeadTextureKey(...currentSkin(), 'stand'), DEPTH_PLAYER);
 
@@ -797,6 +810,8 @@ export class SliceScene extends Phaser.Scene {
     this.accumulator = Math.min(this.accumulator + delta, STEP_MS * MAX_STEPS_PER_FRAME);
     while (this.accumulator >= STEP_MS) {
       stepWorld(this.world, this.readInput(), this.movePlayer, this.enemyBodies.move);
+      // The hero's animation steps with the world, so a slow screen plays it at the game's speed.
+      this.heroLook = stepHeroAnim(this.heroAnim, heroStateOf(this.world));
       // Everything that step made a noise about, played now, before the next one clears
       // the list. INSIDE the loop for the same reason as the three calls below it: a slow
       // rendered frame takes several steps, and draining only after them all would play
@@ -1465,31 +1480,48 @@ export class SliceScene extends Phaser.Scene {
       this.capeImage.setPosition(x, player.y + 6 + wobble).setFlipX(flip);
     }
 
-    this.playerImage.setTexture(resolvePlayerTextureKey(player.frame));
-    this.playerImage.setPosition(player.x - PLAYER_DRAW_INSET, player.y - PLAYER_DRAW_INSET);
-    // Sprites face right by default; flip to face left (index.html:1848: `p.facing<0`).
-    this.playerImage.setFlipX(flip);
-    this.playerImage.setVisible(drawn && !bigHead);
+    // How the hero looks this step (game/heroAnim.ts): the pose, or a blink, a shot, a wince;
+    // nudged by dx/dy, tilted, or turned over as a life is lost.
+    const look = this.heroLook;
+    const [character, skinIndex] = currentSkin();
+    const sprite = resolvePlayerSprite(player.frame);
+    const columns = sprite[0].length;
+    const left = player.x - PLAYER_DRAW_INSET + look.dx;
+    const top = player.y - PLAYER_DRAW_INSET + look.dy;
+
+    this.playerImage.setTexture(playerTextureKey(character, skinIndex, look.frame));
+    this.playerImage
+      .setPosition(left + this.playerImage.displayWidth / 2, top + this.playerImage.displayHeight)
+      // Sprites face right by default; flip to face left (index.html:1848: `p.facing<0`).
+      .setFlipX(flip)
+      .setFlipY(look.flipY)
+      .setRotation(look.angle)
+      .setVisible(drawn && !bigHead);
+
+    // The bow held out in front, at the arm's height, its curve away from the hero.
+    this.heldBowImage.setVisible(drawn && look.bow);
+    if (drawn && look.bow) {
+      const handX = flip ? left - 1 : left + columns * PLAYER_SCALE + 1;
+      // The big head's body stays at its own size, so the arm is at the same height either way.
+      const handY = top + ARM_ROW * PLAYER_SCALE + 1;
+      this.heldBowImage.setPosition(handX, handY).setFlipX(!flip);
+    }
 
     this.bodyImage.setVisible(drawn && bigHead);
     this.headImage.setVisible(drawn && bigHead);
     if (!bigHead) return;
 
-    const [character, skinIndex] = currentSkin();
-    const pose = PLAYER_POSES[player.frame];
-    const sprite = resolvePlayerSprite(player.frame);
+    // The big head takes the same frame and the same nudge, but neither tilts nor turns over.
     const headRows = bigHeadRows(sprite);
-    const columns = sprite[0].length;
-
-    const bodyX = player.x - PLAYER_DRAW_INSET;
-    const bodyY = player.y - PLAYER_DRAW_INSET + headRows * PLAYER_SCALE;
+    const bodyX = left;
+    const bodyY = top + headRows * PLAYER_SCALE;
     this.bodyImage
-      .setTexture(playerBodyTextureKey(character, skinIndex, pose))
+      .setTexture(playerBodyTextureKey(character, skinIndex, look.frame))
       .setPosition(bodyX, bodyY)
       .setFlipX(flip);
 
     this.headImage
-      .setTexture(playerHeadTextureKey(character, skinIndex, pose))
+      .setTexture(playerHeadTextureKey(character, skinIndex, look.frame))
       .setPosition(
         bodyX + (columns * PLAYER_SCALE - columns * BIG_HEAD_SCALE) / 2,
         bodyY - headRows * BIG_HEAD_SCALE,

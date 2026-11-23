@@ -17,6 +17,8 @@ export type Palette = Record<number, string>;
 
 export interface Skin {
   name: string;
+  /** The port's own skins: an i18n key for the name on the character screen. */
+  nameKey?: string;
   palette: Palette;
   stand: SpriteData;
   run: SpriteData;
@@ -35,9 +37,17 @@ export const GIGI_TRUCK_STAND=[[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,
 export const GIGI_TRUCK_RUN=[[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,4,4,4,4,5,0],[0,0,5,4,3,4,3,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,0,8,4,7,4,8,0,0],[0,0,0,0,4,4,4,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,9,9,9,1,0,0],[0,0,0,2,2,2,2,2,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
 export const GIGI_TRUCK_JUMP=[[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,5,5,5,5,5,5,0],[0,0,5,4,4,4,4,4,5,0],[0,0,5,4,3,4,3,4,5,0],[0,0,4,4,4,4,4,4,4,0],[0,0,0,8,4,7,4,8,0,0],[0,0,0,0,4,4,4,0,0,0],[0,1,0,1,1,1,1,1,0,1],[0,0,0,1,1,1,1,1,0,0],[0,0,0,1,9,9,9,1,0,0],[0,0,0,2,2,2,2,2,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
 export const GIGI_TRUCK_P={1:'#2266cc',2:'#223355',3:'#4f7942',4:'#ffcc99',5:'#9b7653',6:'#554433',7:'#b5504a',8:'#ffaa88',9:'#44aaff'};
+// The port's own skins (2026-11-23), not in the live game: tests/sprites.test.ts checks the
+// live game's skins are the first ones, unchanged.
+// Gigi as a ninja: navy hood and suit, an eye slit, a red headband whose tail flaps behind.
+export const GIGI_NINJA_STAND=[[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,7,7,7,7,7,7,7,7,0],[0,0,5,4,4,4,4,4,5,0],[0,0,5,4,3,4,3,4,5,0],[0,0,5,5,5,5,5,5,5,0],[0,0,0,5,5,5,5,5,0,0],[0,0,0,0,5,5,5,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,7,7,7,1,0,0],[0,0,0,2,2,2,2,2,0,0],[0,0,0,2,2,0,2,2,0,0],[0,0,0,6,6,0,6,6,0,0]];
+export const GIGI_NINJA_RUN=[[0,0,0,5,5,5,5,5,0,0],[0,0,5,5,5,5,5,5,5,0],[0,7,7,7,7,7,7,7,7,0],[7,0,5,4,4,4,4,4,5,0],[0,0,5,4,3,4,3,4,5,0],[0,0,5,5,5,5,5,5,5,0],[0,0,0,5,5,5,5,5,0,0],[0,0,0,0,5,5,5,0,0,0],[0,0,0,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,1,1,0],[0,0,0,1,7,7,7,1,0,0],[0,0,0,2,2,2,2,2,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
+export const GIGI_NINJA_JUMP=[[0,0,0,5,5,5,5,5,0,0],[0,7,5,5,5,5,5,5,5,0],[0,7,7,7,7,7,7,7,7,0],[0,0,5,4,4,4,4,4,5,0],[0,0,5,4,3,4,3,4,5,0],[0,0,5,5,5,5,5,5,5,0],[0,0,0,5,5,5,5,5,0,0],[0,0,0,0,5,5,5,0,0,0],[0,1,0,1,1,1,1,1,0,1],[0,0,0,1,1,1,1,1,0,0],[0,0,0,1,7,7,7,1,0,0],[0,0,0,2,2,2,2,2,0,0],[0,0,2,2,0,0,2,2,0,0],[0,6,6,0,0,0,0,6,6,0]];
+export const GIGI_NINJA_P={1:'#2a3550',2:'#1c2338',3:'#4f7942',4:'#ffcc99',5:'#232c45',6:'#111111',7:'#d03030'};
 export const GIGI_SKINS: Skin[] = [
   {name:'Classic',palette:GIGI_P,stand:GIGI_STAND,run:GIGI_RUN,jump:GIGI_JUMP},
-  {name:'Monster Truck',palette:GIGI_TRUCK_P,stand:GIGI_TRUCK_STAND,run:GIGI_TRUCK_RUN,jump:GIGI_TRUCK_JUMP}
+  {name:'Monster Truck',palette:GIGI_TRUCK_P,stand:GIGI_TRUCK_STAND,run:GIGI_TRUCK_RUN,jump:GIGI_TRUCK_JUMP},
+  {name:'Ninja',nameKey:'skin_ninja',palette:GIGI_NINJA_P,stand:GIGI_NINJA_STAND,run:GIGI_NINJA_RUN,jump:GIGI_NINJA_JUMP},
 ];
 export const DODO_STAND=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,5,5,5,5,5,5,0],[0,9,5,5,5,5,5,5,9,0],[0,0,5,4,4,4,4,5,0,0],[0,0,4,3,4,4,3,4,0,0],[0,0,4,8,4,4,8,4,0,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,0,4,4,0,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,0,6,0,0,6,0,0,0]];
 export const DODO_RUN=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,5,5,5,5,5,5,0],[0,9,5,5,5,5,5,5,9,0],[0,0,5,4,4,4,4,5,0,0],[0,0,4,3,4,4,3,4,0,0],[0,0,4,8,4,4,8,4,0,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,0,4,4,0,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,0,6,0,0,0,0,6,0,0],[0,0,0,0,0,0,0,0,0,0]];
@@ -51,9 +61,16 @@ export const DODO_ELSA_JUMP=[[0,5,5,0,0,0,0,5,5,0],[0,5,5,5,5,5,5,5,5,0],[0,9,5,
 // as one undifferentiated blob. Separating them by temperature as well as
 // value is what makes them read as hair.
 export const DODO_ELSA_P={1:'#5fb4dc',2:'#bfe4f5',3:'#3f6d96',4:'#ffd2b0',5:'#dbeaf7',6:'#2e6f99',7:'#b5504a',8:'#ffb096',9:'#5fb4dc'};
+// Dodo as Cinderella, the fairy-tale princess: golden hair in a bun, a pale-blue headband,
+// puffed sleeves, a pale-blue ball gown and glass slippers. A port-only skin, as the Ninja.
+export const DODO_CINDERELLA_STAND=[[0,0,0,0,5,5,0,0,0,0],[0,0,9,9,9,9,9,9,0,0],[0,5,5,5,5,5,5,5,5,0],[0,5,5,4,4,4,4,5,5,0],[0,5,4,3,4,4,3,4,5,0],[0,0,4,8,4,4,8,4,0,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,0,4,4,0,0,0,0],[0,0,2,1,1,1,1,2,0,0],[0,0,1,1,1,1,1,1,0,0],[0,1,2,2,2,2,2,2,1,0],[0,0,6,6,0,0,6,6,0,0]];
+export const DODO_CINDERELLA_RUN=[[0,0,0,0,5,5,0,0,0,0],[0,0,9,9,9,9,9,9,0,0],[0,5,5,5,5,5,5,5,5,0],[0,5,5,4,4,4,4,5,5,0],[0,5,4,3,4,4,3,4,5,0],[0,0,4,8,4,4,8,4,0,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,0,4,4,0,0,0,0],[0,0,2,1,1,1,1,2,0,0],[0,0,1,1,1,1,1,1,0,0],[0,1,2,2,2,2,2,2,1,0],[0,6,6,0,0,0,0,6,6,0]];
+export const DODO_CINDERELLA_JUMP=[[0,0,0,0,5,5,0,0,0,0],[0,0,9,9,9,9,9,9,0,0],[0,5,5,5,5,5,5,5,5,0],[0,5,5,4,4,4,4,5,5,0],[0,5,4,3,4,4,3,4,5,0],[0,0,4,8,4,4,8,4,0,0],[0,0,0,4,7,7,4,0,0,0],[0,0,0,0,4,4,0,0,0,0],[0,2,0,1,1,1,1,0,2,0],[0,0,1,1,1,1,1,1,0,0],[0,0,2,2,2,2,2,2,0,0],[0,0,6,6,0,0,6,6,0,0]];
+export const DODO_CINDERELLA_P={1:'#3f86d0',2:'#cfeaff',3:'#3f6d96',4:'#ffd2b0',5:'#f2cc55',6:'#bfe6ff',7:'#b5504a',8:'#ffb096',9:'#5fb0e0'};
 export const DODO_SKINS: Skin[] = [
   {name:'Classic',palette:DODO_P,stand:DODO_STAND,run:DODO_RUN,jump:DODO_JUMP},
-  {name:'Elsa',palette:DODO_ELSA_P,stand:DODO_ELSA_STAND,run:DODO_ELSA_RUN,jump:DODO_ELSA_JUMP}
+  {name:'Elsa',palette:DODO_ELSA_P,stand:DODO_ELSA_STAND,run:DODO_ELSA_RUN,jump:DODO_ELSA_JUMP},
+  {name:'Cinderella',nameKey:'skin_cinderella',palette:DODO_CINDERELLA_P,stand:DODO_CINDERELLA_STAND,run:DODO_CINDERELLA_RUN,jump:DODO_CINDERELLA_JUMP},
 ];
 
 // Enemies

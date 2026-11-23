@@ -421,3 +421,21 @@ world's villain is one of his helpers.
 - The map: do they want to look at it, or press on straight away?
 - On the phone: does "VAJUTA OK" make sense, and do they find the button?
 - The power-up banner: do they still notice which power-up they got?
+
+## Two new skins, and the heroes move more (2026-11-23)
+
+- **New skins**, on the character screen with ↑↓: Gigi as a **NINJA** (navy hood, red headband
+  that flaps as he runs) and Dodo as **TUHKATRIINU** (golden hair in a bun, a blue ball gown,
+  glass slippers). Sonic could not be drawn: he is another company's game character.
+- **Standing still**, the hero breathes and blinks after a moment, and so do both heroes on
+  the character screen.
+- **Shooting**: the arm goes out with the bow in the hand, and a little kick back.
+- **The cape lost**: the hero winces, arms up and eyes shut, knocked back and tilted.
+- **A life lost**: the hero winces, hops up, turns upside down and falls off the bottom of the
+  screen, behind "OIH!".
+- Nothing about the game itself changed: the animations only move the picture.
+
+### What to watch
+
+- Does your child pick the new skins, and recognise them in the cutscenes?
+- Does the fall off the screen read as funny, not scary?

@@ -32,10 +32,19 @@ const legacySpritesSource = () => legacySectionSource('//  SPRITES', '//  LEVELS
 /** Redrawn for the port at the owner's request (2026-11-22): it did not read as a dinosaur. */
 const REDRAWN = new Set(['BOSS_IDLE', 'BOSS_WALK', 'BOSS_CHARGE', 'BOSS_ROAR', 'BOSS_P']);
 
+/** The port added skins of its own after the live game's (2026-11-23); those come first, unchanged. */
+const EXTENDED = new Set(['GIGI_SKINS', 'DODO_SKINS']);
+
 describe('sprite data matches the live game', () => {
   for (const name of NAMES.filter((n) => !REDRAWN.has(n))) {
     it(`${name} is identical`, () => {
-      expect((ported as Record<string, unknown>)[name]).toEqual(legacy[name]);
+      const mine = (ported as Record<string, unknown>)[name];
+      if (EXTENDED.has(name)) {
+        const theirs = legacy[name] as unknown[];
+        expect((mine as unknown[]).slice(0, theirs.length)).toEqual(theirs);
+      } else {
+        expect(mine).toEqual(legacy[name]);
+      }
     });
   }
 

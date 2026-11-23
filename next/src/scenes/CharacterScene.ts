@@ -8,6 +8,7 @@ import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont
 import { fitScreenCamera } from '../gfx/render';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
 import { menuPlayerTextureKey, MENU_PORTRAIT_SCALE, registerMenuTextures } from '../gfx/textures';
+import { idleLook } from '../game/heroAnim';
 import { bindMenuKeys, type MenuKeys, justDown, pressedAny } from '../input/menuKeys';
 import type { BetweenData } from './BetweenScene';
 import { BETWEEN_SCENE_KEY, CHARACTER_SCENE_KEY, SLICE_SCENE_KEY } from './keys';
@@ -64,6 +65,8 @@ const BOX_H = 190;
 const BOX_LINE_WIDTH = 3;
 
 const SPRITE_DX = 15;
+/** Dodo blinks this many frames after Gigi. */
+const IDLE_STAGGER = 50;
 /** Both labels are centred on `x + 40`, the middle of a box that starts at `x - 15`. */
 const LABEL_DX = 40;
 const NAME_DY = 175;
@@ -99,6 +102,8 @@ export class CharacterScene extends Phaser.Scene {
   private stars!: StarField;
   private highlight!: Phaser.GameObjects.Graphics;
   private portraits: Phaser.GameObjects.Image[] = [];
+  /** Frames on this screen, for the portraits' breathing and blinking (game/heroAnim.ts). */
+  private idleT = 0;
   private skinLabels: Phaser.GameObjects.Text[] = [];
   private rescueText!: Phaser.GameObjects.Text;
   private keys!: MenuKeys;
@@ -151,8 +156,9 @@ export class CharacterScene extends Phaser.Scene {
     this.drawChoice();
   }
 
-  update(): void {
+  update(_time: number, delta: number): void {
     this.stars.update();
+    this.breathe(delta);
     // The live game SETS the index rather than stepping it (index.html:1338-1339).
     if (pressedAny(this.keys.left, this.keys.altLeft)) this.select(0);
     if (pressedAny(this.keys.right, this.keys.altRight)) this.select(1);
@@ -209,8 +215,23 @@ export class CharacterScene extends Phaser.Scene {
     return characterAt(this.index);
   }
 
-  private portraitKey(character: Character): string {
-    return menuPlayerTextureKey(character, getSkinIndex(character), MENU_PORTRAIT_SCALE);
+  private portraitKey(character: Character, frame: 'stand' | 'blink' = 'stand'): string {
+    return menuPlayerTextureKey(character, getSkinIndex(character), MENU_PORTRAIT_SCALE, frame);
+  }
+
+  /**
+   * The two heroes breathe and blink as they wait to be chosen, the same idle as in a
+   * level, Dodo a little behind Gigi so they do not blink together.
+   */
+  private breathe(delta: number): void {
+    this.idleT += delta / (1000 / 60);
+    PANELS.forEach((panel, i) => {
+      const look = idleLook(Math.floor(this.idleT) + i * IDLE_STAGGER);
+      this.portraits[i]
+        .setTexture(this.portraitKey(panel.character, look.frame === 'blink' ? 'blink' : 'stand'))
+        // A level's breath is half a sprite pixel; the portrait's is the same share of its size.
+        .setY(PANEL_Y + panel.spriteDy + (look.dy * MENU_PORTRAIT_SCALE) / 2);
+    });
   }
 
   /** Everything that depends on which panel is highlighted, and on its skin. */
@@ -242,5 +263,6 @@ export class CharacterScene extends Phaser.Scene {
  */
 function skinName(character: Character): string {
   const skins = skinsOf(character);
-  return (skins[getSkinIndex(character)] ?? skins[0]).name;
+  const skin = skins[getSkinIndex(character)] ?? skins[0];
+  return skin.nameKey ? TStr(skin.nameKey) : skin.name;
 }
