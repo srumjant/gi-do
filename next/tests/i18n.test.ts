@@ -35,6 +35,7 @@ const PORT_ONLY_KEYS = [
   'learn_speak', 'learn_cheers', 'learn_found', 'learn_result_hint',
   'fullscreen_on', 'fullscreen_off',
   'level_1_2', 'level_2_2', 'level_1_3', 'level_2_3', 'level_3_2', 'level_3_3', 'level_4_2', 'level_4_3', 'level_5_2', 'level_5_3', 'level_6_2', 'level_6_3', 'villain_dollQueen', 'villain_dollQueen_par', 'villain_pterodactyl', 'villain_pterodactyl_par', 'villain_vanaToomas', 'villain_vanaToomas_par', 'villain_pizzaChef', 'villain_pizzaChef_par', 'villain_yeti', 'villain_yeti_par', 'villain_tRex', 'villain_tRex_par', 'world_1', 'world_2', 'world_3', 'world_4', 'world_5', 'world_6', 'story_wants', 'story_now_me', 'story_sent_me', 'story_took', 'story_follow', 'story_save', 'story_world', 'story_hooray', 'story_trex_tiny', 'prompt_start', 'prompt_choose', 'prompt_next', 'prompt_retry', 'prompt_play_again', 'prompt_learn_menu', 'prompt_learn_result', 'controls_touch', 'follow_them', 'next_level',
+  'skin_ninja', 'skin_cinderella',
 ];
 
 describe('translations match the live game', () => {

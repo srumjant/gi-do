@@ -180,6 +180,9 @@ export const TRANSLATIONS: Record<string, Entry> = {
   story_world:        {et:'MAAILM %N: %W',            en:'WORLD %N: %W'},
   story_hooray:       {et:'HURRAA!',                  en:'HOORAY!'},
   story_trex_tiny:    {et:'T-REX ON NÜÜD PISIKE!',    en:'THE T-REX IS TINY NOW!'},
+  // The port's own skins' names (data/sprites.ts, `nameKey`).
+  skin_ninja:         {et:'NINJA',                    en:'NINJA'},
+  skin_cinderella:    {et:'TUHKATRIINU',              en:'CINDERELLA'},
   // The prompts, naming the button on the device last used (input/source.ts): %K confirm,
   // %B back. The live game's own (press_start, mode_hint, ...) name SPACE whatever the device.
   prompt_start:       {et:'VAJUTA %K ALUSTAMISEKS!',  en:'PRESS %K TO START!'},

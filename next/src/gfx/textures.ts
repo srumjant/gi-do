@@ -38,6 +38,7 @@ import {
 import type { Villain } from '../data/levels';
 import type { Character } from '../game/player';
 import { CHARACTERS, getEnemySpriteInfo, skinsOf } from '../game/run';
+import { HERO_FRAMES, heroSprite, type HeroFrame } from '../game/heroFrames';
 import { bakeScale, rasterise } from './rasterise';
 
 /**
@@ -126,17 +127,17 @@ export const PLAYER_POSES = ['stand', 'run', 'jump'] as const;
 export type Pose = typeof PLAYER_POSES[number];
 
 /** `player-<character>-<skinIndex>-<pose>`, e.g. `player-gigi-0-stand`. */
-export function playerTextureKey(character: Character, skinIndex: number, pose: Pose): string {
+export function playerTextureKey(character: Character, skinIndex: number, pose: HeroFrame): string {
   return `player-${character}-${skinIndex}-${pose}`;
 }
 
 /** The big head's top half: the same pose, first `bigHeadRows` rows, at BIG_HEAD_SCALE. */
-export function playerHeadTextureKey(character: Character, skinIndex: number, pose: Pose): string {
+export function playerHeadTextureKey(character: Character, skinIndex: number, pose: HeroFrame): string {
   return `${playerTextureKey(character, skinIndex, pose)}-head`;
 }
 
 /** The big head's bottom half: the rest of the pose, still at PLAYER_SCALE. */
-export function playerBodyTextureKey(character: Character, skinIndex: number, pose: Pose): string {
+export function playerBodyTextureKey(character: Character, skinIndex: number, pose: HeroFrame): string {
   return `${playerTextureKey(character, skinIndex, pose)}-body`;
 }
 
@@ -167,8 +168,9 @@ export function bigHeadRows(sprite: SpriteData): number {
 function registerPlayerTextures(scene: Phaser.Scene): void {
   CHARACTERS.forEach((character) => {
     skinsOf(character).forEach((skin, skinIndex) => {
-      for (const pose of PLAYER_POSES) {
-        const sprite = skin[pose];
+      // The three drawn poses and the three made from them (game/heroFrames.ts).
+      for (const pose of HERO_FRAMES) {
+        const sprite = heroSprite(skin, pose);
         const headRows = bigHeadRows(sprite);
         const key = playerTextureKey(character, skinIndex, pose);
         addSprite(scene, key, sprite, skin.palette, PLAYER_SCALE);
@@ -510,13 +512,14 @@ export function menuPlayerTextureKey(
   character: Character,
   skinIndex: number,
   scale: number,
+  frame: 'stand' | 'blink' = 'stand',
 ): string {
-  return `menu-${character}-${skinIndex}-${scale}`;
+  return `menu-${character}-${skinIndex}-${scale}${frame === 'blink' ? '-blink' : ''}`;
 }
 
 /**
  * Standing portraits of both characters in every skin, at the two sizes the choice
- * screens draw them. Only the `stand` pose: the menus never animate anybody.
+ * screens draw them, standing and blinking: the character screen's portraits breathe and blink.
  *
  * Registered here rather than reused from `registerPlayerTextures` for the same reason
  * the HUD's four are — scale belongs to the draw site, and the character screen draws
@@ -535,6 +538,8 @@ export function registerMenuTextures(scene: Phaser.Scene): void {
       for (const scale of MENU_SCALES) {
         const key = menuPlayerTextureKey(character, skinIndex, scale);
         addSprite(scene, key, skin.stand, skin.palette, scale);
+        // The character screen's portraits blink (game/heroAnim.ts's idleLook).
+        addSprite(scene, menuPlayerTextureKey(character, skinIndex, scale, 'blink'), heroSprite(skin, 'blink'), skin.palette, scale);
       }
     });
   }
