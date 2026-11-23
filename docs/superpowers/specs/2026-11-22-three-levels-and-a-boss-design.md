@@ -46,7 +46,7 @@ earlier themes come back as reminders.
 | Winter | all four, plus ice | the snow field: slippery ice | the frozen lake | the ice palace | **the Yeti** |
 | Toy Castle | everything | the gate | the halls | the throne room | **the T-Rex**, the final boss, redrawn and with a new fight |
 
-Doll Garden, Dinosaur Canyon, Tallinn and Palermo are designed in detail below; each later theme is designed when
+Doll Garden, Dinosaur Canyon, Tallinn, Palermo and Winter are designed in detail below; each later theme is designed when
 its batch starts.
 
 ## Doll Garden, in detail
@@ -207,6 +207,49 @@ stations in the square, coming back as always.
 - He never hurts by touch: walking into him pushes you off, a stomp on the cook bounces you
   off; only the pizzas hurt.
 - Three hits. Then he flops over in a cloud of flour, his hat rolls off, the cage opens.
+
+## Winter, in detail (batch 5)
+
+The tools are **all four**, one level at a time as reminders, and the new thing is **ice**.
+The theme's zombies are **zombie penguins**: the penguin, grey-green with red eyes, the usual
+zombie rule. The villain is **the Yeti**.
+
+- **Ice** is a floor you slide on: you speed up slowly, and let go and you keep sliding three or
+  four tiles; turning round takes a moment. You can always jump off it. Ice reads as pale blue
+  with a white shine.
+- **Icy water** lies under the frozen lake: falling in is a fall, like a pit or lava.
+
+**Level 1: Talvine imedemaa (Winter Wonderland).** The original level, rebuilt: the snow field,
+penguins and ice bats, `?` blocks, the rainbow block. The first ice: a long flat stretch to
+feel the slide, then ice running up to a pit. The bow comes back for the first two zombie
+penguins. At the end the Yeti runs off with the sibling.
+
+**Level 2: Jäätunud järv (the Frozen Lake).** Ice floes on icy water, jump to jump, each long
+enough to land on from a full jump and slide to a stop; a cliff of ice only a fart jump climbs; a cracked ice wall in front of a cave,
+smashed with a big head; zombie penguins in the cave (the bow comes back). The Yeti leaps away
+from the far shore.
+
+**Level 3: Jääloss (the Ice Palace).** All of it together: a giant in the palace gate (the chicken
+ray); a target behind cracked ice that opens a gate (big head, then bow); an icy hall with zombie
+penguins; a fart up an ice wall. Then the throne room: the door shuts behind you, and the Yeti.
+
+**The boss: the Yeti.** A big white furry beast, two and a half tiles tall, in a throne room with
+a ceiling hung with icicles; the sibling in a cage on an ice dais at the far end.
+
+- He roars and paws the floor (a long warning on Super Easy), then **charges** at the hero, and
+  cannot stop until he slams into a wall. The charge hurts, from the front only: **jump over
+  him**. Every plain jump clears him on every difficulty, best running at him; on Super Easy
+  even standing still. His head throws a hero off, and he never charges into the wall at his
+  back.
+- The slam shakes the room: **icicles fall** from the ceiling, each shaking first with its
+  shadow on the floor. An arrow breaks one. Few and slow on Super Easy.
+- After the slam he **sits dizzy**, stars round his head: **jump on his head** for a hit. The
+  spell is always long enough to run the whole room to him. Not in time, he shakes it off and
+  roars again.
+- He never hurts outside a charge: walking into him pushes you off.
+- After each hit he calls two zombie penguins (a bow station in the room), and charges faster,
+  bringing down more icicles.
+- Three hits and he flops down on the ice, beaten; the cage opens.
 
 ## The final boss: the T-Rex
 

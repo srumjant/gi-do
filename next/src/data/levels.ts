@@ -27,11 +27,16 @@ export const TILE_PLANK = 8;
 export const TILE_GATE = 9;
 /** Lava: not solid, and falling into it is a fall (game/course.ts). Only on hand-built levels. */
 export const TILE_LAVA = 10;
+/** Ice: solid, and slippery to stand on (player.ts's stepMotion). Only on hand-built levels. */
+export const TILE_ICE = 11;
+/** Icy water: not solid, and falling into it is a fall, as lava is (game/course.ts). */
+export const TILE_WATER = 12;
 
 export function isSolid(tile: number): boolean {
   return tile === TILE_GROUND || tile === TILE_BRICK
       || tile === TILE_QUESTION || tile === TILE_RAINBOW
-      || tile === TILE_CRACKED || tile === TILE_SPRING || tile === TILE_PLANK || tile === TILE_GATE;
+      || tile === TILE_CRACKED || tile === TILE_SPRING || tile === TILE_PLANK || tile === TILE_GATE
+      || tile === TILE_ICE;
 }
 
 export interface EnemyDef {
@@ -240,10 +245,10 @@ export const LEVELS: Level[] = [
 export type LevelEnding = 'rescue' | 'chase' | 'boss';
 
 /** A theme's villain, who carries the sibling through its levels. */
-export type Villain = 'dollQueen' | 'pterodactyl' | 'vanaToomas' | 'pizzaChef';
+export type Villain = 'dollQueen' | 'pterodactyl' | 'vanaToomas' | 'pizzaChef' | 'yeti';
 
 /** Each theme's boss. */
-export type BossKind = 'dollQueen' | 'pterodactyl' | 'vanaToomas' | 'pizzaChef';
+export type BossKind = 'dollQueen' | 'pterodactyl' | 'vanaToomas' | 'pizzaChef' | 'yeti';
 
 /** A boss, as a level's ASCII places it. */
 export interface BossDef {

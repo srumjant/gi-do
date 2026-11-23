@@ -17,6 +17,15 @@ const DUST = [0x8a7a6a, 0xb8a890, 0xe0d8c8];
 const SHADOW = 0x000000;
 
 /**
+ * Where the middle of an image turned `angle` degrees goes for it to rest on the floor at `floorY`.
+ * Shared with gfx/yeti.ts.
+ */
+export function restingOn(image: Phaser.GameObjects.Image, floorY: number, angle: number): number {
+  const a = (Math.abs(angle) * Math.PI) / 180;
+  return floorY - (image.displayHeight / 2) * Math.cos(a) - (image.displayWidth / 2) * Math.sin(a);
+}
+
+/**
  * How the Pizza Chef looks (his rules are game/bosses/pizzaChef.ts): the cook with his peel at
  * his front hand, or the big chicken in a chef's hat a ray makes of him. The peel tips forward
  * as he tosses a pizza and swings when he bats a ray away; turning into a chicken and back is
@@ -178,8 +187,15 @@ export class PizzaChefView {
     const dazed = b.phase === 'hurt';
     // Running out of time as a chicken, he flickers: about to pop back.
     const flicker = chicken && b.timer < 90 && b.timer % 8 < 4 ? 0.5 : 1;
-    this.body.setPosition(cx, feet).setFlipX(flip).setAlpha(flicker)
-      .setAngle(dazed ? Math.sin(animFrame * 0.25) * 6 : this.sit.angle);
+    this.body.setFlipX(flip).setAlpha(flicker);
+    if (b.phase === 'defeated') {
+      // Flopped over, turning about his middle and resting on the floor: about his feet, half
+      // of him sank below it.
+      const lying = restingOn(this.body, b.floorY, this.sit.angle);
+      this.body.setOrigin(0.5, 0.5).setPosition(cx, lying).setAngle(this.sit.angle);
+    } else {
+      this.body.setOrigin(0.5, 1).setPosition(cx, feet).setAngle(dazed ? Math.sin(animFrame * 0.25) * 6 : 0);
+    }
     this.stars.forEach((s, i) => {
       const a = animFrame * 0.12 + (i * Math.PI * 2) / 3;
       s.setVisible(dazed).setPosition(cx + Math.cos(a) * 18, b.floorY - 50 + Math.sin(a) * 5);

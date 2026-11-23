@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { TILE } from '../config/constants';
-import { TILE_CRACKED, TILE_GATE, TILE_LAVA, TILE_PLANK, TILE_SPRING, type StationKind } from '../data/levels';
+import {
+  TILE_CRACKED, TILE_GATE, TILE_ICE, TILE_LAVA, TILE_PLANK, TILE_SPRING, TILE_WATER, type StationKind,
+} from '../data/levels';
 import { POWERUP_INFO } from '../data/powerups';
 import { ventWarning, type CourseState, type StationState, type TargetState } from '../game/course';
 import type { EnemyState, World } from '../game/types';
@@ -29,8 +31,8 @@ const GLOW_PX = 48;
 const COURSE_FLAG_TEXTURE = 'course-flag';
 const COURSE_POLE_TEXTURE = 'course-pole';
 
-/** One tileset frame per tile code, so a map cell's code IS its frame. 0..9. */
-const FRAMES = TILE_LAVA + 1;
+/** One tileset frame per tile code, so a map cell's code IS its frame. 0..12. */
+const FRAMES = TILE_WATER + 1;
 const SPARK_PX = 3;
 
 const CRACKED_FILL = 0xb58b62;
@@ -120,6 +122,29 @@ function drawLava(g: Phaser.GameObjects.Graphics, x: number): void {
   g.fillStyle(LAVA_BRIGHT).fillCircle(x + 4, 5, 1.5).fillCircle(x + 11, 7, 2);
 }
 
+const ICE = 0xbfe6ff;
+const ICE_TOP = 0xeaf8ff;
+const ICE_DEEP = 0x8cc4e8;
+const WATER = 0x1f4f8a;
+const WATER_TOP = 0x3f7fc0;
+const WATER_RIPPLE = 0x9fd0ff;
+const SPRAY = [0xffffff, 0x9fd0ff, 0x3f7fc0];
+
+/** Ice: pale blue, a bright top, two white glints: it reads as slippery. */
+function drawIce(g: Phaser.GameObjects.Graphics, x: number): void {
+  g.fillStyle(ICE).fillRect(x, 0, TILE, TILE);
+  g.fillStyle(ICE_DEEP).fillRect(x, TILE - 3, TILE, 3);
+  g.fillStyle(ICE_TOP).fillRect(x, 0, TILE, 3);
+  g.fillStyle(0xffffff).fillRect(x + 3, 5, 4, 1).fillRect(x + 4, 6, 2, 1).fillRect(x + 10, 9, 3, 1);
+}
+
+/** Icy water: deep blue with a lighter surface and a ripple, so it reads as cold and deep. */
+function drawWater(g: Phaser.GameObjects.Graphics, x: number): void {
+  g.fillStyle(WATER).fillRect(x, 0, TILE, TILE);
+  g.fillStyle(WATER_TOP).fillRect(x, 0, TILE, 4);
+  g.fillStyle(WATER_RIPPLE).fillRect(x + 2, 1, 4, 1).fillRect(x + 9, 2, 5, 1);
+}
+
 /** Every texture the course draws with. Cheap, and safe to call on every level start. */
 export function registerCourseTextures(scene: Phaser.Scene): void {
   bake(scene, COURSE_TILES_TEXTURE, TILE * FRAMES, TILE, (g) => {
@@ -128,6 +153,8 @@ export function registerCourseTextures(scene: Phaser.Scene): void {
     drawPlank(g, TILE_PLANK * TILE);
     drawGate(g, TILE_GATE * TILE);
     drawLava(g, TILE_LAVA * TILE);
+    drawIce(g, TILE_ICE * TILE);
+    drawWater(g, TILE_WATER * TILE);
   });
   bake(scene, COURSE_SPARK_TEXTURE, SPARK_PX, SPARK_PX, (g) => {
     g.fillStyle(0xffffff).fillRect(0, 0, SPARK_PX, SPARK_PX);
@@ -161,7 +188,7 @@ export function registerCourseTextures(scene: Phaser.Scene): void {
 /** The course's tiles only, as Phaser data: every other code is drawn by gfx/tiles.ts. */
 function courseOnly(code: number): number {
   return code === TILE_CRACKED || code === TILE_SPRING || code === TILE_PLANK || code === TILE_GATE
-    || code === TILE_LAVA ? code : -1;
+    || code === TILE_LAVA || code === TILE_ICE || code === TILE_WATER ? code : -1;
 }
 
 interface StationView {
@@ -198,6 +225,8 @@ export class CourseView {
   private readonly dust: Phaser.GameObjects.Particles.ParticleEmitter;
   /** Embers off the lava, a splash when someone falls in, a burst from an erupting vent. */
   private readonly embers: Phaser.GameObjects.Particles.ParticleEmitter;
+  /** Spray when someone falls into icy water. */
+  private readonly spray: Phaser.GameObjects.Particles.ParticleEmitter;
   /** Vents glowing before they erupt, redrawn every frame. */
   private readonly ventGlow: Phaser.GameObjects.Graphics;
   /** Every lava cell, for the embers to rise from: the lava never moves. */
@@ -294,6 +323,15 @@ export class CourseView {
       scale: { start: 1.3, end: 0 },
       tint: EMBERS,
       gravityY: 40,
+    }).setDepth(DEPTH_COURSE_FX);
+    this.spray = scene.add.particles(0, 0, COURSE_SPARK_TEXTURE, {
+      emitting: false,
+      lifespan: 700,
+      speedX: { min: -60, max: 60 },
+      speedY: { min: -200, max: -80 },
+      scale: { start: 1.5, end: 0.2 },
+      tint: SPRAY,
+      gravityY: 500,
     }).setDepth(DEPTH_COURSE_FX);
     this.ventGlow = scene.add.graphics().setDepth(DEPTH_COURSE_TILES + 0.5);
     world.map.forEach((row, ty) => row.forEach((code, tx) => {
@@ -393,7 +431,7 @@ export class CourseView {
         case 'smash': this.chunks.explode(6, fx.x, fx.y); break;
         case 'plank': this.dust.explode(5, fx.x, fx.y); break;
         case 'gate': this.chunks.explode(4, fx.x, fx.y); break;
-        case 'splash': this.embers.explode(24, fx.x, fx.y); break;
+        case 'splash': (fx.water ? this.spray : this.embers).explode(24, fx.x, fx.y); break;
         case 'vent': this.embers.explode(12, fx.x, fx.y); break;
         case 'target': this.sparks.explode(40, fx.x, fx.y); break;
         case 'flag': this.sparks.explode(24, fx.x, fx.y); break;

@@ -306,3 +306,33 @@ waits. `?level=10`, `?level=11`, `?level=12` open each one.
 - The fight: do they ray the giant first? Do they find jumping on the chicken? Too quick, too
   long (about 14 seconds of fighting on Super Easy when it goes well)?
 - Anywhere stuck for more than a minute, or more than three or four deaths in a section.
+
+## Winter, the whole theme (2026-11-23)
+
+Winter is now three levels and a boss, right after Palermo: **Talvine imedemaa** (Winter
+Wonderland, rebuilt), **Jäätunud järv** (the Frozen Lake) and **Jääloss** (the Ice Palace),
+where **the Yeti** waits. `?level=13`, `?level=14`, `?level=15` open each one.
+
+- **Ice is new.** The pale blue floor is slippery: you speed up slowly, and when you let go you
+  slide three or four tiles. Jumping off ice is a normal jump.
+- **Icy water** under the frozen lake is like a pit: fall in and you lose a life (the cape
+  throws you out once).
+- **Zombie penguins** are Winter's zombies: grey-green penguins with red eyes. Same rule:
+  they push, never hurt, an arrow puts them down.
+- **All four tools come back**, one or two at a time: the bow for zombie penguins, the fart
+  jump for ice cliffs, the big head for cracked ice, the chicken ray for the palace giant.
+- **The Yeti** runs off with the sibling at the end of the first two levels.
+- **The Yeti fight.** The throne room's door shuts behind you. He roars and paws the floor,
+  then charges and can't stop until he slams into a wall: jump over him (running at him is
+  easiest). The slam shakes icicles loose from the ceiling: each one shakes over its shadow
+  before it falls. Then he sits dizzy with stars round his head: jump on his head. After
+  each hit two zombie penguins come in (there is a bow in the room) and he charges faster.
+  Three hits and he flops over.
+
+### What to watch
+
+- Does the ice feel fun or frustrating? Does your child slide into the water on the lake?
+- Do they remember the old tools (fart at the ice cliff, big head at the cracked ice)?
+- The Yeti: do they find jumping over the charge, and running to jump on him while he's dizzy?
+  About 20 to 40 seconds of fighting when it goes well.
+- Anywhere stuck for more than a minute, or more than three or four deaths in a section.

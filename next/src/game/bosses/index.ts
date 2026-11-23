@@ -5,15 +5,17 @@ import { buildDollQueen, stepDollQueen, type DollQueenState } from './dollQueen'
 import { buildPizzaChef, stepPizzaChef, type PizzaChefState } from './pizzaChef';
 import { buildPterodactyl, stepPterodactyl, type PterodactylState } from './pterodactyl';
 import { buildVanaToomas, stepVanaToomas, type VanaToomasState } from './vanaToomas';
+import { buildYeti, stepYeti, type YetiState } from './yeti';
 
 /** A hand-built level's boss, whichever it is: each theme has its own. */
-export type CourseBoss = DollQueenState | PterodactylState | VanaToomasState | PizzaChefState;
+export type CourseBoss = DollQueenState | PterodactylState | VanaToomasState | PizzaChefState | YetiState;
 
 export function buildCourseBoss(def: BossDef, dc: DifficultyRecord): CourseBoss {
   switch (def.kind) {
     case 'pterodactyl': return buildPterodactyl(def, dc);
     case 'vanaToomas': return buildVanaToomas(def, dc);
     case 'pizzaChef': return buildPizzaChef(def, dc);
+    case 'yeti': return buildYeti(def);
     default: return buildDollQueen(def, dc);
   }
 }
@@ -23,6 +25,7 @@ export function stepCourseBoss(world: World, boss: CourseBoss): void {
     case 'pterodactyl': stepPterodactyl(world, boss); break;
     case 'vanaToomas': stepVanaToomas(world, boss); break;
     case 'pizzaChef': stepPizzaChef(world, boss); break;
+    case 'yeti': stepYeti(world, boss); break;
     default: stepDollQueen(world, boss);
   }
 }

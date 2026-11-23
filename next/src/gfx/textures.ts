@@ -16,6 +16,7 @@ import {
   KIDNAPPERS,
   KNIGHT_S,
   COOK_S,
+  PENGUIN_S,
   PARASOL_P, PARASOL_S,
   PTERO_DOWN_S, PTERO_P, PTERO_UP_S,
   QUEEN_P, QUEEN_S,
@@ -29,7 +30,8 @@ import {
   WAVE_P, WAVE_S,
   CHEF_BARE_S, CHEF_CHICKEN_P, CHEF_CHICKEN_S, CHEF_HAT_S, CHEF_P, CHEF_PEEL_P, CHEF_PEEL_S, CHEF_S,
   PIZZA_P, PIZZA_S,
-  ZOMBIE_COOK_P, ZOMBIE_DINO_P, ZOMBIE_DOLL_P, ZOMBIE_KNIGHT_P,
+  ICICLE_P, ICICLE_S, YETI_P, YETI_ROAR_S, YETI_S,
+  ZOMBIE_COOK_P, ZOMBIE_DINO_P, ZOMBIE_DOLL_P, ZOMBIE_KNIGHT_P, ZOMBIE_PENGUIN_P,
 } from '../data/sprites';
 import type { Villain } from '../data/levels';
 import type { Character } from '../game/player';
@@ -196,6 +198,7 @@ export const ZOMBIE_KINDS: Readonly<Record<string, { sprite: SpriteData; palette
   dino: { sprite: DINO_S, palette: ZOMBIE_DINO_P },
   knight: { sprite: KNIGHT_S, palette: ZOMBIE_KNIGHT_P },
   cook: { sprite: COOK_S, palette: ZOMBIE_COOK_P },
+  penguin: { sprite: PENGUIN_S, palette: ZOMBIE_PENGUIN_P },
 };
 
 /** `enemy-zombie-<type>`. */
@@ -294,12 +297,19 @@ export const CHEF_PEEL_TEXTURE = 'chef-peel';
 export const PIZZA_TEXTURE = 'chef-pizza';
 export const CHEF_SCALE = 2;
 
+/** The Yeti, Winter's boss and villain: 20x20 at 2, roaring or not; and his icicles. */
+export const YETI_TEXTURE = 'yeti';
+export const YETI_ROAR_TEXTURE = 'yeti-roar';
+export const ICICLE_TEXTURE = 'yeti-icicle';
+export const YETI_SCALE = 2;
+
 /** Each villain's picture, for the end of a chase level and its cutscene. */
 export const VILLAIN_TEXTURES: Readonly<Record<Villain, string>> = {
   dollQueen: QUEEN_TEXTURE,
   pterodactyl: PTERO_UP_TEXTURE,
   vanaToomas: TOOMAS_FULL_TEXTURE,
   pizzaChef: CHEF_TEXTURE,
+  yeti: YETI_TEXTURE,
 };
 
 /** The villains that fly: the chase cutscene keeps them off the ground. */
@@ -331,6 +341,9 @@ function registerBossTextures(scene: Phaser.Scene): void {
   addSprite(scene, CHEF_CHICKEN_TEXTURE, CHEF_CHICKEN_S, CHEF_CHICKEN_P, CHEF_SCALE);
   addSprite(scene, CHEF_PEEL_TEXTURE, CHEF_PEEL_S, CHEF_PEEL_P, CHEF_SCALE);
   addSprite(scene, PIZZA_TEXTURE, PIZZA_S, PIZZA_P, 2);
+  addSprite(scene, YETI_TEXTURE, YETI_S, YETI_P, YETI_SCALE);
+  addSprite(scene, YETI_ROAR_TEXTURE, YETI_ROAR_S, YETI_P, YETI_SCALE);
+  addSprite(scene, ICICLE_TEXTURE, ICICLE_S, ICICLE_P, 2);
 }
 
 /**

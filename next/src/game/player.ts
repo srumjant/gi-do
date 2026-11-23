@@ -1,6 +1,6 @@
 import { GRAVITY, TILE } from '../config/constants';
 import type { DifficultyRecord } from '../config/difficulty';
-import { TILE_BRICK, type Level } from '../data/levels';
+import { TILE_BRICK, TILE_ICE, type Level } from '../data/levels';
 import { GIGI_SKINS, DODO_SKINS } from '../data/sprites';
 import type { InputState } from '../input/actions';
 import { random } from './random';
@@ -54,6 +54,12 @@ export const GRND_ACCEL = 0.6;
 export const AIR_ACCEL = 0.4;
 export const GRND_DECEL = 0.72;
 export const AIR_DECEL = 0.92;
+/**
+ * On ice (Winter, 2026-11-23): a third of the grip to speed up or turn round, and letting go
+ * keeps most of the speed each frame, so the hero slides three or four tiles on.
+ */
+export const ICE_ACCEL = 0.2;
+export const ICE_DECEL = 0.95;
 
 /**
  * The sprite draws 2px larger than the hitbox on every side (index.html:1848:
@@ -345,6 +351,8 @@ export interface MotionOptions {
    * adventure never sets it.
    */
   noJumpCut?: boolean;
+  /** Standing on ice: slow to speed up and to stop (ICE_ACCEL, ICE_DECEL). */
+  onIce?: boolean;
 }
 
 /**
@@ -366,8 +374,9 @@ export function stepMotion(
   options: MotionOptions = {},
 ): void {
   // Player movement — smooth acceleration with air control (index.html:1362-1370).
-  const accel = p.onGround ? GRND_ACCEL : AIR_ACCEL;
-  const decel = p.onGround ? GRND_DECEL : AIR_DECEL;
+  const ice = p.onGround && options.onIce === true;
+  const accel = ice ? ICE_ACCEL : p.onGround ? GRND_ACCEL : AIR_ACCEL;
+  const decel = ice ? ICE_DECEL : p.onGround ? GRND_DECEL : AIR_DECEL;
   if (input.left) {
     p.vx = Math.max(p.vx - accel, -dc.playerSpeed);
     p.facing = -1;
@@ -475,6 +484,13 @@ export function stepWalkCycle(p: PlayerState): void {
  * the X sweep, the Y sweep, the left clamp and the head-first block bump, which are
  * Arcade's from this plan on. See PlayerMove above and the call site below.
  */
+/** Whether the tile under the middle of the hero's feet is ice. */
+function standsOnIce(world: World): boolean {
+  const p = world.player;
+  const row = world.map[Math.floor((p.y + p.h + 1) / TILE)];
+  return row?.[Math.floor((p.x + p.w / 2) / TILE)] === TILE_ICE;
+}
+
 export function stepPlayer(world: World, input: InputState, move?: PlayerMove): boolean {
   // index.html:1348 — the live update() checks its dead-state branch, and returns,
   // before it ever reaches player movement. Reproduced by returning immediately: once
@@ -490,7 +506,7 @@ export function stepPlayer(world: World, input: InputState, move?: PlayerMove): 
   // A spring's throw or a cape's rescue is not a jump, and letting go of jump must not
   // shorten it: see PlayerState.liftTimer. Spent at one a step, and as soon as the rise is.
   const lifting = (p.liftTimer ?? 0) > 0 && p.vy < 0;
-  stepMotion(p, input, dc, world.sounds, { noJumpCut: lifting });
+  stepMotion(p, input, dc, world.sounds, { noJumpCut: lifting, onIce: standsOnIce(world) });
   if (p.liftTimer !== undefined) p.liftTimer = lifting ? p.liftTimer - 1 : 0;
 
   // Shooting (index.html:1390-1398). The live source has it between the variable-height
