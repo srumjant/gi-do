@@ -19,8 +19,12 @@ describe('the run order', () => {
     expect(stages[2]).toEqual({ theme: 1, level: b, nameKey: 'y' });
   });
 
-  it('names every classic stage by its classic key, and ends on the boss', () => {
+  it('names every classic stage by its classic key, and ends on the T-Rex', () => {
     for (const s of STAGES) if (LEVELS.includes(s.level)) expect(s.nameKey).toBe(LEVEL_NAME_KEYS[s.theme]);
-    expect(STAGES[STAGES.length - 1].level).toBe(LEVELS[LEVELS.length - 1]);
+    // Every theme is reworked (2026-11-23): the run ends on Troonisaal and the T-Rex's new fight.
+    const last = STAGES[STAGES.length - 1].level;
+    expect(last.ending).toBe('boss');
+    expect(last.course?.boss?.kind).toBe('tRex');
+    expect(STAGES.some((s) => LEVELS.includes(s.level))).toBe(false);
   });
 });

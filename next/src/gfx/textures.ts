@@ -17,6 +17,7 @@ import {
   KNIGHT_S,
   COOK_S,
   PENGUIN_S,
+  SOLDIER_S,
   PARASOL_P, PARASOL_S,
   PTERO_DOWN_S, PTERO_P, PTERO_UP_S,
   QUEEN_P, QUEEN_S,
@@ -31,7 +32,8 @@ import {
   CHEF_BARE_S, CHEF_CHICKEN_P, CHEF_CHICKEN_S, CHEF_HAT_S, CHEF_P, CHEF_PEEL_P, CHEF_PEEL_S, CHEF_S,
   PIZZA_P, PIZZA_S,
   ICICLE_P, ICICLE_S, YETI_P, YETI_ROAR_S, YETI_S,
-  ZOMBIE_COOK_P, ZOMBIE_DINO_P, ZOMBIE_DOLL_P, ZOMBIE_KNIGHT_P, ZOMBIE_PENGUIN_P,
+  CROWN_P, CROWN_S, TOY_BLOCK_P, TOY_BLOCK_S,
+  ZOMBIE_COOK_P, ZOMBIE_DINO_P, ZOMBIE_DOLL_P, ZOMBIE_KNIGHT_P, ZOMBIE_PENGUIN_P, ZOMBIE_SOLDIER_P,
 } from '../data/sprites';
 import type { Villain } from '../data/levels';
 import type { Character } from '../game/player';
@@ -189,7 +191,7 @@ function registerPlayerTextures(scene: Phaser.Scene): void {
  * turned out to be the right call: neither of them needed a texture change.
  */
 const ENEMY_TYPES = [
-  'car', 'doll', 'dino', 'ghost', 'bat', 'cannon', 'bouncer', 'penguin', 'icebat', 'chicken', 'knight', 'cook',
+  'car', 'doll', 'dino', 'ghost', 'bat', 'cannon', 'bouncer', 'penguin', 'icebat', 'chicken', 'knight', 'cook', 'soldier',
 ];
 
 /** The walkers that have a zombie (data/course.ts's uppercase letters), and its palette. */
@@ -199,6 +201,7 @@ export const ZOMBIE_KINDS: Readonly<Record<string, { sprite: SpriteData; palette
   knight: { sprite: KNIGHT_S, palette: ZOMBIE_KNIGHT_P },
   cook: { sprite: COOK_S, palette: ZOMBIE_COOK_P },
   penguin: { sprite: PENGUIN_S, palette: ZOMBIE_PENGUIN_P },
+  soldier: { sprite: SOLDIER_S, palette: ZOMBIE_SOLDIER_P },
 };
 
 /** `enemy-zombie-<type>`. */
@@ -303,6 +306,10 @@ export const YETI_ROAR_TEXTURE = 'yeti-roar';
 export const ICICLE_TEXTURE = 'yeti-icicle';
 export const YETI_SCALE = 2;
 
+/** The T-Rex's crown and the toy block that drops on him (game/bosses/tRex.ts). */
+export const CROWN_TEXTURE = 'trex-crown';
+export const TOY_BLOCK_TEXTURE = 'trex-block';
+
 /** Each villain's picture, for the end of a chase level and its cutscene. */
 export const VILLAIN_TEXTURES: Readonly<Record<Villain, string>> = {
   dollQueen: QUEEN_TEXTURE,
@@ -310,13 +317,14 @@ export const VILLAIN_TEXTURES: Readonly<Record<Villain, string>> = {
   vanaToomas: TOOMAS_FULL_TEXTURE,
   pizzaChef: CHEF_TEXTURE,
   yeti: YETI_TEXTURE,
+  tRex: bossTextureKey('idle'),
 };
 
 /** The villains that fly: the chase cutscene keeps them off the ground. */
 export const FLYING_VILLAINS: ReadonlySet<Villain> = new Set(['pterodactyl']);
 
 /** The villains drawn in profile, facing left: running off to the right, they turn round. */
-export const PROFILE_VILLAINS: ReadonlySet<Villain> = new Set(['pterodactyl', 'vanaToomas', 'pizzaChef']);
+export const PROFILE_VILLAINS: ReadonlySet<Villain> = new Set(['pterodactyl', 'vanaToomas', 'pizzaChef', 'tRex']);
 
 function registerBossTextures(scene: Phaser.Scene): void {
   for (const pose of Object.keys(BOSS_POSES) as BossPose[]) {
@@ -344,6 +352,8 @@ function registerBossTextures(scene: Phaser.Scene): void {
   addSprite(scene, YETI_TEXTURE, YETI_S, YETI_P, YETI_SCALE);
   addSprite(scene, YETI_ROAR_TEXTURE, YETI_ROAR_S, YETI_P, YETI_SCALE);
   addSprite(scene, ICICLE_TEXTURE, ICICLE_S, ICICLE_P, 2);
+  addSprite(scene, CROWN_TEXTURE, CROWN_S, CROWN_P, 3);
+  addSprite(scene, TOY_BLOCK_TEXTURE, TOY_BLOCK_S, TOY_BLOCK_P, 4);
 }
 
 /**

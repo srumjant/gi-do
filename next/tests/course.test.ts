@@ -682,6 +682,29 @@ describe('zombies', () => {
     expect(p.y + p.h).toBe(4 * TILE);
   });
 
+  it('come as toy soldiers too (Toy Castle\'s L): pushing, shuffling after the hero, down to an arrow', () => {
+    const soldiers = courseLevel({
+      name: 'soldiers',
+      theme: 5,
+      sections: [['P'.padEnd(39, '.') + 'R', '.'.repeat(40), '.'.repeat(14) + 'L'.padEnd(26, '.'), '#'.repeat(40), '#'.repeat(40)]],
+    });
+    expect(soldiers.enemyDefs).toEqual([{ type: 'soldier', x: 14, floorRow: 3, zombie: true }]);
+    const world = createWorld(0, 'super_easy', 'gigi', undefined, soldiers);
+    standAt(world, 9, 3);
+    world.player.invincible = 9999;
+    step(world, {}, 30);
+    const e = world.enemies.find((z) => z.type === 'soldier')!;
+    expect(e.zombie).toBe(true);
+    expect(e.x).toBeLessThan(14 * TILE);
+    world.player.x = e.x - world.player.w + 2;
+    step(world);
+    expect(world.dead).toBe(false);
+    expect(world.player.x + world.player.w).toBeLessThanOrEqual(e.x);
+    world.arrows.push({ x: e.x - 6, y: e.y + 6, vx: 6, life: 60, isChicken: false });
+    step(world);
+    expect(e.alive).toBe(false);
+  });
+
   it('come as penguins too (Winter\'s W): pushing, shuffling after the hero, down to an arrow', () => {
     const waddlers = courseLevel({
       name: 'waddlers',

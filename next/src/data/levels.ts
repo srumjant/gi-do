@@ -245,10 +245,10 @@ export const LEVELS: Level[] = [
 export type LevelEnding = 'rescue' | 'chase' | 'boss';
 
 /** A theme's villain, who carries the sibling through its levels. */
-export type Villain = 'dollQueen' | 'pterodactyl' | 'vanaToomas' | 'pizzaChef' | 'yeti';
+export type Villain = 'dollQueen' | 'pterodactyl' | 'vanaToomas' | 'pizzaChef' | 'yeti' | 'tRex';
 
 /** Each theme's boss. */
-export type BossKind = 'dollQueen' | 'pterodactyl' | 'vanaToomas' | 'pizzaChef' | 'yeti';
+export type BossKind = 'dollQueen' | 'pterodactyl' | 'vanaToomas' | 'pizzaChef' | 'yeti' | 'tRex';
 
 /** A boss, as a level's ASCII places it. */
 export interface BossDef {
