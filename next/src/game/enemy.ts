@@ -2,7 +2,7 @@ import { ENEMY_SCALE, GIANT_SCALE, GRAVITY, TILE } from '../config/constants';
 import type { DifficultyRecord } from '../config/difficulty';
 import type { EnemyDef, TileMap } from '../data/levels';
 import {
-  BAT_S, BOUNCER_S, CANNON_S, CAR_S, CHICKEN_S, COOK_S, DINO_S, DOLL_S, GHOST_S, GIANT_S, ICEBAT_S, KNIGHT_S,
+  BAT_S, BOUNCER_S, CANNON_S, CAR_S, CHICKEN_S, COOK_S, DINO_S, DOLL_S, GHOST_S, GIANT_S, ICEBAT_S, KNIGHT_S, SOLDIER_S,
   PENGUIN_S,
   type SpriteData,
 } from '../data/sprites';
@@ -149,6 +149,7 @@ const ENEMY_SPRITES: Partial<Record<string, SpriteData>> = {
   giant: GIANT_S,
   knight: KNIGHT_S,
   cook: COOK_S,
+  soldier: SOLDIER_S,
 };
 
 /**

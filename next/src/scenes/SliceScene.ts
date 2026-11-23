@@ -25,6 +25,7 @@ import { DollQueenView } from '../gfx/dollQueen';
 import { PterodactylView } from '../gfx/pterodactyl';
 import { PizzaChefView } from '../gfx/pizzaChef';
 import { VanaToomasView } from '../gfx/vanaToomas';
+import { TRexView } from '../gfx/tRex';
 import { YetiView } from '../gfx/yeti';
 import type { EnemyState, World } from '../game/types';
 import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
@@ -334,6 +335,8 @@ export class SliceScene extends Phaser.Scene {
   private chefView!: PizzaChefView;
   /** The Yeti, on the level that ends with him (gfx/yeti.ts). */
   private yetiView!: YetiView;
+  /** The T-Rex's final fight, on the level that ends with him (gfx/tRex.ts). */
+  private tRexView!: TRexView;
   private cageBackGraphics!: Phaser.GameObjects.Graphics;
   private cageBarsGraphics!: Phaser.GameObjects.Graphics;
   private rescueCryText!: Phaser.GameObjects.Text;
@@ -457,6 +460,7 @@ export class SliceScene extends Phaser.Scene {
     this.toomasView = new VanaToomasView(this);
     this.chefView = new PizzaChefView(this);
     this.yetiView = new YetiView(this);
+    this.tRexView = new TRexView(this);
 
     this.catPickupImage = this.hiddenImage(CAT_TEXTURE, DEPTH_PICKUP);
     this.catImage = this.hiddenImage(CAT_TEXTURE, DEPTH_CAT);
@@ -927,6 +931,7 @@ export class SliceScene extends Phaser.Scene {
     this.toomasView.update(this.world);
     this.chefView.update(this.world);
     this.yetiView.update(this.world);
+    this.tRexView.update(this.world);
     this.syncEnemyProjectiles();
     this.syncArrows();
     this.syncPlayer();

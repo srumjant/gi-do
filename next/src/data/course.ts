@@ -34,9 +34,10 @@ import {
  *   F  checkpoint flag: a death brings you back to the last one you touched
  *   P  where the hero starts     R  where the sibling waits
  *   d  doll   n  dino   a  bat   x  car   o  cannon   u  bouncer   p  penguin   i  ice bat
- *   D  N  K  Z  W  a ZOMBIE doll, dino, knight, cook or penguin: it can't be stomped, it pushes
- *      you back, an arrow puts it down. Only zombies wear a knight's armour or a cook's hat, so
- *      K and Z have no lower case; W (a waddle) because P is the hero's start.
+ *   D  N  K  Z  W  L  a ZOMBIE doll, dino, knight, cook, penguin or toy soldier: it can't be
+ *      stomped, it pushes you back, an arrow puts it down. Only zombies wear a knight's armour,
+ *      a cook's hat or a tin soldier's coat, so K, Z and L have no lower case; W (a waddle)
+ *      because P is the hero's start.
  *   g  giant: in the way, never hurts (a stomp bounces off, arrows too); only a chicken ray
  *      moves him. Put him where no jump gets over: under a roof 4 tiles up.
  *
@@ -51,7 +52,7 @@ const ENEMY_LETTERS: Record<string, string> = {
   i: 'icebat',
 };
 /** Upper case is the same walker as a zombie (EnemyState.zombie). */
-const ZOMBIE_LETTERS: Record<string, string> = { D: 'doll', N: 'dino', K: 'knight', Z: 'cook', W: 'penguin' };
+const ZOMBIE_LETTERS: Record<string, string> = { D: 'doll', N: 'dino', K: 'knight', Z: 'cook', W: 'penguin', L: 'soldier' };
 
 const STATION_LETTERS: Record<string, StationKind> = {
   b: 'bow', c: 'cape', f: 'fart', h: 'bighead', k: 'chicken',

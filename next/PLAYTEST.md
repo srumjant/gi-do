@@ -336,3 +336,36 @@ where **the Yeti** waits. `?level=13`, `?level=14`, `?level=15` open each one.
 - The Yeti: do they find jumping over the charge, and running to jump on him while he's dizzy?
   About 20 to 40 seconds of fighting when it goes well.
 - Anywhere stuck for more than a minute, or more than three or four deaths in a section.
+
+## Toy Castle, the end of the game (2026-11-23)
+
+Toy Castle is now three levels and the T-Rex's new final fight: **Mängulossi** (Toy Castle,
+rebuilt), **Lossisaalid** (the Castle Halls) and **Troonisaal** (the Throne Room).
+`?level=16`, `?level=17`, `?level=18` open each one. Beating the T-Rex wins the game.
+
+- **Every tool comes back.** The bow, the fart jump, the big head and the chicken ray, each
+  with its station just before what needs it.
+- **Zombie toy soldiers** are Toy Castle's zombies: tin soldiers gone green.
+- **Mängulossi**: the bow and the first toy soldiers; a moat too wide to jump with its
+  drawbridge up (shoot the target and the planks come down); the castle gate with its own
+  target. The T-Rex runs off with the sibling.
+- **Lossisaalid**: a spring up onto the gallery and toy soldiers up there; a cracked wall (big
+  head); a wall only a fart jump gets over; a giant in a corridor (chicken ray).
+- **Troonisaal**: a gate that needs both its targets; toy soldiers in front of a giant; a
+  cracked tower door and a fart wall. Then the throne room.
+- **The T-Rex.** He walks up and down; now and then he stops in the middle, roars and breathes
+  a fireball (jump it or shoot it). His touch never hurts. A bubble over his head shows the
+  tool for the next hit, and its station glows:
+  1. **Bow**: shoot the target by the door when he's under the big toy block; it drops on his
+     head.
+  2. **Fart**: jump on his head with the fart on.
+  3. **Big head**: touch him with a big head and his crown smashes.
+  4. **Chicken ray**: he calls two little dinos; ray them into chickens, then ray him. He
+     shrinks into a tiny toy, the cage opens, and the game is won.
+
+### What to watch
+
+- Does your child read the bubble over the T-Rex, and go for the right station?
+- The block: do they wait for him to be under it?
+- About 20 to 40 seconds of fighting when it goes well. Too long, too short?
+- The ending: is shrinking him into a tiny toy a good enough finale?
