@@ -46,7 +46,7 @@ earlier themes come back as reminders.
 | Winter | all four, plus ice | the snow field: slippery ice | the frozen lake | the ice palace | **the Yeti** |
 | Toy Castle | everything | the gate | the halls | the throne room | **the T-Rex**, the final boss, redrawn and with a new fight |
 
-Doll Garden, Dinosaur Canyon, Tallinn, Palermo and Winter are designed in detail below; each later theme is designed when
+Doll Garden, Dinosaur Canyon, Tallinn, Palermo, Winter and Toy Castle are designed in detail below; each later theme is designed when
 its batch starts.
 
 ## Doll Garden, in detail
@@ -251,6 +251,40 @@ a ceiling hung with icicles; the sibling in a cage on an ice dais at the far end
   bringing down more icicles.
 - Three hits and he flops down on the ice, beaten; the cage opens.
 
+## Toy Castle, in detail (batch 6)
+
+The last theme: **everything** comes back, and the boss is the T-Rex, with his new fight. The
+theme's zombies are **zombie toy soldiers**: little tin soldiers in tall black hats, gone
+green, red eyes, the usual zombie rule. The T-Rex carries the sibling through the chases.
+
+**Level 1: Mängulossi (Toy Castle).** The original level rebuilt: toy-block steps, `?` blocks,
+the rainbow block, dolls, cars, bats. The bow and the first zombie toy soldiers; a moat with
+the drawbridge up (shoot its target and the planks come down); the castle gate, a portcullis
+with a target of its own. At the end the T-Rex runs off with the sibling.
+
+**Level 2: Lossisaalid (the Castle Halls).** A spring up onto a gallery; a cracked wall (big
+head); a wall only a fart climbs; a giant in a corridor (chicken ray); zombie soldiers. The
+T-Rex runs off down the last hall.
+
+**Level 3: Troonisaal (the Throne Room).** Every tool in turn, harder together: a gate with two
+targets, zombie soldiers in front of a giant, a cracked tower door and a wall only a fart gets
+over. Then the throne room: the door shuts behind you, and the T-Rex.
+
+**The boss: the T-Rex.** Four and a half tiles long, walking up and down the throne room, the
+sibling in a cage on a dais. Four stations in the room, one for each tool. A bubble over his
+head shows the tool the next hit needs, and that station glows. His touch never hurts: you
+bounce off or are pushed off. Now and then he stops in the middle of the room and roars,
+breathing a fireball at the hero (an arrow knocks it out; slow and rare on Super Easy).
+
+1. **Bow.** A big toy block hangs from the ceiling over the middle of the room, on a rope tied
+   to a target by the door, with room to stand on either side of it. Shoot the target and the block drops: on his head, a hit. Missed,
+   it smashes on the floor and a new one is lowered.
+2. **Fart.** Only a fart jump lands hard enough: jump on his head with the fart on, a hit.
+   Anything else bounces off.
+3. **Big head.** He wears a crown: touch him with a big head and it smashes, a hit.
+4. **Chicken ray.** He calls two little zombie dinos. Ray them into chickens; with none left,
+   ray him: he shrinks into a tiny toy T-Rex. The cage opens, and the game is won.
+
 ## The final boss: the T-Rex
 
 Today's sprite has both eyes facing front on a thin, upright body: it reads as an owl or a
@@ -262,7 +296,7 @@ poses keep their meaning (idle, walk, charge, roar), the roar opening the jaw wi
 new fight comes with Toy Castle's batch:** the final boss asks for every tool once — shoot the
 targets that drop toy blocks on its head, fart-jump onto its head when it lowers it to roar,
 smash the crown it wears with a big head, chicken-ray the little dinos it calls. Its arena keeps
-it on screen (today it can stand half above the top edge, over the score).
+it on screen (today it can stand half above the top edge, over the score). Built in batch 6: see "Toy Castle, in detail".
 
 ## Zombies
 
