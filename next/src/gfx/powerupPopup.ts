@@ -1,4 +1,4 @@
-import { BASE_H, BASE_W } from '../config/constants';
+import { BASE_W } from '../config/constants';
 
 /**
  * Everything the power-up announcement looks like on one frame, as numbers
@@ -15,8 +15,6 @@ export interface PopupFrame {
    * the last fifth, flat 1 in between. Everything drawn is multiplied by it.
    */
   alpha: number;
-  /** The dim over the whole screen, the live `alpha*0.5` at :3147. */
-  dimAlpha: number;
   /** The burst ring, expanding to 180px and fading as it goes (:3151-3153). */
   ringRadius: number;
   ringAlpha: number;
@@ -34,9 +32,15 @@ export interface PopupFrame {
   showText: boolean;
 }
 
-/** Where the box and the burst are centred: the middle of the screen (:3153, :3158). */
-const CENTRE_X = BASE_W / 2;
-const CENTRE_Y = BASE_H / 2;
+/**
+ * Where the box and the burst are centred. The live game put them in the middle of the
+ * screen (:3153, :3158) over a dimmed, frozen world; the game now plays on under the
+ * announcement, so it sits up top, clear of the player, between the HUD's two corners.
+ */
+export const POPUP_CENTRE_X = BASE_W / 2;
+export const POPUP_CENTRE_Y = 110;
+const CENTRE_X = POPUP_CENTRE_X;
+const CENTRE_Y = POPUP_CENTRE_Y;
 
 /** :3151. */
 const RING_MAX_RADIUS = 180;
@@ -75,7 +79,6 @@ export function popupFrame(timer: number, maxTimer: number, animFrame: number): 
   return {
     progress,
     alpha,
-    dimAlpha: alpha * 0.5,
     ringRadius,
     ringAlpha: alpha * (1 - progress) * 0.6,
     innerRingRadius: ringRadius * INNER_RING_SCALE,

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BASE_W, STEP_MS } from '../config/constants';
 import { T, TStr } from '../config/i18n';
+import { prompt } from '../config/glyphs';
 import { pickFrom } from '../game/learn/content';
 import type { LearnSession } from '../game/learn/types';
 import { random } from '../game/random';
@@ -89,7 +90,7 @@ export class LearnResultScene extends Phaser.Scene {
     this.add.text(BASE_W / 2, CHEER_Y, cheer, CHEER_FONT).setOrigin(0.5, 1);
     this.add.text(BASE_W / 2, FOUND_Y, `${TStr('learn_found')} ${word ?? found.join(' ')}`, FOUND_FONT).setOrigin(0.5, 1);
     this.add.text(BASE_W / 2, SCORE_Y, `${TStr('score_label')}${session.score}`, SCORE_FONT).setOrigin(0.5, 1);
-    this.add.text(BASE_W / 2, HINT_Y, TStr('learn_result_hint'), HINT_FONT).setOrigin(0.5, 1);
+    this.add.text(BASE_W / 2, HINT_Y, prompt('prompt_learn_result'), HINT_FONT).setOrigin(0.5, 1);
 
     const character = getSelectedChar();
     const hero = this.add

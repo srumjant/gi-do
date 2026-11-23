@@ -135,8 +135,7 @@ export function createPlayer(level: Level, dc: DifficultyRecord, character: Char
 
 /**
  * Port of index.html:1148-1156 — what a rainbow block pays out. One of three effects,
- * picked uniformly at random, plus the announcement that freezes the whole game while
- * it shows.
+ * picked uniformly at random, plus the announcement.
  *
  * Its one caller is `bumpBlocksAbove` below — a rainbow block (tile 5) taken from
  * underneath. Nothing else grants a silly power-up.
@@ -151,9 +150,8 @@ export function createPlayer(level: Level, dc: DifficultyRecord, character: Char
  *   - `chicken` sets `hasBow` TOO, and its charge count is a flat 8, not `dc.bowCharges`.
  *     The chicken ray rides the bow's firing path (index.html:1392-1396) rather than
  *     having one of its own, so both fields are genuinely consulted; see PlayerState.
- *   - The popup is not decoration. index.html:1276 returns out of `update()` for as
- *     long as it exists, so granting a power-up stops the world for 120 frames. See
- *     PowerupPopup in types.ts and the gate at the top of stepWorld.
+ *   - The popup no longer stops the world as the live game's did (index.html:1276). See
+ *     PowerupPopup in types.ts.
  *
  * All three of the live function's last line land here as values rather than as calls:
  * `sfxPickup();sfxWin();` as two sound cues and `padRumble(...)` as one rumble cue. The
@@ -168,7 +166,7 @@ export function giveRandomSillyPowerup(world: World): void {
 /**
  * One silly power-up, named rather than rolled: the rainbow block's prize once
  * `giveRandomSillyPowerup` has picked it, and an obstacle course's station's (game/course.ts).
- * `announce` false skips the popup and its world-stopping freeze and the fanfare, for a
+ * `announce` false skips the popup and the fanfare, for a
  * station a child has already taken once this life and knows.
  */
 export function grantSillyPowerup(world: World, type: PowerupType, announce = true): void {
@@ -184,8 +182,7 @@ export function grantSillyPowerup(world: World, type: PowerupType, announce = tr
   world.powerupPopup = { type, timer: 120, maxTimer: 120 };
   // index.html:1155, in this order: the pickup chime and then the win fanfare, both at
   // once, which is what makes a rainbow block sound like more than a pickup. They are
-  // raised on the frame the world FREEZES, and the freeze lasts 120 frames — so these two
-  // play over a still picture, exactly as they do live.
+  // raised on the frame the banner comes up.
   world.sounds.push('pickup', 'win');
   // And the `padRumble(0,0.35,80)` that closes the same line — the ordinary pickup buzz,
   // not a bigger one, however loud the two sounds are together. See World.rumbles.
@@ -233,8 +230,8 @@ export function headColumns(p: PlayerState): [number, number] {
  *     was already flipped by the first. (Level 1 has no two blocks adjacent in a row,
  *     so nothing there can actually show the double pop.)
  *   - The two LISTS are swept separately, question blocks first. A `?` and a rainbow in
- *     adjacent columns both fire, and the star is created before the power-up freezes
- *     the world. Collapsing them into a single pass over both lists would reverse that
+ *     adjacent columns both fire, and the star is created before the power-up is
+ *     granted. Collapsing them into a single pass over both lists would reverse that
  *     for the column-2 rainbow / column-1 question case.
  *
  * Both tile codes are replaced with 2 (brick). 3 and 5 are already solid — so is 2 —
@@ -271,8 +268,7 @@ export function bumpBlocksAbove(world: World, headTileY: number): void {
       // out block-pickup-win rather than pickup-win-block: the knock is the block being
       // hit, the other two are the prize coming out of it.
       world.sounds.push('block');
-      // Not a quiet state change: this freezes the entire game for 120 frames. See
-      // giveRandomSillyPowerup above and the gate at the top of stepWorld.
+      // And the announcement with it. See giveRandomSillyPowerup above.
       giveRandomSillyPowerup(world);
     }
   }

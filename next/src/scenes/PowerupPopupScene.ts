@@ -1,10 +1,9 @@
 import Phaser from 'phaser';
-import { BASE_H, BASE_W } from '../config/constants';
 import { capitals } from '../config/i18n';
 import { powerupLabel } from '../data/powerups';
 import type { PowerupType, World } from '../game/types';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
-import { popupFrame, popupSparks } from '../gfx/powerupPopup';
+import { POPUP_CENTRE_X, POPUP_CENTRE_Y, popupFrame, popupSparks } from '../gfx/powerupPopup';
 import { fitScreenCamera } from '../gfx/render';
 import { POWERUP_POPUP_SCENE_KEY } from './keys';
 
@@ -16,9 +15,9 @@ export interface PowerupPopupData {
   world: World;
 }
 
-/** The middle of the screen, which is what the whole announcement is laid out around. */
-const CENTRE_X = BASE_W / 2;
-const CENTRE_Y = BASE_H / 2;
+/** What the whole announcement is laid out around: up top, over play that goes on. */
+const CENTRE_X = POPUP_CENTRE_X;
+const CENTRE_Y = POPUP_CENTRE_Y;
 
 /** index.html:3168, :3171, :3173 — offsets from the centre, not absolute coordinates. */
 const ICON_DY = -20;
@@ -29,7 +28,7 @@ const ICON_FONT = { fontFamily: 'serif', resolution: GAME_TEXT_RESOLUTION, fontS
 const NAME_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '20px' };
 const DESC_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#ffffff' };
 
-/** :3148 and :3159 — the screen dim and the box are both black, at different alphas. */
+/** :3159 — the box is black, nearly opaque. */
 const BLACK = 0x000000;
 const BOX_FILL_ALPHA = 0.85;
 
@@ -45,27 +44,22 @@ const SPARK_SIZE = 4;
 /**
  * The power-up announcement: `drawPowerupPopup`, index.html:3140-3184.
  *
- * Bumping a rainbow block from underneath calls `giveRandomSillyPowerup`, which hands out
- * the power-up and sets `world.powerupPopup` — and the gate on the second line of the live
- * update() (index.html:1276, `stepWorld` in game/world.ts) then FREEZES the entire world
- * for 120 frames: player, enemies and camera all stop while the countdown runs. This scene
- * is what makes those two seconds mean something. Without it the game simply hangs and
- * then resumes, which is exactly how the port behaved until now.
+ * Taking a power-up (a rainbow block, or a course's station the first time) sets
+ * `world.powerupPopup`. The live game froze the whole world for its 120 frames
+ * (index.html:1276); the port does not any more, so this is a banner up top over play that
+ * carries on, with no dim over the screen.
  *
  * A scene of its own, listed after HudScene in main.ts, because the live game draws the
  * popup AFTER the whole frame including the HUD (index.html:3455 is
  * `update();draw();drawPowerupPopup();`, and the HUD is drawn inside `draw()` at
- * :1854-1867). So the dim falls over the hearts and the score as well, and the box sits in
- * front of everything. Phaser renders scenes in the order main.ts lists them, which is the
+ * :1854-1867). So the box sits in front of everything, the hearts and the score included. Phaser renders scenes in the order main.ts lists them, which is the
  * same mechanism the HUD already relies on to sit in front of the world.
  *
  * It runs for the whole level rather than being launched when a popup appears: every
  * object is made once in `create()` and `update()` only shows, moves and re-texts them,
  * the same shape as the HUD. There is nothing to construct at the moment of the surprise.
  *
- * `world.animFrame` keeps counting behind the freeze (see the gate in stepWorld), which is
- * what the shimmer and the orbiting sparks are driven by — they keep moving while
- * everything else is still, and that is the whole trick of the live popup.
+ * `world.animFrame` drives the shimmer and the orbiting sparks.
  */
 export class PowerupPopupScene extends Phaser.Scene {
   private world!: World;
@@ -134,9 +128,6 @@ export class PowerupPopupScene extends Phaser.Scene {
 
     this.graphics
       .clear()
-      // :3147-3148. The whole screen, HUD included, dimmed to half the master fade.
-      .fillStyle(BLACK, frame.dimAlpha)
-      .fillRect(0, 0, BASE_W, BASE_H)
       // :3151-3154. The burst, thrown outwards and fading as it goes.
       .lineStyle(RING_LINE_WIDTH, this.color, frame.ringAlpha)
       .strokeCircle(CENTRE_X, CENTRE_Y, frame.ringRadius);

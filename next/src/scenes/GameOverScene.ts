@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { startBGM, stopBGM } from '../audio/bgm';
 import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
+import { prompt } from '../config/glyphs';
 import { BGM_GAMEOVER } from '../data/bgmThemes';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
@@ -81,7 +82,7 @@ export class GameOverScene extends Phaser.Scene {
     // `score_label` carries its own trailing space and colon, so this is a bare
     // concatenation and not a missing separator — the same shape the HUD's score uses.
     this.line(SCORE_DY, SCORE_FONT, TStr('score_label') + this.score);
-    this.line(HINT_DY, HINT_FONT, TStr('press_retry'));
+    this.line(HINT_DY, HINT_FONT, prompt('prompt_retry'));
   }
 
   private line(

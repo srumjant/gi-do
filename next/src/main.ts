@@ -4,6 +4,7 @@ import { installVoice } from './audio/voice';
 import { BASE_W, BASE_H, STEP_HZ } from './config/constants';
 import { installGlyphs } from './config/glyphs';
 import { installFullscreenButton } from './gfx/fullscreen';
+import { setInputSource } from './input/source';
 import { installTouchControls } from './input/touchControls';
 import { RENDER_SCALE } from './gfx/render';
 import { BetweenScene } from './scenes/BetweenScene';
@@ -131,6 +132,10 @@ installVoice(game.sound, (key) => game.cache.audio.exists(key));
 // The live game's full-screen button, in the page's corner. See gfx/fullscreen.ts.
 installFullscreenButton(game);
 installTouchControls();
+// Which device the prompts name (input/source.ts): a phone or tablet starts on its touch
+// buttons; a real key press (not one the touch buttons send) means the keyboard.
+if (window.matchMedia('(pointer: coarse)').matches) setInputSource('touch');
+window.addEventListener('keydown', (e) => { if (e.isTrusted) setInputSource('keyboard'); }, true);
 
 /**
  * A handle on the running game, for driving it by hand from a browser console: stepping

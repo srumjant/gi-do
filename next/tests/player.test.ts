@@ -404,12 +404,10 @@ describe('giveRandomSillyPowerup', () => {
   });
 });
 
-// index.html:1276 — the second line of update(), right after `animFrame++` and above
-// every other state check. This is the reason `powerupPopup` is simulation state and
-// not HUD state: while it exists, update() returns immediately and NOTHING moves.
-// Unreachable in play until the rainbow block calls giveRandomSillyPowerup, so no
-// trace can cover it; pinned here instead.
-describe('the power-up popup freezes the whole world', () => {
+// index.html:1276 froze the whole world while the announcement showed. The port dropped
+// that: two seconds of a stopped game in a jump or a chase got in a child's way. Pinned
+// here, as no trace takes a rainbow block.
+describe('the power-up popup lets play go on', () => {
   afterEach(() => setRandom(Math.random));
 
   function snapshot(world: World): string {
@@ -418,7 +416,7 @@ describe('the power-up popup freezes the whole world', () => {
     });
   }
 
-  it('stops the player, the enemies and the camera for exactly 120 frames, but not animFrame', () => {
+  it('keeps the player, the enemies and the camera moving under it, and goes after 120 frames', () => {
     setRandom(() => 0.5); // a bat streams in below and draws its sineOffset from this
     const world = makeWorld();
     // "Nothing moves" has to be a claim about three moving things, not about an empty
@@ -451,29 +449,23 @@ describe('the power-up popup freezes the whole world', () => {
     expect(world.camera.x).toBeGreaterThan(0);
 
     giveRandomSillyPowerup(world);
-    const frozen = snapshot(world);
-    const animAtGrant = world.animFrame;
+    const atGrant = snapshot(world);
     const xAtGrant = world.player.x;
 
-    // 119 frames of held input that would otherwise walk, spawn and scroll.
-    for (let i = 0; i < 119; i++) stepWorld(world, held({ right: true }), testMove);
-    expect(snapshot(world)).toBe(frozen);
-    // animFrame keeps counting through the freeze — it is incremented ABOVE the gate,
-    // which is why the drawn scene behind the popup still animates.
-    expect(world.animFrame).toBe(animAtGrant + 119);
-    expect(world.powerupPopup).toEqual({ type: 'bighead', timer: 1, maxTimer: 120 });
-
-    // The 120th frame is the last frozen one; it is also the one that clears the popup.
-    stepWorld(world, held({ right: true }), testMove);
-    expect(world.powerupPopup).toBeNull();
-    expect(snapshot(world)).toBe(frozen);
-
-    // ...and the 121st moves again.
+    // The very next frame moves, the popup counting down above it.
     stepWorld(world, held({ right: true }), testMove);
     expect(world.player.x).toBeGreaterThan(xAtGrant);
+    expect(snapshot(world)).not.toBe(atGrant);
+    expect(world.powerupPopup).toEqual({ type: 'bighead', timer: 119, maxTimer: 120 });
+
+    // And it is gone on the 120th.
+    for (let i = 0; i < 118; i++) stepWorld(world, held({}), testMove);
+    expect(world.powerupPopup).not.toBeNull();
+    stepWorld(world, held({}), testMove);
+    expect(world.powerupPopup).toBeNull();
   });
 
-  it('is thrown away by a respawn, so a death mid-announcement does not freeze the rebuilt level', () => {
+  it('is thrown away by a respawn, so a death mid-announcement does not carry it into the rebuilt level', () => {
     const world = makeWorld();
     setRandom(() => 0.5);
     giveRandomSillyPowerup(world);

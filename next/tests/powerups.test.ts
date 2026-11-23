@@ -67,12 +67,7 @@ describe('the announcement frame', () => {
     }
   });
 
-  it('dims the screen to half the fade', () => {
-    expect(popupFrame(60, MAX, 0).dimAlpha).toBeCloseTo(0.5);
-    expect(popupFrame(108, MAX, 0).dimAlpha).toBeCloseTo(0.25);
-  });
-
-  it('grows the box to 240x100 about the centre of the screen, and leaves it there', () => {
+  it('grows the box to 240x100 up top, clear of the player, and leaves it there', () => {
     const cases: [timer: number, width: number][] = [
       [120, 0],
       [96, 240],  // full size by the time the fade reaches 1
@@ -84,7 +79,7 @@ describe('the announcement frame', () => {
       expect(frame.boxW, `timer ${timer}`).toBeCloseTo(width);
       expect(frame.boxH, `timer ${timer}`).toBeCloseTo(width * (100 / 240));
       expect(frame.boxX + frame.boxW / 2).toBeCloseTo(320);
-      expect(frame.boxY + frame.boxH / 2).toBeCloseTo(200);
+      expect(frame.boxY + frame.boxH / 2).toBeCloseTo(110);
     }
   });
 
@@ -107,7 +102,7 @@ describe('the announcement frame', () => {
   });
 
   it('pulses the shimmer on the world clock rather than on the countdown', () => {
-    // Sine of animFrame, so it keeps moving while the world behind it is frozen.
+    // Sine of animFrame, the world's free-running clock.
     expect(popupFrame(60, MAX, 0).shimmer).toBeCloseTo(0.7);
     expect(popupFrame(60, MAX, Math.PI / 0.4).shimmer).toBeCloseTo(1);
     expect(popupFrame(60, MAX, Math.PI / 0.4 * 3).shimmer).toBeCloseTo(0.4);
@@ -116,10 +111,10 @@ describe('the announcement frame', () => {
   it('puts the four sparks a quarter turn apart, 10px outside the box', () => {
     const sparks = popupSparks(0, 240, 100);
     expect(sparks.map((s) => [Math.round(s.x), Math.round(s.y)])).toEqual([
-      [450, 200],
-      [320, 260],
-      [190, 200],
-      [320, 140],
+      [450, 110],
+      [320, 170],
+      [190, 110],
+      [320, 50],
     ]);
   });
 });

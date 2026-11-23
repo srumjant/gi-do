@@ -3,6 +3,7 @@ import { ensureAudio } from '../audio/context';
 import { sfxPickup } from '../audio/sfx';
 import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
+import { prompt } from '../config/glyphs';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { MODE_ADVENTURE, MODE_LEARN } from '../game/navigation';
 import { getSkinIndex } from '../game/run';
@@ -211,7 +212,7 @@ export class ModeSelectScene extends Phaser.Scene {
     // skin) and Dodo from the chosen skin, the same asymmetry the title screen has.
     this.hero = this.add.image(HERO_X, GROUND_Y, this.heroKey()).setOrigin(0, 1);
 
-    this.hint = this.add.text(BASE_W / 2, HINT_Y, TStr('mode_hint'), HINT_FONT).setOrigin(0.5, 1);
+    this.hint = this.add.text(BASE_W / 2, HINT_Y, prompt('prompt_choose'), HINT_FONT).setOrigin(0.5, 1);
 
     this.clock = createFrameClock();
     this.keys = bindMenuKeys(this);

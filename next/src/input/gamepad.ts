@@ -1,6 +1,7 @@
 import type { GlyphAction } from '../config/i18n';
 import type { RumbleCue, World } from '../game/types';
 import type { ReadableKey } from './edges';
+import { setInputSource } from './source';
 
 /**
  * The controller: who it is, what its buttons mean, and how it buzzes.
@@ -275,8 +276,11 @@ export function samplePad(): PadSnapshot | null {
     padLastId = gp.id;
     padKind = detectPadKind(gp.id);
   }
+  const buttons = gp.buttons.map((button) => button.pressed);
+  // A button down: the child is on the controller now, so the prompts name its buttons.
+  if (buttons.some(Boolean)) setInputSource('pad');
   return {
-    buttons: gp.buttons.map((button) => button.pressed),
+    buttons,
     axes: Array.from(gp.axes),
   };
 }
