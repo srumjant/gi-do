@@ -1,9 +1,10 @@
 import type Phaser from 'phaser';
 import type { ChefFx, PizzaChefState } from '../game/bosses/pizzaChef';
 import type { EnemyProjectile, World } from '../game/types';
+import { sfxCluck } from '../audio/sfx';
+import { BossShowView } from './bossShow';
 import { COURSE_SPARK_TEXTURE } from './course';
-import {
-  CHEF_BARE_TEXTURE, CHEF_CHICKEN_TEXTURE, CHEF_HAT_TEXTURE, CHEF_PEEL_TEXTURE, CHEF_TEXTURE,
+import { CHEF_CHICKEN_TEXTURE, CHEF_HAT_TEXTURE, CHEF_PEEL_TEXTURE, CHEF_TEXTURE,
   spriteScale, STAR_TEXTURE,
 } from './textures';
 
@@ -51,6 +52,10 @@ export class PizzaChefView {
   /** How far over he has flopped, once beaten; how far the peel is swung. */
   private readonly sit = { angle: 0 };
   private readonly swing = { angle: 0 };
+  /** Beaten, a chicken running off clucking: how far, how high in its hop, how faded. */
+  private readonly flee = { x: 0, y: 0, alpha: 1 };
+  /** What he says and how he moves (gfx/bossShow.ts). */
+  private readonly show: BossShowView;
 
   constructor(private readonly scene: Phaser.Scene) {
     const image = (key: string, depth: number) => {
@@ -74,6 +79,7 @@ export class PizzaChefView {
     this.feathers = burst(FEATHERS, 1200, 60);
     this.sauce = burst(SAUCE, 500, 200);
     this.dust = burst(DUST, 700, 0);
+    this.show = new BossShowView(scene, 'pizzaChef');
   }
 
   /** Once per rendered frame, after the steps. */
@@ -81,12 +87,15 @@ export class PizzaChefView {
     const b = world.courseBoss;
     if (!b || b.kind !== 'pizzaChef') {
       this.hideAll();
+      this.show.hide();
       return;
     }
     if (b !== this.drawn) this.reset(b);
-    for (const fx of b.fx.splice(0)) this.playFx(b, fx);
+    const fx = b.fx.splice(0);
+    for (const f of fx) this.playFx(b, f);
     if (b.phase !== this.phase) this.changePhase(b);
     this.place(b, world.animFrame);
+    this.show.update(world, b, fx.map((f) => f.kind), [this.body], [this.body, this.peel]);
     this.drawPizzas(world, b);
   }
 
@@ -100,6 +109,8 @@ export class PizzaChefView {
     this.phase = null;
     this.sit.angle = 0;
     this.swing.angle = 0;
+    Object.assign(this.flee, { x: 0, y: 0, alpha: 1 });
+    this.scene.tweens.killTweensOf(this.flee);
     this.pizzas.clear();
     for (const im of [this.body, this.peel]) {
       this.scene.tweens.killTweensOf(im);
@@ -168,12 +179,23 @@ export class PizzaChefView {
   private changePhase(b: PizzaChefState): void {
     const was = this.phase;
     this.phase = b.phase;
-    const key = b.phase === 'chicken' ? CHEF_CHICKEN_TEXTURE : b.phase === 'defeated' ? CHEF_BARE_TEXTURE : CHEF_TEXTURE;
+    const key = b.phase === 'chicken' || b.phase === 'defeated' ? CHEF_CHICKEN_TEXTURE : CHEF_TEXTURE;
     this.body.setTexture(key).setScale(spriteScale(this.body));
     if (b.phase === 'defeated' && was !== 'defeated') {
-      // He flops over on his back, beaten, and his peel falls the other way.
-      this.scene.tweens.add({ targets: this.sit, angle: b.facing < 0 ? 84 : -84, duration: 600, ease: 'Bounce.easeOut' });
-      this.scene.tweens.add({ targets: this.peel, angle: b.facing < 0 ? -85 : 85, duration: 700, ease: 'Quad.easeIn' });
+      // Beaten, he is a chicken for good: his peel falls over and off he runs, clucking and
+      // shedding feathers, off the nearer side.
+      const tweens = this.scene.tweens;
+      tweens.add({ targets: this.peel, angle: b.facing < 0 ? -85 : 85, duration: 700, ease: 'Quad.easeIn' });
+      const middle = (b.patrol[0] + b.patrol[1] + b.w) / 2;
+      const away = b.x + b.w / 2 < middle ? -1 : 1;
+      tweens.add({ targets: this.flee, x: away * 260, alpha: 0, duration: 2000, delay: 700, ease: 'Quad.easeIn' });
+      tweens.add({
+        targets: this.flee, y: -10, duration: 120, yoyo: true, repeat: 9, delay: 700, ease: 'Sine.easeOut',
+        onRepeat: () => {
+          if (Math.random() < 0.4) sfxCluck();
+          this.feathers.explode(3, this.body.x, this.body.y - this.body.displayHeight / 2);
+        },
+      });
     }
   }
 
@@ -189,10 +211,10 @@ export class PizzaChefView {
     const flicker = chicken && b.timer < 90 && b.timer % 8 < 4 ? 0.5 : 1;
     this.body.setFlipX(flip).setAlpha(flicker);
     if (b.phase === 'defeated') {
-      // Flopped over, turning about his middle and resting on the floor: about his feet, half
-      // of him sank below it.
-      const lying = restingOn(this.body, b.floorY, this.sit.angle);
-      this.body.setOrigin(0.5, 0.5).setPosition(cx, lying).setAngle(this.sit.angle);
+      // A chicken, running off.
+      const away = this.flee.x === 0 ? flip : this.flee.x > 0;
+      this.body.setOrigin(0.5, 1).setPosition(cx + this.flee.x, b.floorY + this.flee.y).setAngle(0)
+        .setFlipX(away).setAlpha(this.flee.alpha).setVisible(this.flee.alpha > 0.01);
     } else {
       this.body.setOrigin(0.5, 1).setPosition(cx, feet).setAngle(dazed ? Math.sin(animFrame * 0.25) * 6 : 0);
     }

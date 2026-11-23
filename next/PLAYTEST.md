@@ -461,3 +461,27 @@ Open the game with `?fps` at the end of the address
 - **HELI ... MS**: how late the TV itself plays sound, once the game has made one. Over about
   150 ms, the music and sounds will feel late, and that delay is the TV's own (try its game
   mode, or a setting for sound delay or "lip sync").
+
+## The bosses put on a show (2026-11-23)
+
+The fights play exactly as before; the bosses just act much more:
+
+- **An entrance**: when you walk into the arena, the boss's name comes up big, it hops and
+  says a taunt ("MINU VIHMAVARI KAITSEB MIND!"). Nothing can hurt you during it.
+- **They talk**: "AI!" when hit, "OH EI!" on the last heart, a laugh when you get hurt, and a
+  cheeky line when something does not count yet ("HAHA! VIHMAVARI!", "KLÕNKS! HEI!").
+- **Hints, on Super Easy and Easy**: stuck for about eight seconds, the boss gives away its
+  own weakness by telling you not to do it: "ÄRA AINULT MÄRKI LASE!".
+- **Livelier**: they bob as they walk, breathe, blink, crouch before every attack, flash white
+  when hit, screw their eyes shut when dizzy, and go redder as their hearts run out.
+- **Funny defeats**: the Doll Queen runs off crying; the Pterodactyl tumbles down and flaps
+  home; Vana Toomas runs off in spotted underpants; the Pizza Chef turns into a chicken and
+  runs off clucking; the Yeti slides away and becomes a snowman; the T-Rex spins into a tiny
+  bouncing toy.
+
+### What to watch
+
+- Does your child read the bubbles, or want them read out?
+- Do the hints help, or give too much away?
+- Which defeat gets the biggest laugh? That tells us what to do more of in the next batch
+  (a new trick in each fight).

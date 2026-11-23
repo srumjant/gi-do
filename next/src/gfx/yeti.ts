@@ -3,7 +3,10 @@ import { ICICLE_DROP, type YetiFx, type YetiState } from '../game/bosses/yeti';
 import type { EnemyProjectile, World } from '../game/types';
 import { COURSE_SPARK_TEXTURE } from './course';
 import { restingOn } from './pizzaChef';
-import { ICICLE_TEXTURE, spriteScale, STAR_TEXTURE, YETI_ROAR_TEXTURE, YETI_TEXTURE } from './textures';
+import { BossShowView } from './bossShow';
+import {
+  ICICLE_TEXTURE, SNOWMAN_TEXTURE, spriteScale, STAR_TEXTURE, YETI_ROAR_TEXTURE, YETI_TEXTURE,
+} from './textures';
 
 /** With the other bosses (SliceScene's DEPTH_BOSS), and his effects over everything in the world. */
 const DEPTH = 17;
@@ -35,6 +38,13 @@ export class YetiView {
   /** The icicles falling last frame, and where each was: one gone has shattered. */
   private falling = new Map<EnemyProjectile, { x: number; y: number }>();
   private readonly flop = { angle: 0 };
+  /** Beaten: how far he slides along the floor on his back. */
+  private readonly slide = { x: 0 };
+  /** The little snowman he turns into at the end of the slide. */
+  private readonly snowman: Phaser.GameObjects.Image;
+  private melted = false;
+  /** What he says and how he moves (gfx/bossShow.ts). */
+  private readonly show: BossShowView;
 
   constructor(private readonly scene: Phaser.Scene) {
     this.body = scene.add.image(0, 0, YETI_TEXTURE).setOrigin(0.5, 1).setDepth(DEPTH).setVisible(false);
@@ -62,6 +72,8 @@ export class YetiView {
       gravityY: 500,
       tint: SHARDS,
     }).setDepth(DEPTH_FX);
+    this.snowman = scene.add.image(0, 0, SNOWMAN_TEXTURE).setOrigin(0.5, 1).setDepth(DEPTH).setVisible(false);
+    this.show = new BossShowView(scene, 'yeti');
   }
 
   /** Once per rendered frame, after the steps. */
@@ -69,17 +81,21 @@ export class YetiView {
     const b = world.courseBoss;
     if (!b || b.kind !== 'yeti') {
       this.hideAll();
+      this.show.hide();
       return;
     }
     if (b !== this.drawn) this.reset(b);
-    for (const fx of b.fx.splice(0)) this.playFx(fx);
+    const fx = b.fx.splice(0);
+    for (const f of fx) this.playFx(f);
     if (b.phase !== this.phase) this.changePhase(b);
     this.place(b, world.animFrame);
+    this.show.update(world, b, fx.map((f) => f.kind), [this.body], [this.body]);
     this.drawIcicles(world, b);
   }
 
   private hideAll(): void {
     this.body.setVisible(false);
+    this.snowman.setVisible(false);
     for (const im of [...this.stars, ...this.hanging]) im.setVisible(false);
     this.shadows.clear();
   }
@@ -88,8 +104,11 @@ export class YetiView {
     this.drawn = b;
     this.phase = null;
     this.flop.angle = 0;
+    this.slide.x = 0;
+    this.melted = false;
     this.falling.clear();
-    this.scene.tweens.killTweensOf(this.flop);
+    this.scene.tweens.killTweensOf([this.flop, this.slide, this.snowman]);
+    this.snowman.setVisible(false);
     this.body.setVisible(true).setAlpha(1).setAngle(0);
   }
 
@@ -117,8 +136,24 @@ export class YetiView {
   private changePhase(b: YetiState): void {
     this.phase = b.phase;
     if (b.phase !== 'defeated') return;
+    // Beaten: he slips onto his back and slides along the floor, then a puff of snow, and
+    // where he stopped stands a little snowman.
+    const tweens = this.scene.tweens;
     this.snow.explode(50, b.x + b.w / 2, b.y + b.h / 2);
-    this.scene.tweens.add({ targets: this.flop, angle: 84, duration: 600, ease: 'Bounce.easeOut' });
+    tweens.add({ targets: this.flop, angle: 84, duration: 400, ease: 'Quad.easeOut' });
+    tweens.add({
+      targets: this.slide, x: b.facing * 110, duration: 1100, ease: 'Quad.easeOut',
+      onComplete: () => {
+        const x = this.body.x;
+        this.snow.explode(70, x, b.floorY - 16);
+        this.scene.cameras.main.shake(120, 0.004);
+        this.melted = true;
+        this.body.setVisible(false);
+        const snowman = this.snowman.setPosition(x, b.floorY).setVisible(true).setScale(0).setAlpha(1);
+        tweens.add({ targets: snowman, scale: spriteScale(snowman), duration: 450, ease: 'Back.easeOut' });
+        tweens.add({ targets: snowman, y: b.floorY - 6, duration: 180, yoyo: true, repeat: 2, delay: 450, ease: 'Sine.easeOut' });
+      },
+    });
   }
 
   private place(b: YetiState, animFrame: number): void {
@@ -136,8 +171,10 @@ export class YetiView {
     const flash = b.phase === 'hurt' && b.timer % 8 < 4 ? 0.4 : 1;
     this.body.setAlpha(flash).setFlipX(b.facing > 0).setAngle(angle);
     if (b.phase === 'defeated') {
-      // Flopped over about his middle, resting on the floor rather than half through it.
-      this.body.setOrigin(0.5, 0.5).setPosition(cx, restingOn(this.body, b.floorY, angle));
+      // Flopped over about his middle, resting on the floor rather than half through it, and
+      // sliding; gone once he is a snowman.
+      this.body.setOrigin(0.5, 0.5).setPosition(cx + this.slide.x, restingOn(this.body, b.floorY, angle))
+        .setVisible(!this.melted);
     } else {
       this.body.setOrigin(0.5, 1).setPosition(cx + shake, b.floorY + bob);
     }

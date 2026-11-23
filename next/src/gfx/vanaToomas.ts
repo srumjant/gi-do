@@ -4,8 +4,9 @@ import {
 } from '../game/bosses/vanaToomas';
 import type { World } from '../game/types';
 import { COURSE_SPARK_TEXTURE } from './course';
+import { BossShowView } from './bossShow';
 import {
-  spriteScale, TOOMAS_ARMOUR_TEXTURES, TOOMAS_BODY_TEXTURE, TOOMAS_POLE_TEXTURE,
+  spriteScale, TOOMAS_ARMOUR_TEXTURES, TOOMAS_BODY_TEXTURE, TOOMAS_POLE_TEXTURE, TOOMAS_UNDIES_TEXTURE,
 } from './textures';
 
 /** With the other bosses (SliceScene's DEPTH_BOSS), and his effects over everything in the world. */
@@ -34,6 +35,10 @@ export class VanaToomasView {
   private phase: string | null = null;
   /** How far he has sunk, sitting down once beaten. */
   private readonly sit = { y: 0 };
+  /** Beaten, running off in his underpants: how far, how high in his hop, how faded. */
+  private readonly flee = { x: 0, y: 0, alpha: 1 };
+  /** What he says and how he moves (gfx/bossShow.ts). */
+  private readonly show: BossShowView;
 
   constructor(private readonly scene: Phaser.Scene) {
     const layer = (key: string, depth: number) => {
@@ -63,6 +68,7 @@ export class VanaToomasView {
       alpha: { start: 0.8, end: 0 },
       tint: DUST,
     }).setDepth(DEPTH_FX);
+    this.show = new BossShowView(scene, 'vanaToomas');
   }
 
   /** Once per rendered frame, after the steps. */
@@ -70,12 +76,16 @@ export class VanaToomasView {
     const b = world.courseBoss;
     if (!b || b.kind !== 'vanaToomas') {
       this.hideAll();
+      this.show.hide();
       return;
     }
     if (b !== this.drawn) this.reset(b);
-    for (const fx of b.fx.splice(0)) this.playFx(b, fx);
+    const fx = b.fx.splice(0);
+    for (const f of fx) this.playFx(b, f);
     if (b.phase !== this.phase) this.changePhase(b);
     this.place(b);
+    const armour = ARMOUR.map((piece) => this.armour[piece]);
+    this.show.update(world, b, fx.map((f) => f.kind), [this.body, ...armour], this.layers());
   }
 
   private layers(): Phaser.GameObjects.Image[] {
@@ -90,6 +100,9 @@ export class VanaToomasView {
     this.drawn = b;
     this.phase = null;
     this.sit.y = 0;
+    Object.assign(this.flee, { x: 0, y: 0, alpha: 1 });
+    this.scene.tweens.killTweensOf(this.flee);
+    this.body.setTexture(TOOMAS_BODY_TEXTURE);
     for (const image of this.layers()) {
       this.scene.tweens.killTweensOf(image);
       image.setVisible(true).setAlpha(1).setAngle(0);
@@ -130,10 +143,23 @@ export class VanaToomasView {
   private changePhase(b: VanaToomasState): void {
     this.phase = b.phase;
     if (b.phase !== 'defeated') return;
-    // He sits down, beaten, and his flag pole falls over.
+    // Beaten: his flag pole falls over, and with his armour gone he is down to his spotted
+    // underpants. He jumps, mortified, then hops off the nearer side and is gone.
+    const tweens = this.scene.tweens;
     this.sparks.explode(40, b.x + b.w / 2, b.y + b.h / 2);
-    this.scene.tweens.add({ targets: this.sit, y: 10, duration: 500, ease: 'Bounce.easeOut' });
-    this.scene.tweens.add({ targets: this.pole, angle: b.facing < 0 ? -80 : 80, duration: 700, ease: 'Quad.easeIn' });
+    tweens.add({ targets: this.pole, angle: b.facing < 0 ? -80 : 80, duration: 700, ease: 'Quad.easeIn' });
+    this.body.setTexture(TOOMAS_UNDIES_TEXTURE);
+    const middle = (b.patrol[0] + b.patrol[1] + b.w) / 2;
+    const away = b.x + b.w / 2 < middle ? -1 : 1;
+    tweens.chain({
+      targets: this.flee,
+      tweens: [
+        { y: -18, duration: 220, ease: 'Quad.easeOut' },
+        { y: 0, duration: 220, ease: 'Quad.easeIn' },
+        { x: away * 240, alpha: 0, duration: 1800, delay: 500, ease: 'Linear' },
+      ],
+    });
+    tweens.add({ targets: this.flee, y: -8, duration: 140, yoyo: true, repeat: 6, delay: 940, ease: 'Sine.easeOut' });
   }
 
   private place(b: VanaToomasState): void {
@@ -143,11 +169,17 @@ export class VanaToomasView {
     const feet = b.floorY + bob + this.sit.y;
     const flash = b.phase === 'hurt' && b.timer % 8 < 4 ? 0.35 : 1;
     const left = armourLeft(b);
+    if (b.phase === 'defeated') {
+      const away = this.flee.x === 0 ? flip : this.flee.x > 0;
+      this.body.setPosition(cx + this.flee.x, feet + this.flee.y).setFlipX(away).setAlpha(this.flee.alpha)
+        .setVisible(this.flee.alpha > 0.01);
+      for (const piece of ARMOUR) this.armour[piece].setVisible(false);
+      return;
+    }
     this.body.setPosition(cx, feet).setFlipX(flip).setAlpha(flash);
     for (const piece of ARMOUR) {
       this.armour[piece].setPosition(cx, feet).setFlipX(flip).setAlpha(flash).setVisible(left.includes(piece));
     }
-    if (b.phase === 'defeated') return;
     // The pole stands at his front hand; in the windup it goes up, shaking, then comes down.
     const raise = b.phase === 'windup'
       ? Math.min(1, (TOOMAS_WINDUP_FRAMES - b.timer) / 10) * POLE_RAISE + (b.timer % 6 < 3 ? 1 : -1)
