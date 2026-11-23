@@ -36,6 +36,7 @@ const PORT_ONLY_KEYS = [
   'fullscreen_on', 'fullscreen_off',
   'level_1_2', 'level_2_2', 'level_1_3', 'level_2_3', 'level_3_2', 'level_3_3', 'level_4_2', 'level_4_3', 'level_5_2', 'level_5_3', 'level_6_2', 'level_6_3', 'villain_dollQueen', 'villain_dollQueen_par', 'villain_pterodactyl', 'villain_pterodactyl_par', 'villain_vanaToomas', 'villain_vanaToomas_par', 'villain_pizzaChef', 'villain_pizzaChef_par', 'villain_yeti', 'villain_yeti_par', 'villain_tRex', 'villain_tRex_par', 'world_1', 'world_2', 'world_3', 'world_4', 'world_5', 'world_6', 'story_wants', 'story_now_me', 'story_sent_me', 'story_took', 'story_follow', 'story_save', 'story_world', 'story_hooray', 'story_trex_tiny', 'prompt_start', 'prompt_choose', 'prompt_next', 'prompt_retry', 'prompt_play_again', 'prompt_learn_menu', 'prompt_learn_result', 'controls_touch', 'follow_them', 'next_level',
   'skin_ninja', 'skin_cinderella',
+  'boss_intro_dollQueen', 'boss_intro_pterodactyl', 'boss_intro_vanaToomas', 'boss_intro_pizzaChef', 'boss_intro_yeti', 'boss_intro_tRex', 'boss_shrug_dollQueen', 'boss_shrug_pterodactyl', 'boss_shrug_vanaToomas', 'boss_shrug_pizzaChef', 'boss_shrug_yeti', 'boss_shrug_tRex', 'boss_hit_1', 'boss_hit_2', 'boss_hit_3', 'boss_last', 'boss_laugh', 'hint_target', 'hint_fart', 'hint_bighead', 'hint_chicken', 'hint_head', 'hint_jump_over', 'boss_beaten_dollQueen', 'boss_beaten_pterodactyl', 'boss_beaten_vanaToomas', 'boss_beaten_pizzaChef', 'boss_beaten_yeti', 'boss_beaten_tRex',
 ];
 
 describe('translations match the live game', () => {

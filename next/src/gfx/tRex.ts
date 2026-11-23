@@ -5,6 +5,7 @@ import { BLOCK_SIZE, neededTool, TREX_ROUNDS, type TRexFx, type TRexState } from
 import type { World } from '../game/types';
 import { COURSE_GLOW_TEXTURE, COURSE_SPARK_TEXTURE, COURSE_TARGET_TEXTURE, TARGET_PX } from './course';
 import { WORLD_TEXT_RESOLUTION } from './gameFont';
+import { BossShowView } from './bossShow';
 import {
   BOW_TEXTURE, bossTextureKey, CROWN_TEXTURE, spriteScale, STAR_TEXTURE, TOY_BLOCK_TEXTURE,
 } from './textures';
@@ -43,6 +44,10 @@ export class TRexView {
   private drawn: TRexState | null = null;
   private phase: string | null = null;
   private readonly size = { scale: 1 };
+  /** Beaten, a toy now: his little bounces. */
+  private readonly hop = { y: 0 };
+  /** What he says and how he moves (gfx/bossShow.ts). */
+  private readonly show: BossShowView;
 
   constructor(private readonly scene: Phaser.Scene) {
     const image = (key: string, depth: number) => {
@@ -69,6 +74,7 @@ export class TRexView {
     this.sparks = burst(CONFETTI, 220);
     this.gold = burst(GOLD, 400);
     this.dust = burst(DUST, 60);
+    this.show = new BossShowView(scene, 'tRex');
   }
 
   /** Once per rendered frame, after the steps. */
@@ -76,14 +82,18 @@ export class TRexView {
     const b = world.courseBoss;
     if (!b || b.kind !== 'tRex') {
       this.hideAll();
+      this.show.hide();
       return;
     }
     if (b !== this.drawn) this.reset(b);
-    for (const fx of b.fx.splice(0)) this.playFx(fx);
+    const fx = b.fx.splice(0);
+    for (const f of fx) this.playFx(f);
     if (b.phase !== this.phase) this.changePhase(b);
     this.place(b, world.animFrame);
     this.drawBlock(b);
     this.drawHints(world, b);
+    this.show.update(world, b, fx.map((f) => f.kind), [this.body, this.crown], [this.body, this.crown],
+      this.bubble ? [this.bubble] : []);
   }
 
   private hideAll(): void {
@@ -97,7 +107,8 @@ export class TRexView {
     this.drawn = b;
     this.phase = null;
     this.size.scale = 1;
-    this.scene.tweens.killTweensOf(this.size);
+    this.hop.y = 0;
+    this.scene.tweens.killTweensOf([this.size, this.hop, this.body]);
     this.body.setVisible(true).setAlpha(1).setAngle(0);
     this.crown.setVisible(true);
     const box = b.target;
@@ -144,8 +155,23 @@ export class TRexView {
     const was = this.phase;
     this.phase = b.phase;
     if (b.phase === 'defeated' && was !== 'defeated') {
-      // He shrinks down into a tiny toy T-Rex.
-      this.scene.tweens.add({ targets: this.size, scale: 0.25, duration: 1200, ease: 'Back.easeIn' });
+      // He spins as he shrinks down into a tiny toy T-Rex, then confetti, and two little bounces.
+      const tweens = this.scene.tweens;
+      tweens.add({ targets: this.body, angle: 720, duration: 1200, ease: 'Quad.easeIn', onComplete: () => this.body.setAngle(0) });
+      tweens.add({
+        targets: this.size, scale: 0.25, duration: 1200, ease: 'Back.easeIn',
+        onComplete: () => {
+          this.sparks.explode(60, b.x + b.w / 2, b.floorY - 10);
+          this.gold.explode(20, b.x + b.w / 2, b.floorY - 10);
+          tweens.chain({
+            targets: this.hop,
+            tweens: [
+              { y: -24, duration: 260, ease: 'Quad.easeOut' }, { y: 0, duration: 260, ease: 'Quad.easeIn' },
+              { y: -12, duration: 200, ease: 'Quad.easeOut' }, { y: 0, duration: 200, ease: 'Quad.easeIn' },
+            ],
+          });
+        },
+      });
     }
   }
 
@@ -157,7 +183,7 @@ export class TRexView {
     this.body.setScale(spriteScale(this.body) * this.size.scale);
     const shake = b.phase === 'roaring' && animFrame % 4 < 2 ? 1 : 0;
     const flash = b.phase === 'hurt' && b.timer % 8 < 4 ? 0.4 : 1;
-    this.body.setPosition(cx + shake, b.floorY).setFlipX(flip).setAlpha(flash);
+    this.body.setPosition(cx + shake, b.floorY + this.hop.y).setFlipX(flip).setAlpha(flash);
     // The crown sits on his head, which is at the front of him, until a big head smashes it.
     const crowned = b.round <= TREX_ROUNDS.indexOf('bighead') && b.phase !== 'defeated';
     const headX = flip ? b.x + b.w - 22 : b.x + 22;

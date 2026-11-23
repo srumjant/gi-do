@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import { rockWarning, type PteroFx, type PterodactylState } from '../game/bosses/pterodactyl';
 import type { World } from '../game/types';
 import { COURSE_SPARK_TEXTURE } from './course';
+import { BossShowView } from './bossShow';
 import { PTERO_DOWN_TEXTURE, PTERO_UP_TEXTURE, QUEEN_HEART_TEXTURE, spriteScale } from './textures';
 
 /** With the other bosses (SliceScene's DEPTH_BOSS), and her effects over everything in the world. */
@@ -23,6 +24,8 @@ export class PterodactylView {
   private readonly hearts: Phaser.GameObjects.Image[];
   private readonly feathers: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly sparks: Phaser.GameObjects.Particles.ParticleEmitter;
+  /** What she says and how she moves (gfx/bossShow.ts). */
+  private readonly show: BossShowView;
   /** The state last drawn: a respawn rebuilds the level, and with it a fresh Pterodactyl. */
   private drawn: PterodactylState | null = null;
   private phase: string | null = null;
@@ -51,6 +54,7 @@ export class PterodactylView {
       scale: { start: 1.6, end: 0 },
       tint: SPARKS,
     }).setDepth(DEPTH_FX);
+    this.show = new BossShowView(scene, 'pterodactyl');
   }
 
   /** Once per rendered frame, after the steps. */
@@ -58,15 +62,19 @@ export class PterodactylView {
     const b = world.courseBoss;
     if (!b || b.kind !== 'pterodactyl') {
       this.hideAll();
+      this.show.hide();
       return;
     }
     if (b !== this.drawn) this.reset(b);
-    for (const fx of b.fx.splice(0)) this.playFx(fx);
+    const fx = b.fx.splice(0);
+    for (const f of fx) this.playFx(f);
     if (b.phase !== this.phase) this.changePhase(b);
     this.place(b);
+    this.show.update(world, b, fx.map((f) => f.kind), [this.bird], [this.bird], this.hearts);
   }
 
   private hideAll(): void {
+    this.scene.tweens.killTweensOf(this.bird);
     this.bird.setVisible(false);
     this.shadow.clear();
     for (const h of this.hearts) h.setVisible(false);
@@ -91,13 +99,24 @@ export class PterodactylView {
   private changePhase(b: PterodactylState): void {
     this.phase = b.phase;
     if (b.phase !== 'defeated') return;
-    // Down she tumbles, and bursts into feathers where she lands.
-    this.scene.tweens.killTweensOf(this.bird);
-    this.scene.tweens.add({
-      targets: this.bird, y: b.floorY - 12, angle: 540, duration: 900, ease: 'Quad.easeIn',
+    // Down she tumbles in a cloud of feathers, sits there dazed a moment, then flaps off home,
+    // up and away, wobbling.
+    const tweens = this.scene.tweens;
+    const bird = this.bird.setAlpha(1);
+    tweens.killTweensOf(bird);
+    tweens.add({
+      targets: bird, y: b.floorY - 12, angle: 540, duration: 900, ease: 'Quad.easeIn',
       onComplete: () => {
-        this.feathers.explode(70, this.bird.x, this.bird.y);
-        this.bird.setVisible(false);
+        this.feathers.explode(70, bird.x, bird.y);
+        this.scene.cameras.main.shake(150, 0.005);
+        bird.setAngle(0);
+        tweens.add({
+          targets: bird, x: bird.x + b.facing * 260, y: bird.y - 320, alpha: 0, duration: 2200, delay: 600,
+          ease: 'Sine.easeIn',
+          onUpdate: () => bird.setTexture(Math.floor(this.scene.time.now / 90) % 2 ? PTERO_DOWN_TEXTURE : PTERO_UP_TEXTURE),
+          onComplete: () => bird.setVisible(false),
+        });
+        tweens.add({ targets: bird, angle: { from: -12, to: 12 }, duration: 260, yoyo: true, repeat: 8, delay: 600 });
       },
     });
   }

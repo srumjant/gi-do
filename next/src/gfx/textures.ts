@@ -40,6 +40,7 @@ import type { Character } from '../game/player';
 import { CHARACTERS, getEnemySpriteInfo, skinsOf } from '../game/run';
 import { HERO_FRAMES, heroSprite, type HeroFrame } from '../game/heroFrames';
 import { bakeScale, rasterise } from './rasterise';
+import { BOSS_EYES, eyesShut, RED_P, silhouette, SNOWMAN_P, SNOWMAN_S, undies, WHITE_P } from './bossFrames';
 
 /**
  * Registers every sprite this plan draws as a named Phaser texture, once, at boot.
@@ -367,6 +368,53 @@ export function registerBossTextures(scene: Phaser.Scene): void {
   addSprite(scene, ICICLE_TEXTURE, ICICLE_S, ICICLE_P, 2);
   addSprite(scene, CROWN_TEXTURE, CROWN_S, CROWN_P, 3);
   addSprite(scene, TOY_BLOCK_TEXTURE, TOY_BLOCK_S, TOY_BLOCK_P, 4);
+  registerBossShowTextures(scene);
+}
+
+/** Toomas beaten, in his spotted underpants (gfx/bossFrames.ts). */
+export const TOOMAS_UNDIES_TEXTURE = 'toomas-undies';
+/** The little snowman the beaten Yeti becomes. */
+export const SNOWMAN_TEXTURE = 'snowman';
+
+/** A boss picture with its eyes shut, and its one-colour copies for the flash and the anger. */
+export const shutKey = (key: string): string => `${key}-shut`;
+export const whiteKey = (key: string): string => `${key}-white`;
+export const redKey = (key: string): string => `${key}-red`;
+
+/**
+ * Every boss body picture the show flashes, reddens or shuts the eyes of (gfx/bossShow.ts), with
+ * the name of its sprite in data/sprites.ts, the name gfx/bossFrames.ts's eye table goes by.
+ */
+const SHOW_BODIES: ReadonlyArray<readonly [string, string, SpriteData, Palette, number]> = [
+  [QUEEN_TEXTURE, 'QUEEN_S', QUEEN_S, QUEEN_P, QUEEN_SCALE],
+  [PTERO_UP_TEXTURE, 'PTERO_UP_S', PTERO_UP_S, PTERO_P, PTERO_SCALE],
+  [PTERO_DOWN_TEXTURE, 'PTERO_DOWN_S', PTERO_DOWN_S, PTERO_P, PTERO_SCALE],
+  [TOOMAS_BODY_TEXTURE, 'TOOMAS_BODY_S', TOOMAS_BODY_S, TOOMAS_P, TOOMAS_SCALE],
+  [TOOMAS_ARMOUR_TEXTURES.helmet, 'TOOMAS_HELMET_S', TOOMAS_HELMET_S, TOOMAS_P, TOOMAS_SCALE],
+  [TOOMAS_ARMOUR_TEXTURES.plate, 'TOOMAS_PLATE_S', TOOMAS_PLATE_S, TOOMAS_P, TOOMAS_SCALE],
+  [TOOMAS_ARMOUR_TEXTURES.shield, 'TOOMAS_SHIELD_S', TOOMAS_SHIELD_S, TOOMAS_P, TOOMAS_SCALE],
+  [CHEF_TEXTURE, 'CHEF_S', CHEF_S, CHEF_P, CHEF_SCALE],
+  [CHEF_BARE_TEXTURE, 'CHEF_BARE_S', CHEF_BARE_S, CHEF_P, CHEF_SCALE],
+  [CHEF_HAT_TEXTURE, 'CHEF_HAT_S', CHEF_HAT_S, CHEF_P, CHEF_SCALE],
+  [CHEF_CHICKEN_TEXTURE, 'CHEF_CHICKEN_S', CHEF_CHICKEN_S, CHEF_CHICKEN_P, CHEF_SCALE],
+  [YETI_TEXTURE, 'YETI_S', YETI_S, YETI_P, YETI_SCALE],
+  [YETI_ROAR_TEXTURE, 'YETI_ROAR_S', YETI_ROAR_S, YETI_P, YETI_SCALE],
+  [bossTextureKey('idle'), 'BOSS_IDLE', BOSS_IDLE, BOSS_P, BOSS_SCALE],
+  [bossTextureKey('walk'), 'BOSS_WALK', BOSS_WALK, BOSS_P, BOSS_SCALE],
+  [bossTextureKey('charge'), 'BOSS_CHARGE', BOSS_CHARGE, BOSS_P, BOSS_SCALE],
+  [bossTextureKey('roar'), 'BOSS_ROAR', BOSS_ROAR, BOSS_P, BOSS_SCALE],
+];
+
+function registerBossShowTextures(scene: Phaser.Scene): void {
+  for (const [key, name, sprite, palette, scale] of SHOW_BODIES) {
+    const eyes = BOSS_EYES[name];
+    if (eyes) addSprite(scene, shutKey(key), eyesShut(sprite, eyes), palette, scale);
+    const flat = silhouette(sprite);
+    addSprite(scene, whiteKey(key), flat, WHITE_P, scale);
+    addSprite(scene, redKey(key), flat, RED_P, scale);
+  }
+  addSprite(scene, TOOMAS_UNDIES_TEXTURE, undies(TOOMAS_BODY_S), TOOMAS_P, TOOMAS_SCALE);
+  addSprite(scene, SNOWMAN_TEXTURE, SNOWMAN_S, SNOWMAN_P, YETI_SCALE);
 }
 
 /**
