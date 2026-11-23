@@ -9,7 +9,8 @@ import { fitScreenCamera } from '../gfx/render';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
 import { menuPlayerTextureKey, MENU_PORTRAIT_SCALE, registerMenuTextures } from '../gfx/textures';
 import { bindMenuKeys, type MenuKeys, justDown, pressedAny } from '../input/menuKeys';
-import { CHARACTER_SCENE_KEY, SLICE_SCENE_KEY } from './keys';
+import type { BetweenData } from './BetweenScene';
+import { BETWEEN_SCENE_KEY, CHARACTER_SCENE_KEY, SLICE_SCENE_KEY } from './keys';
 import { takeBack } from './navigate';
 import { requestedStage } from './startStage';
 
@@ -195,8 +196,13 @@ export class CharacterScene extends Phaser.Scene {
    */
   private confirm(): void {
     setSelectedChar(this.chosen());
-    startRun(requestedStage());
-    this.scene.start(SLICE_SCENE_KEY);
+    const first = requestedStage();
+    startRun(first);
+    // A run from the very start opens with the story: the first villain snatches the sibling,
+    // and the map shows the way to the T-Rex's castle (BetweenScene, game/story.ts). A run
+    // started further in (?level=N, for testing) goes straight to its level.
+    if (first === 0) this.scene.start(BETWEEN_SCENE_KEY, { next: SLICE_SCENE_KEY, opening: true } satisfies BetweenData);
+    else this.scene.start(SLICE_SCENE_KEY);
   }
 
   private chosen(): Character {

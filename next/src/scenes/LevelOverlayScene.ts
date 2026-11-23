@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
 import { getRescueSprites, isLastLevel } from '../game/run';
+import { fill, villainKey } from '../game/story';
 import type { World } from '../game/types';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { fitScreenCamera } from '../gfx/render';
@@ -86,12 +87,14 @@ export class LevelOverlayScene extends Phaser.Scene {
     const sibling = getRescueSprites().name.toUpperCase();
     // A chase level ends with the villain getting away (Level.ending): no "is safe" yet.
     const chase = this.world.level.ending === 'chase';
-    this.rescueTitle = this.centred(
-      RESCUE_TITLE_DY, RESCUE_TITLE_FONT, chase ? TStr('follow_them') : sibling + TStr('is_safe'),
-    );
-    // 'Next world...' or 'You did it!', decided by whether there is a level after this one.
-    const closing = chase ? 'next_level' : isLastLevel(this.levelIndex) ? 'you_did_it' : 'next_world';
-    this.rescueSub = this.centred(RESCUE_SUB_DY, RESCUE_SUB_FONT, TStr(closing));
+    // Named: who you are following (the owner, 2026-11-23: the words didn't say what was
+    // going on). The cutscene after it shows the chase and the world's levels.
+    const villain = this.world.level.villain;
+    const follow = villain ? fill(TStr('story_follow'), { villain: TStr(villainKey(villain, true)) }) : TStr('follow_them');
+    this.rescueTitle = this.centred(RESCUE_TITLE_DY, RESCUE_TITLE_FONT, chase ? follow : sibling + TStr('is_safe'));
+    // Saved: hooray, or at the very end, you did it. A chase says no more; the cutscene goes on.
+    const closing = chase ? '' : TStr(isLastLevel(this.levelIndex) ? 'you_did_it' : 'story_hooray');
+    this.rescueSub = this.centred(RESCUE_SUB_DY, RESCUE_SUB_FONT, closing);
     this.deathText = this.centred(0, DEATH_FONT, TStr('oops'));
   }
 

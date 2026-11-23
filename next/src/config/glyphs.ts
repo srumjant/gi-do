@@ -1,5 +1,6 @@
 import { padGlyph } from '../input/gamepad';
-import { setGlyphResolver } from './i18n';
+import { backName, confirmName } from '../input/source';
+import { setGlyphResolver, TStr } from './i18n';
 
 /**
  * Placeholders like `{A}` in the translations resolve through this. Two strings in the
@@ -32,4 +33,12 @@ import { setGlyphResolver } from './i18n';
  */
 export function installGlyphs(): void {
   setGlyphResolver(padGlyph);
+}
+
+/**
+ * A prompt from the table with the buttons named for the device in the child's hands
+ * (input/source.ts): %K the confirm button, %B the back button.
+ */
+export function prompt(key: string): string {
+  return TStr(key).replace('%K', confirmName(padGlyph('confirm'))).replace('%B', backName(padGlyph('back')));
 }

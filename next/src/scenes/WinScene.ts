@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BASE_H, BASE_W } from '../config/constants';
 import { getDifficulty } from '../config/difficulty';
 import { capitals, TDiff, TStr } from '../config/i18n';
+import { prompt } from '../config/glyphs';
 import { startBGM, stopBGM } from '../audio/bgm';
 import { sfxWin } from '../audio/sfx';
 import { BGM_WIN } from '../data/bgmThemes';
@@ -39,6 +40,8 @@ const SAVED_Y = 90;
 const BEST_Y = 130;
 const SUMMARY_Y = 160;
 const HINT_Y = 330;
+/** The story's last line, under the two of them. */
+const TINY_Y = 300;
 
 const SAVED_FONT = {
   fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '28px', color: '#ff69b4',
@@ -48,6 +51,7 @@ const BEST_FONT = {
 };
 const SUMMARY_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '14px', color: '#aaddff' };
 const HINT_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '12px', color: '#ffffff' };
+const TINY_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '16px', color: '#88ff88' };
 
 /** The two of them standing together (index.html:2457). Scale 4, and the sibling sits lower. */
 const PORTRAIT_SCALE = 4;
@@ -173,7 +177,9 @@ export class WinScene extends Phaser.Scene {
       this.hearts.push(heart.setScale(spriteScale(heart)));
     }
 
-    this.line(HINT_Y, HINT_FONT, TStr('press_play_again'));
+    // The story's end (game/story.ts): the T-Rex behind it all is a tiny toy now.
+    this.line(TINY_Y, TINY_FONT, TStr('story_trex_tiny'));
+    this.line(HINT_Y, HINT_FONT, prompt('prompt_play_again'));
   }
 
   private line(

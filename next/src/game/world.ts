@@ -288,26 +288,13 @@ export function stepWorld(
   // which counts frames of actual play and is intentionally left alone.
   world.animFrame++;
 
-  // The silly power-up announcement (index.html:1276) — the very next line after
-  // `animFrame++` in the live update(), ABOVE the dead check, the pause menu and
-  // everything else. While it exists the whole game is frozen: no player, no enemies,
-  // no camera, for the full 120 frames. `animFrame` keeps counting (it was already
-  // incremented above), which is exactly why the live game's bats keep flapping on the
-  // sine clock in the drawn frame behind the popup even though nothing simulates.
-  //
-  // The live line also calls `clearJP()`. There is no port equivalent and none is
-  // needed: `justPressed` is a live global the live update() has to scrub by hand on
-  // every early return, whereas this port is handed `jumpPressed` as a rising edge the
-  // caller computes per step. Nothing carries over to scrub.
-  //
-  // Reached by taking a rainbow block from underneath, and by nothing else:
-  // `giveRandomSillyPowerup` (player.ts) is the only writer of `powerupPopup`, and
-  // `bumpBlocksAbove` is its only caller.
+  // The silly power-up announcement. The live game (index.html:1276) froze the whole world
+  // for its 120 frames; here it only counts down, a banner over play that is still going,
+  // because two seconds of a stopped game in the middle of a jump or a chase got in a
+  // child's way. Written by `grantSillyPowerup` (player.ts) alone.
   if (world.powerupPopup) {
     world.powerupPopup.timer--;
     if (world.powerupPopup.timer <= 0) world.powerupPopup = null;
-    world.frame++;
-    return;
   }
 
   // Already dead: nothing plays. The live update() returns at index.html:1348, above

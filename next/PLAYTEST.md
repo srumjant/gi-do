@@ -391,3 +391,33 @@ changed a little:
   than the shore, and walking right up to the edge was a fall.
 - **The giants' roofs** (Palermo, Winter, Toy Castle) have arched corners now, so they read as
   archways and halls rather than floating blocks.
+
+## The story, and the cutscenes between levels (2026-11-23)
+
+The T-Rex is behind it all now: he wants your child's sibling for his Toy Castle, and each
+world's villain is one of his helpers.
+
+- **An opening** before the first level: the hero and the sibling together, the Doll Queen
+  grabs the sibling ("T-REX TAHAB DODOT!"), then a **world map** with all six worlds, the
+  villain carrying the sibling along the path to the castle.
+- **After a world's first and second levels**: "JÄLITA PTERODAKTÜLI!", the next level's name,
+  and dots for the world's three levels.
+- **After a boss**: the hero and the sibling together for a moment, the beaten boss sitting
+  dazed ("T-REX SAATIS MIND..."), then the next world's villain grabs the sibling, and the map
+  shows the hero walking on to the next world. Before the last world the T-Rex comes himself:
+  "NÜÜD MINA ISE!".
+- The win screen ends with "T-REX ON NÜÜD PISIKE!".
+- **Every word is in capitals**, so a child can read it on their own.
+- **"VAJUTA SPACE" works as soon as it shows**: the first press skips to the map, the next one
+  starts the level. It is bigger, outlined, and says what to press on what you are holding:
+  SPACE on a keyboard, OK on a phone or tablet, Ⓐ (or ✕) on a controller. The menus,
+  pause, game over and win screens follow the same rule.
+- **Power-ups no longer stop the game.** The announcement used to freeze everything for two
+  seconds; now it is a banner at the top and play goes on under it.
+
+### What to watch
+
+- Does your child follow the story? Ask them who took the sibling, and who sent them.
+- The map: do they want to look at it, or press on straight away?
+- On the phone: does "VAJUTA OK" make sense, and do they find the button?
+- The power-up banner: do they still notice which power-up they got?

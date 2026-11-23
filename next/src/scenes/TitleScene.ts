@@ -3,6 +3,8 @@ import { startBGM } from '../audio/bgm';
 import { ensureAudio } from '../audio/context';
 import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
+import { prompt } from '../config/glyphs';
+import { inputSource } from '../input/source';
 import { BGM_TITLE } from '../data/bgmThemes';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { MODE_ADVENTURE } from '../game/navigation';
@@ -140,6 +142,8 @@ export class TitleScene extends Phaser.Scene {
   private keys!: MenuKeys;
   private leaving = false;
   private start!: Phaser.GameObjects.Text;
+  /** The controls line: keys and the pad, or the touch buttons (input/source.ts). */
+  private controls!: Phaser.GameObjects.Text;
   private modes!: Phaser.GameObjects.Text;
   private creatures: Phaser.GameObjects.Image[] = [];
 
@@ -177,7 +181,7 @@ export class TitleScene extends Phaser.Scene {
     this.line(TITLE_Y, TITLE_FONT, TStr('title'));
     this.line(SUBTITLE_Y, SUBTITLE_FONT, TStr('subtitle'));
     this.line(WORLDS_Y, WORLDS_FONT, TStr('worlds'));
-    this.line(CONTROLS_Y, CONTROLS_FONT, TStr('controls'));
+    this.controls = this.line(CONTROLS_Y, CONTROLS_FONT, controlsLine());
     // index.html:1961. Both modes are named under the title now that neither is behind a
     // hidden hotkey — the live comment at :1958 says exactly that.
     this.modes = this.line(MODES_Y, MODES_FONT, `🎮 ${TStr('mode_adventure')}   📚 ${TStr('mode_learn')}`);
@@ -205,7 +209,7 @@ export class TitleScene extends Phaser.Scene {
     // glyph — Ⓐ, ✕ or Ⓑ depending on what is plugged in (config/glyphs.ts). Resolved here,
     // once, which is the whole reason the resolver is installed at boot rather than by a
     // scene: this is the first string in the game that needs it.
-    this.start = this.line(START_Y, START_FONT, TStr('press_start'));
+    this.start = this.line(START_Y, START_FONT, prompt('prompt_start'));
 
     this.clock = createFrameClock();
     this.keys = bindMenuKeys(this);
@@ -243,6 +247,11 @@ export class TitleScene extends Phaser.Scene {
     });
 
     this.start.setVisible(Math.floor(t / BLINK_FRAMES) % 2 === 0);
+    // The device can change under the title (a first tap, a pad's first button): name its buttons.
+    const start = prompt('prompt_start');
+    if (this.start.text !== start) this.start.setText(start);
+    const controls = controlsLine();
+    if (this.controls.text !== controls) this.controls.setText(controls);
     this.modes.setAlpha(MODES_PULSE_BASE + Math.sin(t * MODES_PULSE_SPEED) * MODES_PULSE_SWING);
 
     if (this.leaving) return;
@@ -264,4 +273,9 @@ export class TitleScene extends Phaser.Scene {
     startBGM(BGM_TITLE);
     this.scene.start(MODE_SELECT_SCENE_KEY, { index: MODE_ADVENTURE } satisfies ModeSelectData);
   }
+}
+
+/** How to play, for the device in the child's hands: the keys (and the pad), or the touch buttons. */
+function controlsLine(): string {
+  return inputSource() === 'touch' ? TStr('controls_touch') : TStr('controls');
 }

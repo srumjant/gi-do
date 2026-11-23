@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { sfxPickup } from '../audio/sfx';
 import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
+import { prompt } from '../config/glyphs';
 import { clampIndex } from '../game/menu';
 import { MODE_ADVENTURE } from '../game/navigation';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
@@ -133,7 +134,7 @@ export class PauseScene extends Phaser.Scene {
         .setOrigin(0.5, 1),
     );
 
-    this.add.text(BASE_W / 2, HINT_Y, TStr('pause_hint'), HINT_FONT).setOrigin(0.5, 1);
+    this.add.text(BASE_W / 2, HINT_Y, prompt('prompt_choose'), HINT_FONT).setOrigin(0.5, 1);
 
     this.keys = bindMenuKeys(this);
     this.drawChoice();

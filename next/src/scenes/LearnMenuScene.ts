@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
+import { prompt } from '../config/glyphs';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import type { LearnMode } from '../game/learn/content';
 import type { LearnSession } from '../game/learn/types';
@@ -145,7 +146,7 @@ export class LearnMenuScene extends Phaser.Scene {
         .setFlipX(true),
     ];
 
-    this.add.text(BASE_W / 2, HINT_Y, TStr('learn_menu_hint'), HINT_FONT).setOrigin(0.5, 1);
+    this.add.text(BASE_W / 2, HINT_Y, prompt('prompt_learn_menu'), HINT_FONT).setOrigin(0.5, 1);
 
     this.clock = createFrameClock();
     this.keys = bindMenuKeys(this);

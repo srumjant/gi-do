@@ -1,10 +1,13 @@
 import Phaser from 'phaser';
 import { BASE_H, BASE_W } from '../config/constants';
+import { prompt } from '../config/glyphs';
 import { T, TStr } from '../config/i18n';
 import type { Villain } from '../data/levels';
+import { PARALLAX } from '../data/parallax';
 import { snatcher, STAGES, type Stage } from '../data/stages';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { siblingOf } from '../game/menu';
+import { fill, scriptFor, transitionInto, type Line, type Script, type Transition } from '../game/story';
 import type { Character } from '../game/player';
 import {
   getCurrentLevel,
@@ -17,17 +20,21 @@ import {
   type Kidnapper,
   kidnapperIndex,
 } from '../game/run';
-import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
+import { drawRidges, drawSky } from '../gfx/parallax';
 import { fitScreenCamera } from '../gfx/render';
+import { WORLD_MAP_DEPTH, WorldMap } from '../gfx/worldMap';
 import {
   KIDNAPPER_SCALE,
-  registerBossTextures,
+  registerTextures,
   kidnapperTextureKey,
   registerKidnapperTextures,
   registerScaledPlayerTextures,
   scaledPlayerTextureKey,
   FLYING_VILLAINS,
   PROFILE_VILLAINS,
+  spriteScale,
+  STAR_TEXTURE,
   VILLAIN_COLORS,
   VILLAIN_TEXTURES,
 } from '../gfx/textures';
@@ -44,6 +51,8 @@ import { takeBack } from './navigate';
  */
 export interface BetweenData {
   next: string;
+  /** The opening, before the first level: the first villain snatches the sibling, then the map. */
+  opening?: boolean;
 }
 
 /**
@@ -51,12 +60,11 @@ export interface BetweenData {
  *
  * `AUTO_EXIT` is checked with `>`, and the timer starts at 0 and is incremented BEFORE the
  * check, so the first frame drawn is t=1 and the last is t=480 — eight seconds exactly.
- * `SKIPPABLE_AFTER` is the same shape: two seconds of cutscene that a hand on the Space bar
- * cannot skip past, which is what stops the confirm that started the level from also
- * skipping the cutscene at the end of it.
+ * The live game also let nothing skip it for two seconds; here a press works from the second
+ * the prompt shows (HINT_AT), and a press held over from the level does not count (menuKeys'
+ * edges), which is what that wait was for.
  */
 const AUTO_EXIT = 480;
-const SKIPPABLE_AFTER = 120;
 /** t at which the snatch begins, and how far into it the carrying-off starts (:2318, :2322). */
 const GRAB_AT = 130;
 const CARRY_AFTER = 90;
@@ -65,6 +73,24 @@ const HEADLINE_AT = 220;
 const HEADLINE_GROW = 25;
 /** The skip hint fades in after a second (:2372). */
 const HINT_AT = 60;
+
+/**
+ * The story's timelines (docs/superpowers/specs/2026-11-23-story-and-transitions-design.md),
+ * in frames: when the snatch starts, when its headline comes, when the map comes up, when it
+ * all ends. A press moves on a beat: to the map, and from the map out. It works from the moment
+ * the prompt shows (the owner, 2026-11-23: the prompt came up a second before a press did
+ * anything).
+ */
+const STORY_TIMES = {
+  opening: { grabAt: 100, headlineAt: 9999, mapAt: 330, exit: 630 },
+  worldChange: { grabAt: 190, headlineAt: 300, mapAt: 430, exit: 700 },
+  chase: { grabAt: 9999, headlineAt: 110, mapAt: 9999, exit: AUTO_EXIT },
+} as const;
+const CLASSIC_TIMES = { grabAt: GRAB_AT, headlineAt: HEADLINE_AT, mapAt: 9999, exit: AUTO_EXIT };
+/** Where the beaten boss sits, dazed, while the two have their moment. */
+const BEATEN_X = 470;
+/** The beaten boss owns up from here to the snatch. */
+const BEATEN_SAYS_AT = 40;
 
 /** index.html:2303. The ground is a flat band across the bottom, the sky is the rest. */
 const GROUND_H = 70;
@@ -93,7 +119,11 @@ const HELP_FONT = {
   fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#3388ff',
 };
 const BUBBLE_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px' };
-const HINT_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '10px', color: '#ffffff' };
+/** Big enough for a child to find, and outlined so it reads on snow as well as at night. */
+const HINT_FONT = {
+  fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '14px', color: '#ffffff',
+  stroke: '#000000', strokeThickness: 3,
+};
 /** Both headline lines are black-outlined; the thickness is the live `ctx.lineWidth` (:2358). */
 const HEADLINE_STROKE = { stroke: '#000000', strokeThickness: 3 };
 const HEADLINE_FONT = {
@@ -192,6 +222,22 @@ export class BetweenScene extends Phaser.Scene {
   private headline!: Phaser.GameObjects.Container;
   private hint!: Phaser.GameObjects.Text;
 
+  /** The story's beat (game/story.ts), or null for the original game's kidnapper cutscene. */
+  private transition: Transition | null = null;
+  private script: Script = {};
+  private opening = false;
+  private times: { grabAt: number; headlineAt: number; mapAt: number; exit: number } = CLASSIC_TIMES;
+  /** Frames skipped by a press, added to the clock. */
+  private skipped = 0;
+  /** The boss just beaten, sitting dazed, and what it says. */
+  private beaten?: Phaser.GameObjects.Image;
+  private beatenStars: Phaser.GameObjects.Image[] = [];
+  private beatenBubble?: Phaser.GameObjects.Graphics;
+  private beatenSays?: Phaser.GameObjects.Text;
+  private map?: WorldMap;
+  private mapHeadline?: Phaser.GameObjects.Container;
+
+
   constructor() {
     super(BETWEEN_SCENE_KEY);
   }
@@ -199,14 +245,17 @@ export class BetweenScene extends Phaser.Scene {
   init(data: BetweenData): void {
     this.next = data.next;
     this.leaving = false;
+    this.opening = data.opening ?? false;
+    this.skipped = 0;
   }
 
   create(): void {
     fitScreenCamera(this);
     registerScaledPlayerTextures(this, [['stand', CUTSCENE_SCALE], ['jump', CARRIED_SCALE]]);
     registerKidnapperTextures(this);
-    // The villains, whom a level registers too: the cutscene must not depend on one having run.
-    registerBossTextures(this);
+    // The villains and the stars, which a level registers too: the cutscene must not depend on
+    // one having run (the opening comes before any).
+    registerTextures(this);
 
     this.clock = createFrameClock();
     // The PLAY mapping, not the menu one, and that is the live game's own answer: `between`
@@ -217,8 +266,11 @@ export class BetweenScene extends Phaser.Scene {
     this.keys = bindMenuKeys(this, padContextFor('between'));
     this.levelIndex = getCurrentLevel();
     this.stage = getCurrentStage();
-    const finished = STAGES[this.levelIndex - 1];
+    const finished = this.opening ? undefined : STAGES[this.levelIndex - 1];
     this.chase = finished?.level.ending === 'chase' ? finished.level.villain ?? 'dollQueen' : null;
+    this.transition = transitionInto(this.levelIndex, this.opening);
+    this.script = this.transition ? scriptFor(this.transition) : {};
+    this.times = this.transition ? STORY_TIMES[this.transition.kind] : CLASSIC_TIMES;
     this.kidnapper = getKidnapper(this.stage.theme);
     this.snatching = this.chase ? null : snatcher(this.stage);
 
@@ -238,7 +290,7 @@ export class BetweenScene extends Phaser.Scene {
       ? 1.6
       : (0.75 * this.textures.getFrame(VILLAIN_TEXTURES.dollQueen).height) / this.textures.getFrame(VILLAIN_TEXTURES[v]).height);
 
-    this.drawBackdrop();
+    this.drawBackdrop(finished?.theme ?? this.stage.theme);
 
     this.hero = this.actor(hero, 'stand', CUTSCENE_SCALE, DEPTH_ACTOR);
     this.sibling = this.actor(sibling, 'stand', CUTSCENE_SCALE, DEPTH_ACTOR);
@@ -276,10 +328,58 @@ export class BetweenScene extends Phaser.Scene {
 
     this.headline = this.buildHeadline();
     this.hint = this.add
-      .text(BASE_W / 2, BASE_H - 10, TStr('press_space'), HINT_FONT)
+      .text(BASE_W / 2, BASE_H - 10, prompt('prompt_next'), HINT_FONT)
       .setOrigin(0.5, 1)
-      .setDepth(DEPTH_LABEL)
+      // Over the map too, so the prompt is never under its dim.
+      .setDepth(WORLD_MAP_DEPTH + 1)
       .setVisible(false);
+
+    const t = this.transition;
+    if (t?.kind === 'worldChange') {
+      // The boss just beaten sits to one side, dazed, stars round its head.
+      this.beaten = this.add.image(BEATEN_X, GROUND_Y, VILLAIN_TEXTURES[t.beaten])
+        .setOrigin(0.5, 1).setScale(villainScale(t.beaten) * 0.85).setAngle(-6).setDepth(DEPTH_ACTOR).setVisible(false);
+      this.beatenStars = [0, 1, 2].map(() => {
+        const star = this.add.image(0, 0, STAR_TEXTURE).setDepth(DEPTH_BUBBLE).setVisible(false);
+        return star.setScale(spriteScale(star));
+      });
+      this.beatenBubble = this.add.graphics().setDepth(DEPTH_BUBBLE).setVisible(false);
+      this.beatenSays = this.label({ ...BUBBLE_FONT, color: VILLAIN_COLORS[t.beaten] }, this.say(this.script.beaten));
+      this.beatenSays.setDepth(DEPTH_BUBBLE);
+    }
+    if (t?.kind === 'opening' || t?.kind === 'worldChange') {
+      const heroKey = scaledPlayerTextureKey(hero, getSkinIndex(hero), 'stand', CUTSCENE_SCALE);
+      const siblingKey = scaledPlayerTextureKey(sibling, getSkinIndex(sibling), 'jump', CARRIED_SCALE);
+      this.map = new WorldMap(this, {
+        done: t.world,
+        from: t.kind === 'opening' ? 0 : t.world - 1,
+        to: t.world,
+        hero: heroKey,
+        heroScale: 0.55,
+        carrier: t.kind === 'opening' ? t.villain : undefined,
+        sibling: siblingKey,
+        siblingScale: 0.5,
+      });
+      this.mapHeadline = this.buildLines(this.say(this.script.mapTitle), this.say(this.script.mapSub), 46).setDepth(WORLD_MAP_DEPTH + 1);
+    }
+  }
+
+  /** A line of the story in words: its key's text with the names put in, in capitals. */
+  private say(line?: Line): string {
+    if (!line) return '';
+    return fill(TStr(line.key), {
+      villain: line.villainKey ? TStr(line.villainKey) : undefined,
+      sibling: getRescueSprites().name.toUpperCase(),
+      worldNumber: line.worldNumber,
+      world: line.worldKey ? TStr(line.worldKey) : undefined,
+    });
+  }
+
+  /** A two-line headline, the big line red and the second yellow, both outlined. */
+  private buildLines(title: string, sub: string, y: number): Phaser.GameObjects.Container {
+    const big = this.add.text(0, 0, title, HEADLINE_FONT).setOrigin(0.5, 0.5);
+    const small = this.add.text(0, 30, sub, SUBHEAD_FONT).setOrigin(0.5, 0.5);
+    return this.add.container(BASE_W / 2, y, [big, small]).setDepth(DEPTH_LABEL + 1).setVisible(false);
   }
 
   /**
@@ -287,14 +387,20 @@ export class BetweenScene extends Phaser.Scene {
    * (index.html:2302-2303). Not its parallax and not its tiles — the cutscene is a preview
    * of the palette, which is as much of a level as a cutscene can show.
    */
-  private drawBackdrop(): void {
-    const level = this.stage.level;
+  private drawBackdrop(theme: number): void {
+    // The world's own sky and hills, as its levels draw them (gfx/parallax.ts), then its ground
+    // (the owner, 2026-11-23: a flat colour looked plain).
+    const level = STAGES.find((s) => s.theme === theme)?.level ?? this.stage.level;
+    const parallax = PARALLAX[theme];
+    const sky = this.add.graphics().setDepth(-3);
+    drawSky(sky, level.bg, parallax?.bg2 ?? level.bg);
+    if (parallax) drawRidges(this.add.graphics().setDepth(-2), parallax.layers, 0);
     this.add
       .graphics()
-      .fillStyle(colour(level.bg))
-      .fillRect(0, 0, BASE_W, BASE_H)
       .fillStyle(colour(level.groundColor))
       .fillRect(0, GROUND_Y, BASE_W, GROUND_H)
+      .fillStyle(colour(level.groundTop))
+      .fillRect(0, GROUND_Y, BASE_W, 6)
       .setDepth(-1);
   }
 
@@ -339,14 +445,29 @@ export class BetweenScene extends Phaser.Scene {
   private buildHeadline(): Phaser.GameObjects.Container {
     const sibName = getRescueSprites().name.toUpperCase();
     const nextName = TStr(this.stage.nameKey);
-    const title = this.add
-      .text(0, 0, this.chase ? TStr('follow_them') : sibName + TStr('sib_stolen_again'), HEADLINE_FONT)
-      .setOrigin(0.5, 0.5);
+    const story = this.script.headline;
+    const titleText = story ? this.say(story) : this.chase ? TStr('follow_them') : sibName + TStr('sib_stolen_again');
+    const title = this.add.text(0, 0, titleText, HEADLINE_FONT).setOrigin(0.5, 0.5);
     const sub = this.add
       .text(0, 35, `${TStr('keep_going')} → ${nextName}`, SUBHEAD_FONT)
       .setOrigin(0.5, 0.5);
+    const parts: Phaser.GameObjects.GameObject[] = [title, sub];
+    const t = this.transition;
+    if (t?.kind === 'chase') {
+      // The world's levels: the ones done gold, the next one white, the boss's a red ring.
+      const dots = this.add.graphics();
+      for (let i = 1; i <= t.levels; i++) {
+        const x = (i - (t.levels + 1) / 2) * 26;
+        if (i < t.level) dots.fillStyle(0xffd23f).fillCircle(x, 66, 8).lineStyle(2, 0x000000).strokeCircle(x, 66, 8);
+        else if (i === t.level) dots.fillStyle(0xffffff).fillCircle(x, 66, 8).lineStyle(2, 0x000000).strokeCircle(x, 66, 8);
+        else dots.fillStyle(0x000000, 0.35).fillCircle(x, 66, 8).lineStyle(3, 0xff3333).strokeCircle(x, 66, 8);
+      }
+      parts.push(dots);
+    }
+    // The snatch's headline sits high, out of the way of the villain running off below it.
+    const y = t?.kind === 'worldChange' ? 70 : BASE_H / 2 - 50;
     return this.add
-      .container(BASE_W / 2, BASE_H / 2 - 50, [title, sub])
+      .container(BASE_W / 2, y, parts)
       .setDepth(DEPTH_LABEL)
       .setVisible(false);
   }
@@ -369,28 +490,86 @@ export class BetweenScene extends Phaser.Scene {
       return;
     }
 
-    const t = this.clock.advance(delta);
+    const t = this.clock.advance(delta) + this.skipped;
+    const { mapAt, exit } = this.times;
 
-    // index.html:1351. Eight seconds, or two seconds in with Space or Enter — and Enter as
-    // well as Space here, unlike the game-over and win screens, which take Space alone.
-    const skipped = t > SKIPPABLE_AFTER
-      && pressedAny(this.keys.confirm, this.keys.enter);
-    if (t > AUTO_EXIT || skipped) {
+    // A press moves on a beat: on to the map, and from the map (or a chase) out. It works from
+    // the moment the prompt shows, a second in (the live game waited two, with the prompt
+    // already up: the owner found it did nothing).
+    const pressed = t > HINT_AT && pressedAny(this.keys.confirm, this.keys.enter);
+    if (pressed && this.map && t < mapAt) {
+      this.skipped += mapAt - t;
+      return;
+    }
+    if (t > exit || pressed) {
       this.leaving = true;
       this.scene.start(this.next);
       return;
     }
 
-    if (this.chase) {
+    if (this.map && t >= mapAt) {
+      this.drawMap(t - mapAt);
+    } else if (this.chase) {
       this.drawChase(t);
+      this.drawHeadline(t);
     } else {
       this.drawTogether(t);
+      this.drawBeaten(t);
       this.drawSnatch(t);
+      this.drawHeadline(t);
     }
-    this.drawHeadline(t);
 
-    // :2372-2376. A slow pulse between alpha 0.1 and 0.5, not a blink.
-    this.hint.setVisible(t > HINT_AT).setAlpha(0.3 + Math.sin(t * 0.06) * 0.2);
+    // :2372-2376. A slow pulse between alpha 0.1 and 0.5, not a blink. It names the button in
+    // the child's hands, and follows them if they change device.
+    const hint = prompt('prompt_next');
+    if (this.hint.text !== hint) this.hint.setText(hint);
+    this.hint.setVisible(t > HINT_AT).setAlpha(0.45 + Math.sin(t * 0.06) * 0.25);
+  }
+
+  /** The map: everything else away, the hero walking on to the next world (gfx/worldMap.ts). */
+  private drawMap(m: number): void {
+    for (const obj of [this.hero, this.sibling, this.carried, this.villain, this.hearts, this.confused,
+      this.ohNo, this.help, this.bubble, this.taunt, this.headline, ...this.beatenStars]) obj.setVisible(false);
+    this.beaten?.setVisible(false);
+    this.beatenBubble?.setVisible(false);
+    this.beatenSays?.setVisible(false);
+    this.map?.setVisible(true).update(m);
+    this.mapHeadline?.setVisible(true).setScale(Math.min(1, m / HEADLINE_GROW)).setRotation(Math.sin(m * 0.03) * 0.06);
+  }
+
+  /** The boss just beaten, sitting dazed to one side, owning up: the T-Rex sent it. */
+  private drawBeaten(t: number): void {
+    if (!this.beaten) return;
+    this.beaten.setVisible(true).setAngle(-6 + Math.sin(t * 0.08) * 4);
+    const head = this.beaten.y - this.beaten.displayHeight;
+    this.beatenStars.forEach((star, i) => {
+      const a = t * 0.12 + (i * Math.PI * 2) / 3;
+      star.setVisible(true).setPosition(BEATEN_X + Math.cos(a) * 22, head + 4 + Math.sin(a) * 5);
+    });
+    const says = t >= BEATEN_SAYS_AT && t < this.times.grabAt + 60;
+    this.beatenBubble?.setVisible(says);
+    this.beatenSays?.setVisible(says);
+    if (says && this.beatenBubble && this.beatenSays) {
+      this.drawBubble(this.beatenBubble, this.beatenSays, BEATEN_X - 40, head - 40);
+    }
+  }
+
+  /** A speech bubble sized to its words, its tail down at the left, the words inside. */
+  private drawBubble(g: Phaser.GameObjects.Graphics, text: Phaser.GameObjects.Text, left: number, top: number): void {
+    const w = Math.max(BUBBLE_W, text.width + 20);
+    const x = Math.max(4, Math.min(left, BASE_W - w - 4));
+    g.clear().fillStyle(BUBBLE_FILL).lineStyle(BUBBLE_LINE_WIDTH, BUBBLE_LINE).beginPath();
+    g.moveTo(x, top);
+    g.lineTo(x + w, top);
+    g.lineTo(x + w, top + BUBBLE_H);
+    g.lineTo(x + 25, top + BUBBLE_H);
+    g.lineTo(x + 15, top + BUBBLE_H + 10);
+    g.lineTo(x + 10, top + BUBBLE_H);
+    g.lineTo(x, top + BUBBLE_H);
+    g.closePath();
+    g.fillPath();
+    g.strokePath();
+    text.setPosition(x + w / 2, top + 16);
   }
 
   /**
@@ -419,7 +598,7 @@ export class BetweenScene extends Phaser.Scene {
 
   /** Phase one (index.html:2308-2314): the two of them together, bobbing, and three hearts. */
   private drawTogether(t: number): void {
-    const together = t < GRAB_AT;
+    const together = t < this.times.grabAt;
     this.hearts.setVisible(together);
     if (!together) return;
 
@@ -440,7 +619,7 @@ export class BetweenScene extends Phaser.Scene {
    * at once.
    */
   private drawSnatch(t: number): void {
-    const grabbing = t >= GRAB_AT;
+    const grabbing = t >= this.times.grabAt;
     this.villain.setVisible(grabbing);
     this.carried.setVisible(false);
     this.confused.setVisible(false);
@@ -451,7 +630,7 @@ export class BetweenScene extends Phaser.Scene {
     if (!grabbing) return;
 
     this.hero.setVisible(true).setPosition(HERO_X, this.heroY);
-    const grabT = t - GRAB_AT;
+    const grabT = t - this.times.grabAt;
 
     // A theme's own villain drawn in profile faces left already: coming in it is as drawn, and
     // turns to run off. The original kidnappers face right, so it is the other way round.
@@ -497,25 +676,10 @@ export class BetweenScene extends Phaser.Scene {
    * rounding artefact.
    */
   private drawTaunt(runX: number): void {
-    const x = Math.min(runX - 10, BASE_W - 160);
-    const y = this.villainY - 35;
-    this.bubble
-      .setVisible(true)
-      .clear()
-      .fillStyle(BUBBLE_FILL)
-      .lineStyle(BUBBLE_LINE_WIDTH, BUBBLE_LINE)
-      .beginPath();
-    this.bubble.moveTo(x, y);
-    this.bubble.lineTo(x + BUBBLE_W, y);
-    this.bubble.lineTo(x + BUBBLE_W, y + BUBBLE_H);
-    this.bubble.lineTo(x + 25, y + BUBBLE_H);
-    this.bubble.lineTo(x + 15, y + BUBBLE_H + 10);
-    this.bubble.lineTo(x + 10, y + BUBBLE_H);
-    this.bubble.lineTo(x, y + BUBBLE_H);
-    this.bubble.closePath();
-    this.bubble.fillPath();
-    this.bubble.strokePath();
-    this.taunt.setVisible(true).setPosition(x + 75, y + 16).setText(this.tauntLine());
+    // The story's line (the T-Rex wants the sibling), or the original game's taunts.
+    this.taunt.setVisible(true).setText(this.script.grab ? this.say(this.script.grab) : this.tauntLine());
+    this.bubble.setVisible(true);
+    this.drawBubble(this.bubble, this.taunt, runX - 10, this.villainY - 35);
   }
 
   /**
@@ -542,11 +706,12 @@ export class BetweenScene extends Phaser.Scene {
    * rocks gently from side to side for as long as the cutscene lasts.
    */
   private drawHeadline(t: number): void {
-    const shown = t >= HEADLINE_AT;
+    const at = this.times.headlineAt;
+    const shown = t >= at;
     this.headline.setVisible(shown);
     if (!shown) return;
     this.headline
-      .setScale(Math.min(1, (t - HEADLINE_AT) / HEADLINE_GROW))
+      .setScale(Math.min(1, (t - at) / HEADLINE_GROW))
       .setRotation(Math.sin(t * 0.03) * 0.1);
   }
 }

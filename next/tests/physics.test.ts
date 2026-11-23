@@ -109,7 +109,7 @@ describe('bumping a block from below', () => {
     expect(world.stars.length).toBe(1);
   });
 
-  it('takes a rainbow block and freezes the world with the announcement', () => {
+  it('takes a rainbow block and puts up the announcement', () => {
     const world = createWorld(0, 'normal');
     const block = world.rainbowBlocks[0];
     expect(block).toBeDefined();

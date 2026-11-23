@@ -207,15 +207,10 @@ export interface CatState {
 export type PowerupType = 'fart' | 'bighead' | 'chicken';
 
 /**
- * The silly power-up announcement (index.html:1154). Presentation, except that it is
- * NOT: index.html:1276 — the second line of `update()`, right after `animFrame++` and
- * above every other state check — freezes the ENTIRE game while it exists:
- *
- *   if(powerupPopup){powerupPopup.timer--;if(powerupPopup.timer<=0)powerupPopup=null;clearJP();return;}
- *
- * So a rainbow block does not just grant a power-up, it stops the world for 120 frames
- * — two whole seconds in which the player, the enemies and the camera are all frozen
- * while `animFrame` keeps counting. `maxTimer` is only ever read by the drawing code (it
+ * The silly power-up announcement (index.html:1154): a banner that counts down for 120
+ * frames while play goes on. The live game froze the ENTIRE world while it existed
+ * (index.html:1276); the port dropped that, as two seconds of a stopped game in a jump or
+ * a chase got in a child's way. `maxTimer` is only ever read by the drawing code (it
  * scales the pop-in), but it is carried here rather than dropped so the field set stays
  * the live object's.
  */

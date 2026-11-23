@@ -14,6 +14,8 @@
  * not need. Shown only on a coarse pointer (index.html's CSS).
  */
 
+import { setInputSource } from './source';
+
 export interface TouchKey {
   key: string;
   code: string;
@@ -54,6 +56,7 @@ export function keyEvent(type: 'keydown' | 'keyup', k: TouchKey): KeyboardEvent 
 }
 
 function send(type: 'keydown' | 'keyup', k: TouchKey): void {
+  setInputSource('touch');
   window.dispatchEvent(keyEvent(type, k));
 }
 
