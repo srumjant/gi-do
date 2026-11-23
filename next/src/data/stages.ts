@@ -1,12 +1,15 @@
 import { LEVELS, LEVEL_NAME_KEYS, type Level } from './levels';
 import { DINO_CANYON_2 } from './levels2/dinoCanyon2';
 import { DOLL_GARDEN_2 } from './levels2/dollGarden2';
+import { JAALOSS } from './levels2/jaaloss';
+import { JARV } from './levels2/jarv';
 import { KANJON } from './levels2/kanjon';
 import { KATEDRAAL } from './levels2/katedraal';
 import { NUKUAED } from './levels2/nukuaed';
 import { NUKUMAJA } from './levels2/nukumaja';
 import { PIAZZA } from './levels2/piazza';
 import { RAEKODA } from './levels2/raekoda';
+import { TALVEMAA } from './levels2/talvemaa';
 import { TORNID } from './levels2/tornid';
 import { TURG } from './levels2/turg';
 import { VANALINN } from './levels2/vanalinn';
@@ -60,5 +63,10 @@ export const STAGES: readonly Stage[] = buildStages({
     { level: PIAZZA, nameKey: LEVEL_NAME_KEYS[3] },
     { level: TURG, nameKey: 'level_4_2' },
     { level: KATEDRAAL, nameKey: 'level_4_3' },
+  ],
+  4: [
+    { level: TALVEMAA, nameKey: LEVEL_NAME_KEYS[4] },
+    { level: JARV, nameKey: 'level_5_2' },
+    { level: JAALOSS, nameKey: 'level_5_3' },
   ],
 });

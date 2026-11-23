@@ -1,6 +1,6 @@
 import { TILE } from '../config/constants';
 import {
-  TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_LAVA, TILE_PLANK, TILE_SPRING,
+  TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_LAVA, TILE_PLANK, TILE_SPRING, TILE_WATER,
   type CourseDef, type StationKind,
 } from '../data/levels';
 import { grantSillyPowerup, playerDie } from './player';
@@ -69,6 +69,8 @@ export interface CourseFx {
   kind: 'smash' | 'plank' | 'gate' | 'target' | 'flag' | 'spring' | 'station' | 'splash' | 'vent';
   x: number;
   y: number;
+  /** A splash into icy water rather than lava. */
+  water?: boolean;
 }
 
 export interface CourseState {
@@ -297,7 +299,8 @@ export function ventWarning(vent: { timer: number }): boolean {
 
 /**
  * Lava under the hero's feet is a fall, as a pit is: a cape throws them up out of it, once, as
- * from a pit (player.ts), and without one it is the end of a life.
+ * from a pit (player.ts), and without one it is the end of a life. Winter's icy water is the
+ * same fall in another colour.
  */
 function stepLava(world: World, course: CourseState): void {
   const p = world.player;
@@ -308,8 +311,9 @@ function stepLava(world: World, course: CourseState): void {
   const x1 = Math.floor((p.x + p.w - 3) / TILE);
   for (let ty = y0; ty <= y1; ty++) {
     for (let tx = x0; tx <= x1; tx++) {
-      if (world.map[ty]?.[tx] !== TILE_LAVA) continue;
-      pushFx(course, { kind: 'splash', x: p.x + p.w / 2, y: ty * TILE });
+      const code = world.map[ty]?.[tx];
+      if (code !== TILE_LAVA && code !== TILE_WATER) continue;
+      pushFx(course, { kind: 'splash', x: p.x + p.w / 2, y: ty * TILE, water: code === TILE_WATER });
       if (p.hasCape) {
         p.hasCape = false;
         p.invincible = 60;

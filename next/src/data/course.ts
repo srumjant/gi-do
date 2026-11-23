@@ -2,8 +2,8 @@ import type {
   BossDef, BossKind, CourseDef, EnemyDef, Level, LevelEnding, StationKind, TileMap, Villain,
 } from './levels';
 import {
-  isSolid, LEVELS, TILE_BRICK, TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_GROUND, TILE_LAVA,
-  TILE_PLANK, TILE_QUESTION, TILE_RAINBOW, TILE_SPRING,
+  isSolid, LEVELS, TILE_BRICK, TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_GROUND, TILE_ICE, TILE_LAVA,
+  TILE_PLANK, TILE_QUESTION, TILE_RAINBOW, TILE_SPRING, TILE_WATER,
 } from './levels';
 
 /**
@@ -28,14 +28,15 @@ import {
  *   :  door: open until the player is through it, then it shuts behind them
  *   Q  the boss, where she stands    1 2 3  where her targets stand, round by round
  *   ~  lava: falling in is a fall     v  a vent in the lava: it spits fireballs straight up
+ *   I  ice: solid, and you slide on it     _  icy water: falling in is a fall, as lava
  *   b  bow       c  cape       f  fart jump     h  big head     k  chicken ray
  *      (these come back a few seconds after they are taken)
  *   F  checkpoint flag: a death brings you back to the last one you touched
  *   P  where the hero starts     R  where the sibling waits
- *   d  doll   n  dino   a  bat   x  car   o  cannon   u  bouncer   p  penguin
- *   D  N  K  Z  a ZOMBIE doll, dino, knight or cook: it can't be stomped, it pushes you back,
- *      an arrow puts it down. Only zombies wear a knight's armour or a cook's hat, so K and Z
- *      have no lower case.
+ *   d  doll   n  dino   a  bat   x  car   o  cannon   u  bouncer   p  penguin   i  ice bat
+ *   D  N  K  Z  W  a ZOMBIE doll, dino, knight, cook or penguin: it can't be stomped, it pushes
+ *      you back, an arrow puts it down. Only zombies wear a knight's armour or a cook's hat, so
+ *      K and Z have no lower case; W (a waddle) because P is the hero's start.
  *   g  giant: in the way, never hurts (a stomp bounces off, arrows too); only a chicken ray
  *      moves him. Put him where no jump gets over: under a roof 4 tiles up.
  *
@@ -47,9 +48,10 @@ import {
 
 const ENEMY_LETTERS: Record<string, string> = {
   d: 'doll', n: 'dino', a: 'bat', x: 'car', o: 'cannon', u: 'bouncer', p: 'penguin', g: 'giant',
+  i: 'icebat',
 };
 /** Upper case is the same walker as a zombie (EnemyState.zombie). */
-const ZOMBIE_LETTERS: Record<string, string> = { D: 'doll', N: 'dino', K: 'knight', Z: 'cook' };
+const ZOMBIE_LETTERS: Record<string, string> = { D: 'doll', N: 'dino', K: 'knight', Z: 'cook', W: 'penguin' };
 
 const STATION_LETTERS: Record<string, StationKind> = {
   b: 'bow', c: 'cape', f: 'fart', h: 'bighead', k: 'chicken',
@@ -59,6 +61,7 @@ const TILE_LETTERS: Record<string, number> = {
   '#': TILE_GROUND, B: TILE_BRICK, '?': TILE_QUESTION, C: TILE_CRACKED, S: TILE_SPRING, '|': TILE_GATE,
   '!': TILE_RAINBOW,
   '~': TILE_LAVA, v: TILE_LAVA,
+  I: TILE_ICE, _: TILE_WATER,
 };
 
 /** The sections laid side by side into one picture, a string per row. */

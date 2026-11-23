@@ -453,6 +453,80 @@ describe('the giant', () => {
   });
 });
 
+describe('ice and icy water (Winter, 2026-11-23)', () => {
+  /** A floor of snow (`#`) or of ice (`I`), 60 wide, the hero at its start. */
+  function floor(top: string): World {
+    const level = courseLevel({
+      name: 'rink',
+      theme: 4,
+      sections: [['P'.padEnd(59, '.') + 'R', '.'.repeat(60), '.'.repeat(60), top.repeat(60), '#'.repeat(60)]],
+    });
+    const world = quietWorld(level);
+    standAt(world, 2, 3);
+    return world;
+  }
+
+  /** Frames to full speed from standing, and how far the hero slides once they let go. */
+  function grip(top: string): { frames: number; slide: number } {
+    const world = floor(top);
+    const p = world.player;
+    let frames = 0;
+    while (p.vx < world.dc.playerSpeed && frames < 200) {
+      step(world, { right: true });
+      frames++;
+    }
+    step(world, { right: true }, 10);
+    const x0 = p.x;
+    step(world, {}, 200);
+    return { frames, slide: p.x - x0 };
+  }
+
+  it('makes a floor of ice slow to speed up on, and slide for tiles when the hero lets go', () => {
+    const snow = grip('#');
+    const ice = grip('I');
+    expect(ice.frames).toBeGreaterThan(snow.frames * 2);
+    expect(ice.slide).toBeGreaterThan(snow.slide + 2 * TILE);
+    expect(ice.slide).toBeLessThan(8 * TILE);
+  });
+
+  it('jumps off ice as high as off snow', () => {
+    const top = (t: string) => {
+      const world = floor(t);
+      let y = world.player.y;
+      step(world, { jump: true, jumpPressed: true });
+      for (let i = 0; i < 60; i++) {
+        step(world, { jump: true });
+        y = Math.min(y, world.player.y);
+      }
+      return y;
+    };
+    expect(top('I')).toBe(top('#'));
+  });
+
+  it('is a fall into icy water: the cape throws the hero out once, without it a life is gone', () => {
+    const lake = courseLevel({
+      name: 'lake',
+      theme: 4,
+      sections: [['P'.padEnd(29, '.') + 'R', '.'.repeat(30), '.'.repeat(30), '#'.repeat(10) + '_'.repeat(10) + '#'.repeat(10), '#'.repeat(10) + '_'.repeat(10) + '#'.repeat(10)]],
+    });
+    for (const cape of [true, false]) {
+      const world = quietWorld(lake);
+      standAt(world, 14, 2);
+      world.player.hasCape = cape;
+      world.player.invincible = 0;
+      let deepest = 0;
+      for (let i = 0; i < 30; i++) {
+        step(world);
+        deepest = Math.max(deepest, world.player.y + world.player.h);
+      }
+      expect({ cape, dead: world.dead, capeLeft: world.player.hasCape }).toEqual({ cape, dead: !cape, capeLeft: false });
+      // Caught at the surface, not fallen out through the bottom of the level as from a pit.
+      expect(deepest).toBeLessThan(5 * TILE);
+      expect(world.course!.fx.some((f) => f.kind === 'splash')).toBe(true);
+    }
+  });
+});
+
 describe('chickens', () => {
   /** A zombie from the course, rayed into a chicken, with the hero at its side. */
   function rayedZombie(world: World) {
@@ -606,6 +680,29 @@ describe('zombies', () => {
     expect(world.dead).toBe(false);
     expect(leftmost).toBeGreaterThanOrEqual(6 * TILE);
     expect(p.y + p.h).toBe(4 * TILE);
+  });
+
+  it('come as penguins too (Winter\'s W): pushing, shuffling after the hero, down to an arrow', () => {
+    const waddlers = courseLevel({
+      name: 'waddlers',
+      theme: 4,
+      sections: [['P'.padEnd(39, '.') + 'R', '.'.repeat(40), '.'.repeat(14) + 'W'.padEnd(26, '.'), '#'.repeat(40), '#'.repeat(40)]],
+    });
+    expect(waddlers.enemyDefs).toEqual([{ type: 'penguin', x: 14, floorRow: 3, zombie: true }]);
+    const world = createWorld(0, 'super_easy', 'gigi', undefined, waddlers);
+    standAt(world, 9, 3);
+    world.player.invincible = 9999;
+    step(world, {}, 30);
+    const e = world.enemies.find((z) => z.type === 'penguin')!;
+    expect(e.zombie).toBe(true);
+    expect(e.x).toBeLessThan(14 * TILE);
+    world.player.x = e.x - world.player.w + 2;
+    step(world);
+    expect(world.dead).toBe(false);
+    expect(world.player.x + world.player.w).toBeLessThanOrEqual(e.x);
+    world.arrows.push({ x: e.x - 6, y: e.y + 6, vx: 6, life: 60, isChicken: false });
+    step(world);
+    expect(e.alive).toBe(false);
   });
 
   it('come as cooks too (Palermo\'s Z): pushing, and a ray makes a harmless chicken of one', () => {
