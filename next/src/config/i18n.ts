@@ -144,6 +144,8 @@ export const TRANSLATIONS: Record<string, Entry> = {
   level_2_3:          {et:'Vulkaan',                  en:'Volcano'},
   level_3_2:          {et:'Tornid',                   en:'The Towers'},
   level_3_3:          {et:'Raekoja plats',            en:'Town Hall Square'},
+  level_4_2:          {et:'Turg',                     en:'The Market'},
+  level_4_3:          {et:'Katedraal',                en:'The Cathedral'},
   follow_them:        {et:'JÄLITA NEID!',             en:'FOLLOW THEM!'},
   next_level:         {et:'Järgmine tase...',         en:'Next level...'},
 };

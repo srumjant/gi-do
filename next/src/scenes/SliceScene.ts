@@ -23,6 +23,7 @@ import { createWorld, rescueSpot, stepWorld, type RescueSpot } from '../game/wor
 import { CourseView } from '../gfx/course';
 import { DollQueenView } from '../gfx/dollQueen';
 import { PterodactylView } from '../gfx/pterodactyl';
+import { PizzaChefView } from '../gfx/pizzaChef';
 import { VanaToomasView } from '../gfx/vanaToomas';
 import type { EnemyState, World } from '../game/types';
 import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
@@ -57,6 +58,7 @@ import {
   ZOMBIE_KINDS,
   zombieTextureKey,
   FIREBALL_TEXTURE,
+  PIZZA_TEXTURE,
   QUEEN_HEART_TEXTURE,
   ROCK_TEXTURE,
   WAVE_TEXTURE,
@@ -326,6 +328,8 @@ export class SliceScene extends Phaser.Scene {
   private pteroView!: PterodactylView;
   /** Vana Toomas, on the level that ends with him (gfx/vanaToomas.ts). */
   private toomasView!: VanaToomasView;
+  /** The Pizza Chef, on the level that ends with him (gfx/pizzaChef.ts). */
+  private chefView!: PizzaChefView;
   private cageBackGraphics!: Phaser.GameObjects.Graphics;
   private cageBarsGraphics!: Phaser.GameObjects.Graphics;
   private rescueCryText!: Phaser.GameObjects.Text;
@@ -447,6 +451,7 @@ export class SliceScene extends Phaser.Scene {
     this.queenView = new DollQueenView(this);
     this.pteroView = new PterodactylView(this);
     this.toomasView = new VanaToomasView(this);
+    this.chefView = new PizzaChefView(this);
 
     this.catPickupImage = this.hiddenImage(CAT_TEXTURE, DEPTH_PICKUP);
     this.catImage = this.hiddenImage(CAT_TEXTURE, DEPTH_CAT);
@@ -915,6 +920,7 @@ export class SliceScene extends Phaser.Scene {
     this.queenView.update(this.world);
     this.pteroView.update(this.world);
     this.toomasView.update(this.world);
+    this.chefView.update(this.world);
     this.syncEnemyProjectiles();
     this.syncArrows();
     this.syncPlayer();
@@ -1352,21 +1358,26 @@ export class SliceScene extends Phaser.Scene {
         FIREBALL_TEXTURE,
         DEPTH_ENEMY_PROJECTILE,
       );
-      // The Doll Queen throws hearts, the Pterodactyl drops rocks and Vana Toomas's stamp rolls
-      // a wave of dust (game/bosses/); everything else is a fireball, and only a fireball
-      // leaves a trail. The wave is drawn twice its 8px box wide, centred on it.
+      // The Doll Queen throws hearts, the Pterodactyl drops rocks, Vana Toomas's stamp rolls
+      // a wave of dust and the Pizza Chef tosses pizzas (game/bosses/); everything else is a
+      // fireball, and only a fireball leaves a trail. The wave is drawn twice its 8px box wide,
+      // centred on it; a pizza twice as big as its box, centred and spinning.
       const heart = shot.type === 'heart';
       const rock = shot.type === 'rock';
       const wave = shot.type === 'wave';
-      image.setTexture(heart ? QUEEN_HEART_TEXTURE : rock ? ROCK_TEXTURE : wave ? WAVE_TEXTURE : FIREBALL_TEXTURE);
+      const pizza = shot.type === 'pizza';
+      image.setTexture(heart ? QUEEN_HEART_TEXTURE : rock ? ROCK_TEXTURE : wave ? WAVE_TEXTURE
+        : pizza ? PIZZA_TEXTURE : FIREBALL_TEXTURE);
       image.setScale(spriteScale(image) * (heart ? 0.6 : 1));
       const flicker = Math.sin(animFrame * 0.3 + shot.x) * 0.3;
       image
-        .setPosition(wave ? shot.x - 4 : shot.x, shot.y)
+        .setOrigin(pizza ? 0.5 : 0, pizza ? 0.5 : 0)
+        .setPosition(wave ? shot.x - 4 : pizza ? shot.x + 4 : shot.x, pizza ? shot.y + 4 : shot.y)
+        .setAngle(pizza ? (animFrame * 18) % 360 : 0)
         .setFlipX(wave && animFrame % 10 < 5)
-        .setAlpha(wave ? 1 : 0.8 + flicker * 0.2)
+        .setAlpha(wave || pizza ? 1 : 0.8 + flicker * 0.2)
         .setVisible(true);
-      if (!heart && !rock && !wave) {
+      if (!heart && !rock && !wave && !pizza) {
         const trailX = shot.vx > 0 ? shot.x - 4 : shot.x + 10;
         fillRect(trails, FIREBALL_TRAIL, trailX, shot.y + 2, 4, 4);
       }

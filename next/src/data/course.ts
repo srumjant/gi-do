@@ -33,9 +33,11 @@ import {
  *   F  checkpoint flag: a death brings you back to the last one you touched
  *   P  where the hero starts     R  where the sibling waits
  *   d  doll   n  dino   a  bat   x  car   o  cannon   u  bouncer   p  penguin
- *   D  N  K  a ZOMBIE doll, dino or knight: it can't be stomped, it pushes you back, an arrow
- *      puts it down. Only zombies wear a knight's armour, so K has no lower case.
- *   g  giant: stomping hurts, arrows bounce off, only a chicken ray moves it
+ *   D  N  K  Z  a ZOMBIE doll, dino, knight or cook: it can't be stomped, it pushes you back,
+ *      an arrow puts it down. Only zombies wear a knight's armour or a cook's hat, so K and Z
+ *      have no lower case.
+ *   g  giant: in the way, never hurts (a stomp bounces off, arrows too); only a chicken ray
+ *      moves him. Put him where no jump gets over: under a roof 4 tiles up.
  *
  * Size obstacles from the jump itself (tests/helpers/courseRuns.ts's jumpRise): a held jump
  * lifts the feet 6.1 tiles on super easy and 3.9 on hard, a fart jump 13.9 and 8.8. So a
@@ -47,7 +49,7 @@ const ENEMY_LETTERS: Record<string, string> = {
   d: 'doll', n: 'dino', a: 'bat', x: 'car', o: 'cannon', u: 'bouncer', p: 'penguin', g: 'giant',
 };
 /** Upper case is the same walker as a zombie (EnemyState.zombie). */
-const ZOMBIE_LETTERS: Record<string, string> = { D: 'doll', N: 'dino', K: 'knight' };
+const ZOMBIE_LETTERS: Record<string, string> = { D: 'doll', N: 'dino', K: 'knight', Z: 'cook' };
 
 const STATION_LETTERS: Record<string, StationKind> = {
   b: 'bow', c: 'cape', f: 'fart', h: 'bighead', k: 'chicken',

@@ -2,7 +2,7 @@ import { ENEMY_SCALE, GIANT_SCALE, GRAVITY, TILE } from '../config/constants';
 import type { DifficultyRecord } from '../config/difficulty';
 import type { EnemyDef, TileMap } from '../data/levels';
 import {
-  BAT_S, BOUNCER_S, CANNON_S, CAR_S, CHICKEN_S, DINO_S, DOLL_S, GHOST_S, ICEBAT_S, KNIGHT_S,
+  BAT_S, BOUNCER_S, CANNON_S, CAR_S, CHICKEN_S, COOK_S, DINO_S, DOLL_S, GHOST_S, GIANT_S, ICEBAT_S, KNIGHT_S,
   PENGUIN_S,
   type SpriteData,
 } from '../data/sprites';
@@ -146,8 +146,9 @@ const ENEMY_SPRITES: Partial<Record<string, SpriteData>> = {
   icebat: ICEBAT_S,
   cannon: CANNON_S,
   bouncer: BOUNCER_S,
-  giant: DINO_S,
+  giant: GIANT_S,
   knight: KNIGHT_S,
+  cook: COOK_S,
 };
 
 /**
@@ -286,6 +287,12 @@ export function spawnEnemy(
  * constant 0.5 makes `0.5 > 0.5` FALSE, so a stubbed chicken always walks left.
  */
 export function chickenify(e: EnemyState): void {
+  // A giant's chicken stands where his feet were, not up at his head (Palermo, 2026-11-23: it
+  // dropped from three tiles up). Everyone else's is the original's, from the top-left.
+  if (e.type === 'giant') {
+    e.x += (e.w - CHICKEN_S[0].length * ENEMY_SCALE) / 2;
+    e.y += e.h - CHICKEN_S.length * ENEMY_SCALE;
+  }
   e.isChicken = true;
   e.type = 'chicken';
   e.vx = (random() > 0.5 ? 1 : -1) * 1.5;
@@ -320,6 +327,24 @@ export function chickenify(e: EnemyState): void {
  * exactly what they read before, and turning them into Arcade overlap callbacks would put
  * the game's most safety-critical interaction at risk for nothing.
  */
+/**
+ * The hero touching a giant (Palermo, 2026-11-23): falling onto his head bounces them off, from
+ * the side they are put back out where they came from, never into a wall. No harm either way.
+ */
+function giantContact(world: World, e: EnemyState): void {
+  const p = world.player;
+  if (p.vy > 0 && p.y + p.h - 8 < e.y + e.h / 3) {
+    p.y = e.y - p.h;
+    p.vy = -6;
+    world.sounds.push('boing');
+    return;
+  }
+  const fromLeft = p.x + p.w / 2 < e.x + e.w / 2;
+  const pushedX = fromLeft ? e.x - p.w - 1 : e.x + e.w + 1;
+  if (!boxHitsSolid(world.map, { x: pushedX, y: p.y, w: p.w, h: p.h })) p.x = pushedX;
+  p.vx = 0;
+}
+
 export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
   // index.html:1525 — the squash countdown runs even for a dead enemy (set to 30, or 45
   // when a big head did the stomping — see the stomp below), so a stomped enemy keeps
@@ -574,6 +599,14 @@ export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
   // the hero (browser, 2026-11-22).
   if (e.zombie) return;
 
+  // A giant is in the way, and that is all (Palermo, 2026-11-23): a stomp bounces off him, a
+  // side touch pushes the hero back out, and he never hurts. Arcade's static body stops the
+  // hero in the game (gfx/course.ts); this is the same wall for the rules and the tests.
+  if (e.type === 'giant') {
+    if (rectOverlap({ x: p.x, y: p.y, w: p.w, h: p.h }, { x: e.x, y: e.y, w: e.w, h: e.h })) giantContact(world, e);
+    return;
+  }
+
   const shm = (dc.stompHitbox || 1) * (p.bigHeadTimer > 0 ? 1.5 : 1);
   const bhx = p.bigHeadTimer > 0 ? 8 : 0;
   if (p.invincible <= 0 && rectOverlap(
@@ -610,6 +643,11 @@ export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
       // too, since neither stepEnemies' loop nor stepCamera's call in world.ts checks
       // world.dead mid-frame. Only the NEXT frame's top-of-stepWorld check freezes
       // everything. Mirrored exactly: no early return is added to stepEnemies below.
+      //
+      // Except a chicken on a hand-built level, which never hurts (Palermo, 2026-11-23): a
+      // ray made a harmless zombie into a chicken that killed you. The six original levels
+      // keep the original rule.
+      if (e.isChicken && world.course) return;
       playerHit(world);
       return;
     }

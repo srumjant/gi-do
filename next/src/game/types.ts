@@ -421,6 +421,11 @@ export interface EnemyProjectile {
    * now ported, really does set it, on a field that still nothing reads.
    */
   type?: string;
+  /**
+   * Added to `vy` every frame by the boss that threw it, for an arc: the Pizza Chef's pizzas
+   * (game/bosses/pizzaChef.ts). Nothing in the original sets it, so its shots stay straight.
+   */
+  ay?: number;
 }
 
 /**

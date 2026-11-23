@@ -479,6 +479,11 @@ export class CourseView {
     const standing = new Set(world.enemies.filter((e) => e.alive && e.type === 'giant'));
     for (const [enemy, zone] of this.giantZones) {
       if (standing.has(enemy)) continue;
+      // A ray made a chicken of him: a burst of confetti and a puff where he stood.
+      if (enemy.alive && enemy.isChicken) {
+        this.sparks.explode(30, zone.x, zone.y);
+        this.dust.explode(24, zone.x, zone.y + zone.height / 2);
+      }
       this.giants.remove(zone, true, true);
       this.giantZones.delete(enemy);
     }
