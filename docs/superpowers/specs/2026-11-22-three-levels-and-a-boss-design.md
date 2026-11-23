@@ -46,7 +46,7 @@ earlier themes come back as reminders.
 | Winter | all four, plus ice | the snow field: slippery ice | the frozen lake | the ice palace | **the Yeti** |
 | Toy Castle | everything | the gate | the halls | the throne room | **the T-Rex**, the final boss, redrawn and with a new fight |
 
-Doll Garden and Dinosaur Canyon are designed in detail below; each later theme is designed when
+Doll Garden, Dinosaur Canyon and Tallinn are designed in detail below; each later theme is designed when
 its batch starts.
 
 ## Doll Garden, in detail
@@ -115,6 +115,47 @@ sibling in a cage on a rock at the far end.
 - Three hits. After each she screeches, flies up out of sight for a moment, calls two zombie
   dinos (never more than two up), and comes back faster and dropping more.
 - Beaten, she tumbles down and bursts into feathers; the cage opens.
+
+## Tallinn, in detail (batch 3)
+
+The tool is the **big head**: it smashes cracked stone, and it is the only thing that knocks a
+knight's armour off. The theme's zombies are **zombie knights**: little knights in rusty
+armour, green faces, red eyes, with the usual zombie rule. The villain is **Vana Toomas**, the
+knight from the top of the town hall spire, with his flag.
+
+**Level 1: Tallinna vanalinn (the Old Town).** The original level, rebuilt by hand: cobbled
+streets, steps, a pit, `?` blocks, the rainbow block, dolls and cars. Then the town gate: a
+tower too tall to jump, its doorway bricked up with cracked stone, and the big head station in
+front of it. The bow comes back for the first two zombie knights; a second tower with a cannon
+on top; Vana Toomas runs off with the sibling at the end.
+
+**Level 2: Tornid (the Towers).** Springs up, walls down. A spring throws you onto the town
+wall, where a cracked wall bars the wall walk; a tower whose floors are cracked, so a big head
+drops you through them one by one; a target hidden behind a cracked wall, opening a gate when
+you smash the wall and shoot it; zombie knights in the passage under the wall. At the end a
+spring up the last tower, and Toomas leaps away from its top.
+
+**Level 3: Raekoja plats (Town Hall Square).** Harder together: zombie knights guarding a
+cracked wall (shoot them, then smash it); a cracked wall high up that only a spring reaches,
+with a gate's target behind it; cannons on the walls. Then the square: the door shuts behind
+you, and Vana Toomas.
+
+**The boss: Vana Toomas.** A knight three tiles tall in helmet, breastplate and shield, with his
+flag on a pole, marching up and down the square; the sibling in a cage on the town hall steps.
+
+- His armour turns everything without a big head: a stomp bounces you off with a clang,
+  walking into him pushes you back, arrows clang off. No harm done: he is the one to catch.
+- With a big head (two big head stations in the square, coming back as always), **land on
+  him, or run into his back**: a piece of armour flies off. His shield covers his front, so
+  running into him from the front just clangs. Three pieces: helmet, breastplate, shield.
+- He stops now and then, raises his flag pole and stamps it down: a shockwave rolls along the
+  ground both ways. Jump it. Slow and rare on Super Easy. While the pole is up he is braced,
+  and even a big head clangs off: the moment to land on him is while he marches.
+- After each hit he throws you off his helmet to the side, staggers well away, calls two zombie
+  knights (never more than two up; a bow station is in the square), and stamps as soon as he
+  recovers; then he marches faster, stamping more often. (Without the stagger and the brace,
+  in the browser, bouncing on his helmet won the fight in seconds.)
+- With the shield gone he sits down in his underclothes, beaten; the cage opens.
 
 ## The final boss: the T-Rex
 

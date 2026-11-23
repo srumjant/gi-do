@@ -23,6 +23,7 @@ import { createWorld, rescueSpot, stepWorld, type RescueSpot } from '../game/wor
 import { CourseView } from '../gfx/course';
 import { DollQueenView } from '../gfx/dollQueen';
 import { PterodactylView } from '../gfx/pterodactyl';
+import { VanaToomasView } from '../gfx/vanaToomas';
 import type { EnemyState, World } from '../game/types';
 import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
 import { GAME_FONT_BOLD, WORLD_TEXT_RESOLUTION } from '../gfx/gameFont';
@@ -50,6 +51,7 @@ import {
   enemyTextureKey,
   VILLAIN_TEXTURES,
   FLYING_VILLAINS,
+  PROFILE_VILLAINS,
   PTERO_DOWN_TEXTURE,
   PTERO_UP_TEXTURE,
   ZOMBIE_KINDS,
@@ -57,6 +59,7 @@ import {
   FIREBALL_TEXTURE,
   QUEEN_HEART_TEXTURE,
   ROCK_TEXTURE,
+  WAVE_TEXTURE,
   playerBodyTextureKey,
   playerHeadTextureKey,
   PLAYER_POSES,
@@ -321,6 +324,8 @@ export class SliceScene extends Phaser.Scene {
   private queenView!: DollQueenView;
   /** The Pterodactyl, on the level that ends with her (gfx/pterodactyl.ts). */
   private pteroView!: PterodactylView;
+  /** Vana Toomas, on the level that ends with him (gfx/vanaToomas.ts). */
+  private toomasView!: VanaToomasView;
   private cageBackGraphics!: Phaser.GameObjects.Graphics;
   private cageBarsGraphics!: Phaser.GameObjects.Graphics;
   private rescueCryText!: Phaser.GameObjects.Text;
@@ -441,6 +446,7 @@ export class SliceScene extends Phaser.Scene {
 
     this.queenView = new DollQueenView(this);
     this.pteroView = new PterodactylView(this);
+    this.toomasView = new VanaToomasView(this);
 
     this.catPickupImage = this.hiddenImage(CAT_TEXTURE, DEPTH_PICKUP);
     this.catImage = this.hiddenImage(CAT_TEXTURE, DEPTH_CAT);
@@ -908,6 +914,7 @@ export class SliceScene extends Phaser.Scene {
     this.syncBoss();
     this.queenView.update(this.world);
     this.pteroView.update(this.world);
+    this.toomasView.update(this.world);
     this.syncEnemyProjectiles();
     this.syncArrows();
     this.syncPlayer();
@@ -1099,7 +1106,7 @@ export class SliceScene extends Phaser.Scene {
     this.villainImage
       .setTexture(VILLAIN_TEXTURES[level.villain ?? 'dollQueen'])
       .setVisible(true)
-      .setFlipX(false)
+      .setFlipX(won && level.villain !== undefined && PROFILE_VILLAINS.has(level.villain))
       .setPosition(x, floor);
     this.villainImage.setScale(spriteScale(this.villainImage));
     const top = floor - this.villainImage.displayHeight;
@@ -1345,18 +1352,21 @@ export class SliceScene extends Phaser.Scene {
         FIREBALL_TEXTURE,
         DEPTH_ENEMY_PROJECTILE,
       );
-      // The Doll Queen throws hearts and the Pterodactyl drops rocks (game/bosses/); everything
-      // else is a fireball, and only a fireball leaves a trail.
+      // The Doll Queen throws hearts, the Pterodactyl drops rocks and Vana Toomas's stamp rolls
+      // a wave of dust (game/bosses/); everything else is a fireball, and only a fireball
+      // leaves a trail. The wave is drawn twice its 8px box wide, centred on it.
       const heart = shot.type === 'heart';
       const rock = shot.type === 'rock';
-      image.setTexture(heart ? QUEEN_HEART_TEXTURE : rock ? ROCK_TEXTURE : FIREBALL_TEXTURE);
+      const wave = shot.type === 'wave';
+      image.setTexture(heart ? QUEEN_HEART_TEXTURE : rock ? ROCK_TEXTURE : wave ? WAVE_TEXTURE : FIREBALL_TEXTURE);
       image.setScale(spriteScale(image) * (heart ? 0.6 : 1));
       const flicker = Math.sin(animFrame * 0.3 + shot.x) * 0.3;
       image
-        .setPosition(shot.x, shot.y)
-        .setAlpha(0.8 + flicker * 0.2)
+        .setPosition(wave ? shot.x - 4 : shot.x, shot.y)
+        .setFlipX(wave && animFrame % 10 < 5)
+        .setAlpha(wave ? 1 : 0.8 + flicker * 0.2)
         .setVisible(true);
-      if (!heart && !rock) {
+      if (!heart && !rock && !wave) {
         const trailX = shot.vx > 0 ? shot.x - 4 : shot.x + 10;
         fillRect(trails, FIREBALL_TRAIL, trailX, shot.y + 2, 4, 4);
       }

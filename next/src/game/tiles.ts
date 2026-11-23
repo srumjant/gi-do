@@ -11,6 +11,22 @@ import type { Rect } from './types';
 export { isSolid };
 
 /**
+ * Whether a box overlaps any solid tile. For a push that moves the hero by hand: Arcade,
+ * finding them inside a wall, separates them the short way, which can be down through the
+ * floor (browser, 2026-11-22).
+ */
+export function boxHitsSolid(map: TileMap, box: Rect): boolean {
+  const x0 = Math.floor(box.x / TILE);
+  const x1 = Math.floor((box.x + box.w - 1) / TILE);
+  const y0 = Math.floor(box.y / TILE);
+  const y1 = Math.floor((box.y + box.h - 1) / TILE);
+  for (let ty = y0; ty <= y1; ty++) {
+    for (let tx = x0; tx <= x1; tx++) if (isSolid(map[ty]?.[tx] ?? 0)) return true;
+  }
+  return false;
+}
+
+/**
  * Port of index.html:1137. Reads a tile by pixel coordinate, flooring to the tile grid.
  * The live version reads `LEVELS[currentLevel]` and the `map` global for its bounds;
  * this takes the map as a parameter and derives the bounds from it directly —
