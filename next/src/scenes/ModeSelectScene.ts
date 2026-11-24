@@ -5,8 +5,9 @@ import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
 import { prompt } from '../config/glyphs';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
-import { MODE_ADVENTURE, MODE_LEARN } from '../game/navigation';
-import { getSkinIndex } from '../game/run';
+import { clampIndex } from '../game/menu';
+import { MODE_LEARN, MODE_PICK, MODE_STORY } from '../game/navigation';
+import { getSkinIndex, setPlayMode } from '../game/run';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { fitScreenCamera } from '../gfx/render';
 import { menuPlayerTextureKey, MENU_PREVIEW_SCALE, registerMenuTextures } from '../gfx/textures';
@@ -53,13 +54,16 @@ const HEADING_FONT = {
   fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '26px', color: '#e03030',
 };
 
-/** index.html:1982. The card geometry, from which every label on a card is an offset. */
-const CARD_W = 250;
+/**
+ * The card geometry, from which every label on a card is an offset. The live game's two cards
+ * were 250 wide (index.html:1982); three fit at 180.
+ */
+const CARD_W = 180;
 const CARD_H = 170;
-const CARD_GAP = 30;
+const CARD_GAP = 20;
 const CARD_TOP = 95;
-/** :1986 — the pair is centred, so the left card starts a card and half a gap left of centre. */
-const CARD_LEFT = BASE_W / 2 - (CARD_W + CARD_GAP / 2);
+/** The row is centred: three cards and two gaps. */
+const CARD_LEFT = (BASE_W - (3 * CARD_W + 2 * CARD_GAP)) / 2;
 
 /** :1985. The chosen card breathes, ±3px around its resting size. */
 const PULSE_SPEED = 0.09;
@@ -81,7 +85,8 @@ const CARD_EDGE_W_OFF = 2;
 const CARD_ALPHA_OFF = 0.65;
 const ICON_DY = 52;
 const NAME_DY = 110;
-const DESC_DY = 134;
+/** The description hangs from here, wrapped inside its card. */
+const DESC_DY = 122;
 const ICON_FONT = { fontFamily: 'serif', resolution: GAME_TEXT_RESOLUTION, fontSize: '48px' };
 const NAME_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '19px' };
 const DESC_FONT = { fontFamily: GAME_FONT, resolution: GAME_TEXT_RESOLUTION, fontSize: '11px' };
@@ -90,7 +95,7 @@ const DESC_COLOR_ON = '#ffffff';
 const DESC_COLOR_OFF = '#999999';
 
 /** :2002-2006. Two arrows, pointing INWARD at the chosen card from just outside it. */
-const ARROW_DX = 16;
+const ARROW_DX = 10;
 const ARROW_DY = 5;
 const ARROW_FONT = { fontFamily: GAME_FONT_BOLD, resolution: GAME_TEXT_RESOLUTION, fontSize: '14px' };
 
@@ -121,12 +126,18 @@ interface ModeCard {
 }
 
 /**
- * Adventure or learn. Port of `drawModeSelect` (index.html:1965-2018) and the input that
+ * Story, one level, or learn. Port of `drawModeSelect` (index.html:1965-2018) and the input that
  * drives it (:1318-1329).
+ *
+ * ## Pick a level
+ *
+ * The second card, the port's own, goes through the difficulty and the hero screens as the
+ * story does and then to the level map (LevelMapScene), to play one level on its own
+ * (docs/superpowers/specs/2026-11-24-level-pick-design.md).
  *
  * ## Learn mode
  *
- * The second card opens the learn menu (LearnMenuScene): letters, syllables or words, each
+ * The third card opens the learn menu (LearnMenuScene): letters, syllables or words, each
  * a tower to climb.
  *
  * Its way back is wired as well: `learnmenu` goes back to `modeselect` with the cursor
@@ -134,7 +145,7 @@ interface ModeCard {
  * this area that exists purely for learn mode and the one most easily left out.
  */
 export class ModeSelectScene extends Phaser.Scene {
-  private index = MODE_ADVENTURE;
+  private index = MODE_STORY;
   private clock!: FrameClock;
   private keys!: MenuKeys;
   private leaving = false;
@@ -155,9 +166,9 @@ export class ModeSelectScene extends Phaser.Scene {
 
   init(data: ModeSelectData): void {
     // Phaser reuses the scene instance, so the cursor has to be set from the data every
-    // time rather than left where the last visit put it. `?? MODE_ADVENTURE` covers a start
+    // time rather than left where the last visit put it. `?? MODE_STORY` covers a start
     // with no data at all, which is what a hand-driven console session does.
-    this.index = data?.index ?? MODE_ADVENTURE;
+    this.index = data?.index ?? MODE_STORY;
     this.leaving = false;
   }
 
@@ -168,21 +179,12 @@ export class ModeSelectScene extends Phaser.Scene {
 
     // index.html:1979-1980. Read here rather than at module scope because `TStr` answers in
     // whichever language is current, and a module-level table would freeze the first one.
+    // The story is the live game's adventure card; PICK A LEVEL is the port's own
+    // (docs/superpowers/specs/2026-11-24-level-pick-design.md).
     this.cards = [
-      {
-        icon: '🎮',
-        name: TStr('mode_adventure'),
-        desc: TStr('mode_adventure_d'),
-        col: '#e03030',
-        glow: '#ff8866',
-      },
-      {
-        icon: '📚',
-        name: TStr('mode_learn'),
-        desc: TStr('mode_learn_d'),
-        col: '#22aa66',
-        glow: '#88ffbb',
-      },
+      { icon: '📖', name: TStr('mode_story'), desc: TStr('mode_adventure_d'), col: '#e03030', glow: '#ff8866' },
+      { icon: '🗺️', name: TStr('mode_pick'), desc: TStr('mode_pick_d'), col: '#2a6fd6', glow: '#88bbff' },
+      { icon: '📚', name: TStr('mode_learn'), desc: TStr('mode_learn_d'), col: '#22aa66', glow: '#88ffbb' },
     ];
 
     this.add
@@ -202,12 +204,14 @@ export class ModeSelectScene extends Phaser.Scene {
       // :1994's `textBaseline='middle'`, the one place on this screen that is not a baseline.
       .setOrigin(0.5, 0.5));
     this.names = this.cards.map((card) => this.add.text(0, 0, card.name, NAME_FONT).setOrigin(0.5, 1));
-    this.descs = this.cards.map((card) => this.add.text(0, 0, card.desc, DESC_FONT).setOrigin(0.5, 1));
+    this.descs = this.cards.map((card) => this.add
+      .text(0, 0, card.desc, { ...DESC_FONT, wordWrap: { width: CARD_W - 16 }, align: 'center' })
+      .setOrigin(0.5, 0));
 
     this.arrowIn = this.add.text(0, 0, '▶', ARROW_FONT).setOrigin(0.5, 1);
     this.arrowOut = this.add.text(0, 0, '◀', ARROW_FONT).setOrigin(0.5, 1);
 
-    // index.html:2010. Gigi for adventure, Dodo for learn — not a choice of character, just
+    // index.html:2010. Gigi for the two ways to play, Dodo for learn — not a choice of character, just
     // a face on the card you are looking at. Gigi comes from the bare constant (the Classic
     // skin) and Dodo from the chosen skin, the same asymmetry the title screen has.
     this.hero = this.add.image(HERO_X, GROUND_Y, this.heroKey()).setOrigin(0, 1);
@@ -225,10 +229,10 @@ export class ModeSelectScene extends Phaser.Scene {
     this.hint.setVisible(Math.floor(t / BLINK_FRAMES) % 2 === 0);
 
     if (this.leaving) return;
-    // index.html:1319-1320. Left and right SET the card rather than stepping to it: with two
-    // of them, pressing left twice must not walk off anywhere.
-    if (pressedAny(this.keys.left, this.keys.altLeft)) this.select(MODE_ADVENTURE);
-    if (pressedAny(this.keys.right, this.keys.altRight)) this.select(MODE_LEARN);
+    // Left and right step along the row and stop at its ends, as the pause menu's row does.
+    // (The live game's two cards were set outright, index.html:1319-1320; three need a step.)
+    if (pressedAny(this.keys.left, this.keys.altLeft)) this.select(clampIndex(this.index, -1, this.cards.length));
+    if (pressedAny(this.keys.right, this.keys.altRight)) this.select(clampIndex(this.index, 1, this.cards.length));
     if (pressedAny(this.keys.confirm, this.keys.enter)) this.confirm();
     if (justDown(this.keys.back)) {
       this.leaving = true;
@@ -255,11 +259,17 @@ export class ModeSelectScene extends Phaser.Scene {
     this.leaving = true;
     ensureAudio();
     sfxPickup();
-    this.scene.start(this.index === MODE_ADVENTURE ? DIFFICULTY_SCENE_KEY : LEARN_MENU_SCENE_KEY);
+    if (this.index === MODE_LEARN) {
+      this.scene.start(LEARN_MENU_SCENE_KEY);
+      return;
+    }
+    // Story or one level: the difficulty and the hero first, either way (game/run.ts's PlayMode).
+    setPlayMode(this.index === MODE_PICK ? 'pick' : 'story');
+    this.scene.start(DIFFICULTY_SCENE_KEY);
   }
 
   private heroKey(): string {
-    const character = this.index === MODE_ADVENTURE ? 'gigi' : 'dodo';
+    const character = this.index === MODE_LEARN ? 'dodo' : 'gigi';
     const skin = character === 'gigi' ? 0 : getSkinIndex('dodo');
     return menuPlayerTextureKey(character, skin, MENU_PREVIEW_SCALE);
   }

@@ -237,6 +237,15 @@ export const TRANSLATIONS: Record<string, Entry> = {
   prompt_play_again:  {et:'VAJUTA %K UUESTI MÄNGIMISEKS',  en:'PRESS %K TO PLAY AGAIN'},
   prompt_learn_menu:  {et:'◀ ▶ VALI  •  %K ALUSTA  •  %B TAGASI', en:'◀ ▶ CHOOSE  •  %K START  •  %B BACK'},
   prompt_learn_result:{et:'%K UUS TORN  •  %B MENÜÜ', en:'%K NEW TOWER  •  %B MENU'},
+  // Pick a level (docs/superpowers/specs/2026-11-24-level-pick-design.md): the mode screen's
+  // story and pick cards (learn keeps mode_learn), the level map's two hints, the pause
+  // menu's way back to the map.
+  mode_story:         {et:'LUGU',                     en:'STORY'},
+  mode_pick:          {et:'VALI TASE',                en:'PICK A LEVEL'},
+  mode_pick_d:        {et:'MÄNGI ÜHTE TASET!',        en:'PLAY ONE LEVEL!'},
+  prompt_map_world:   {et:'◀ ▶ VALI MAAILM  •  %K AVA  •  %B TAGASI', en:'◀ ▶ CHOOSE A WORLD  •  %K OPEN  •  %B BACK'},
+  prompt_map_level:   {et:'◀ ▶ VALI TASE  •  %K MÄNGI  •  %B TAGASI', en:'◀ ▶ CHOOSE A LEVEL  •  %K PLAY  •  %B BACK'},
+  pause_map:          {et:'KAART',                    en:'MAP'},
   controls_touch:     {et:'◀ ▶ LIIGU  •  ⤒ HÜPPA  •  🏹 TULISTA', en:'◀ ▶ MOVE  •  ⤒ JUMP  •  🏹 SHOOT'},
   follow_them:        {et:'JÄLITA NEID!',             en:'FOLLOW THEM!'},
   next_level:         {et:'Järgmine tase...',         en:'Next level...'},

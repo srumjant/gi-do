@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { sfxPickup } from '../audio/sfx';
 import { backFrom, type GameState } from '../game/navigation';
+import { getPlayMode } from '../game/run';
 import { PAUSE_SCENE_KEY, SCENE_FOR_STATE } from './keys';
 import type { ModeSelectData } from './ModeSelectScene';
 import type { PauseData } from './PauseScene';
@@ -24,7 +25,7 @@ import type { PauseData } from './PauseScene';
  * is frozen underneath it.
  */
 export function takeBack(scene: Phaser.Scene, state: GameState, onResume?: () => void): void {
-  const action = backFrom(state);
+  const action = backFrom(state, getPlayMode() === 'pick');
   switch (action.kind) {
     case 'resume':
       onResume?.();

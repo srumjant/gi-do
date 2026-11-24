@@ -7,7 +7,7 @@ import { prompt } from '../config/glyphs';
 import { inputSource } from '../input/source';
 import { BGM_TITLE } from '../data/bgmThemes';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
-import { MODE_ADVENTURE } from '../game/navigation';
+import { MODE_STORY } from '../game/navigation';
 import { getSkinIndex } from '../game/run';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION, preloadGameFont } from '../gfx/gameFont';
 import { fitScreenCamera } from '../gfx/render';
@@ -271,7 +271,7 @@ export class TitleScene extends Phaser.Scene {
     this.leaving = true;
     ensureAudio();
     startBGM(BGM_TITLE);
-    this.scene.start(MODE_SELECT_SCENE_KEY, { index: MODE_ADVENTURE } satisfies ModeSelectData);
+    this.scene.start(MODE_SELECT_SCENE_KEY, { index: MODE_STORY } satisfies ModeSelectData);
   }
 }
 

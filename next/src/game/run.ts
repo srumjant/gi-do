@@ -301,12 +301,46 @@ export function inDemo(): boolean {
   return demo !== null;
 }
 
+/**
+ * What the mode screen chose: the story, the whole run; or one level picked on the map
+ * (docs/superpowers/specs/2026-11-24-level-pick-design.md). The hero screen reads it to know
+ * where to go next.
+ */
+export type PlayMode = 'story' | 'pick';
+let playMode: PlayMode = 'story';
+
+export function getPlayMode(): PlayMode {
+  return playMode;
+}
+
+export function setPlayMode(mode: PlayMode): void {
+  playMode = mode;
+}
+
+/**
+ * The stage picked on the level map and played on its own, or null. Kept after the level ends,
+ * so the map opens again on its world; a new story or `?boss=` forgets it.
+ */
+let picked: number | null = null;
+
+export function pickedStage(): number | null {
+  return picked;
+}
+
 /** Play one level on its own: the run's lives and score, and then it is won. */
 export function startDemo(stage: Stage): void {
+  picked = null;
   demo = stage;
   currentLevel = 0;
   lives = DC().lives;
   score = 0;
+}
+
+/** Play one stage of the run on its own, as `?boss=` plays its level: then back to the map. */
+export function startPicked(stage: number): void {
+  const index = Math.max(0, Math.min(stage, STAGES.length - 1));
+  startDemo(STAGES[index]);
+  picked = index;
 }
 
 /** What the next `World` starts with — see `createWorld`'s `start` argument. */
@@ -328,6 +362,7 @@ export function getRunTotals(): RunTotals {
  * setting rather than a debug state; see World.lives in game/types.ts.
  */
 export function startRun(firstStage = 0): void {
+  picked = null;
   demo = null;
   // A playtest can start partway (scenes/startStage.ts's `?level=N`); never past the end.
   currentLevel = Math.max(0, Math.min(firstStage, STAGES.length - 1));

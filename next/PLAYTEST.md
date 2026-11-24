@@ -559,3 +559,20 @@ PÄEV, the day:
 - Do they find out on their own that a bubble carries them, or need showing?
 - Plungers and brushes: fun to time, or too fiddly?
 - The ducks: do they wait for the next duck, or jump into the water?
+
+## Pick a level (2026-11-24)
+
+The mode screen has three cards now: **LUGU** (the story, the whole run as before), **VALI TASE**
+(pick a level) and **ÕPIME!** (learn). VALI TASE goes through the difficulty and the hero, then to
+the world map: ◀ ▶ walks the hero from world to world, OK opens that world's three levels, ◀ ▶
+picks one, OK plays it. The level is exactly as in the story, its ending too; then it is back to
+the map, standing on that world. Out of lives: GAME OVER, then the map. In the pause menu the
+middle button is **KAART** (map). Back from the map goes to the hero screen.
+
+### What to watch
+
+- Do they find their way: world first, then the level? Or do they expect OK on the map to play?
+- Can they tell the three levels apart? Most worlds' levels share one colour; the cards carry a
+  number, the name, and the villain's face on the fight.
+- After a level, do they want to go on to the next one in that world, or pick something else?
+- Does the chase ending ("JÄLITA NUKUKUNINGANNAT!") read oddly when it leads back to the map?
