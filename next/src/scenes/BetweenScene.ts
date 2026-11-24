@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { BASE_H, BASE_W } from '../config/constants';
 import { prompt } from '../config/glyphs';
 import { T, TStr } from '../config/i18n';
-import type { Villain } from '../data/levels';
+import { HOME_THEME, type Villain } from '../data/levels';
 import { PARALLAX } from '../data/parallax';
 import { snatcher, STAGES, type Stage } from '../data/stages';
 import { createFrameClock, type FrameClock } from '../game/frameClock';
@@ -21,7 +21,7 @@ import {
   kidnapperIndex,
 } from '../game/run';
 import { GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
-import { drawRidges, drawSky } from '../gfx/parallax';
+import { drawRidges, drawSky, drawWallpaper } from '../gfx/parallax';
 import { fitScreenCamera } from '../gfx/render';
 import { WORLD_MAP_DEPTH, WorldMap } from '../gfx/worldMap';
 import {
@@ -35,6 +35,7 @@ import {
   PROFILE_VILLAINS,
   spriteScale,
   STAR_TEXTURE,
+  TOILET_TEXTURE,
   VILLAIN_COLORS,
   VILLAIN_TEXTURES,
 } from '../gfx/textures';
@@ -91,6 +92,20 @@ const CLASSIC_TIMES = { grabAt: GRAB_AT, headlineAt: HEADLINE_AT, mapAt: 9999, e
 const BEATEN_X = 470;
 /** The beaten boss owns up from here to the snatch. */
 const BEATEN_SAYS_AT = 40;
+/**
+ * Into the home world (docs/superpowers/specs/2026-11-24-home-world-design.md) the scene cuts
+ * from the castle to home at the snatch, through black. The toilet stands at home, drawn twice
+ * its size so Härra Kaka fits in its bowl: he grows up out of the bowl (POP_FRAMES), hops down
+ * to the floor (HOP_FRAMES), and goes over to the sibling.
+ */
+const CUT_FRAMES = 20;
+const HOME_TOILET_X = 540;
+const HOME_TOILET_SCALE = 2;
+/** The bowl's middle, and its rim's height over the floor, at that size (TOILET_S: the seat is columns 0-9, the rim row 6). */
+const HOME_BOWL_X = HOME_TOILET_X - 18;
+const HOME_RIM_UP = 84;
+const POP_FRAMES = 30;
+const HOP_FRAMES = 16;
 
 /** index.html:2303. The ground is a flat band across the bottom, the sky is the rest. */
 const GROUND_H = 70;
@@ -236,6 +251,13 @@ export class BetweenScene extends Phaser.Scene {
   private beatenSays?: Phaser.GameObjects.Text;
   private map?: WorldMap;
   private mapHeadline?: Phaser.GameObjects.Container;
+  /** Into the home world: the castle until the snatch, then home. */
+  private homeCut = false;
+  /** The snatching villain's scale as drawn, which Härra Kaka grows to out of the toilet. */
+  private villainBase = 1;
+  private away: Array<Phaser.GameObjects.Graphics | Phaser.GameObjects.Image> = [];
+  private home: Array<Phaser.GameObjects.Graphics | Phaser.GameObjects.Image> = [];
+  private cutShade?: Phaser.GameObjects.Rectangle;
 
 
   constructor() {
@@ -290,7 +312,16 @@ export class BetweenScene extends Phaser.Scene {
       ? 1.6
       : (0.75 * this.textures.getFrame(VILLAIN_TEXTURES.dollQueen).height) / this.textures.getFrame(VILLAIN_TEXTURES[v]).height);
 
-    this.drawBackdrop(finished?.theme ?? this.stage.theme);
+    this.homeCut = this.transition?.kind === 'worldChange' && this.stage.theme === HOME_THEME;
+    this.away = this.drawBackdrop(finished?.theme ?? this.stage.theme);
+    this.home = [];
+    this.cutShade = undefined;
+    if (this.homeCut) {
+      this.home = this.drawHome();
+      for (const o of this.home) o.setVisible(false);
+      this.cutShade = this.add.rectangle(0, 0, BASE_W, BASE_H, 0x000000).setOrigin(0, 0)
+        .setDepth(DEPTH_LABEL + 0.5).setAlpha(0);
+    }
 
     this.hero = this.actor(hero, 'stand', CUTSCENE_SCALE, DEPTH_ACTOR);
     this.sibling = this.actor(sibling, 'stand', CUTSCENE_SCALE, DEPTH_ACTOR);
@@ -301,6 +332,7 @@ export class BetweenScene extends Phaser.Scene {
       .setVisible(false);
     if (this.snatching) {
       this.villain.setTexture(VILLAIN_TEXTURES[this.snatching]).setScale(villainScale(this.snatching));
+      this.villainBase = this.villain.scaleX;
       // On foot, on the ground; a flier a little above it, the sibling hanging below.
       this.villainY = GROUND_Y - this.villain.displayHeight - (FLYING_VILLAINS.has(this.snatching) ? 34 : 0);
     }
@@ -387,21 +419,80 @@ export class BetweenScene extends Phaser.Scene {
    * (index.html:2302-2303). Not its parallax and not its tiles — the cutscene is a preview
    * of the palette, which is as much of a level as a cutscene can show.
    */
-  private drawBackdrop(theme: number): void {
+  private drawBackdrop(theme: number): Phaser.GameObjects.Graphics[] {
     // The world's own sky and hills, as its levels draw them (gfx/parallax.ts), then its ground
     // (the owner, 2026-11-23: a flat colour looked plain).
     const level = STAGES.find((s) => s.theme === theme)?.level ?? this.stage.level;
     const parallax = PARALLAX[theme];
     const sky = this.add.graphics().setDepth(-3);
-    drawSky(sky, level.bg, parallax?.bg2 ?? level.bg);
-    if (parallax) drawRidges(this.add.graphics().setDepth(-2), parallax.layers, 0);
-    this.add
+    // A world indoors (home) has its wallpaper for a sky.
+    if (level.indoors) drawWallpaper(sky, level.bg);
+    else drawSky(sky, level.bg, parallax?.bg2 ?? level.bg);
+    const drawn = [sky];
+    if (parallax) {
+      const ridges = this.add.graphics().setDepth(-2);
+      drawRidges(ridges, parallax.layers, 0);
+      drawn.push(ridges);
+    }
+    drawn.push(this.add
       .graphics()
       .fillStyle(colour(level.groundColor))
       .fillRect(0, GROUND_Y, BASE_W, GROUND_H)
       .fillStyle(colour(level.groundTop))
       .fillRect(0, GROUND_Y, BASE_W, 6)
+      .setDepth(-1));
+    return drawn;
+  }
+
+  /** Home: the next level's wallpaper and floor, and the toilet Härra Kaka comes up out of. */
+  private drawHome(): Array<Phaser.GameObjects.Graphics | Phaser.GameObjects.Image> {
+    const level = this.stage.level;
+    const wall = this.add.graphics().setDepth(-3);
+    drawWallpaper(wall, level.bg);
+    const floor = this.add.graphics()
+      .fillStyle(colour(level.groundColor)).fillRect(0, GROUND_Y, BASE_W, GROUND_H)
+      .fillStyle(colour(level.groundTop)).fillRect(0, GROUND_Y, BASE_W, 6)
       .setDepth(-1);
+    const toilet = this.add.image(HOME_TOILET_X, GROUND_Y, TOILET_TEXTURE).setOrigin(0.5, 1).setDepth(DEPTH_ACTOR + 0.5);
+    toilet.setScale(spriteScale(toilet) * HOME_TOILET_SCALE);
+    return [wall, floor, toilet];
+  }
+
+  /**
+   * Härra Kaka coming for the sibling at home: growing up out of the bowl, behind its front, then
+   * a hop down to the floor in front of the toilet, then over to the sibling on foot.
+   */
+  private outOfTheToilet(grabT: number): void {
+    const rimY = GROUND_Y - HOME_RIM_UP;
+    let cx: number;
+    let bottom: number;
+    let size = 1;
+    if (grabT < POP_FRAMES) {
+      const k = grabT / POP_FRAMES;
+      size = 0.4 + 0.6 * k;
+      cx = HOME_BOWL_X;
+      bottom = rimY + 24 - 60 * k;
+    } else if (grabT < POP_FRAMES + HOP_FRAMES) {
+      const f = (grabT - POP_FRAMES) / HOP_FRAMES;
+      cx = HOME_BOWL_X - 60 * f;
+      bottom = rimY - 36 + (GROUND_Y - rimY + 36) * f - 30 * Math.sin(Math.PI * f);
+    } else {
+      // Quick enough to reach the sibling as the carrying-off starts (CARRY_AFTER).
+      cx = HOME_BOWL_X - 60 - (grabT - POP_FRAMES - HOP_FRAMES) * 5.5;
+      bottom = GROUND_Y;
+    }
+    this.villain.setScale(this.villainBase * size).setFlipX(false)
+      .setDepth(grabT < POP_FRAMES ? DEPTH_ACTOR : DEPTH_CARRIED);
+    this.villain.setPosition(cx - this.villain.displayWidth / 2, bottom - this.villain.displayHeight);
+  }
+
+  /** Into the home world: through black from the castle to home as Härra Kaka comes. */
+  private syncHomeCut(t: number): void {
+    if (!this.homeCut) return;
+    const at = this.times.grabAt;
+    for (const o of this.away) o.setVisible(t < at);
+    for (const o of this.home) o.setVisible(t >= at);
+    this.cutShade?.setAlpha(Math.max(0, 1 - Math.abs(t - at) / CUT_FRAMES));
   }
 
   /** One of the cutscene's people, hidden until the phase that wants them. */
@@ -507,6 +598,7 @@ export class BetweenScene extends Phaser.Scene {
       return;
     }
 
+    this.syncHomeCut(t);
     if (this.map && t >= mapAt) {
       this.drawMap(t - mapAt);
     } else if (this.chase) {
@@ -540,6 +632,14 @@ export class BetweenScene extends Phaser.Scene {
   /** The boss just beaten, sitting dazed to one side, owning up: the T-Rex sent it. */
   private drawBeaten(t: number): void {
     if (!this.beaten) return;
+    // Home: the T-Rex stayed at his castle.
+    if (this.homeCut && t >= this.times.grabAt) {
+      this.beaten.setVisible(false);
+      for (const star of this.beatenStars) star.setVisible(false);
+      this.beatenBubble?.setVisible(false);
+      this.beatenSays?.setVisible(false);
+      return;
+    }
     this.beaten.setVisible(true).setAngle(-6 + Math.sin(t * 0.08) * 4);
     const head = this.beaten.y - this.beaten.displayHeight;
     this.beatenStars.forEach((star, i) => {
@@ -638,9 +738,13 @@ export class BetweenScene extends Phaser.Scene {
     if (grabT < CARRY_AFTER) {
       // Swooping in, facing left — the enemy art faces left already, so `fl` true at :2325
       // is the flip, matching SliceScene's own `setFlipX` convention for enemies.
-      this.villain
-        .setFlipX(this.snatching === null)
-        .setPosition(BASE_W + 20 - grabT * 4, this.villainY + Math.sin(t * 0.3) * 2);
+      if (this.homeCut) {
+        this.outOfTheToilet(grabT);
+      } else {
+        this.villain
+          .setFlipX(this.snatching === null)
+          .setPosition(BASE_W + 20 - grabT * 4, this.villainY + Math.sin(t * 0.3) * 2);
+      }
       this.sibling.setVisible(true).setPosition(HERO_X + SIBLING_DX, this.heroY + SIBLING_DY);
       this.confused.setVisible(grabT > 40).setPosition(HERO_X + 75, this.heroY - 5);
     } else {

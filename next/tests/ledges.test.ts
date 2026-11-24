@@ -14,7 +14,7 @@ import { STAGES } from '../src/data/stages';
  */
 describe('every ledge in the run', () => {
   // Every hand-built level: the run's, and those on a screen of their own (data/demos.ts).
-  for (const { level } of [...STAGES, ...Object.values(DEMOS)].filter((s) => !LEVELS.includes(s.level))) {
+  for (const level of new Set([...STAGES, ...Object.values(DEMOS)].map((s) => s.level).filter((l) => !LEVELS.includes(l)))) {
     it(`lands a jump off every step and perch in ${level.name} on solid ground`, () => {
       const map = level.generate({} as never);
       const W = map[0].length;

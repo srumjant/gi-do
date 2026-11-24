@@ -1,6 +1,7 @@
-import { LEVELS, LEVEL_NAME_KEYS, type Level, type Villain } from './levels';
+import { HOME_THEME, LEVELS, LEVEL_NAME_KEYS, type Level, type Villain } from './levels';
 import { DINO_CANYON_2 } from './levels2/dinoCanyon2';
 import { DOLL_GARDEN_2 } from './levels2/dollGarden2';
+import { HOMMIK } from './levels2/hommik';
 import { JAALOSS } from './levels2/jaaloss';
 import { JARV } from './levels2/jarv';
 import { KANJON } from './levels2/kanjon';
@@ -8,6 +9,8 @@ import { KATEDRAAL } from './levels2/katedraal';
 import { MANGULOSSI } from './levels2/mangulossi';
 import { NUKUAED } from './levels2/nukuaed';
 import { NUKUMAJA } from './levels2/nukumaja';
+import { OHTU } from './levels2/ohtu';
+import { PAEV } from './levels2/paev';
 import { PIAZZA } from './levels2/piazza';
 import { RAEKODA } from './levels2/raekoda';
 import { SAALID } from './levels2/saalid';
@@ -35,16 +38,21 @@ export interface LevelEntry {
 /**
  * The run, theme by theme. A theme with a list of its own plays that list in place of its
  * classic level (docs/superpowers/specs/2026-11-22-three-levels-and-a-boss-design.md); a theme
- * not yet reworked plays its classic level alone. Every theme is reworked now, so the run ends on
- * Troonisaal and the T-Rex's new fight; the classic Toy Castle and its fight (game/boss.ts) are
- * left for the tests that pin them to the original game.
+ * not yet reworked plays its classic level alone. Every theme is reworked now; after the T-Rex's
+ * Troonisaal comes the home world, the first theme with no classic level, and the run ends there
+ * on Härra Kaka. The classic Toy Castle and its fight (game/boss.ts) are left for the tests that
+ * pin them to the original game.
  */
 export function buildStages(themes: Partial<Record<number, readonly LevelEntry[]>>): Stage[] {
-  return LEVELS.flatMap((level, theme) => {
+  const classic = LEVELS.flatMap((level, theme) => {
     const listed = themes[theme];
     if (!listed) return [{ theme, level, nameKey: LEVEL_NAME_KEYS[theme] }];
     return listed.map((entry) => ({ theme, level: entry.level, nameKey: entry.nameKey }));
   });
+  // A theme with no classic level (the home world, HOME_THEME) comes after them all.
+  const extra = Object.keys(themes).map(Number).filter((theme) => theme >= LEVELS.length).sort((a, b) => a - b)
+    .flatMap((theme) => (themes[theme] ?? []).map((entry) => ({ theme, level: entry.level, nameKey: entry.nameKey })));
+  return [...classic, ...extra];
 }
 
 export const STAGES: readonly Stage[] = buildStages({
@@ -77,6 +85,13 @@ export const STAGES: readonly Stage[] = buildStages({
     { level: MANGULOSSI, nameKey: LEVEL_NAME_KEYS[5] },
     { level: SAALID, nameKey: 'level_6_2' },
     { level: TROONISAAL, nameKey: 'level_6_3' },
+  ],
+  // The home world (docs/superpowers/specs/2026-11-24-home-world-design.md): a normal day after
+  // the T-Rex, morning, day and evening, the last ending in Härra Kaka's bathroom.
+  [HOME_THEME]: [
+    { level: HOMMIK, nameKey: 'level_7_1' },
+    { level: PAEV, nameKey: 'level_7_2' },
+    { level: OHTU, nameKey: 'level_7_3' },
   ],
 });
 

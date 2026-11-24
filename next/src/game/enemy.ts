@@ -5,7 +5,7 @@ import {
   BAT_S, BOUNCER_S, CANNON_S, CAR_S, CHICKEN_S, COOK_S, DINO_S, DOLL_S, GHOST_S, GIANT_S, ICEBAT_S, KNIGHT_S, SOLDIER_S,
   PENGUIN_S,
   type SpriteData,
-  POOLET_S,
+  HAIRBRUSH_S, HOUSEFLY_S, PLUNGER_S, POOLET_S, SHAMPOO_S, SOCK_S,
 } from '../data/sprites';
 import { playerHit } from './player';
 import { random } from './random';
@@ -89,9 +89,29 @@ export type EnemyMove = (world: World, e: EnemyState) => EnemyBlocked;
  * it is asked to move one. A hit CANNON is the same story: it stops being a cannon, so it
  * starts being asked to move, and gets its body then.
  */
+/** The fixed-height flyers: the bat, the ice bat and the home world's fly. */
+const FLYERS: ReadonlySet<string> = new Set(['bat', 'icebat', 'fly']);
+/** The ones that stand and shoot: the cannon, and the home world's shampoo bottle with its soap. */
+const SHOOTERS: ReadonlySet<string> = new Set(['cannon', 'shampoo']);
+
+/** The plunger (the home world): it stays where it stands and jumps straight up, again and again. */
+export const PLUNGER_JUMP = 7;
+/** Frames it squats before each jump, which the scene shows. */
+export const PLUNGER_SQUAT = 18;
+
+/** Frames a plunger rests between jumps: longer on Super Easy. */
+export function plungerRest(dc: { enemyShootInterval: number }): number {
+  return Math.round(dc.enemyShootInterval * 0.4) + 30;
+}
+
+/** Whether a plunger on the ground is about to jump. */
+export function plungerSquatting(e: EnemyState, dc: { enemyShootInterval: number }): boolean {
+  return !e.airborne && e.bounceTimer > plungerRest(dc) - PLUNGER_SQUAT;
+}
+
 export function isGroundPatrol(e: EnemyState): boolean {
-  return e.type !== 'ghost' && e.type !== 'bat' && e.type !== 'icebat'
-    && e.type !== 'cannon' && e.type !== 'bouncer' && e.type !== 'giant';
+  return e.type !== 'ghost' && !FLYERS.has(e.type) && e.type !== 'plunger'
+    && !SHOOTERS.has(e.type) && e.type !== 'bouncer' && e.type !== 'giant';
 }
 
 /** How near, in pixels, a zombie notices the hero and starts after them. */
@@ -153,6 +173,14 @@ const ENEMY_SPRITES: Partial<Record<string, SpriteData>> = {
   soldier: SOLDIER_S,
   // The little poos Härra Kaka splits into (game/bosses/poo.ts).
   poolet: POOLET_S,
+  // The home world: a sock walks like a doll, a fly flies like a bat, a hairbrush is a zombie.
+  sock: SOCK_S,
+  fly: HOUSEFLY_S,
+  hairbrush: HAIRBRUSH_S,
+  // It stays where it stands and jumps straight up (stepEnemy below).
+  plunger: PLUNGER_S,
+  // A cannon that squirts soap (stepEnemy below).
+  shampoo: SHAMPOO_S,
 };
 
 /**
@@ -205,7 +233,7 @@ export function spawnEnemy(
     e.vx = 0;
     e.originY = e.y;
     e.noGravity = true;
-  } else if (def.type === 'bat' || def.type === 'icebat') {
+  } else if (FLYERS.has(def.type)) {
     // index.html:1217 — a fixed-height flyer, not a physics body: no gravity, and its y
     // is rewritten from scratch every frame (stepEnemy below) from `originY` — set here,
     // once, 60px above where it would otherwise have stood on the ground — plus a sine
@@ -218,7 +246,7 @@ export function spawnEnemy(
     e.vx = -1.2 * dc.enemySpeed;
     e.noGravity = true;
     e.sineOffset = random() * Math.PI * 2;
-  } else if (def.type === 'cannon') {
+  } else if (SHOOTERS.has(def.type)) {
     // index.html:1218 — the one enemy that never moves, and the one enemy a child cannot
     // kill by jumping on it (`noStomp`; see the stomp branch at the bottom of stepEnemy).
     //
@@ -245,6 +273,12 @@ export function spawnEnemy(
     // the same hand-written floor snap a cannon does.
     e.vx = 0;
     e.noStomp = true;
+  } else if (def.type === 'plunger') {
+    // Stays where it stands; it falls and lands by the hand-written floor snap, as a cannon.
+    // Each starts at its own point in its rest, so a row of them is a rhythm, not one jump.
+    e.vx = 0;
+    e.bounceTimer = (def.x * 37) % 60;
+    e.airborne = false;
   } else if (def.type === 'bouncer') {
     // index.html:1219 — starts at rest (vy stays 0, the base object's default, until
     // gravity below first touches it) with the hop countdown at zero; stepEnemy fires
@@ -439,7 +473,7 @@ export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
       e.y = e.originY + Math.sin(world.animFrame * 0.04) * 15;
     }
     e.vx = p.x > e.x ? 0.1 : -0.1;
-  } else if (e.type === 'bat' || e.type === 'icebat') {
+  } else if (FLYERS.has(e.type)) {
     // index.html:1533 — x drifts at the constant vx spawnEnemy gave it; y is
     // overwritten from scratch every frame off `world.animFrame` (not a per-enemy
     // timer — every bat reads the same shared clock and differs only by its own
@@ -449,7 +483,7 @@ export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
     e.x += e.vx;
     e.y = e.originY + Math.sin(world.animFrame * 0.06 + e.sineOffset) * 30;
     if (e.x < 0 || e.x > world.level.width * TILE) e.vx *= -1;
-  } else if (e.type === 'cannon') {
+  } else if (SHOOTERS.has(e.type)) {
     // index.html:1534-1535. The whole of the cannon: a countdown, and a fireball when it
     // hits zero. No movement of any kind — `vx` stays the 0 spawnEnemy set and nothing
     // in this branch touches `x` or `y`.
@@ -476,12 +510,12 @@ export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
         vx: dir * 2.5 * dc.enemySpeed,
         vy: 0,
         life: 120,
-        type: 'fireball',
+        type: e.type === 'shampoo' ? 'soap' : 'fireball',
       });
       // index.html:1535's bare `playTone(150,.1,'sawtooth',.08,300)` — NOT the boss's
       // shot, which is the same wave at the same volume and slides the other way. See
       // audio/sfx.ts, which predicted this one wanting a function of its own.
-      world.sounds.push('cannon-fire');
+      world.sounds.push(e.type === 'shampoo' ? 'squirt' : 'cannon-fire');
     }
   } else if (e.type === 'bouncer') {
     // index.html:1536-1537 — hops rather than walks. Sits until `bounceTimer` clears 40
@@ -501,6 +535,23 @@ export function stepEnemy(world: World, e: EnemyState, move?: EnemyMove): void {
     e.x += e.vx;
     const ef = e.vx > 0 ? e.x + e.w : e.x;
     if (isSolid(getTile(map, ef, e.y + e.h / 2))) e.vx *= -1;
+  } else if (e.type === 'plunger') {
+    // Stays where it stands: rests, squats, jumps straight up, lands with a plop.
+    e.vx = 0;
+    if (e.vy === 0) {
+      if (e.airborne) {
+        e.airborne = false;
+        e.bounceTimer = 0;
+        world.sounds.push('plop');
+      }
+      if (++e.bounceTimer >= plungerRest(dc)) {
+        e.vy = -PLUNGER_JUMP;
+        e.airborne = true;
+        e.bounceTimer = 0;
+      }
+    }
+    // Stomped only while it is down: up in the air it is a hit.
+    e.noStomp = e.airborne === true;
   } else {
     // Ground patrol (index.html:1538-1539): doll, car, dino, penguin — and 'chicken',
     // which has no branch of its own here for the same reason it has none in the live

@@ -32,6 +32,13 @@ export const TILE_ICE = 11;
 /** Icy water: not solid, and falling into it is a fall, as lava is (game/course.ts). */
 export const TILE_WATER = 12;
 
+/**
+ * The home world's theme (docs/superpowers/specs/2026-11-24-home-world-design.md): world 7,
+ * after the T-Rex, and the first theme with no classic level behind it, so `LEVELS[6]` is
+ * undefined. Its levels carry their own look and its tune is not one of the original game's.
+ */
+export const HOME_THEME = 6;
+
 export function isSolid(tile: number): boolean {
   return tile === TILE_GROUND || tile === TILE_BRICK
       || tile === TILE_QUESTION || tile === TILE_RAINBOW
@@ -83,6 +90,27 @@ export interface Level {
   villain?: Villain;
   /** Drawn indoors: a wallpaper instead of the theme's sky, hills and clouds. */
   indoors?: boolean;
+  /** Pictures of furniture over the level (gfx/furniture.ts). They have no rules of their own. */
+  furniture?: Furniture[];
+  /** The home world's look: potties for flags, a shower curtain for a gate's bars. */
+  home?: boolean;
+}
+
+export type FurnitureKind =
+  | 'bed' | 'window' | 'door' | 'toyBlocks' | 'stool' | 'counter' | 'mirror' | 'basin' | 'toilet'
+  | 'boots' | 'basket' | 'washer' | 'shelf' | 'towel' | 'bathtub' | 'nightWindow' | 'tubEnd';
+
+/**
+ * A piece of furniture, in tiles: `x` its left column, `y` its bottom row, `w` by `h` tiles.
+ * Over blocks it makes them look like furniture (a stool, a counter); over air it is a
+ * picture on the wall (a window, a mirror). The toilet is drawn at its own size.
+ */
+export interface Furniture {
+  kind: FurnitureKind;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 /** Where a course's pieces are, in tiles. Built from the ASCII map in data/course.ts. */
@@ -106,6 +134,17 @@ export interface CourseDef {
   doors: Array<{ x: number; cells: Array<{ x: number; y: number }> }>;
   /** Vents (`v`) in the lava, each a cell that spits fireballs straight up. */
   vents: Array<{ x: number; y: number }>;
+  /** Taps (`w`), each a cell that lets go of a drop straight down now and then. */
+  taps?: Array<{ x: number; y: number }>;
+  /** Soap dishes (`O`), each standing on floor row `y`: they let go of bubbles to ride. */
+  soaps?: Array<{ x: number; y: number }>;
+  /** Toilet brushes (`X`), each spinning round the middle of its cell. */
+  brushes?: Array<{ x: number; y: number }>;
+  /**
+   * Rubber ducks (`q`) on a bath: `y` the water's top row, `left`..`right` the columns of the
+   * duck's own stretch of it, which it drifts back and forth over.
+   */
+  ducks?: Array<{ x: number; y: number; left: number; right: number }>;
   /** The boss, on a level that ends with one. */
   boss?: BossDef;
 }

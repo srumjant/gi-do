@@ -20,6 +20,7 @@ import {
   type Skin,
   type SpriteData,
   POOLET_P, POOLET_S,
+  HAIRBRUSH_P, HAIRBRUSH_S, HOUSEFLY_P, HOUSEFLY_S, PLUNGER_P, PLUNGER_S, SHAMPOO_P, SHAMPOO_S, SOCK_P, SOCK_S,
 } from '../data/sprites';
 
 /**
@@ -147,6 +148,11 @@ export function getEnemySpriteInfo(type: string): EnemySpriteInfo {
     case 'soldier': return { sprite: SOLDIER_S, palette: SOLDIER_P };
     case 'giant': return { sprite: GIANT_S, palette: GIANT_P };
     case 'poolet': return { sprite: POOLET_S, palette: POOLET_P };
+    case 'sock': return { sprite: SOCK_S, palette: SOCK_P };
+    case 'fly': return { sprite: HOUSEFLY_S, palette: HOUSEFLY_P };
+    case 'hairbrush': return { sprite: HAIRBRUSH_S, palette: HAIRBRUSH_P };
+    case 'plunger': return { sprite: PLUNGER_S, palette: PLUNGER_P };
+    case 'shampoo': return { sprite: SHAMPOO_S, palette: SHAMPOO_P };
     default: return { sprite: DINO_S, palette: DINO_P };
   }
 }

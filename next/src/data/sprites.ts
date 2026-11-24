@@ -267,3 +267,26 @@ export const LID_S=[[3,3,3,3,3,3,3,3],[3,6,6,6,6,6,6,3]];
 export const LID_P={3:'#7a8090',6:'#eef1f6'};
 export const FLUSH_BUTTON_S=[[0,8,7,0],[7,7,7,7]];
 export const FLUSH_BUTTON_P={7:'#e03a3a',8:'#ff8f8f'};
+// The home world (docs/superpowers/specs/2026-11-24-home-world-design.md). A smelly sock with
+// a red stripe and eyes, its toe forward (enemies face left as drawn), a whiff of stink
+// over it; a house fly, bigger than Härra Kaka's buzzing ones, with red eyes; a pink
+// hairbrush on two little feet, its bristles up: nobody stomps on that.
+export const SOCK_S=[[0,3,0,1,1,1,1,0],[3,0,0,2,2,2,2,0],[0,3,0,1,4,1,4,0],[0,0,0,1,1,1,1,0],[0,0,0,2,2,2,2,0],[0,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,0],[1,1,1,1,1,1,5,0],[0,5,5,5,5,5,0,0]];
+export const SOCK_P={1:'#f2f2f2',2:'#e04040',3:'#8fcf4a',4:'#222222',5:'#c8c8c8'};
+export const HOUSEFLY_S=[[0,2,2,0,2,2,0],[2,2,2,0,2,2,2],[0,2,1,1,1,2,0],[0,1,3,1,3,1,0],[0,0,1,1,1,0,0],[0,0,0,1,0,0,0]];
+export const HOUSEFLY_P={1:'#2a2a2a',2:'#cfe8ff',3:'#ff3333'};
+export const HAIRBRUSH_S=[[6,0,6,0,6,0,6,0],[6,0,6,0,6,0,6,0],[6,6,6,6,6,6,6,0],[1,1,1,1,1,1,1,0],[1,4,1,1,1,4,1,0],[1,1,1,1,1,1,1,0],[0,0,2,2,2,0,0,0],[0,0,2,2,2,0,0,0],[0,0,3,0,3,0,0,0]];
+export const HAIRBRUSH_P={1:'#ff8fc0',2:'#c05a90',3:'#5a2a40',4:'#222222',6:'#333333'};
+// A drop from a dripping tap.
+export const DROP_S=[[0,0,1,0],[0,1,1,0],[1,2,1,1],[1,1,1,1],[0,1,1,0]];
+export const DROP_P={1:'#5ab8f0',2:'#e8f8ff'};
+// A plunger (the home world): a red rubber cup with eyes, a wooden stick, a knob on top.
+export const PLUNGER_S=[[0,0,0,3,3,0,0,0],[0,0,0,2,2,0,0,0],[0,0,0,2,2,0,0,0],[0,0,0,2,2,0,0,0],[0,0,0,2,2,0,0,0],[0,1,1,1,1,1,1,0],[1,1,4,1,1,4,1,1],[1,1,1,1,1,1,1,1],[1,5,5,5,5,5,5,1]];
+export const PLUNGER_P={1:'#e03a3a',2:'#c8935a',3:'#8a5a3a',4:'#222222',5:'#a02020'};
+// A shampoo bottle (the home world): pink, a blue pump on top, eyes, a white label. It squirts
+// soap blobs, as a cannon fires.
+export const SHAMPOO_S=[[0,0,0,3,3,3,0,0],[0,0,0,0,3,0,0,0],[0,0,0,2,2,0,0,0],[0,1,1,1,1,1,1,0],[0,1,4,1,1,4,1,0],[0,1,1,1,1,1,1,0],[0,1,5,5,5,5,1,0],[0,1,5,5,5,5,1,0],[0,1,1,1,1,1,1,0]];
+export const SHAMPOO_P={1:'#ff8fc0',2:'#ffffff',3:'#5ab0ff',4:'#222222',5:'#ffffff'};
+// A soap blob.
+export const SOAP_S=[[0,1,1,0],[1,2,1,1],[1,1,1,1],[0,1,1,0]];
+export const SOAP_P={1:'#ffd0ea',2:'#ffffff'};

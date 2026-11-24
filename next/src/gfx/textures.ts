@@ -34,6 +34,7 @@ import {
   ICICLE_P, ICICLE_S, YETI_P, YETI_ROAR_S, YETI_S,
   CROWN_P, CROWN_S, TOY_BLOCK_P, TOY_BLOCK_S,
   ZOMBIE_COOK_P, ZOMBIE_DINO_P, ZOMBIE_DOLL_P, ZOMBIE_KNIGHT_P, ZOMBIE_PENGUIN_P, ZOMBIE_SOLDIER_P,
+  DROP_P, DROP_S, HAIRBRUSH_P, HAIRBRUSH_S, SOAP_P, SOAP_S,
   BATHTUB_P, BATHTUB_S, DUCK_P, DUCK_S, FLUSH_BUTTON_P, FLUSH_BUTTON_S, FLY_P, FLY_S, LID_P, LID_S, POO_P, POO_S, STINK_P, STINK_S, TOILET_P, TOILET_S,
 } from '../data/sprites';
 import type { Villain } from '../data/levels';
@@ -197,6 +198,8 @@ function registerPlayerTextures(scene: Phaser.Scene): void {
 const ENEMY_TYPES = [
   'car', 'doll', 'dino', 'ghost', 'bat', 'cannon', 'bouncer', 'penguin', 'icebat', 'chicken', 'knight', 'cook', 'soldier',
   'poolet',
+  // The home world's (docs/superpowers/specs/2026-11-24-home-world-design.md).
+  'sock', 'fly', 'hairbrush', 'plunger', 'shampoo',
 ];
 
 /** The walkers that have a zombie (data/course.ts's uppercase letters), and its palette. */
@@ -207,6 +210,8 @@ export const ZOMBIE_KINDS: Readonly<Record<string, { sprite: SpriteData; palette
   cook: { sprite: COOK_S, palette: ZOMBIE_COOK_P },
   penguin: { sprite: PENGUIN_S, palette: ZOMBIE_PENGUIN_P },
   soldier: { sprite: SOLDIER_S, palette: ZOMBIE_SOLDIER_P },
+  // In its own colours: it is a hairbrush, not a green zombie, and nobody stomps on one.
+  hairbrush: { sprite: HAIRBRUSH_S, palette: HAIRBRUSH_P },
 };
 
 /** `enemy-zombie-<type>`. */
@@ -321,6 +326,10 @@ export const TOILET_TEXTURE = 'toilet';
 export const BATHTUB_TEXTURE = 'bathtub';
 export const DUCK_TEXTURE = 'duck';
 export const STINK_TEXTURE = 'stink';
+/** A dripping tap's drop (the home world, game/course.ts). */
+export const DROP_TEXTURE = 'drop';
+/** A shampoo bottle's soap blob (the home world, game/enemy.ts). */
+export const SOAP_TEXTURE = 'soap';
 export const FLY_TEXTURE = 'fly';
 export const LID_TEXTURE = 'toilet-lid';
 export const FLUSH_BUTTON_TEXTURE = 'flush-button';
@@ -388,6 +397,8 @@ export function registerBossTextures(scene: Phaser.Scene): void {
   addSprite(scene, BATHTUB_TEXTURE, BATHTUB_S, BATHTUB_P, 3);
   addSprite(scene, DUCK_TEXTURE, DUCK_S, DUCK_P, 2);
   addSprite(scene, STINK_TEXTURE, STINK_S, STINK_P, 2);
+  addSprite(scene, DROP_TEXTURE, DROP_S, DROP_P, 2);
+  addSprite(scene, SOAP_TEXTURE, SOAP_S, SOAP_P, 2);
   addSprite(scene, FLY_TEXTURE, FLY_S, FLY_P, 1);
   addSprite(scene, LID_TEXTURE, LID_S, LID_P, 3);
   addSprite(scene, FLUSH_BUTTON_TEXTURE, FLUSH_BUTTON_S, FLUSH_BUTTON_P, 3);

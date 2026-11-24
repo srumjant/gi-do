@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
 import { startBGM } from '../audio/bgm';
+import { levelMusic } from '../data/bgmThemes';
+import { drawFurniture } from '../gfx/furniture';
+import { plungerSquatting } from '../game/enemy';
 import { playSounds } from '../audio/cues';
 import { BASE_H, BASE_W, MAX_STEPS_PER_FRAME, STEP_MS, TILE, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
 import { getDifficulty, type DifficultyKey } from '../config/difficulty';
@@ -78,6 +81,8 @@ import {
   STAR_TEXTURE,
   SUPER_TEXTURE,
   STINK_TEXTURE,
+  DROP_TEXTURE,
+  SOAP_TEXTURE,
 } from '../gfx/textures';
 import type { InputState } from '../input/actions';
 import { createControls, type Controls } from '../input/controls';
@@ -437,6 +442,8 @@ export class SliceScene extends Phaser.Scene {
     this.createParallax(levelIndex);
 
     this.questionBlocks = drawStaticTiles(this, this.world);
+    // The home world's furniture, over the tiles (gfx/furniture.ts).
+    drawFurniture(this, this.world.level);
     const rainbow = createRainbowBlocks(this, this.world);
     this.rainbowBlocks = rainbow.blocks;
     this.rainbowGraphics = rainbow.graphics;
@@ -591,7 +598,8 @@ export class SliceScene extends Phaser.Scene {
     } satisfies PowerupPopupData);
 
     // The last line of `initLevel` (index.html:1209), and the reason each level sounds
-    // different: theme 0-5 IS the level index. Down here rather than up beside
+    // different: theme 0-5 IS the level index; the home world has a tune of its own
+    // (data/bgmThemes.ts's levelMusic). Down here rather than up beside
     // `createWorld` because that is where the live source has it — after everything else
     // the level needs is built.
     //
@@ -600,7 +608,7 @@ export class SliceScene extends Phaser.Scene {
     // silent cutscene. A RESPAWN does not come through here at all — the scene is not
     // restarted, the World is rebuilt in place — which is why `respawnLevel` raises a
     // `music-level` cue of its own (game/world.ts).
-    startBGM(levelIndex);
+    startBGM(levelMusic(levelIndex));
 
     // All three of them run alongside this scene and hold a reference to THIS World, so all
     // three have to go when it does — whether it is going to the next level, to the win
@@ -1432,21 +1440,25 @@ export class SliceScene extends Phaser.Scene {
       const wave = shot.type === 'wave';
       const pizza = shot.type === 'pizza';
       const icicle = shot.type === 'icicle';
-      // Härra Kaka's stink wave rolls along the floor like Toomas's (game/bosses/poo.ts).
+      // Härra Kaka's stink wave rolls along the floor like Toomas's (game/bosses/poo.ts); a
+      // dripping tap's drops fall straight down (game/course.ts).
       const stink = shot.type === 'stink';
-      image.setTexture(heart ? QUEEN_HEART_TEXTURE : rock ? ROCK_TEXTURE : wave ? WAVE_TEXTURE
+      const drop = shot.type === 'drop';
+      // A shampoo bottle's soap blob (game/enemy.ts).
+      const soap = shot.type === 'soap';
+      image.setTexture(drop ? DROP_TEXTURE : soap ? SOAP_TEXTURE : heart ? QUEEN_HEART_TEXTURE : rock ? ROCK_TEXTURE : wave ? WAVE_TEXTURE
         : stink ? STINK_TEXTURE : pizza ? PIZZA_TEXTURE : icicle ? ICICLE_TEXTURE : FIREBALL_TEXTURE);
       image.setScale(spriteScale(image) * (heart ? 0.6 : 1));
       const flicker = Math.sin(animFrame * 0.3 + shot.x) * 0.3;
       // A falling icicle hangs point down, its point at the bottom of its 8px box.
       image
         .setOrigin(pizza || icicle ? 0.5 : 0, pizza ? 0.5 : icicle ? 1 : 0)
-        .setPosition(wave || stink ? shot.x - 4 : pizza || icicle ? shot.x + 4 : shot.x, pizza ? shot.y + 4 : icicle ? shot.y + 8 : stink ? shot.y - 4 : shot.y)
+        .setPosition(wave || stink ? shot.x - 4 : pizza || icicle ? shot.x + 4 : shot.x, drop ? shot.y - 2 : pizza ? shot.y + 4 : icicle ? shot.y + 8 : stink ? shot.y - 4 : shot.y)
         .setAngle(pizza ? (animFrame * 18) % 360 : 0)
         .setFlipX((wave || stink) && animFrame % 10 < 5)
-        .setAlpha(wave || stink || pizza || icicle ? 1 : 0.8 + flicker * 0.2)
+        .setAlpha(drop || soap || wave || stink || pizza || icicle ? 1 : 0.8 + flicker * 0.2)
         .setVisible(true);
-      if (!heart && !rock && !wave && !stink && !pizza && !icicle) {
+      if (!drop && !soap && !heart && !rock && !wave && !stink && !pizza && !icicle) {
         const trailX = shot.vx > 0 ? shot.x - 4 : shot.x + 10;
         fillRect(trails, FIREBALL_TRAIL, trailX, shot.y + 2, 4, 4);
       }
@@ -1632,6 +1644,15 @@ export class SliceScene extends Phaser.Scene {
     const wobble = Math.sin(animFrame * 0.15 + enemy.x);
     image.setVisible(true);
     image.setScale(scale);
+    // A plunger squats before it jumps and stretches in the air (game/enemy.ts).
+    if (enemy.type === 'plunger') {
+      const squat = plungerSquatting(enemy, this.world.dc);
+      const sx = squat ? 1.15 : enemy.airborne ? 0.9 : 1;
+      const sy = squat ? 0.78 : enemy.airborne ? 1.12 : 1;
+      image.setScale(scale * sx, scale * sy).setAlpha(1)
+        .setPosition(enemy.x - (enemy.w * (sx - 1)) / 2, enemy.y + enemy.h * (1 - sy));
+      return;
+    }
     // A living GHOST is translucent and breathes (index.html:1761): `.6 + sin(f*.08)*.2`,
     // so it runs between 0.4 and 0.8 and never reaches solid. Off the SHARED animFrame
     // with no per-ghost offset, exactly like its drift, so every ghost on screen pulses

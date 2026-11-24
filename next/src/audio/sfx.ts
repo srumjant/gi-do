@@ -170,3 +170,24 @@ export function sfxFlush(): void {
     setTimeout(() => playTone(220 - i * 30, 0.12, 'sine', 0.06, 320), 320 + i * 140);
   });
 }
+
+/** A tap letting go of a drop: a little high plip (the home world). */
+export function sfxDrip(): void {
+  playTone(1500, 0.05, 'sine', 0.07, 900);
+  setTimeout(() => playTone(1100, 0.06, 'sine', 0.04, 700), 50);
+}
+
+/** A plunger landing: a low rubbery plop (the home world). */
+export function sfxPlop(): void {
+  playTone(180, 0.12, 'sine', 0.12, 90);
+}
+
+/** A soap bubble popping (the home world). */
+export function sfxPop(): void {
+  playTone(900, 0.04, 'triangle', 0.08, 1400);
+}
+
+/** A shampoo bottle squirting soap (the home world). */
+export function sfxSquirt(): void {
+  playTone(500, 0.09, 'triangle', 0.06, 150);
+}

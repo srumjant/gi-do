@@ -10,7 +10,7 @@ import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { characterName, siblingOf } from '../game/menu';
 import type { Character } from '../game/player';
 import { random } from '../game/random';
-import { getSelectedChar, getSkinIndex, inDemo } from '../game/run';
+import { getSelectedChar, getSkinIndex } from '../game/run';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { fitScreenCamera } from '../gfx/render';
 import {
@@ -177,9 +177,9 @@ export class WinScene extends Phaser.Scene {
       this.hearts.push(heart.setScale(spriteScale(heart)));
     }
 
-    // The story's end (game/story.ts): the T-Rex behind it all is a tiny toy now. Or, after
-    // Härra Kaka's level on its own (?boss=poo), he is flushed away.
-    this.line(TINY_Y, TINY_FONT, TStr(inDemo() ? 'story_poo_flushed' : 'story_trex_tiny'));
+    // The story's end (game/story.ts): the run ends at home, Härra Kaka flushed away, and bed.
+    // His level on its own (?boss=poo) ends the same way.
+    this.line(TINY_Y, TINY_FONT, `${TStr('story_poo_flushed')} ${TStr('story_good_night')}`);
     this.line(HINT_Y, HINT_FONT, prompt('prompt_play_again'));
   }
 

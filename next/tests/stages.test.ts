@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LEVELS, LEVEL_NAME_KEYS } from '../src/data/levels';
+import { HOME_THEME, LEVELS, LEVEL_NAME_KEYS } from '../src/data/levels';
 import { buildStages, snatcher, STAGES } from '../src/data/stages';
 
 const named = (name: string) => ({ ...LEVELS[0], name });
@@ -19,12 +19,13 @@ describe('the run order', () => {
     expect(stages[2]).toEqual({ theme: 1, level: b, nameKey: 'y' });
   });
 
-  it('names every classic stage by its classic key, and ends on the T-Rex', () => {
+  it('names every classic stage by its classic key, and ends on Härra Kaka at home', () => {
     for (const s of STAGES) if (LEVELS.includes(s.level)) expect(s.nameKey).toBe(LEVEL_NAME_KEYS[s.theme]);
-    // Every theme is reworked (2026-11-23): the run ends on Troonisaal and the T-Rex's new fight.
+    // Every theme is reworked (2026-11-23), and after the T-Rex comes the home world
+    // (2026-11-24): the run ends on Härra Kaka's fight.
     const last = STAGES[STAGES.length - 1].level;
     expect(last.ending).toBe('boss');
-    expect(last.course?.boss?.kind).toBe('tRex');
+    expect(last.course?.boss?.kind).toBe('poo');
     expect(STAGES.some((s) => LEVELS.includes(s.level))).toBe(false);
   });
 
@@ -41,5 +42,22 @@ describe('the run order', () => {
 
   it('has no villain for a classic level, which keeps the original kidnapper', () => {
     expect(snatcher({ theme: 0, level: LEVELS[0], nameKey: 'level_1' })).toBeNull();
+  });
+});
+
+describe('a theme past the classic six', () => {
+  it('is played after them, in its own order', () => {
+    const a = named('A');
+    const b = named('B');
+    const stages = buildStages({ [HOME_THEME]: [{ level: a, nameKey: 'x' }, { level: b, nameKey: 'y' }] });
+    expect(stages.slice(-2)).toEqual([
+      { theme: HOME_THEME, level: a, nameKey: 'x' },
+      { theme: HOME_THEME, level: b, nameKey: 'y' },
+    ]);
+    expect(stages.slice(0, -2).map((s) => s.level)).toEqual(LEVELS);
+  });
+
+  it('is the first theme with no classic level', () => {
+    expect(HOME_THEME).toBe(LEVELS.length);
   });
 });

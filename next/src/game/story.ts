@@ -4,8 +4,10 @@ import { STAGES } from '../data/stages';
 /**
  * The story the cutscenes tell (docs/superpowers/specs/2026-11-23-story-and-transitions-design.md):
  * the T-Rex wants the sibling for his Toy Castle, and each world's villain is one of his
- * helpers, carrying the sibling a world nearer. Pure: which beat a transition is, who is in it,
- * and which lines (i18n keys, with names to put in) it says. BetweenScene acts it out.
+ * helpers, carrying the sibling a world nearer. After him the kids are home on a normal day,
+ * and Härra Kaka is the last villain (docs/superpowers/specs/2026-11-24-home-world-design.md).
+ * Pure: which beat a transition is, who is in it, and which lines (i18n keys, with names to put
+ * in) it says. BetweenScene acts it out.
  */
 
 /** A world's villain: who runs off with the sibling in its chases and waits at its end. */
@@ -95,8 +97,9 @@ export function scriptFor(t: Transition): Script {
       return { headline: { key: 'story_follow', villainKey: villainKey(t.villain, true) } };
     case 'worldChange':
       return {
-        beaten: { key: 'story_sent_me' },
-        grab: { key: t.villain === 'tRex' ? 'story_now_me' : 'story_wants' },
+        // The T-Rex was behind it all, so nobody sent him: he owns up he is tiny now.
+        beaten: { key: t.beaten === 'tRex' ? 'story_tiny_now' : 'story_sent_me' },
+        grab: { key: t.villain === 'tRex' ? 'story_now_me' : t.villain === 'poo' ? 'story_poo_grab' : 'story_wants' },
         headline: { key: 'story_took', villainKey: villainKey(t.villain) },
         mapTitle: { key: 'story_world', worldNumber: t.world + 1, worldKey: worldKey(t.world) },
         mapSub: { key: 'story_save' },

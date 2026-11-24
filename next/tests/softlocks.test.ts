@@ -13,7 +13,7 @@ import { STAGES } from '../src/data/stages';
  */
 describe('no dead ends', () => {
   // Every hand-built level: the run's, and those on a screen of their own (data/demos.ts).
-  for (const { level } of [...STAGES, ...Object.values(DEMOS)].filter((s) => !LEVELS.includes(s.level))) {
+  for (const level of new Set([...STAGES, ...Object.values(DEMOS)].map((s) => s.level).filter((l) => !LEVELS.includes(l)))) {
     it(`leaves no dead end in ${level.name}, on any difficulty`, () => {
       for (const key of DIFF_KEYS) {
         const { locks, finishable } = findLocks(level, key);
