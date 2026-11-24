@@ -485,3 +485,26 @@ The fights play exactly as before; the bosses just act much more:
 - Do the hints help, or give too much away?
 - Which defeat gets the biggest laugh? That tells us what to do more of in the next batch
   (a new trick in each fight).
+
+## Härra Kaka, the poo boss (2026-11-24), on a screen of its own
+
+The kids' idea. Open the game with `?boss=poo` at the end of the address
+(`https://srumjant.github.io/gi-do/next/?boss=poo`), choose the difficulty and the hero, and you
+go straight into the bathroom. The normal run of 18 levels is not changed.
+
+- A big poo with a face hops about the bathroom, flies buzzing round it. Every landing sends a
+  green stink wave along the floor both ways: jump it.
+- **Don't touch the poo**: on top or at the side, it hurts.
+- **The toilet is the weapon**: jump up at the giant toilet's tank, where the red flush button
+  glows. The lid springs open and throws you back, and the view zooms out while the flush sucks
+  the poo in, over the rim and round and down the bowl: a piece goes down, and the rest flies
+  back out, smaller, landing between you and the toilet, with two little poos.
+- Three flushes and it is gone down the toilet ("NÄGEMIIIST!"), and you can free Dodo.
+
+### What to watch
+
+- Do they find the toilet button on their own, or need the hint ("ÄRA AINULT NUPPU VAJUTA!",
+  after a few seconds on Super Easy)?
+- Is being thrown across the room fun, or annoying?
+- Too easy, too hard? On the laptop a simple bot beat it in about 11 seconds on Super Easy and
+  15 on Easy, without a hit; Normal and Hard need real timing (jump it just after it lands).

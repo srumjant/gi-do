@@ -213,6 +213,15 @@ export const TRANSLATIONS: Record<string, Entry> = {
   boss_beaten_pizzaChef:    {et:'KAAK-KAAK-KAAK!', en:'BAWK BAWK BAWK!'},
   boss_beaten_yeti:         {et:'NÜÜD OLEN MA LUMEMEES!', en:"NOW I'M A SNOWMAN!"},
   boss_beaten_tRex:         {et:'MA OLEN NÜÜD PISIKE!', en:"I'M TINY NOW!"},
+  // Härra Kaka, the poo boss, on a screen of his own (?boss=poo).
+  villain_poo:              {et:'HÄRRA KAKA', en:'MR. POO'},
+  villain_poo_par:          {et:'HÄRRA KAKAT', en:'MR. POO'},
+  level_poo:                {et:'VANNITUBA', en:'THE BATHROOM'},
+  boss_intro_poo:           {et:'MA OLEN SUUR JA HAISEN!', en:"I'M BIG AND I STINK!"},
+  boss_shrug_poo:           {et:'PLÄRTS! HIHII!', en:'SPLAT! TEE HEE!'},
+  boss_beaten_poo:          {et:'NÄGEMIIIST!', en:'BYE-BYYYE!'},
+  hint_button:              {et:'ÄRA AINULT NUPPU VAJUTA!', en:"JUST DON'T PRESS THE BUTTON!"},
+  story_poo_flushed:        {et:'HÄRRA KAKA ON MINEMA LOPUTATUD!', en:'MR. POO HAS BEEN FLUSHED AWAY!'},
   // The prompts, naming the button on the device last used (input/source.ts): %K confirm,
   // %B back. The live game's own (press_start, mode_hint, ...) name SPACE whatever the device.
   prompt_start:       {et:'VAJUTA %K ALUSTAMISEKS!',  en:'PRESS %K TO START!'},

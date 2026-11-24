@@ -161,3 +161,12 @@ export function sfxGroan(): void {
   playTone(130, 0.45, 'sawtooth', 0.06, 90);
   setTimeout(() => playTone(110, 0.5, 'triangle', 0.07, 70), 200);
 }
+
+/** Härra Kaka flushed away (gfx/poo.ts): a long swoosh down, then a gurgle. */
+export function sfxFlush(): void {
+  playTone(700, 0.9, 'sine', 0.09, 90);
+  setTimeout(() => playTone(520, 0.7, 'triangle', 0.07, 70), 120);
+  [0, 1, 2, 3].forEach((i) => {
+    setTimeout(() => playTone(220 - i * 30, 0.12, 'sine', 0.06, 320), 320 + i * 140);
+  });
+}

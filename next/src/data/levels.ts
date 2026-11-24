@@ -245,10 +245,11 @@ export const LEVELS: Level[] = [
 export type LevelEnding = 'rescue' | 'chase' | 'boss';
 
 /** A theme's villain, who carries the sibling through its levels. */
-export type Villain = 'dollQueen' | 'pterodactyl' | 'vanaToomas' | 'pizzaChef' | 'yeti' | 'tRex';
+export type Villain = 'dollQueen' | 'pterodactyl' | 'vanaToomas' | 'pizzaChef' | 'yeti' | 'tRex' | 'poo';
 
 /** Each theme's boss. */
-export type BossKind = 'dollQueen' | 'pterodactyl' | 'vanaToomas' | 'pizzaChef' | 'yeti' | 'tRex';
+/** Each theme's boss, and Härra Kaka, the poo, on a screen of his own (data/demos.ts). */
+export type BossKind = 'dollQueen' | 'pterodactyl' | 'vanaToomas' | 'pizzaChef' | 'yeti' | 'tRex' | 'poo';
 
 /** A boss, as a level's ASCII places it. */
 export interface BossDef {

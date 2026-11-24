@@ -3,6 +3,7 @@ import { quietWorld, step } from './helpers/courseRuns';
 import { TILE } from '../src/config/constants';
 import { DIFF_KEYS } from '../src/config/difficulty';
 import { isSolid, LEVELS } from '../src/data/levels';
+import { DEMOS } from '../src/data/demos';
 import { STAGES } from '../src/data/stages';
 
 /**
@@ -12,7 +13,8 @@ import { STAGES } from '../src/data/stages';
  * a jump off a step landed exactly in the pit a few tiles past it, in six levels).
  */
 describe('every ledge in the run', () => {
-  for (const { level } of STAGES.filter((s) => !LEVELS.includes(s.level))) {
+  // Every hand-built level: the run's, and those on a screen of their own (data/demos.ts).
+  for (const { level } of [...STAGES, ...Object.values(DEMOS)].filter((s) => !LEVELS.includes(s.level))) {
     it(`lands a jump off every step and perch in ${level.name} on solid ground`, () => {
       const map = level.generate({} as never);
       const W = map[0].length;

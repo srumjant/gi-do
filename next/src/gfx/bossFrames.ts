@@ -34,6 +34,8 @@ export const BOSS_EYES: Readonly<Record<string, EyeSpec>> = {
   BOSS_WALK: { indices: [6, 5], rows: [3, 3] },
   BOSS_CHARGE: { indices: [6, 5], rows: [3, 3] },
   BOSS_ROAR: { indices: [6, 5], rows: [3, 3] },
+  // Härra Kaka: a pupil in each big white eye.
+  POO_S: { indices: [5, 4], rows: [6, 9] },
 };
 
 /**
@@ -46,19 +48,33 @@ export function eyesShut(sprite: SpriteData, eyes: EyeSpec): SpriteData {
   const pupil = eyes.indices[0];
   const inRows = (y: number): boolean => y >= eyes.rows[0] && y <= eyes.rows[1];
   const isEye = (y: number, x: number): boolean => inRows(y) && eyes.indices.includes(sprite[y]?.[x] ?? 0);
-  const around = (y: number, x: number): number => {
-    const counts = new Map<number, number>();
-    for (const [dy, dx] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-      const n = sprite[y + dy]?.[x + dx] ?? 0;
-      if (n === 0 || eyes.indices.includes(n)) continue;
-      counts.set(n, (counts.get(n) ?? 0) + 1);
+  // Painted from the edge of the eye inward, a pass at a time, so a big eye (Härra Kaka's) fills
+  // too: each eye pixel takes the most common colour around it that is no longer eye.
+  const out = sprite.map((row) => row.slice());
+  const open = new Set<string>();
+  sprite.forEach((row, y) => row.forEach((_, x) => { if (isEye(y, x)) open.add(`${y},${x}`); }));
+  while (open.size > 0) {
+    const painted: Array<[number, number, number]> = [];
+    for (const cell of open) {
+      const [y, x] = cell.split(',').map(Number);
+      const counts = new Map<number, number>();
+      for (const [dy, dx] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        if (open.has(`${y + dy},${x + dx}`)) continue;
+        const n = out[y + dy]?.[x + dx] ?? 0;
+        if (n === 0) continue;
+        counts.set(n, (counts.get(n) ?? 0) + 1);
+      }
+      let best = 0;
+      let most = 0;
+      for (const [n, c] of counts) if (c > most) [best, most] = [n, c];
+      if (best !== 0) painted.push([y, x, best]);
     }
-    let best = sprite[y][x];
-    let most = 0;
-    for (const [n, c] of counts) if (c > most) [best, most] = [n, c];
-    return best;
-  };
-  const out = sprite.map((row, y) => row.map((v, x) => (isEye(y, x) ? around(y, x) : v)));
+    if (painted.length === 0) break;
+    for (const [y, x, v] of painted) {
+      out[y][x] = v;
+      open.delete(`${y},${x}`);
+    }
+  }
   const middle = (sprite[0].length - 1) / 2;
   sprite.forEach((row, y) => row.forEach((v, x) => {
     if (!inRows(y) || v !== pupil) return;

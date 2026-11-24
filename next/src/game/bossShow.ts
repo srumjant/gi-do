@@ -1,6 +1,7 @@
 import type { Villain } from '../data/levels';
 import type { CourseBoss } from './bosses';
 import { CHEF_HP } from './bosses/pizzaChef';
+import { POO_HP } from './bosses/poo';
 import { PTERO_HP } from './bosses/pterodactyl';
 import { QUEEN_HP } from './bosses/dollQueen';
 import { TREX_HP, TREX_ROUNDS } from './bosses/tRex';
@@ -18,6 +19,7 @@ import { YETI_HP } from './bosses/yeti';
 /** Every boss's hearts, for how red it has gone. */
 export const HEARTS: Readonly<Record<Villain, number>> = {
   dollQueen: QUEEN_HP, pterodactyl: PTERO_HP, vanaToomas: TOOMAS_HP, pizzaChef: CHEF_HP, yeti: YETI_HP, tRex: TREX_HP,
+  poo: POO_HP,
 };
 
 /** The events that mean "that did not count yet", each boss's own (game/bosses/*.ts). */
@@ -28,6 +30,7 @@ export const SHRUGS: Readonly<Record<Villain, readonly string[]>> = {
   pizzaChef: ['swat', 'bonk'],
   yeti: ['thud', 'bonk'],
   tRex: ['thud', 'bonk'],
+  poo: ['thud'],
 };
 
 /** The entrance's hop, and how high it goes in pixels. */
@@ -138,6 +141,7 @@ export function windingUp(b: CourseBoss): boolean {
     case 'pizzaChef': return b.phase === 'cooking' && b.throwTimer < CROUCH;
     case 'yeti': return b.phase === 'windup';
     case 'tRex': return b.phase === 'roaring';
+    case 'poo': return b.phase === 'hopping' && b.hop === 'crouch';
   }
 }
 
@@ -154,6 +158,7 @@ export function hintFor(b: CourseBoss): string | null {
       const tool = TREX_ROUNDS[b.round];
       return tool === 'bow' ? 'hint_target' : tool === 'fart' ? 'hint_fart' : tool === 'bighead' ? 'hint_bighead' : 'hint_chicken';
     }
+    case 'poo': return b.phase === 'hopping' || b.phase === 'spat' ? 'hint_button' : null;
   }
 }
 
@@ -254,7 +259,7 @@ export function stepBossShow(s: BossShowState, input: ShowInput): ShowFrame {
   look.flash = s.flash / FLASH;
   if (s.wobble > 0) look.angle = Math.sin(s.wobble * 0.9) * 6 * (s.wobble / WOBBLE);
   look.red = RED_MAX * Math.max(0, HEARTS[b.kind] - b.hp) / HEARTS[b.kind];
-  const dizzy = b.phase === 'dizzy' || b.phase === 'hurt';
+  const dizzy = b.phase === 'dizzy' || b.phase === 'hurt' || b.phase === 'spat';
   const blinking = s.t % BLINK_EVERY >= BLINK_EVERY - BLINK_FOR;
   look.eyesShut = b.phase === 'asleep' || dizzy || blinking;
   look.banner = s.banner > 0 ? Math.min(1, s.banner / BANNER_FADE) : 0;

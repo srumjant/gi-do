@@ -34,6 +34,7 @@ import {
   ICICLE_P, ICICLE_S, YETI_P, YETI_ROAR_S, YETI_S,
   CROWN_P, CROWN_S, TOY_BLOCK_P, TOY_BLOCK_S,
   ZOMBIE_COOK_P, ZOMBIE_DINO_P, ZOMBIE_DOLL_P, ZOMBIE_KNIGHT_P, ZOMBIE_PENGUIN_P, ZOMBIE_SOLDIER_P,
+  BATHTUB_P, BATHTUB_S, DUCK_P, DUCK_S, FLUSH_BUTTON_P, FLUSH_BUTTON_S, FLY_P, FLY_S, LID_P, LID_S, POO_P, POO_S, STINK_P, STINK_S, TOILET_P, TOILET_S,
 } from '../data/sprites';
 import type { Villain } from '../data/levels';
 import type { Character } from '../game/player';
@@ -195,6 +196,7 @@ function registerPlayerTextures(scene: Phaser.Scene): void {
  */
 const ENEMY_TYPES = [
   'car', 'doll', 'dino', 'ghost', 'bat', 'cannon', 'bouncer', 'penguin', 'icebat', 'chicken', 'knight', 'cook', 'soldier',
+  'poolet',
 ];
 
 /** The walkers that have a zombie (data/course.ts's uppercase letters), and its palette. */
@@ -313,6 +315,17 @@ export const YETI_SCALE = 2;
 export const CROWN_TEXTURE = 'trex-crown';
 export const TOY_BLOCK_TEXTURE = 'trex-block';
 
+/** Härra Kaka and his bathroom (gfx/poo.ts). The little poos are an enemy type, `poolet`. */
+export const POO_TEXTURE = 'poo';
+export const TOILET_TEXTURE = 'toilet';
+export const BATHTUB_TEXTURE = 'bathtub';
+export const DUCK_TEXTURE = 'duck';
+export const STINK_TEXTURE = 'stink';
+export const FLY_TEXTURE = 'fly';
+export const LID_TEXTURE = 'toilet-lid';
+export const FLUSH_BUTTON_TEXTURE = 'flush-button';
+export const POO_SCALE = 2;
+
 /** Each villain's picture, for the end of a chase level and its cutscene. */
 export const VILLAIN_TEXTURES: Readonly<Record<Villain, string>> = {
   dollQueen: QUEEN_TEXTURE,
@@ -321,6 +334,7 @@ export const VILLAIN_TEXTURES: Readonly<Record<Villain, string>> = {
   pizzaChef: CHEF_TEXTURE,
   yeti: YETI_TEXTURE,
   tRex: bossTextureKey('idle'),
+  poo: POO_TEXTURE,
 };
 
 /** Each villain's colour, for the speech bubble's words when it snatches the sibling. */
@@ -331,6 +345,7 @@ export const VILLAIN_COLORS: Readonly<Record<Villain, string>> = {
   pizzaChef: '#dd2222',
   yeti: '#77aadd',
   tRex: '#44bb44',
+  poo: '#7b4a1e',
 };
 
 /** The villains that fly: the chase cutscene keeps them off the ground. */
@@ -368,6 +383,14 @@ export function registerBossTextures(scene: Phaser.Scene): void {
   addSprite(scene, ICICLE_TEXTURE, ICICLE_S, ICICLE_P, 2);
   addSprite(scene, CROWN_TEXTURE, CROWN_S, CROWN_P, 3);
   addSprite(scene, TOY_BLOCK_TEXTURE, TOY_BLOCK_S, TOY_BLOCK_P, 4);
+  addSprite(scene, POO_TEXTURE, POO_S, POO_P, POO_SCALE);
+  addSprite(scene, TOILET_TEXTURE, TOILET_S, TOILET_P, 3);
+  addSprite(scene, BATHTUB_TEXTURE, BATHTUB_S, BATHTUB_P, 3);
+  addSprite(scene, DUCK_TEXTURE, DUCK_S, DUCK_P, 2);
+  addSprite(scene, STINK_TEXTURE, STINK_S, STINK_P, 2);
+  addSprite(scene, FLY_TEXTURE, FLY_S, FLY_P, 1);
+  addSprite(scene, LID_TEXTURE, LID_S, LID_P, 3);
+  addSprite(scene, FLUSH_BUTTON_TEXTURE, FLUSH_BUTTON_S, FLUSH_BUTTON_P, 3);
   registerBossShowTextures(scene);
 }
 
@@ -403,6 +426,7 @@ const SHOW_BODIES: ReadonlyArray<readonly [string, string, SpriteData, Palette, 
   [bossTextureKey('walk'), 'BOSS_WALK', BOSS_WALK, BOSS_P, BOSS_SCALE],
   [bossTextureKey('charge'), 'BOSS_CHARGE', BOSS_CHARGE, BOSS_P, BOSS_SCALE],
   [bossTextureKey('roar'), 'BOSS_ROAR', BOSS_ROAR, BOSS_P, BOSS_SCALE],
+  [POO_TEXTURE, 'POO_S', POO_S, POO_P, POO_SCALE],
 ];
 
 function registerBossShowTextures(scene: Phaser.Scene): void {

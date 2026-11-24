@@ -5,6 +5,7 @@ import {
   BAT_S, BOUNCER_S, CANNON_S, CAR_S, CHICKEN_S, COOK_S, DINO_S, DOLL_S, GHOST_S, GIANT_S, ICEBAT_S, KNIGHT_S, SOLDIER_S,
   PENGUIN_S,
   type SpriteData,
+  POOLET_S,
 } from '../data/sprites';
 import { playerHit } from './player';
 import { random } from './random';
@@ -150,6 +151,8 @@ const ENEMY_SPRITES: Partial<Record<string, SpriteData>> = {
   knight: KNIGHT_S,
   cook: COOK_S,
   soldier: SOLDIER_S,
+  // The little poos Härra Kaka splits into (game/bosses/poo.ts).
+  poolet: POOLET_S,
 };
 
 /**
