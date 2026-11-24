@@ -8,8 +8,9 @@ import {
   isPausable,
   LEARN_STATES,
   MENU_STATES,
-  MODE_ADVENTURE,
   MODE_LEARN,
+  MODE_PICK,
+  MODE_STORY,
   modeCursorFor,
   PAUSABLE,
 } from '../src/game/navigation';
@@ -131,7 +132,7 @@ describe('the mode select cursor follows you back', () => {
   // then confirm — the two most natural buttons there are — drops a child into a level.
   it('lands on learn from every learn state and on adventure from everywhere else', () => {
     for (const state of GAME_STATES) {
-      const expected = LEARN_STATES.indexOf(state) >= 0 ? MODE_LEARN : MODE_ADVENTURE;
+      const expected = LEARN_STATES.indexOf(state) >= 0 ? MODE_LEARN : MODE_STORY;
       expect(modeCursorFor(state), `cursor after leaving ${state}`).toBe(expected);
     }
   });
@@ -141,7 +142,7 @@ describe('the mode select cursor follows you back', () => {
       kind: 'go', target: 'modeselect', modeIndex: MODE_LEARN,
     });
     expect(backFrom('gameover')).toEqual({
-      kind: 'go', target: 'modeselect', modeIndex: MODE_ADVENTURE,
+      kind: 'go', target: 'modeselect', modeIndex: MODE_STORY,
     });
   });
 
@@ -220,5 +221,23 @@ describe('every route this port can take leads to a screen that exists', () => {
   it('names exactly what is left to port', () => {
     const missing = GAME_STATES.filter((s) => !SCENE_FOR_STATE[s]);
     expect(missing).toEqual(['intro', 'debug']);
+  });
+});
+
+describe('the level map', () => {
+  it('goes back to the hero screen, is a menu, and has a scene', () => {
+    expect(BACK_TARGET.levelmap).toBe('select');
+    expect(isMenuState('levelmap')).toBe(true);
+    expect(SCENE_FOR_STATE.levelmap).toBeTruthy();
+  });
+
+  it('has three cards, learn the last', () => {
+    expect([MODE_STORY, MODE_PICK, MODE_LEARN]).toEqual([0, 1, 2]);
+  });
+
+  it('puts the cursor back on the pick card when backing out while picking', () => {
+    expect(backFrom('difficulty', true)).toEqual({ kind: 'go', target: 'modeselect', modeIndex: MODE_PICK });
+    expect(backFrom('difficulty')).toEqual({ kind: 'go', target: 'modeselect', modeIndex: MODE_STORY });
+    expect(modeCursorFor('learnmenu', true)).toBe(MODE_LEARN);
   });
 });

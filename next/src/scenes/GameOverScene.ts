@@ -8,8 +8,9 @@ import { createFrameClock, type FrameClock } from '../game/frameClock';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { fitScreenCamera } from '../gfx/render';
 import { bindMenuKeys, type MenuKeys, justDown } from '../input/menuKeys';
-import { GAME_OVER_SCENE_KEY, TITLE_SCENE_KEY } from './keys';
-import { takeBack } from './navigate';
+import { pickedStage } from '../game/run';
+import { GAME_OVER_SCENE_KEY, LEVEL_MAP_SCENE_KEY, TITLE_SCENE_KEY } from './keys';
+import { goToState, takeBack } from './navigate';
 
 /**
  * The run's final score, handed over by the scene that ran the level: the World it was read
@@ -102,7 +103,8 @@ export class GameOverScene extends Phaser.Scene {
       // index.html:1349's `gameState='title';stopBGM();`. The title is silent until its own
       // confirm starts the menu theme again, which is exactly how the live one sounds.
       stopBGM();
-      this.scene.start(TITLE_SCENE_KEY);
+      // A level picked on the map goes back to the map (docs/superpowers/specs/2026-11-24-level-pick-design.md).
+      this.scene.start(pickedStage() !== null ? LEVEL_MAP_SCENE_KEY : TITLE_SCENE_KEY);
       return;
     }
     // index.html:1235 — Escape goes to mode select rather than to the title, so a child who
@@ -115,7 +117,9 @@ export class GameOverScene extends Phaser.Scene {
     // as it takes to start a level. See navigate.ts.
     if (justDown(this.keys.back)) {
       this.leaving = true;
-      takeBack(this, 'gameover');
+      // A picked level's way out is its map, whichever button.
+      if (pickedStage() !== null) goToState(this, 'levelmap');
+      else takeBack(this, 'gameover');
     }
   }
 }

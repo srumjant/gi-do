@@ -4,11 +4,12 @@ import { BASE_H, BASE_W } from '../config/constants';
 import { TStr } from '../config/i18n';
 import { prompt } from '../config/glyphs';
 import { clampIndex } from '../game/menu';
-import { MODE_ADVENTURE } from '../game/navigation';
+import { MODE_STORY } from '../game/navigation';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { fitScreenCamera } from '../gfx/render';
 import { bindMenuKeys, justDown, type MenuKeys, pressedAny } from '../input/menuKeys';
-import { MODE_SELECT_SCENE_KEY, PAUSE_SCENE_KEY, TITLE_SCENE_KEY } from './keys';
+import { pickedStage } from '../game/run';
+import { LEVEL_MAP_SCENE_KEY, MODE_SELECT_SCENE_KEY, PAUSE_SCENE_KEY, TITLE_SCENE_KEY } from './keys';
 import type { ModeSelectData } from './ModeSelectScene';
 import { takeBack } from './navigate';
 
@@ -128,7 +129,9 @@ export class PauseScene extends Phaser.Scene {
     this.add.text(BASE_W / 2, TITLE_Y, TStr('pause_title'), TITLE_FONT).setOrigin(0.5, 1);
 
     this.buttons = this.add.graphics();
-    this.labels = [TStr('pause_continue'), TStr('pause_switch'), TStr('pause_menu')].map(
+    // In a level picked on the map the middle button is MAP, back to it; in the story, SWITCH MODE.
+    const middle = TStr(pickedStage() !== null ? 'pause_map' : 'pause_switch');
+    this.labels = [TStr('pause_continue'), middle, TStr('pause_menu')].map(
       (label, i) => this.add
         .text(buttonX(i) + BUTTON_W / 2, BUTTON_Y + LABEL_DY, label, LABEL_FONT)
         .setOrigin(0.5, 1),
@@ -180,10 +183,8 @@ export class PauseScene extends Phaser.Scene {
       case SWITCH_MODE:
         this.leaving = true;
         this.scene.stop(this.frozen);
-        this.scene.start(
-          MODE_SELECT_SCENE_KEY,
-          { index: MODE_ADVENTURE } satisfies ModeSelectData,
-        );
+        if (pickedStage() !== null) this.scene.start(LEVEL_MAP_SCENE_KEY);
+        else this.scene.start(MODE_SELECT_SCENE_KEY, { index: MODE_STORY } satisfies ModeSelectData);
         return;
       case MAIN_MENU:
         this.leaving = true;

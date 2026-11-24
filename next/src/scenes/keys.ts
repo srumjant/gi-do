@@ -39,6 +39,8 @@ export const LEARN_RESULT_SCENE_KEY = 'LearnResult';
 export const DIFFICULTY_SCENE_KEY = 'Difficulty';
 /** Pick a character and a skin (`select`). */
 export const CHARACTER_SCENE_KEY = 'Character';
+/** The world map, to pick one level on (`levelmap`). */
+export const LEVEL_MAP_SCENE_KEY = 'LevelMap';
 /** The level itself (`playing`, and the frozen `dead` and `levelcomplete` inside it). */
 export const SLICE_SCENE_KEY = 'Slice';
 /** Lives, score, level name and power-ups. Runs alongside the level. */
@@ -84,4 +86,5 @@ export const SCENE_FOR_STATE: Readonly<Partial<Record<GameState, string>>> = {
   learnletters: LEARN_TOWER_SCENE_KEY,
   learnresult: LEARN_RESULT_SCENE_KEY,
   paused: PAUSE_SCENE_KEY,
+  levelmap: LEVEL_MAP_SCENE_KEY,
 };

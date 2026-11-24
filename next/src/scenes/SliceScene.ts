@@ -21,6 +21,7 @@ import {
   getRunTotals,
   getSelectedChar,
   getSkinIndex,
+  pickedStage,
 } from '../game/run';
 import { createWorld, rescueSpot, stepWorld, type RescueSpot } from '../game/world';
 import { createHeroAnim, heroStateOf, stepHeroAnim, type HeroAnim, type HeroLook } from '../game/heroAnim';
@@ -98,6 +99,7 @@ import {
   BETWEEN_SCENE_KEY,
   GAME_OVER_SCENE_KEY,
   HUD_SCENE_KEY,
+  LEVEL_MAP_SCENE_KEY,
   LEVEL_OVERLAY_SCENE_KEY,
   POWERUP_POPUP_SCENE_KEY,
   SLICE_SCENE_KEY,
@@ -896,6 +898,9 @@ export class SliceScene extends Phaser.Scene {
       const outcome = finishLevel({ lives, score });
       if (outcome === 'next-level') {
         this.scene.start(BETWEEN_SCENE_KEY, { next: SLICE_SCENE_KEY } satisfies BetweenData);
+      } else if (pickedStage() !== null) {
+        // A level picked on the map: back to the map, on its world.
+        this.scene.start(LEVEL_MAP_SCENE_KEY);
       } else {
         this.scene.start(WIN_SCENE_KEY, { score } satisfies WinData);
       }

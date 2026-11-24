@@ -54,13 +54,15 @@ export type GameState =
   | 'learnmenu'
   | 'learnletters'
   | 'learnresult'
-  | 'paused';
+  | 'paused'
+  /** The level map (docs/superpowers/specs/2026-11-24-level-pick-design.md): the port's own, not the live game's. */
+  | 'levelmap';
 
 /** The same sixteen as a list, for the tests that must run over every one of them. */
 export const GAME_STATES: readonly GameState[] = [
   'title', 'modeselect', 'difficulty', 'select', 'intro', 'playing', 'dead',
   'between', 'levelcomplete', 'gameover', 'win', 'debug', 'learnmenu',
-  'learnletters', 'learnresult', 'paused',
+  'learnletters', 'learnresult', 'paused', 'levelmap',
 ];
 
 /**
@@ -81,6 +83,9 @@ export const BACK_TARGET: Readonly<Partial<Record<GameState, GameState>>> = {
   learnmenu: 'modeselect',
   learnletters: 'learnmenu',
   learnresult: 'learnmenu',
+  // The level map goes back to the hero screen; the difficulty and the hero are kept for every
+  // level played from it.
+  levelmap: 'select',
 };
 
 /**
@@ -133,12 +138,17 @@ export const LEARN_STATES: readonly string[] = [
  */
 export const MENU_STATES: readonly GameState[] = [
   'title', 'modeselect', 'difficulty', 'select', 'learnmenu', 'learnresult',
-  'gameover', 'win', 'debug', 'paused',
+  'gameover', 'win', 'debug', 'paused', 'levelmap',
 ];
 
-/** The two cards on the mode select screen, in the order it draws them (index.html:1978-1981). */
-export const MODE_ADVENTURE = 0;
-export const MODE_LEARN = 1;
+/**
+ * The three cards on the mode select screen, in the order it draws them. The live game has two,
+ * adventure and learn (index.html:1978-1981); the story is its adventure, and picking one level
+ * on the map comes between them (docs/superpowers/specs/2026-11-24-level-pick-design.md).
+ */
+export const MODE_STORY = 0;
+export const MODE_PICK = 1;
+export const MODE_LEARN = 2;
 
 /** Does back open the pause menu here, rather than leave? */
 export function isPausable(state: GameState): boolean {
@@ -160,8 +170,11 @@ export function isMenuState(state: GameState): boolean {
  * level instead. The cursor returning to where they were is what makes back feel like
  * back.
  */
-export function modeCursorFor(from: GameState): number {
-  return LEARN_STATES.indexOf(from) >= 0 ? MODE_LEARN : MODE_ADVENTURE;
+export function modeCursorFor(from: GameState, picking = false): number {
+  if (LEARN_STATES.indexOf(from) >= 0) return MODE_LEARN;
+  // The same for the two ways to play: backing out of the difficulty screen while picking a
+  // level lands on PICK A LEVEL, not on the story.
+  return picking ? MODE_PICK : MODE_STORY;
 }
 
 /**
@@ -193,10 +206,10 @@ export type BackAction =
  * is here is the decision, which is the part that can be wrong in a way nobody sees until
  * a child is stuck.
  */
-export function backFrom(state: GameState): BackAction {
+export function backFrom(state: GameState, picking = false): BackAction {
   if (state === 'paused') return { kind: 'resume' };
   if (isPausable(state)) return { kind: 'pause' };
   const target = BACK_TARGET[state];
   if (!target) return { kind: 'none' };
-  return { kind: 'go', target, modeIndex: modeCursorFor(state) };
+  return { kind: 'go', target, modeIndex: modeCursorFor(state, picking) };
 }

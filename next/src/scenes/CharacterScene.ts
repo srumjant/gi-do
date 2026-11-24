@@ -3,7 +3,7 @@ import { BASE_W } from '../config/constants';
 import { capitals, TStr } from '../config/i18n';
 import type { Character } from '../game/player';
 import { characterAt, characterName, siblingOf, wrapIndex } from '../game/menu';
-import { getSkinIndex, setSelectedChar, setSkinIndex, skinsOf, startDemo, startRun } from '../game/run';
+import { getPlayMode, getSkinIndex, setSelectedChar, setSkinIndex, skinsOf, startDemo, startRun } from '../game/run';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { fitScreenCamera } from '../gfx/render';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
@@ -11,7 +11,7 @@ import { menuPlayerTextureKey, MENU_PORTRAIT_SCALE, registerMenuTextures } from 
 import { idleLook } from '../game/heroAnim';
 import { bindMenuKeys, type MenuKeys, justDown, pressedAny } from '../input/menuKeys';
 import type { BetweenData } from './BetweenScene';
-import { BETWEEN_SCENE_KEY, CHARACTER_SCENE_KEY, SLICE_SCENE_KEY } from './keys';
+import { BETWEEN_SCENE_KEY, CHARACTER_SCENE_KEY, LEVEL_MAP_SCENE_KEY, SLICE_SCENE_KEY } from './keys';
 import { takeBack } from './navigate';
 import { requestedDemo, requestedStage } from './startStage';
 
@@ -207,6 +207,11 @@ export class CharacterScene extends Phaser.Scene {
     if (demo) {
       startDemo(demo);
       this.scene.start(SLICE_SCENE_KEY);
+      return;
+    }
+    // PICK A LEVEL: the map, to choose one (scenes/LevelMapScene.ts).
+    if (getPlayMode() === 'pick') {
+      this.scene.start(LEVEL_MAP_SCENE_KEY);
       return;
     }
     const first = requestedStage();
