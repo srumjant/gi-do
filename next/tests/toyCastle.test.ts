@@ -10,7 +10,7 @@ import { SAALID } from '../src/data/levels2/saalid';
 import { TROONISAAL } from '../src/data/levels2/troonisaal';
 import { STAGES } from '../src/data/stages';
 import type { TRexState } from '../src/game/bosses/tRex';
-import { finishLevel, getCurrentLevel, getRunTotals, startRun } from '../src/game/run';
+import { finishLevel, getRunTotals, startRun } from '../src/game/run';
 import { createWorld, rescueSpot } from '../src/game/world';
 import type { World } from '../src/game/types';
 
@@ -76,17 +76,19 @@ function runs(map: number[][], y: number, code: number): Array<[number, number]>
 }
 
 describe('Toy Castle, the theme', () => {
-  it('ends the run: two chases after the T-Rex, then his last fight', () => {
-    expect(STAGES.slice(15).map((s) => [s.theme, s.level, s.nameKey])).toEqual([
+  it('is the sixth world: two chases after the T-Rex, then his fight', () => {
+    expect(STAGES.slice(15, 18).map((s) => [s.theme, s.level, s.nameKey])).toEqual([
       [5, MANGULOSSI, 'level_6'], [5, SAALID, 'level_6_2'], [5, TROONISAAL, 'level_6_3'],
     ]);
     expect(LEVELS.map((l) => l.ending)).toEqual(['chase', 'chase', 'boss']);
     expect([MANGULOSSI.villain, SAALID.villain]).toEqual(['tRex', 'tRex']);
   });
 
-  it('wins the game when the Throne Room is done', () => {
+  it('goes on to the home world when the Throne Room is done (2026-11-24); the run is won at its end', () => {
+    startRun(17);
+    expect(STAGES[17].level).toBe(TROONISAAL);
+    expect(finishLevel(getRunTotals())).toBe('next-level');
     startRun(STAGES.length - 1);
-    expect(getCurrentLevel()).toBe(STAGES.length - 1);
     expect(finishLevel(getRunTotals())).toBe('game-won');
   });
 

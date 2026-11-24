@@ -177,8 +177,9 @@ export class WinScene extends Phaser.Scene {
       this.hearts.push(heart.setScale(spriteScale(heart)));
     }
 
-    // The story's end (game/story.ts): the T-Rex behind it all is a tiny toy now.
-    this.line(TINY_Y, TINY_FONT, TStr('story_trex_tiny'));
+    // The story's end (game/story.ts): the run ends at home, Härra Kaka flushed away, and bed.
+    // His level on its own (?boss=poo) ends the same way.
+    this.line(TINY_Y, TINY_FONT, `${TStr('story_poo_flushed')} ${TStr('story_good_night')}`);
     this.line(HINT_Y, HINT_FONT, prompt('prompt_play_again'));
   }
 

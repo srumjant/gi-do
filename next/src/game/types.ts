@@ -346,6 +346,8 @@ export interface EnemyState {
   zombie?: boolean;
   /** Set once a zombie has seen the hero and groaned about it. */
   noticed?: boolean;
+  /** A plunger in the air (game/enemy.ts): it can be stomped only while it is down. */
+  airborne?: boolean;
   /** Frames until a zombie may groan again while it pushes the hero. */
   groanTimer?: number;
 }
@@ -581,6 +583,14 @@ export type SoundCue =
   | 'cannon-fire'
   | 'wrong'
   | 'groan'
+  /** A dripping tap letting go of a drop (the home world, game/course.ts). */
+  | 'drip'
+  /** A plunger landing (the home world, game/enemy.ts). */
+  | 'plop'
+  /** A soap bubble popping (the home world, game/course.ts). */
+  | 'pop'
+  /** A shampoo bottle squirting soap (the home world, game/enemy.ts). */
+  | 'squirt'
   | 'music-level'
   | 'music-stop';
 

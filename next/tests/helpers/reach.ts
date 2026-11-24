@@ -13,7 +13,9 @@ import { arrowY, jumpRise } from './courseRuns';
  *
  * A cell (x, y) is somewhere to stand: solid at row y, two rows of room above. From one a hero
  * can walk to the next, jump up to the difficulty's height and across its reach, and drop any
- * distance, if the way is clear; a spring throws them as high as a fart does. The fart and the
+ * distance, if the way is clear; a spring throws them as high as a fart does, and a soap dish's
+ * bubble lifts them up its column to jump off at any height, and the rubber ducks on a bath carry
+ * them over it (a duck's stretch counts as a floor over the water). The fart and the
  * big head are powers with a station: picked up, the hero has them; and wherever they land
  * they may since have run out, so "can still finish" is asked without them. A target opens its
  * gate or bridge once some cell can shoot it (a standing shot or a jump-shot, the line clear).
@@ -53,6 +55,9 @@ export function findLocks(level: Level, key: DifficultyKey): { locks: Lock[]; fi
   const heroH = playerSize('gigi').h;
   const { plain, fart } = moves(key);
   const stations = course.stations.map((s) => ({ kind: s.kind, x: s.x, y: s.y }));
+  // The ducks get you across, given the wait: each one's stretch is a floor on the row over the water.
+  const duckFloor = new Set<number>();
+  for (const d of course.ducks ?? []) for (let x = d.left; x <= d.right; x++) duckFloor.add((d.y - 1) * W + x);
 
   /** The map with every target in `hit` (and its helpers) applied. */
   const mapFor = (hit: number): TileMap => {
@@ -77,7 +82,7 @@ export function findLocks(level: Level, key: DifficultyKey): { locks: Lock[]; fi
       const c = map[y]?.[x];
       if (c === undefined) return y >= 0 && (x < 0 || x >= W);
       if (s.bighead && c === TILE_CRACKED) return false;
-      return isSolid(c);
+      return isSolid(c) || duckFloor.has(y * W + x);
     };
     const clear = (x: number, y0: number, y1: number) => {
       for (let y = Math.max(0, y0); y <= y1; y++) if (solid(x, y)) return false;
@@ -90,8 +95,8 @@ export function findLocks(level: Level, key: DifficultyKey): { locks: Lock[]; fi
     const edges: number[][] = cells.map(() => []);
     const dies: boolean[] = cells.map(() => false);
     const deadly = (x: number, y: number) => map[y]?.[x] === TILE_LAVA || map[y]?.[x] === TILE_WATER;
-    cells.forEach(([x, y], n) => {
-      const m = map[y][x] === TILE_SPRING || s.fart ? fart : plain;
+    /** Every cell a jump from a floor at (x, y) lands on. */
+    const jumpFrom = (x: number, y: number, m: Move, push: (cell: number) => void) => {
       for (let dx = -m.reach; dx <= m.reach; dx++) {
         const x2 = x + dx;
         if (x2 < 0 || x2 >= W) continue;
@@ -103,8 +108,16 @@ export function findLocks(level: Level, key: DifficultyKey): { locks: Lock[]; fi
           if (!clear(x, top - 2, y - 1)) continue;
           let ok = true;
           for (let cx = Math.min(x, x2) + 1; cx < Math.max(x, x2) && ok; cx++) ok = clear(cx, top - 2, top - 1);
-          if (ok && clear(x2, top - 2, y2 - 1)) edges[n].push(id[y2 * W + x2]);
+          if (ok && clear(x2, top - 2, y2 - 1)) push(id[y2 * W + x2]);
         }
+      }
+    };
+    cells.forEach(([x, y], n) => {
+      const m = map[y][x] === TILE_SPRING || s.fart ? fart : plain;
+      jumpFrom(x, y, m, (cell) => edges[n].push(cell));
+      for (let dx = -1; dx <= 1; dx++) {
+        const x2 = x + dx;
+        if (dx === 0 || x2 < 0 || x2 >= W) continue;
         // Over an edge into nothing, lava or water: a way to lose a life.
         if (Math.abs(dx) <= 1 && dx !== 0 && clear(x2, y - 2, y - 1)) {
           let fy = y;
@@ -113,6 +126,15 @@ export function findLocks(level: Level, key: DifficultyKey): { locks: Lock[]; fi
         }
       }
     });
+    // A soap dish's bubbles lift whoever stands at it (game/course.ts): from any height they
+    // rise to, with room for the hero's head, a jump as from a floor there.
+    for (const d of course.soaps ?? []) {
+      const from = id[d.y * W + d.x];
+      if (from < 0) continue;
+      for (let h = d.y - 1; h >= 2 && clear(d.x, h - 2, h - 1); h--) {
+        jumpFrom(d.x, h, plain, (cell) => edges[from].push(cell));
+      }
+    }
     const g = { map, id, cells, edges, dies };
     graphs.set(k, g);
     return g;

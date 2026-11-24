@@ -161,3 +161,33 @@ export function sfxGroan(): void {
   playTone(130, 0.45, 'sawtooth', 0.06, 90);
   setTimeout(() => playTone(110, 0.5, 'triangle', 0.07, 70), 200);
 }
+
+/** Härra Kaka flushed away (gfx/poo.ts): a long swoosh down, then a gurgle. */
+export function sfxFlush(): void {
+  playTone(700, 0.9, 'sine', 0.09, 90);
+  setTimeout(() => playTone(520, 0.7, 'triangle', 0.07, 70), 120);
+  [0, 1, 2, 3].forEach((i) => {
+    setTimeout(() => playTone(220 - i * 30, 0.12, 'sine', 0.06, 320), 320 + i * 140);
+  });
+}
+
+/** A tap letting go of a drop: a little high plip (the home world). */
+export function sfxDrip(): void {
+  playTone(1500, 0.05, 'sine', 0.07, 900);
+  setTimeout(() => playTone(1100, 0.06, 'sine', 0.04, 700), 50);
+}
+
+/** A plunger landing: a low rubbery plop (the home world). */
+export function sfxPlop(): void {
+  playTone(180, 0.12, 'sine', 0.12, 90);
+}
+
+/** A soap bubble popping (the home world). */
+export function sfxPop(): void {
+  playTone(900, 0.04, 'triangle', 0.08, 1400);
+}
+
+/** A shampoo bottle squirting soap (the home world). */
+export function sfxSquirt(): void {
+  playTone(500, 0.09, 'triangle', 0.06, 150);
+}

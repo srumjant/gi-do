@@ -3,7 +3,7 @@ import { BASE_W } from '../config/constants';
 import { capitals, TStr } from '../config/i18n';
 import type { Character } from '../game/player';
 import { characterAt, characterName, siblingOf, wrapIndex } from '../game/menu';
-import { getSkinIndex, setSelectedChar, setSkinIndex, skinsOf, startRun } from '../game/run';
+import { getSkinIndex, setSelectedChar, setSkinIndex, skinsOf, startDemo, startRun } from '../game/run';
 import { GAME_FONT, GAME_FONT_BOLD, GAME_TEXT_RESOLUTION } from '../gfx/gameFont';
 import { fitScreenCamera } from '../gfx/render';
 import { createStarField, type StarField, type StarFieldSpec } from '../gfx/starfield';
@@ -13,7 +13,7 @@ import { bindMenuKeys, type MenuKeys, justDown, pressedAny } from '../input/menu
 import type { BetweenData } from './BetweenScene';
 import { BETWEEN_SCENE_KEY, CHARACTER_SCENE_KEY, SLICE_SCENE_KEY } from './keys';
 import { takeBack } from './navigate';
-import { requestedStage } from './startStage';
+import { requestedDemo, requestedStage } from './startStage';
 
 /** index.html:2152. */
 const BACKGROUND = '#2a2a5a';
@@ -202,6 +202,13 @@ export class CharacterScene extends Phaser.Scene {
    */
   private confirm(): void {
     setSelectedChar(this.chosen());
+    // `?boss=poo`: one level on its own, straight in, no story (scenes/startStage.ts).
+    const demo = requestedDemo();
+    if (demo) {
+      startDemo(demo);
+      this.scene.start(SLICE_SCENE_KEY);
+      return;
+    }
     const first = requestedStage();
     startRun(first);
     // A run from the very start opens with the story: the first villain snatches the sibling,

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { HOME_THEME } from '../src/data/levels';
 import { STAGES } from '../src/data/stages';
 import { TRANSLATIONS } from '../src/config/i18n';
 import { fill, scriptFor, transitionInto, villainOf, worlds, type Line } from '../src/game/story';
 
 describe('the story', () => {
-  it('has a villain for every world, the T-Rex last', () => {
-    expect(worlds().map(villainOf)).toEqual(['dollQueen', 'pterodactyl', 'vanaToomas', 'pizzaChef', 'yeti', 'tRex']);
+  it('has a villain for every world, the T-Rex, then Härra Kaka at home', () => {
+    expect(worlds().map(villainOf)).toEqual(['dollQueen', 'pterodactyl', 'vanaToomas', 'pizzaChef', 'yeti', 'tRex', 'poo']);
   });
 
   it('opens with the first world\'s villain snatching the sibling, and the map at world 1', () => {
@@ -32,11 +33,22 @@ describe('the story', () => {
     });
   });
 
-  it('has the T-Rex come for the sibling himself before the last world', () => {
+  it('has the T-Rex come for the sibling himself before his castle', () => {
     const into = STAGES.findIndex((s) => s.theme === 5);
     const t = transitionInto(into)!;
-    expect(t).toMatchObject({ kind: 'worldChange', beaten: 'yeti', villain: 'tRex', finalWorld: true });
+    expect(t).toMatchObject({ kind: 'worldChange', beaten: 'yeti', villain: 'tRex', finalWorld: false });
     expect(scriptFor(t).grab).toEqual({ key: 'story_now_me' });
+  });
+
+  it('takes the kids home after the T-Rex: he is tiny now, Härra Kaka snatches the sibling, the map shows home', () => {
+    const t = transitionInto(STAGES.findIndex((s) => s.theme === HOME_THEME))!;
+    expect(t).toEqual({ kind: 'worldChange', beaten: 'tRex', villain: 'poo', world: 6, finalWorld: true });
+    expect(scriptFor(t)).toMatchObject({
+      beaten: { key: 'story_tiny_now' },
+      grab: { key: 'story_poo_grab' },
+      headline: { key: 'story_took', villainKey: 'villain_poo' },
+      mapTitle: { key: 'story_world', worldNumber: 7, worldKey: 'world_7' },
+    });
   });
 
   it('has a transition for every stage after the first, and every line it says is a word in capitals', () => {

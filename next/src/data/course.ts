@@ -1,5 +1,5 @@
 import type {
-  BossDef, BossKind, CourseDef, EnemyDef, Level, LevelEnding, StationKind, TileMap, Villain,
+  BossDef, BossKind, CourseDef, EnemyDef, Furniture, Level, LevelEnding, StationKind, TileMap, Villain,
 } from './levels';
 import {
   isSolid, LEVELS, TILE_BRICK, TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_GROUND, TILE_ICE, TILE_LAVA,
@@ -40,6 +40,15 @@ import {
  *      because P is the hero's start.
  *   g  giant: in the way, never hurts (a stomp bounces off, arrows too); only a chicken ray
  *      moves him. Put him where no jump gets over: under a roof 4 tiles up.
+ *   w  a dripping tap: now and then a drop falls straight down from it (the home world)
+ *   s  smelly sock (walks, like a doll)    y  fly (flies, like a bat)
+ *   H  hairbrush: only ever a zombie, since nobody stomps on a hairbrush
+ *   j  plunger: stays where it is and jumps straight up, again and again
+ *   O  soap dish: lets go of a bubble to ride now and then
+ *   X  toilet brush: spins round the middle of its cell; nothing stops it
+ *   q  rubber duck on the bath below it: the ducks on one bath share it out, each drifting back
+ *      and forth over its own stretch, neighbours meeting at the border
+ *   m  shampoo bottle: squirts soap blobs, as a cannon fires
  *
  * Size obstacles from the jump itself (tests/helpers/courseRuns.ts's jumpRise): a held jump
  * lifts the feet 6.1 tiles on super easy and 3.9 on hard, a fart jump 13.9 and 8.8. So a
@@ -49,10 +58,12 @@ import {
 
 const ENEMY_LETTERS: Record<string, string> = {
   d: 'doll', n: 'dino', a: 'bat', x: 'car', o: 'cannon', u: 'bouncer', p: 'penguin', g: 'giant',
-  i: 'icebat',
+  i: 'icebat', s: 'sock', y: 'fly', j: 'plunger', m: 'shampoo',
 };
 /** Upper case is the same walker as a zombie (EnemyState.zombie). */
-const ZOMBIE_LETTERS: Record<string, string> = { D: 'doll', N: 'dino', K: 'knight', Z: 'cook', W: 'penguin', L: 'soldier' };
+const ZOMBIE_LETTERS: Record<string, string> = {
+  D: 'doll', N: 'dino', K: 'knight', Z: 'cook', W: 'penguin', L: 'soldier', H: 'hairbrush',
+};
 
 const STATION_LETTERS: Record<string, StationKind> = {
   b: 'bow', c: 'cape', f: 'fart', h: 'bighead', k: 'chicken',
@@ -143,6 +154,33 @@ function doorsIn(rows: readonly string[]): CourseDef['doors'] {
   return doors;
 }
 
+/**
+ * The ducks on their baths: each finds the water under it, and the ducks on one run of water
+ * share it out in order, so each drifts over a stretch of its own (game/course.ts).
+ */
+function ducksOn(map: TileMap, marks: Array<{ x: number; y: number }>): NonNullable<CourseDef['ducks']> {
+  const found = marks.map((m) => {
+    let y = m.y;
+    while (y < map.length && map[y][m.x] !== TILE_WATER) y++;
+    if (y >= map.length) throw new Error(`the duck at ${m.x},${m.y} has no water under it`);
+    let a = m.x;
+    while (map[y][a - 1] === TILE_WATER) a--;
+    let b = m.x;
+    while (map[y][b + 1] === TILE_WATER) b++;
+    return { x: m.x, y, a, b };
+  });
+  return found.map((d) => {
+    const same = found.filter((o) => o.y === d.y && o.a === d.a).sort((p, q) => p.x - q.x);
+    const i = same.indexOf(d);
+    const len = d.b - d.a + 1;
+    return {
+      x: d.x, y: d.y,
+      left: d.a + Math.floor((i * len) / same.length),
+      right: d.a + Math.floor(((i + 1) * len) / same.length) - 1,
+    };
+  }).sort((p, q) => p.x - q.x);
+}
+
 export function parseCourse(rows: readonly string[]): ParsedCourse {
   const map: TileMap = rows.map((row) => [...row].map((ch) => TILE_LETTERS[ch] ?? TILE_EMPTY));
   let playerStart: [number, number] | null = null;
@@ -154,6 +192,10 @@ export function parseCourse(rows: readonly string[]): ParsedCourse {
   const helpers: Array<{ x: number; y: number }> = [];
   const spots: Array<{ n: number; x: number; y: number }> = [];
   const vents: CourseDef['vents'] = [];
+  const taps: Array<{ x: number; y: number }> = [];
+  const soaps: Array<{ x: number; y: number }> = [];
+  const brushes: Array<{ x: number; y: number }> = [];
+  const duckMarks: Array<{ x: number; y: number }> = [];
   const stations: CourseDef['stations'] = [];
   const flags: CourseDef['flags'] = [];
 
@@ -165,6 +207,10 @@ export function parseCourse(rows: readonly string[]): ParsedCourse {
       else if (ch === 'Q') queen = { x, y: floorBelow(map, x, y) };
       else if (ch === '@') cat = x;
       else if (ch === 'v') vents.push({ x, y });
+      else if (ch === 'w') taps.push({ x, y });
+      else if (ch === 'O') soaps.push({ x, y: floorBelow(map, x, y) });
+      else if (ch === 'X') brushes.push({ x, y });
+      else if (ch === 'q') duckMarks.push({ x, y });
       else if (ch === 't') helpers.push({ x, y });
       else if (ch >= '1' && ch <= '9') spots.push({ n: Number(ch), x, y });
       else if (ch === 'T') targets.push({ x, y });
@@ -232,25 +278,40 @@ export function parseCourse(rows: readonly string[]): ParsedCourse {
       flags,
       doors,
       vents,
+      ...(taps.length > 0 ? { taps } : {}),
+      ...(soaps.length > 0 ? { soaps } : {}),
+      ...(brushes.length > 0 ? { brushes } : {}),
+      ...(duckMarks.length > 0 ? { ducks: ducksOn(map, duckMarks) } : {}),
       ...(boss ? { boss } : {}),
     },
   };
+}
+
+/** A piece of furniture as a level file writes it: `x` counted from the start of `section`. */
+export interface FurnitureSpec extends Furniture {
+  section: number;
 }
 
 /** What a second level is made of: its sections and which theme it belongs to. */
 export interface CourseLevelSpec {
   /** The English name it was authored under (the screens use its translation key). */
   name: string;
-  /** 0-5: the classic level whose colours and clouds it borrows. */
+  /** 0-5: the classic level whose colours and clouds it borrows; HOME_THEME has none. */
   theme: number;
   sections: readonly (readonly string[])[];
-  /** Colours instead of the theme's, for a ground that stands out against its hills. */
+  /**
+   * Colours instead of the theme's, for a ground that stands out against its hills. A theme
+   * with no classic level behind it (HOME_THEME) must give all four.
+   */
   look?: Partial<Pick<Level, 'bg' | 'groundColor' | 'brickColor' | 'groundTop'>>;
   ending?: LevelEnding;
   villain?: Villain;
   indoors?: boolean;
   /** Which boss the level's Q is (the Doll Queen if it does not say). */
   boss?: BossKind;
+  furniture?: readonly FurnitureSpec[];
+  /** The home world's look: potties for flags, a shower curtain for a gate. */
+  home?: boolean;
 }
 
 /**
@@ -260,14 +321,20 @@ export interface CourseLevelSpec {
  */
 export function courseLevel(spec: CourseLevelSpec): Level {
   const parsed = parseCourse(joinSections(spec.sections));
-  const theme = LEVELS[spec.theme];
+  const theme: Level | undefined = LEVELS[spec.theme];
+  const look = spec.look ?? {};
+  if (!theme && !(look.bg && look.groundColor && look.brickColor && look.groundTop)) {
+    throw new Error(`theme ${spec.theme} has no classic level to borrow from: give ${spec.name} its whole look`);
+  }
+  // Where each section starts, for the furniture counted from its own section.
+  const starts = spec.sections.map((_, i) => spec.sections.slice(0, i).reduce((sum, s) => sum + s[0].length, 0));
   return {
     name: spec.name,
-    bg: theme.bg,
-    groundColor: theme.groundColor,
-    brickColor: theme.brickColor,
-    groundTop: theme.groundTop,
-    ...spec.look,
+    bg: theme?.bg ?? '',
+    groundColor: theme?.groundColor ?? '',
+    brickColor: theme?.brickColor ?? '',
+    groundTop: theme?.groundTop ?? '',
+    ...look,
     width: parsed.map[0].length,
     height: parsed.map.length,
     playerStart: parsed.playerStart,
@@ -278,12 +345,16 @@ export function courseLevel(spec: CourseLevelSpec): Level {
     superPositions: [],
     // The cat, where the level puts one (@).
     catPosition: parsed.cat,
-    clouds: theme.clouds,
+    clouds: theme?.clouds ?? [],
     course: spec.boss && parsed.course.boss
       ? { ...parsed.course, boss: { ...parsed.course.boss, kind: spec.boss } }
       : parsed.course,
     ...(spec.ending ? { ending: spec.ending } : {}),
     ...(spec.villain ? { villain: spec.villain } : {}),
     ...(spec.indoors ? { indoors: true } : {}),
+    ...(spec.furniture
+      ? { furniture: spec.furniture.map(({ section, ...piece }) => ({ ...piece, x: piece.x + starts[section] })) }
+      : {}),
+    ...(spec.home ? { home: true } : {}),
   };
 }

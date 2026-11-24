@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { loadLegacySection } from './helpers/legacy';
-import { LEVELS } from '../src/data/levels';
+import { HOME_THEME, LEVELS } from '../src/data/levels';
 import {
-  BGM_THEMES, BGM_TITLE, BGM_WIN, BGM_GAMEOVER, BGM_INTRO,
+  BGM_HOME, BGM_THEMES, BGM_TITLE, BGM_WIN, BGM_GAMEOVER, BGM_INTRO, HOME_BGM, bgmTheme, levelMusic,
 } from '../src/data/bgmThemes';
 
 const legacy = loadLegacySection({
@@ -41,5 +41,21 @@ describe('BGM themes match the live game', () => {
       expect(theme.bpm).toBeGreaterThan(0);
       expect(theme.notes.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('the home world\'s tune', () => {
+  it('is its own, outside the original game\'s list, and the home levels play it', () => {
+    expect(BGM_HOME).toBeGreaterThanOrEqual(BGM_THEMES.length);
+    expect(bgmTheme(BGM_HOME)).toBe(HOME_BGM);
+    expect(levelMusic(HOME_THEME)).toBe(BGM_HOME);
+    LEVELS.forEach((_, i) => expect(levelMusic(i)).toBe(i));
+    expect(bgmTheme(0)).toBe(BGM_THEMES[0]);
+  });
+
+  it('is a playable tune: a tempo, and its parts the same length', () => {
+    expect(HOME_BGM.bpm).toBeGreaterThan(0);
+    expect(HOME_BGM.bassN).toHaveLength(HOME_BGM.notes.length);
+    expect(HOME_BGM.harmN).toHaveLength(HOME_BGM.notes.length);
   });
 });

@@ -1,3 +1,5 @@
+import { HOME_THEME } from './levels';
+
 export type OscillatorKind = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
 export interface BgmTheme {
@@ -126,3 +128,30 @@ export const BGM_TITLE = 6;
 export const BGM_WIN = 7;
 export const BGM_GAMEOVER = 8;
 export const BGM_INTRO = 9;
+
+/**
+ * The home world's tune (docs/superpowers/specs/2026-11-24-home-world-design.md): playful and
+ * bouncy, bath time. Not in BGM_THEMES, which is the original game's list and stays its own;
+ * it is played by its own number, BGM_HOME, past the end of that list.
+ */
+export const HOME_BGM: BgmTheme = {
+  bpm: 150, wave: 'square', vol: 0.03, bass: 'triangle', bassVol: 0.025, harm: 'sine', harmVol: 0.016,
+  notes: [262,0,330,0,392,330,262,0, 294,0,349,0,440,349,294,0,
+          262,330,392,523,392,330,262,0, 294,262,247,262,294,0,262,0],
+  bassN: [131,131,196,196,131,131,196,196, 147,147,220,220,147,147,220,220,
+          131,131,196,196,131,131,196,196, 196,196,147,147,196,196,131,131],
+  harmN: [330,330,392,392,330,330,392,392, 349,349,440,440,349,349,440,440,
+          330,330,392,392,330,330,392,392, 392,392,349,349,392,392,330,330],
+  perc: [1,0,2,0,1,0,2,2,1,0,2,0,1,2,2,0],
+};
+export const BGM_HOME = BGM_THEMES.length;
+
+/** A tune by its number: one of the original game's, or the home world's. */
+export function bgmTheme(index: number): BgmTheme | undefined {
+  return index === BGM_HOME ? HOME_BGM : BGM_THEMES[index];
+}
+
+/** A level's tune by its theme: the classic six are their own index (index.html:1209). */
+export function levelMusic(theme: number): number {
+  return theme === HOME_THEME ? BGM_HOME : theme;
+}

@@ -1,7 +1,10 @@
 import Phaser from 'phaser';
 import { startBGM } from '../audio/bgm';
+import { levelMusic } from '../data/bgmThemes';
+import { drawFurniture } from '../gfx/furniture';
+import { plungerSquatting } from '../game/enemy';
 import { playSounds } from '../audio/cues';
-import { BASE_H, BASE_W, MAX_STEPS_PER_FRAME, STEP_MS, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
+import { BASE_H, BASE_W, MAX_STEPS_PER_FRAME, STEP_MS, TILE, VIEW_H, VIEW_W, ZOOM } from '../config/constants';
 import { getDifficulty, type DifficultyKey } from '../config/difficulty';
 import { T, TStr } from '../config/i18n';
 import { PARALLAX, type ParallaxLayer } from '../data/parallax';
@@ -28,6 +31,7 @@ import { PterodactylView } from '../gfx/pterodactyl';
 import { PizzaChefView } from '../gfx/pizzaChef';
 import { VanaToomasView } from '../gfx/vanaToomas';
 import { TRexView } from '../gfx/tRex';
+import { PooView } from '../gfx/poo';
 import { YetiView } from '../gfx/yeti';
 import type { EnemyState, World } from '../game/types';
 import { BOSS_BAR_BACK, bossBarColor } from '../gfx/bossBar';
@@ -76,6 +80,9 @@ import {
   spriteScale,
   STAR_TEXTURE,
   SUPER_TEXTURE,
+  STINK_TEXTURE,
+  DROP_TEXTURE,
+  SOAP_TEXTURE,
 } from '../gfx/textures';
 import type { InputState } from '../input/actions';
 import { createControls, type Controls } from '../input/controls';
@@ -109,6 +116,8 @@ import type { WinData } from './WinScene';
  */
 const CAMERA_PIVOT_X = (BASE_W * RENDER_SCALE - VIEW_W) / 2;
 const CAMERA_PIVOT_Y = (BASE_H * RENDER_SCALE - VIEW_H) / 2;
+/** The view's zoom, against the usual, while Härra Kaka is flushed: a fifth more room in sight. */
+const FLUSH_ZOOM = 0.8;
 
 /** Cloud alpha (index.html:1681: `ctx.globalAlpha=0.75`). */
 const CLOUD_ALPHA = 0.75;
@@ -346,6 +355,11 @@ export class SliceScene extends Phaser.Scene {
   private yetiView!: YetiView;
   /** The T-Rex's final fight, on the level that ends with him (gfx/tRex.ts). */
   private tRexView!: TRexView;
+  private pooView!: PooView;
+  /** An indoor level's wallpaper, its one fixed layer: grown with the view when it zooms out. */
+  private wallLayer: Phaser.GameObjects.Graphics | null = null;
+  /** The view's zoom against the usual, eased: below 1 while Härra Kaka is being flushed. */
+  private viewZoom = 1;
   private cageBackGraphics!: Phaser.GameObjects.Graphics;
   private cageBarsGraphics!: Phaser.GameObjects.Graphics;
   private rescueCryText!: Phaser.GameObjects.Text;
@@ -397,6 +411,8 @@ export class SliceScene extends Phaser.Scene {
 
   create(): void {
     this.resetForNewLevel();
+    this.wallLayer = null;
+    this.viewZoom = 1;
     this.heroAnim = createHeroAnim();
     // Which level, and what the run brings into it. `getCurrentLevel` was a hard-coded 0
     // here until the run loop landed; it now moves because `finishLevel` (game/run.ts)
@@ -426,6 +442,8 @@ export class SliceScene extends Phaser.Scene {
     this.createParallax(levelIndex);
 
     this.questionBlocks = drawStaticTiles(this, this.world);
+    // The home world's furniture, over the tiles (gfx/furniture.ts).
+    drawFurniture(this, this.world.level);
     const rainbow = createRainbowBlocks(this, this.world);
     this.rainbowBlocks = rainbow.blocks;
     this.rainbowGraphics = rainbow.graphics;
@@ -471,6 +489,7 @@ export class SliceScene extends Phaser.Scene {
     this.chefView = new PizzaChefView(this);
     this.yetiView = new YetiView(this);
     this.tRexView = new TRexView(this);
+    this.pooView = new PooView(this);
 
     this.catPickupImage = this.hiddenImage(CAT_TEXTURE, DEPTH_PICKUP);
     this.catImage = this.hiddenImage(CAT_TEXTURE, DEPTH_CAT);
@@ -579,7 +598,8 @@ export class SliceScene extends Phaser.Scene {
     } satisfies PowerupPopupData);
 
     // The last line of `initLevel` (index.html:1209), and the reason each level sounds
-    // different: theme 0-5 IS the level index. Down here rather than up beside
+    // different: theme 0-5 IS the level index; the home world has a tune of its own
+    // (data/bgmThemes.ts's levelMusic). Down here rather than up beside
     // `createWorld` because that is where the live source has it — after everything else
     // the level needs is built.
     //
@@ -588,7 +608,7 @@ export class SliceScene extends Phaser.Scene {
     // silent cutscene. A RESPAWN does not come through here at all — the scene is not
     // restarted, the World is rebuilt in place — which is why `respawnLevel` raises a
     // `music-level` cue of its own (game/world.ts).
-    startBGM(levelIndex);
+    startBGM(levelMusic(levelIndex));
 
     // All three of them run alongside this scene and hold a reference to THIS World, so all
     // three have to go when it does — whether it is going to the next level, to the win
@@ -702,6 +722,7 @@ export class SliceScene extends Phaser.Scene {
       const wall = this.add.graphics();
       this.setupFixedLayer(wall);
       drawWallpaper(wall, this.world.level.bg);
+      this.wallLayer = wall;
       return;
     }
     const parallax = PARALLAX[levelIndex];
@@ -947,6 +968,7 @@ export class SliceScene extends Phaser.Scene {
     this.chefView.update(this.world);
     this.yetiView.update(this.world);
     this.tRexView.update(this.world);
+    this.pooView.update(this.world);
     this.syncEnemyProjectiles();
     this.syncArrows();
     this.syncPlayer();
@@ -994,10 +1016,34 @@ export class SliceScene extends Phaser.Scene {
     // biased back by that much for the two to show the same region. Measured in the
     // browser: without this the view started at world (106.7, 199.7) while the
     // simulation said (0, 133.3), which put the player off-screen to the left.
-    this.cameras.main.setScroll(
-      Math.round(camera.x) - CAMERA_PIVOT_X,
-      Math.round(camera.y) - CAMERA_PIVOT_Y,
-    );
+    //
+    // And while Härra Kaka is flushed the view zooms out a little, so the toilet, the poo going
+    // in and the hero thrown back are all in sight (owner, 2026-11-24: "zoom out screen for that
+    // animation"). Only indoors, where the wallpaper is the one fixed layer that has to grow
+    // with it; the bathroom is the only level that asks.
+    const flushing = this.world.courseBoss?.kind === 'poo' && this.world.courseBoss.phase === 'sucked';
+    const wantZoom = flushing && this.wallLayer ? FLUSH_ZOOM : 1;
+    this.viewZoom += (wantZoom - this.viewZoom) * 0.08;
+    if (Math.abs(this.viewZoom - wantZoom) < 0.002) this.viewZoom = wantZoom;
+    const view = this.cameras.main.setZoom(ZOOM * RENDER_SCALE * this.viewZoom);
+    let midX = Math.round(camera.x) + VIEW_W / 2;
+    let midY = Math.round(camera.y) + VIEW_H / 2;
+    if (this.viewZoom < 1) {
+      // Widened about its middle, and kept inside the level, so nothing past its edges shows.
+      const halfW = VIEW_W / 2 / this.viewZoom;
+      const halfH = VIEW_H / 2 / this.viewZoom;
+      midX = Math.max(halfW, Math.min(this.world.level.width * TILE - halfW, midX));
+      midY = Math.max(halfH, Math.min(this.world.level.height * TILE - halfH, midY));
+    }
+    view.setScroll(midX - VIEW_W / 2 - CAMERA_PIVOT_X, midY - VIEW_H / 2 - CAMERA_PIVOT_Y);
+    if (this.wallLayer) {
+      // The wallpaper grows with the view, about the middle of the screen, to fill it still.
+      const k = this.viewZoom;
+      const screenX = (BASE_W * RENDER_SCALE) / 2;
+      const screenY = (BASE_H * RENDER_SCALE) / 2;
+      this.wallLayer.setScale(1 / ZOOM / k)
+        .setPosition(screenX + (CAMERA_PIVOT_X - screenX) / k, screenY + (CAMERA_PIVOT_Y - screenY) / k);
+    }
   }
 
   /**
@@ -1394,19 +1440,25 @@ export class SliceScene extends Phaser.Scene {
       const wave = shot.type === 'wave';
       const pizza = shot.type === 'pizza';
       const icicle = shot.type === 'icicle';
-      image.setTexture(heart ? QUEEN_HEART_TEXTURE : rock ? ROCK_TEXTURE : wave ? WAVE_TEXTURE
-        : pizza ? PIZZA_TEXTURE : icicle ? ICICLE_TEXTURE : FIREBALL_TEXTURE);
+      // Härra Kaka's stink wave rolls along the floor like Toomas's (game/bosses/poo.ts); a
+      // dripping tap's drops fall straight down (game/course.ts).
+      const stink = shot.type === 'stink';
+      const drop = shot.type === 'drop';
+      // A shampoo bottle's soap blob (game/enemy.ts).
+      const soap = shot.type === 'soap';
+      image.setTexture(drop ? DROP_TEXTURE : soap ? SOAP_TEXTURE : heart ? QUEEN_HEART_TEXTURE : rock ? ROCK_TEXTURE : wave ? WAVE_TEXTURE
+        : stink ? STINK_TEXTURE : pizza ? PIZZA_TEXTURE : icicle ? ICICLE_TEXTURE : FIREBALL_TEXTURE);
       image.setScale(spriteScale(image) * (heart ? 0.6 : 1));
       const flicker = Math.sin(animFrame * 0.3 + shot.x) * 0.3;
       // A falling icicle hangs point down, its point at the bottom of its 8px box.
       image
         .setOrigin(pizza || icicle ? 0.5 : 0, pizza ? 0.5 : icicle ? 1 : 0)
-        .setPosition(wave ? shot.x - 4 : pizza || icicle ? shot.x + 4 : shot.x, pizza ? shot.y + 4 : icicle ? shot.y + 8 : shot.y)
+        .setPosition(wave || stink ? shot.x - 4 : pizza || icicle ? shot.x + 4 : shot.x, drop ? shot.y - 2 : pizza ? shot.y + 4 : icicle ? shot.y + 8 : stink ? shot.y - 4 : shot.y)
         .setAngle(pizza ? (animFrame * 18) % 360 : 0)
-        .setFlipX(wave && animFrame % 10 < 5)
-        .setAlpha(wave || pizza || icicle ? 1 : 0.8 + flicker * 0.2)
+        .setFlipX((wave || stink) && animFrame % 10 < 5)
+        .setAlpha(drop || soap || wave || stink || pizza || icicle ? 1 : 0.8 + flicker * 0.2)
         .setVisible(true);
-      if (!heart && !rock && !wave && !pizza && !icicle) {
+      if (!drop && !soap && !heart && !rock && !wave && !stink && !pizza && !icicle) {
         const trailX = shot.vx > 0 ? shot.x - 4 : shot.x + 10;
         fillRect(trails, FIREBALL_TRAIL, trailX, shot.y + 2, 4, 4);
       }
@@ -1592,6 +1644,15 @@ export class SliceScene extends Phaser.Scene {
     const wobble = Math.sin(animFrame * 0.15 + enemy.x);
     image.setVisible(true);
     image.setScale(scale);
+    // A plunger squats before it jumps and stretches in the air (game/enemy.ts).
+    if (enemy.type === 'plunger') {
+      const squat = plungerSquatting(enemy, this.world.dc);
+      const sx = squat ? 1.15 : enemy.airborne ? 0.9 : 1;
+      const sy = squat ? 0.78 : enemy.airborne ? 1.12 : 1;
+      image.setScale(scale * sx, scale * sy).setAlpha(1)
+        .setPosition(enemy.x - (enemy.w * (sx - 1)) / 2, enemy.y + enemy.h * (1 - sy));
+      return;
+    }
     // A living GHOST is translucent and breathes (index.html:1761): `.6 + sin(f*.08)*.2`,
     // so it runs between 0.4 and 0.8 and never reaches solid. Off the SHARED animFrame
     // with no per-ghost offset, exactly like its drift, so every ghost on screen pulses

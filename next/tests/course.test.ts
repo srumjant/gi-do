@@ -4,7 +4,7 @@ import { DIFF_KEYS, DIFFICULTY_CONFIG, type DifficultyKey } from '../src/config/
 import { courseLevel, joinSections, parseCourse } from '../src/data/course';
 import { DEMO_COURSE as COURSE_LEVEL } from './helpers/demoCourse';
 import {
-  TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_PLANK, TILE_RAINBOW, TILE_SPRING, isSolid,
+  HOME_THEME, TILE_CRACKED, TILE_EMPTY, TILE_GATE, TILE_PLANK, TILE_RAINBOW, TILE_SPRING, isSolid,
 } from '../src/data/levels';
 import {
   LIFT_FRAMES, MIN_STATION_ARROWS, PLANK_INTERVAL, SPRING_FORCE, STATION_COOLDOWN, VENT_REACH,
@@ -874,5 +874,77 @@ describe('lava and vents', () => {
     expect(world.dead).toBe(false);
     expect(world.enemyProjectiles).toHaveLength(0);
     expect(sounds).not.toContain('cannon-fire');
+  });
+});
+
+/** A 25-row section `w` wide, ground in the bottom two rows, with `rows` written in by row number. */
+function sectionOf(w: number, rows: Record<number, string>): string[] {
+  return Array.from({ length: 25 }, (_, y) => rows[y] ?? (y >= 23 ? '#'.repeat(w) : '.'.repeat(w)));
+}
+
+describe('the home world in the level format', () => {
+  it('reads a tap (w), a sock (s), a fly (y) and a hairbrush (H, only ever a zombie)', () => {
+    const parsed = parseCourse(joinSections([sectionOf(12, {
+      18: '.....w......',
+      20: '..P.........',
+      22: '...s.y.H..R.',
+    })]));
+    expect(parsed.course.taps).toEqual([{ x: 5, y: 18 }]);
+    expect(parsed.map[18][5]).toBe(TILE_EMPTY);
+    expect(parsed.enemyDefs).toEqual([
+      { type: 'sock', x: 3, floorRow: 23 },
+      { type: 'fly', x: 5, floorRow: 23 },
+      { type: 'hairbrush', x: 7, floorRow: 23, zombie: true },
+    ]);
+  });
+
+  it('reads a plunger (j), a soap dish (O) standing on the floor, and a toilet brush (X)', () => {
+    const parsed = parseCourse(joinSections([sectionOf(12, {
+      19: '.......X....',
+      20: '..P.........',
+      22: '...j.O....R.',
+    })]));
+    expect(parsed.enemyDefs).toEqual([{ type: 'plunger', x: 3, floorRow: 23 }]);
+    expect(parsed.course.soaps).toEqual([{ x: 5, y: 23 }]);
+    expect(parsed.course.brushes).toEqual([{ x: 7, y: 19 }]);
+  });
+
+  it('reads ducks (q) on the bath, each with its own stretch of it, and a shampoo bottle (m)', () => {
+    const water = '..BB________BB..';
+    const parsed = parseCourse(joinSections([sectionOf(16, {
+      19: '.....q...q......',
+      20: '..P.........m...',
+      21: water, 22: '..BB________BB.R', 23: water, 24: water,
+    })]));
+    expect(parsed.course.ducks).toEqual([
+      { x: 5, y: 21, left: 4, right: 7 },
+      { x: 9, y: 21, left: 8, right: 11 },
+    ]);
+    expect(parsed.enemyDefs.map((d) => d.type)).toEqual(['shampoo']);
+  });
+
+  it('leaves taps out of a course that has none', () => {
+    const parsed = parseCourse(joinSections([sectionOf(6, { 20: '.P....', 22: '....R.' })]));
+    expect(parsed.course.taps).toBeUndefined();
+  });
+
+  it('wants the whole look for a theme with no classic level behind it, and gives it no clouds', () => {
+    const sections = [sectionOf(6, { 20: '.P....', 22: '....R.' })];
+    expect(() => courseLevel({ name: 'Bare', theme: HOME_THEME, sections })).toThrow(/whole look/);
+    const look = { bg: '#111111', groundColor: '#222222', brickColor: '#333333', groundTop: '#444444' };
+    const level = courseLevel({ name: 'Home', theme: HOME_THEME, sections, look });
+    expect(level).toMatchObject(look);
+    expect(level.clouds).toEqual([]);
+  });
+
+  it('counts a piece of furniture\'s column from the start of its section, and draws potties for flags when asked', () => {
+    const sections = [sectionOf(10, { 20: '.P........' }), sectionOf(12, { 22: '.........R..' })];
+    const level = courseLevel({
+      name: 'Rooms', theme: 0, sections, home: true,
+      furniture: [{ kind: 'stool', section: 1, x: 2, y: 22, w: 2, h: 2 }],
+    });
+    expect(level.furniture).toEqual([{ kind: 'stool', x: 12, y: 22, w: 2, h: 2 }]);
+    expect(level.home).toBe(true);
+    expect(courseLevel({ name: 'Plain', theme: 0, sections }).home).toBeUndefined();
   });
 });

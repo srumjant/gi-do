@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { findLocks } from './helpers/reach';
 import { DIFF_KEYS } from '../src/config/difficulty';
 import { LEVELS } from '../src/data/levels';
+import { DEMOS } from '../src/data/demos';
 import { STAGES } from '../src/data/stages';
 
 /**
@@ -11,7 +12,8 @@ import { STAGES } from '../src/data/stages';
  * on the floor between a sheer wall and the shut gate, for good.
  */
 describe('no dead ends', () => {
-  for (const { level } of STAGES.filter((s) => !LEVELS.includes(s.level))) {
+  // Every hand-built level: the run's, and those on a screen of their own (data/demos.ts).
+  for (const level of new Set([...STAGES, ...Object.values(DEMOS)].map((s) => s.level).filter((l) => !LEVELS.includes(l)))) {
     it(`leaves no dead end in ${level.name}, on any difficulty`, () => {
       for (const key of DIFF_KEYS) {
         const { locks, finishable } = findLocks(level, key);

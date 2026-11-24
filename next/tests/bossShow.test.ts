@@ -31,6 +31,7 @@ function drive(kind: Villain, hints = false) {
   const wake = () => {
     const awake: Record<Villain, string> = {
       dollQueen: 'shielded', pterodactyl: 'flying', vanaToomas: 'marching', pizzaChef: 'cooking', yeti: 'windup', tRex: 'walking',
+      poo: 'hopping',
     };
     (boss as { phase: string }).phase = awake[kind];
     return step(['wake']);

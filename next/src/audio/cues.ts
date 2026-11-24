@@ -1,8 +1,13 @@
 import type { EffectCue, SoundCue, World } from '../game/types';
+import { levelMusic } from '../data/bgmThemes';
 import { startBGM, stopBGM } from './bgm';
 import {
   sfxBlock,
   sfxBoing,
+  sfxDrip,
+  sfxPlop,
+  sfxPop,
+  sfxSquirt,
   sfxBossCharge,
   sfxBossFire,
   sfxBossRoar,
@@ -38,7 +43,7 @@ import {
 export function playCue(cue: SoundCue, levelIndex: number): void {
   switch (cue) {
     // index.html:1209 — a respawn is an initLevel, and initLevel ends on startBGM(idx).
-    case 'music-level': startBGM(levelIndex); break;
+    case 'music-level': startBGM(levelMusic(levelIndex)); break;
     // index.html:1631 (rescued) and :1647 (died). Both go quiet on the spot.
     case 'music-stop': stopBGM(); break;
     default: playEffect(cue);
@@ -71,6 +76,10 @@ export function playEffect(cue: EffectCue): void {
     // index.html:2743, learn mode's wrong letter.
     case 'wrong': sfxWrong(); break;
     case 'groan': sfxGroan(); break;
+    case 'drip': sfxDrip(); break;
+    case 'plop': sfxPlop(); break;
+    case 'pop': sfxPop(); break;
+    case 'squirt': sfxSquirt(); break;
     default:
       // An effect this switch does not play fails the build here, not silently in play.
       cue satisfies never;

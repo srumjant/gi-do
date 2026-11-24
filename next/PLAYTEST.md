@@ -485,3 +485,77 @@ The fights play exactly as before; the bosses just act much more:
 - Do the hints help, or give too much away?
 - Which defeat gets the biggest laugh? That tells us what to do more of in the next batch
   (a new trick in each fight).
+
+## Härra Kaka, the poo boss (2026-11-24), on a screen of its own
+
+The kids' idea. Open the game with `?boss=poo` at the end of the address
+(`https://srumjant.github.io/gi-do/next/?boss=poo`), choose the difficulty and the hero, and you
+go straight into the bathroom. (Since the home world, below, this fight also ends the normal run.)
+
+- A big poo with a face hops about the bathroom, flies buzzing round it. Every landing sends a
+  green stink wave along the floor both ways: jump it.
+- **Don't touch the poo**: on top or at the side, it hurts.
+- **The toilet is the weapon**: jump up at the giant toilet's tank, where the red flush button
+  glows. The lid springs open and throws you back, and the view zooms out while the flush sucks
+  the poo in, over the rim and round and down the bowl: a piece goes down, and the rest flies
+  back out, smaller, landing between you and the toilet, with two little poos.
+- Three flushes and it is gone down the toilet ("NÄGEMIIIST!"), and you can free Dodo.
+
+### What to watch
+
+- Do they find the toilet button on their own, or need the hint ("ÄRA AINULT NUPPU VAJUTA!",
+  after a few seconds on Super Easy)?
+- Is being thrown across the room fun, or annoying?
+- Too easy, too hard? On the laptop a simple bot beat it in about 11 seconds on Super Easy and
+  15 on Easy, without a hit; Normal and Hard need real timing (jump it just after it lands).
+
+## The home world, KODU (2026-11-24)
+
+After the T-Rex the kids go home, and it is a normal day: World 7, KODU. The T-Rex, dazed, says
+"MA OLEN NÜÜD PISIKE...", the scene cuts home, and Härra Kaka comes up out of the toilet and
+takes the sibling. The map has a seventh stop, a little house. The run is now 21 levels, the home
+world's three a normal day: HOMMIK (the morning), PÄEV (the day) and ÕHTU (the evening), which
+ends in Härra Kaka's bathroom, the same fight as `?boss=poo`. The run ends there: "HÄRRA KAKA ON
+MINEMA LOPUTATUD! HEAD ÖÖD!"
+
+To start at HOMMIK: `?level=19` at the end of the address; PÄEV is `?level=20`, ÕHTU `?level=21`
+(`?level=18` is the T-Rex's level, to see the cutscene into home).
+
+- **The bedroom**: you start on the bed, and it is bouncy. Bounce up into the `?` block. Toy
+  blocks to climb, the rainbow block over them.
+- **The hallway**: smelly socks (stomp them), a fly, the bow, and a hairbrush: nobody stomps on a
+  hairbrush, so shoot it.
+- **The sink**: the green step stool up onto the counter, three dripping taps: a drop swells at the
+  tap, then falls. Run under between the drops. Toothpaste puddles are slippery.
+- **The checkpoints are potties**: grey until you reach one.
+- At the end, Härra Kaka by the toilet with the sibling, who hops off as you come.
+
+PÄEV, the day:
+
+- **The hall**: muddy boots to climb, and plungers that jump up and down where they stand. Run under
+  one while it is up, or stomp it while it is down; it squats just before it jumps.
+- **The laundry**: smelly socks by the basket, and a washing machine with a dryer on top, too tall
+  to jump: take the fart jump from in front of it.
+- **Washing hands**: soap bubbles float up from the soap dish. Stand on the dish, ride a bubble up,
+  and jump off onto the high shelf. From there, shoot the target: the shower curtain lifts.
+- **Toilet brushes** spinning round: wait beside one, and slip past while it is turned away.
+- Härra Kaka by the bathtub hops off with the sibling again.
+
+ÕHTU, the evening:
+
+- **The bath is filling**: the floor is wet and slippery, and shampoo bottles squirt soap blobs
+  along it. Jump the blobs, or shoot the bottles (the bow is just past the potty).
+- **The bath**: climb onto the tub's rim, then hop onto the rubber ducks drifting on the water.
+  Neighbouring ducks meet in the middle: step across then. Fall in, and it is back to the potty.
+- **The toilet**: the door shuts, and it is Härra Kaka, three flushes (as in `?boss=poo`).
+
+### What to watch
+
+- Do they bounce on the bed for ages? (A fly flew over the bed at first and hit anyone
+  bouncing; it is in the hallway now.)
+- Do they see the drop swelling at the tap and wait, or run into it?
+- Do they know the hairbrush wants an arrow, not a stomp?
+- The home world has its own tune: does it fit?
+- Do they find out on their own that a bubble carries them, or need showing?
+- Plungers and brushes: fun to time, or too fiddly?
+- The ducks: do they wait for the next duck, or jump into the water?

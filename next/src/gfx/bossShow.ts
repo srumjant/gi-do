@@ -213,7 +213,16 @@ export class BossShowView {
       if (bounds.top < top) [top, centre] = [bounds.top, bounds.centerX];
     }
     if (top === Infinity) top = boss.y;
-    if (!this.show.beaten) centre = boss.x + boss.w / 2;
+    if (!this.show.beaten) {
+      // Over the boss; but over its picture when the picture is off somewhere of its own (the poo
+      // flying out of the toilet).
+      centre = boss.x + boss.w / 2;
+      const body = anchors[0];
+      if (body?.visible) {
+        const drawnAt = body.getBounds().centerX;
+        if (Math.abs(drawnAt - centre) > 24) centre = drawnAt;
+      }
+    }
     const tip = Math.max(view.x + 10, Math.min(view.right - 10, centre));
     const x = Math.max(view.x + half, Math.min(view.right - half, tip));
     const y = Math.max(view.y + HUD_STRIP + this.bubbleH + TAIL, top - ABOVE_HEAD);

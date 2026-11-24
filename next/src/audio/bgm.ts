@@ -1,4 +1,4 @@
-import { BGM_THEMES } from '../data/bgmThemes';
+import { bgmTheme } from '../data/bgmThemes';
 import { ensureAudio } from './context';
 import { playBGMNote, playPercNote } from './synth';
 
@@ -34,7 +34,7 @@ export function stopBGM(): void {
 export function startBGM(themeIndex: number): void {
   stopBGM();
 
-  const theme = BGM_THEMES[themeIndex];
+  const theme = bgmTheme(themeIndex);
   if (!theme) return;
 
   const ctx = ensureAudio();

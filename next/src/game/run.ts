@@ -19,6 +19,8 @@ import {
   type Palette,
   type Skin,
   type SpriteData,
+  POOLET_P, POOLET_S,
+  HAIRBRUSH_P, HAIRBRUSH_S, HOUSEFLY_P, HOUSEFLY_S, PLUNGER_P, PLUNGER_S, SHAMPOO_P, SHAMPOO_S, SOCK_P, SOCK_S,
 } from '../data/sprites';
 
 /**
@@ -145,6 +147,12 @@ export function getEnemySpriteInfo(type: string): EnemySpriteInfo {
     case 'cook': return { sprite: COOK_S, palette: COOK_P };
     case 'soldier': return { sprite: SOLDIER_S, palette: SOLDIER_P };
     case 'giant': return { sprite: GIANT_S, palette: GIANT_P };
+    case 'poolet': return { sprite: POOLET_S, palette: POOLET_P };
+    case 'sock': return { sprite: SOCK_S, palette: SOCK_P };
+    case 'fly': return { sprite: HOUSEFLY_S, palette: HOUSEFLY_P };
+    case 'hairbrush': return { sprite: HAIRBRUSH_S, palette: HAIRBRUSH_P };
+    case 'plunger': return { sprite: PLUNGER_S, palette: PLUNGER_P };
+    case 'shampoo': return { sprite: SHAMPOO_S, palette: SHAMPOO_P };
     default: return { sprite: DINO_S, palette: DINO_P };
   }
 }
@@ -282,7 +290,23 @@ export function getCurrentLevel(): number {
 
 /** The stage being played, or about to be: its theme and its level (data/stages.ts). */
 export function getCurrentStage(): Stage {
-  return STAGES[currentLevel] ?? STAGES[0];
+  return demo ?? STAGES[currentLevel] ?? STAGES[0];
+}
+
+/** A level played on its own, outside the run (data/demos.ts), or null in a run. */
+let demo: Stage | null = null;
+
+/** Whether this is a demo of one level (`?boss=`), not the run. */
+export function inDemo(): boolean {
+  return demo !== null;
+}
+
+/** Play one level on its own: the run's lives and score, and then it is won. */
+export function startDemo(stage: Stage): void {
+  demo = stage;
+  currentLevel = 0;
+  lives = DC().lives;
+  score = 0;
 }
 
 /** What the next `World` starts with — see `createWorld`'s `start` argument. */
@@ -304,6 +328,7 @@ export function getRunTotals(): RunTotals {
  * setting rather than a debug state; see World.lives in game/types.ts.
  */
 export function startRun(firstStage = 0): void {
+  demo = null;
   // A playtest can start partway (scenes/startStage.ts's `?level=N`); never past the end.
   currentLevel = Math.max(0, Math.min(firstStage, STAGES.length - 1));
   lives = DC().lives;
@@ -326,6 +351,8 @@ export function startRun(firstStage = 0): void {
 export function finishLevel(totals: RunTotals): LevelOutcome {
   lives = totals.lives;
   score = totals.score;
+  // A demo is one level: finished, it is won.
+  if (demo) return 'game-won';
   currentLevel++;
   // `currentLevel` counts STAGES now, not LEVELS: the run has a second level per theme as
   // they are built (data/stages.ts).
@@ -339,6 +366,6 @@ export function finishLevel(totals: RunTotals): LevelOutcome {
  * and it is also what makes a level the boss level.
  */
 export function isLastLevel(levelIndex: number): boolean {
-  // A stage index, not a LEVELS one: see finishLevel.
-  return levelIndex === STAGES.length - 1;
+  // A stage index, not a LEVELS one: see finishLevel. A demo's one level is its last.
+  return demo !== null || levelIndex === STAGES.length - 1;
 }
